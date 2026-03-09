@@ -1,5 +1,4 @@
 node_modules
-dist
 output
 .DS_Store
 *.zip
