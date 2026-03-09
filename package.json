@@ -1,0 +1,25 @@
+{
+  "name": "threads-obsidian-extension",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Save Threads posts directly to your Obsidian vault as Markdown. Falls back to ZIP download when direct save is unavailable.",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test tests/**/*.test.ts"
+  },
+  "dependencies": {
+    "jszip": "^3.10.1"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.0.306",
+    "@types/jsdom": "^21.1.7",
+    "@types/jszip": "^3.4.1",
+    "@types/node": "^22.13.11",
+    "esbuild": "^0.25.0",
+    "jsdom": "^26.0.0",
+    "tsx": "^4.19.3",
+    "typescript": "^5.8.2"
+  }
+}

@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="ko">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Threads to Obsidian</title>
+  <link rel="stylesheet" href="./options.css" />
+</head>
+
+<body>
+  <main class="page">
+    <header class="hero">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <p class="eyebrow">Options</p>
+        <button id="lang-toggle" class="lang-button" type="button">EN</button>
+      </div>
+      <h1 id="options-title"></h1>
+      <p id="options-subtitle"></p>
+    </header>
+
+    <form id="options-form" class="panel">
+      <div class="mini-steps">
+        <span id="step1"></span>
+        <span id="step2"></span>
+        <span id="step3"></span>
+      </div>
+
+      <section class="subsection">
+        <h2 id="folder-section-title"></h2>
+        <p id="folder-status" class="section-copy"></p>
+        <div class="folder-meta">
+          <span class="meta-label" id="folder-meta-label"></span>
+          <strong id="folder-label"></strong>
+        </div>
+        <div class="action-row">
+          <button id="connect-folder" class="action-button" type="button"></button>
+          <button id="disconnect-folder" class="ghost-button hidden" type="button"></button>
+        </div>
+      </section>
+
+      <section class="subsection">
+        <h2 id="file-rules-title"></h2>
+
+        <label class="field">
+          <span id="pattern-label"></span>
+          <input id="filename-pattern" name="filenamePattern" type="text" />
+          <small id="tokens-hint"></small>
+        </label>
+
+        <label class="checkbox">
+          <input id="include-images" name="includeImages" type="checkbox" />
+          <span id="images-label"></span>
+        </label>
+      </section>
+
+      <button id="submit-btn" class="save-button" type="submit"></button>
+      <p id="save-status" class="status"></p>
+    </form>
+  </main>
+
+  <script type="module" src="./options.js"></script>
+</body>
+
+</html>

@@ -1,0 +1,137 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import JSZip from "jszip";
+import { buildZipPackage } from "../src/extension/lib/package";
+import type { ExtractedPost } from "../src/extension/lib/types";
+
+const basePost: ExtractedPost = {
+  canonicalUrl: "https://www.threads.com/@writer/post/ZIP123",
+  shortcode: "ZIP123",
+  author: "writer",
+  title: "writer on Threads",
+  text: "본문 예시",
+  publishedAt: "2026-03-08T08:00:00.000Z",
+  capturedAt: "2026-03-08T08:01:00.000Z",
+  sourceType: "image",
+  imageUrls: ["https://cdn.example.com/image-1.jpg"],
+  externalUrl: "https://example.com/article",
+  quotedPostUrl: null,
+  repliedToUrl: null,
+  thumbnailUrl: null,
+  authorReplies: [],
+  extractorVersion: "2026-03-08",
+  contentHash: "deadbeef"
+};
+
+test("zip packaging stores note and downloaded image assets", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () =>
+    new Response(new Uint8Array([1, 2, 3, 4]), {
+      headers: {
+        "content-type": "image/jpeg"
+      }
+    });
+
+  try {
+    const result = await buildZipPackage(basePost, "{date}_{author}_{shortcode}", true);
+    const zip = await JSZip.loadAsync(await result.blob.arrayBuffer());
+    const note = await zip.file("2026-03-08_writer_ZIP123/2026-03-08_writer_ZIP123.md")?.async("string");
+
+    assert.equal(result.zipFilename, "2026-03-08_writer_ZIP123.zip");
+    assert.ok(note?.includes("tags: [threads]"));
+    assert.ok(note?.includes("published_at: 2026-03-08T08:00:00.000Z"));
+    assert.ok(note?.includes("captured_at: 2026-03-08T08:01:00.000Z"));
+    assert.ok(note?.includes("Author: @writer"));
+    assert.ok(note?.includes("![Image 1](assets/post-image-01.jpg)"));
+    assert.ok(zip.file("2026-03-08_writer_ZIP123/assets/post-image-01.jpg"));
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("zip packaging falls back to remote image urls when image download is disabled", async () => {
+  const result = await buildZipPackage(basePost, "{date}_{author}_{shortcode}", false);
+  const zip = await JSZip.loadAsync(await result.blob.arrayBuffer());
+  const note = await zip.file("2026-03-08_writer_ZIP123/2026-03-08_writer_ZIP123.md")?.async("string");
+
+  assert.ok(note?.includes("https://cdn.example.com/image-1.jpg"));
+  assert.equal(Boolean(zip.file("2026-03-08_writer_ZIP123/assets/post-image-01.jpg")), false);
+});
+
+test("zip packaging includes consecutive author replies and reply assets", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () =>
+    new Response(new Uint8Array([9, 8, 7, 6]), {
+      headers: {
+        "content-type": "image/jpeg"
+      }
+    });
+
+  try {
+    const result = await buildZipPackage(
+      {
+        ...basePost,
+        imageUrls: [],
+        sourceType: "text",
+        authorReplies: [
+          {
+            author: "writer",
+            canonicalUrl: "https://www.threads.com/@writer/post/ZIP124",
+            shortcode: "ZIP124",
+            text: "작성자가 이어서 단 첫 번째 답글",
+            publishedAt: "2026-03-08T08:03:00.000Z",
+            sourceType: "image",
+            imageUrls: ["https://cdn.example.com/reply-image-1.jpg"],
+            externalUrl: "https://example.com/reply",
+            thumbnailUrl: null
+          }
+        ]
+      },
+      "{date}_{author}_{shortcode}",
+      true
+    );
+    const zip = await JSZip.loadAsync(await result.blob.arrayBuffer());
+    const note = await zip.file("2026-03-08_writer_ZIP123/2026-03-08_writer_ZIP123.md")?.async("string");
+
+    assert.ok(note?.includes("## Author Replies"));
+    assert.ok(note?.includes("Author: @writer"));
+    assert.ok(note?.includes("작성자가 이어서 단 첫 번째 답글"));
+    assert.ok(note?.includes("![Reply image 1 1](assets/reply-01-image-01.jpg)"));
+    assert.ok(zip.file("2026-03-08_writer_ZIP123/assets/reply-01-image-01.jpg"));
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("zip packaging omits the image section when only thumbnail metadata exists", async () => {
+  const result = await buildZipPackage(
+    {
+      ...basePost,
+      sourceType: "video",
+      imageUrls: [],
+      thumbnailUrl: "https://cdn.example.com/threads-logo.png"
+    },
+    "{date}_{author}_{shortcode}",
+    true
+  );
+  const zip = await JSZip.loadAsync(await result.blob.arrayBuffer());
+  const note = await zip.file("2026-03-08_writer_ZIP123/2026-03-08_writer_ZIP123.md")?.async("string");
+
+  assert.equal(note?.includes("## Image"), false);
+  assert.equal(Boolean(zip.file("2026-03-08_writer_ZIP123/assets/post-image-01.jpg")), false);
+});
+
+test("zip packaging uses author and first sentence when configured", async () => {
+  const result = await buildZipPackage(
+    {
+      ...basePost,
+      text: "나는 1979년에 태어났다.\n\n어릴 때는 공중전화 앞에 줄을 섰다."
+    },
+    "{author}_{first_sentence}",
+    false
+  );
+  const zip = await JSZip.loadAsync(await result.blob.arrayBuffer());
+
+  assert.equal(result.zipFilename, "writer_나는_1979년에_태어났다.zip");
+  assert.ok(zip.file("writer_나는_1979년에_태어났다/writer_나는_1979년에_태어났다.md"));
+});
