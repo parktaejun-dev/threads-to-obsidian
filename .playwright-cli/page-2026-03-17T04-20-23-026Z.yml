@@ -1,0 +1,116 @@
+- main [ref=e2]:
+  - generic [ref=e3]:
+    - generic [ref=e4]:
+      - paragraph [ref=e5]: Admin Portal
+      - heading "Payments, issuance, and delivery" [level=1] [ref=e6]
+      - paragraph [ref=e7]: Manage accepted payment methods, review purchase requests, issue signed Pro keys, and keep an auditable history for manual email delivery.
+    - generic [ref=e8]:
+      - generic [ref=e9]: Admin token
+      - generic [ref=e10]:
+        - textbox "Admin token" [ref=e11]:
+          - /placeholder: Bearer token
+        - button "Apply" [ref=e12] [cursor=pointer]
+      - paragraph [ref=e13]: Token required for /api/admin/*
+  - generic [ref=e14]:
+    - article [ref=e15]:
+      - paragraph [ref=e16]: Pending orders
+      - paragraph [ref=e17]: —
+    - article [ref=e18]:
+      - paragraph [ref=e19]: Paid, awaiting key
+      - paragraph [ref=e20]: —
+    - article [ref=e21]:
+      - paragraph [ref=e22]: Issued keys
+      - paragraph [ref=e23]: —
+    - article [ref=e24]:
+      - paragraph [ref=e25]: Active payment methods
+      - paragraph [ref=e26]: —
+  - generic [ref=e27]:
+    - generic [ref=e28]:
+      - generic [ref=e29]:
+        - heading "Payment methods" [level=2] [ref=e30]
+        - paragraph [ref=e31]: Public landing page reads only enabled methods from here.
+      - button "Reload dashboard" [ref=e32] [cursor=pointer]
+    - generic [ref=e33]:
+      - table [ref=e35]:
+        - rowgroup [ref=e36]:
+          - row "Name Summary Action Enabled Actions" [ref=e37]:
+            - columnheader "Name" [ref=e38]
+            - columnheader "Summary" [ref=e39]
+            - columnheader "Action" [ref=e40]
+            - columnheader "Enabled" [ref=e41]
+            - columnheader "Actions" [ref=e42]
+        - rowgroup
+      - generic [ref=e43]:
+        - generic [ref=e44]:
+          - generic [ref=e45]:
+            - text: Method name
+            - textbox "Method name" [ref=e46]:
+              - /placeholder: Bank Transfer
+          - generic [ref=e47]:
+            - text: Sort order
+            - spinbutton "Sort order" [ref=e48]: "10"
+        - generic [ref=e49]:
+          - text: Summary
+          - textbox "Summary" [ref=e50]:
+            - /placeholder: Manual confirmation, good for local sales
+        - generic [ref=e51]:
+          - text: Instructions
+          - textbox "Instructions" [ref=e52]:
+            - /placeholder: How the buyer should complete or confirm payment
+        - generic [ref=e53]:
+          - generic [ref=e54]:
+            - text: CTA label
+            - textbox "CTA label" [ref=e55]:
+              - /placeholder: Request purchase
+          - generic [ref=e56]:
+            - text: External action URL
+            - textbox "External action URL" [ref=e57]:
+              - /placeholder: https://...
+        - generic [ref=e58] [cursor=pointer]:
+          - checkbox "Enabled" [checked] [ref=e59]
+          - generic [ref=e60]: Enabled
+        - button "Add payment method" [ref=e61] [cursor=pointer]
+  - generic [ref=e62]:
+    - generic [ref=e64]:
+      - heading "Purchase requests" [level=2] [ref=e65]
+      - paragraph [ref=e66]: Mark payment, issue a key, then copy the email draft.
+    - table [ref=e68]:
+      - rowgroup [ref=e69]:
+        - row "Buyer Method Status Created Actions" [ref=e70]:
+          - columnheader "Buyer" [ref=e71]
+          - columnheader "Method" [ref=e72]
+          - columnheader "Status" [ref=e73]
+          - columnheader "Created" [ref=e74]
+          - columnheader "Actions" [ref=e75]
+      - rowgroup
+  - generic [ref=e76]:
+    - generic [ref=e77]:
+      - generic [ref=e78]:
+        - heading "Issued keys" [level=2] [ref=e79]
+        - paragraph [ref=e80]: Every generated key is stored with preview, holder, and status.
+      - table [ref=e82]:
+        - rowgroup [ref=e83]:
+          - row "Holder Issued at Preview Status" [ref=e84]:
+            - columnheader "Holder" [ref=e85]
+            - columnheader "Issued at" [ref=e86]
+            - columnheader "Preview" [ref=e87]
+            - columnheader "Status" [ref=e88]
+        - rowgroup
+    - generic [ref=e89]:
+      - heading "Email delivery draft" [level=3] [ref=e90]
+      - paragraph [ref=e91]: Email works well for this product because it is simple, auditable, and fits paste-in offline keys.
+      - generic [ref=e92]:
+        - text: Preview
+        - textbox "Preview" [ref=e93]
+      - button "Copy email draft" [ref=e94] [cursor=pointer]
+      - paragraph [ref=e95]: Select an issued order to preview delivery text.
+  - generic [ref=e96]:
+    - generic [ref=e97]:
+      - heading "History" [level=2] [ref=e98]
+      - paragraph [ref=e99]: Recent key and payment events.
+    - table [ref=e101]:
+      - rowgroup [ref=e102]:
+        - row "When Event" [ref=e103]:
+          - columnheader "When" [ref=e104]
+          - columnheader "Event" [ref=e105]
+      - rowgroup

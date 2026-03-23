@@ -1,9 +1,16 @@
-import type { ExtractedPost } from "./types";
+import type { AiOrganizationResult, ExtractedPost, FrontmatterPrimitive, FrontmatterValue } from "./types";
 import { t } from "./i18n";
 
-export interface MarkdownImageRefs {
+export interface MarkdownVideoRef {
+  thumbnail: string | null;
+  file: string | null;
+}
+
+export interface MarkdownMediaRefs {
   postImages: string[];
+  postVideo: MarkdownVideoRef | null;
   replyImages: string[][];
+  replyVideos: Array<MarkdownVideoRef | null>;
 }
 
 function formatYamlStringValue(value: string | null): string {
@@ -22,6 +29,34 @@ function formatYamlDateValue(value: string | null): string {
   return value;
 }
 
+function formatYamlString(value: string): string {
+  return JSON.stringify(value);
+}
+
+function formatFrontmatterPrimitive(value: FrontmatterPrimitive): string {
+  if (value === null) {
+    return "null";
+  }
+
+  if (typeof value === "string") {
+    return formatYamlString(value);
+  }
+
+  return String(value);
+}
+
+function renderFrontmatterField(key: string, value: FrontmatterValue): string[] {
+  if (Array.isArray(value)) {
+    if (value.length === 0) {
+      return [`${key}: []`];
+    }
+
+    return [`${key}:`, ...value.map((item) => `  - ${formatFrontmatterPrimitive(item)}`)];
+  }
+
+  return [`${key}: ${formatFrontmatterPrimitive(value)}`];
+}
+
 function renderImageBlock(refs: string[], labelPrefix: string): string[] {
   const lines: string[] = [];
   for (const [index, ref] of refs.entries()) {
@@ -30,7 +65,27 @@ function renderImageBlock(refs: string[], labelPrefix: string): string[] {
   return lines;
 }
 
-async function renderReplySection(post: ExtractedPost, imageRefs: MarkdownImageRefs): Promise<string[]> {
+function renderVideoBlock(videoRef: MarkdownVideoRef | null, canonicalUrl: string, msg: Awaited<ReturnType<typeof t>>): string[] {
+  if (!videoRef) {
+    return [];
+  }
+
+  const lines: string[] = [`## ${msg.mdVideoLabel}`, "", `${msg.mdVideoOnThreads}: ${canonicalUrl}`];
+
+  if (videoRef.file && !/^https?:\/\//i.test(videoRef.file)) {
+    lines.push(`${msg.mdSavedVideoFile}: ${videoRef.file}`);
+  }
+
+  lines.push("");
+
+  if (videoRef.thumbnail) {
+    lines.push(`![${msg.mdVideoThumbnailLabel}](${videoRef.thumbnail})`, "");
+  }
+
+  return lines;
+}
+
+async function renderReplySection(post: ExtractedPost, mediaRefs: MarkdownMediaRefs): Promise<string[]> {
   if (post.authorReplies.length === 0) {
     return [];
   }
@@ -52,31 +107,54 @@ async function renderReplySection(post: ExtractedPost, imageRefs: MarkdownImageR
 
     section.push("", reply.text.trim(), "");
 
-    section.push(...renderImageBlock(imageRefs.replyImages[index] ?? [], `${msg.mdReplyImageLabel} ${index + 1}`));
+    const replyVideoRef = mediaRefs.replyVideos[index] ?? null;
+    if (reply.sourceType === "video") {
+      section.push(`${msg.mdVideoOnThreads}: ${reply.canonicalUrl}`);
+      if (replyVideoRef?.file && !/^https?:\/\//i.test(replyVideoRef.file)) {
+        section.push(`${msg.mdSavedVideoFile}: ${replyVideoRef.file}`);
+      }
+      section.push("");
+
+      if (replyVideoRef?.thumbnail) {
+        section.push(`![${msg.mdVideoThumbnailLabel}](${replyVideoRef.thumbnail})`, "");
+      }
+    }
+
+    section.push(...renderImageBlock(mediaRefs.replyImages[index] ?? [], `${msg.mdReplyImageLabel} ${index + 1}`));
   });
 
   return section;
 }
 
-export async function renderMarkdown(post: ExtractedPost, imageRefs: MarkdownImageRefs, warning: string | null): Promise<string> {
+export async function renderMarkdown(
+  post: ExtractedPost,
+  mediaRefs: MarkdownMediaRefs,
+  warning: string | null,
+  aiResult: AiOrganizationResult | null = null
+): Promise<string> {
   const msg = await t();
   const hasImages = post.imageUrls.length > 0 || post.authorReplies.some((reply) => reply.imageUrls.length > 0);
   const hasExternalUrl = Boolean(post.externalUrl || post.authorReplies.some((reply) => reply.externalUrl));
+  const tags = Array.from(new Set(["threads", ...(aiResult?.tags ?? [])]));
   const frontmatter = [
     "---",
     `title: ${formatYamlStringValue(post.title)}`,
     `author: ${formatYamlStringValue(post.author)}`,
-    "tags: [threads]",
+    ...renderFrontmatterField("tags", tags),
+    ...(aiResult?.summary ? renderFrontmatterField("summary", aiResult.summary) : []),
     `canonical_url: ${formatYamlStringValue(post.canonicalUrl)}`,
     `shortcode: ${formatYamlStringValue(post.shortcode)}`,
     `published_at: ${formatYamlDateValue(post.publishedAt)}`,
     `captured_at: ${formatYamlDateValue(post.capturedAt)}`,
     `source_type: ${formatYamlStringValue(post.sourceType)}`,
+    ...(post.sourceType === "video" && post.thumbnailUrl ? renderFrontmatterField("thumbnail_url", post.thumbnailUrl) : []),
+    ...(post.sourceType === "video" && post.videoUrl ? renderFrontmatterField("video_url", post.videoUrl) : []),
     `has_images: ${hasImages}`,
     `has_external_url: ${hasExternalUrl}`,
     `quoted_post_url: ${formatYamlStringValue(post.quotedPostUrl)}`,
     `replied_to_url: ${formatYamlStringValue(post.repliedToUrl)}`,
     `author_reply_count: ${post.authorReplies.length}`,
+    ...Object.entries(aiResult?.frontmatter ?? {}).flatMap(([key, value]) => renderFrontmatterField(key, value)),
     "---",
     ""
   ];
@@ -95,14 +173,24 @@ export async function renderMarkdown(post: ExtractedPost, imageRefs: MarkdownIma
     body.push(`${msg.mdWarning}: ${warning}`);
   }
 
-  body.push("", post.text.trim(), "");
-
-  if (imageRefs.postImages.length > 0) {
-    body.push(`## ${msg.mdImageLabel}`, "");
-    body.push(...renderImageBlock(imageRefs.postImages, msg.mdImageLabel));
+  if (aiResult?.summary) {
+    body.push("", `## ${msg.mdSummary}`, "", aiResult.summary, "");
+  } else {
+    body.push("");
   }
 
-  body.push(...(await renderReplySection(post, imageRefs)));
+  body.push(post.text.trim(), "");
+
+  if (post.sourceType === "video") {
+    body.push(...renderVideoBlock(mediaRefs.postVideo, post.canonicalUrl, msg));
+  }
+
+  if (mediaRefs.postImages.length > 0) {
+    body.push(`## ${msg.mdImageLabel}`, "");
+    body.push(...renderImageBlock(mediaRefs.postImages, msg.mdImageLabel));
+  }
+
+  body.push(...(await renderReplySection(post, mediaRefs)));
 
   return [...frontmatter, ...body].join("\n").trimEnd() + "\n";
 }

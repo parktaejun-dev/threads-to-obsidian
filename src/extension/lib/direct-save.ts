@@ -1,6 +1,7 @@
 import { t } from "./i18n";
-import { buildArchiveBundle } from "./package";
-import type { ExtractedPost } from "./types";
+import { buildArchiveBundle, buildArchiveNoteFilename } from "./package";
+import type { AiOrganizationSettings, ExtractedPost } from "./types";
+import { buildPathPatternParts } from "./utils";
 
 export interface DirectSaveResult {
   archiveName: string;
@@ -119,12 +120,16 @@ export async function writePostToDirectory(
   post: ExtractedPost,
   filenamePattern: string,
   includeImages: boolean,
-  fallbackWarning?: string
+  fallbackWarning?: string,
+  savePathPattern = "",
+  aiOrganization?: AiOrganizationSettings
 ): Promise<DirectSaveResult> {
-  const bundle = await buildArchiveBundle(post, filenamePattern, includeImages, fallbackWarning);
-  const archiveName = await findAvailableDirectoryName(rootHandle, bundle.archiveName);
-  const archiveDirectory = await rootHandle.getDirectoryHandle(archiveName, { create: true });
-  const markdownFilename = `${archiveName}.md`;
+  const bundle = await buildArchiveBundle(post, filenamePattern, includeImages, fallbackWarning, aiOrganization);
+  const routeParts = buildPathPatternParts(savePathPattern, post);
+  const targetRoot = await ensureSubdirectory(rootHandle, routeParts);
+  const archiveName = await findAvailableDirectoryName(targetRoot, bundle.archiveName);
+  const archiveDirectory = await targetRoot.getDirectoryHandle(archiveName, { create: true });
+  const markdownFilename = buildArchiveNoteFilename(archiveName);
 
   await writeFile(archiveDirectory, markdownFilename, new Blob([bundle.markdownContent], { type: "text/markdown;charset=utf-8" }));
   for (const assetFile of bundle.assetFiles) {
@@ -133,7 +138,7 @@ export async function writePostToDirectory(
 
   return {
     archiveName,
-    savedRelativePath: `${archiveName}/${markdownFilename}`,
+    savedRelativePath: [...routeParts, archiveName, markdownFilename].join("/"),
     warning: bundle.warning
   };
 }

@@ -1,8 +1,8 @@
 import { queryDirectoryPermission, requestDirectoryPermission, supportsFileSystemAccess, writePostToDirectory } from "./lib/direct-save";
 import { getObsidianDirectoryHandle } from "./lib/fs-handle-store";
-import { type Messages, getLocale, setLocale, t } from "./lib/i18n";
+import { type Locale, type Messages, getLocale, setLocale, t } from "./lib/i18n";
 import { resolveImageDownloadPolicy } from "./lib/media-permissions";
-import { findDuplicateSave, findRecentSaveByUrl, getOptions, upsertRecentSave } from "./lib/storage";
+import { findDuplicateSave, findRecentSaveByUrl, getEffectiveOptions, upsertRecentSave } from "./lib/storage";
 import type { ExtractedPost, PopupState, RecentSave, SaveStatus } from "./lib/types";
 import { cleanTextLines, normalizeThreadsUrl } from "./lib/utils";
 
@@ -13,7 +13,8 @@ const retryButton = document.querySelector<HTMLButtonElement>("#retry-button");
 const recentList = document.querySelector<HTMLUListElement>("#recent-list");
 const openOptionsButton = document.querySelector<HTMLButtonElement>("#open-options");
 const clearRecentsButton = document.querySelector<HTMLButtonElement>("#clear-recents");
-const langToggle = document.querySelector<HTMLButtonElement>("#lang-toggle");
+const languageSwitch = document.querySelector<HTMLElement>("#language-switch");
+const languageButtons = Array.from(document.querySelectorAll<HTMLButtonElement>("[data-locale]"));
 
 let latestStatus: SaveStatus | null = null;
 let cachedDirectoryHandle: FileSystemDirectoryHandle | null = null;
@@ -55,6 +56,20 @@ function setStatus(status: SaveStatus): void {
   statusLabel.textContent = status.message;
   retryButton.classList.toggle("hidden", !status.canRetry);
   retryButton.textContent = status.kind === "error" ? msg.statusRetry : msg.statusResaveButton;
+}
+
+function applyLanguageSwitch(locale: Locale): void {
+  if (languageSwitch) {
+    languageSwitch.setAttribute("aria-label", msg.uiLanguageLabel);
+  }
+
+  for (const button of languageButtons) {
+    const buttonLocale = button.dataset.locale;
+    const isActive = buttonLocale === locale;
+    button.textContent = buttonLocale === "ko" ? msg.uiLanguageKo : msg.uiLanguageEn;
+    button.classList.toggle("language-option-active", isActive);
+    button.setAttribute("aria-pressed", String(isActive));
+  }
 }
 
 function escapeHtml(value: string): string {
@@ -384,7 +399,7 @@ async function tryDirectSaveCurrent(): Promise<{ status: SaveStatus } | { fallba
   cachedDirectReady = true;
   cachedPermissionState = "granted";
 
-  const options = await getOptions();
+  const options = await getEffectiveOptions();
   const post = await extractCurrentPost();
 
   const existingSave = await findRecentSaveByUrl(post.canonicalUrl);
@@ -406,7 +421,9 @@ async function tryDirectSaveCurrent(): Promise<{ status: SaveStatus } | { fallba
       post,
       options.filenamePattern,
       imagePolicy.allowImageDownloads,
-      imagePolicy.fallbackWarning
+      imagePolicy.fallbackWarning,
+      options.savePathPattern,
+      options.aiOrganization
     );
     const recent = await recordDirectSave(post, result.archiveName, result.savedRelativePath, result.warning);
 
@@ -429,7 +446,7 @@ async function resolveZipImageOverride(post: ExtractedPost): Promise<{
   allowImageDownloads: boolean;
   imageFallbackWarning: string;
 }> {
-  const options = await getOptions();
+  const options = await getEffectiveOptions();
   const imagePolicy = await resolveImageDownloadPolicy(post, options.includeImages, true);
 
   return {
@@ -507,14 +524,16 @@ async function resaveRecent(item: RecentSave): Promise<void> {
   cachedPermissionState = "granted";
 
   try {
-    const options = await getOptions();
+    const options = await getEffectiveOptions();
     const imagePolicy = await resolveImageDownloadPolicy(item.post, options.includeImages, true);
     const result = await writePostToDirectory(
       cachedDirectoryHandle,
       item.post,
       options.filenamePattern,
       imagePolicy.allowImageDownloads,
-      imagePolicy.fallbackWarning
+      imagePolicy.fallbackWarning,
+      options.savePathPattern,
+      options.aiOrganization
     );
     const updatedSave: RecentSave = {
       ...item,
@@ -545,6 +564,25 @@ async function resaveRecent(item: RecentSave): Promise<void> {
   }
 }
 
+async function openLocalizedOptionsPage(): Promise<void> {
+  const locale = await getLocale();
+  const baseUrl = chrome.runtime.getURL("options.html");
+  const optionsUrl = `${baseUrl}?locale=${locale}`;
+  const [existingTab] = await chrome.tabs.query({
+    url: [baseUrl, `${baseUrl}?*`, `${baseUrl}#*`]
+  });
+
+  if (existingTab?.id) {
+    await chrome.tabs.update(existingTab.id, { active: true, url: optionsUrl });
+    if (typeof existingTab.windowId === "number") {
+      await chrome.windows.update(existingTab.windowId, { focused: true });
+    }
+    return;
+  }
+
+  await chrome.tabs.create({ url: optionsUrl });
+}
+
 saveButton?.addEventListener("click", async () => {
   await saveCurrent();
 });
@@ -562,7 +600,7 @@ retryButton?.addEventListener("click", async () => {
 });
 
 openOptionsButton?.addEventListener("click", async () => {
-  await chrome.runtime.openOptionsPage();
+  await openLocalizedOptionsPage();
 });
 
 clearRecentsButton?.addEventListener("click", async () => {
@@ -585,11 +623,21 @@ chrome.runtime.onMessage.addListener((message) => {
 void (async () => {
   msg = await t();
   const locale = await getLocale();
-  if (langToggle) {
-    langToggle.textContent = locale === "ko" ? "EN" : "한";
-    langToggle.addEventListener("click", async () => {
+  document.documentElement.lang = locale;
+  applyLanguageSwitch(locale);
+
+  for (const button of languageButtons) {
+    button.addEventListener("click", async () => {
+      const next = button.dataset.locale;
+      if (next !== "ko" && next !== "en") {
+        return;
+      }
+
       const current = await getLocale();
-      const next = current === "ko" ? "en" : "ko";
+      if (current === next) {
+        return;
+      }
+
       await setLocale(next);
       location.reload();
     });
@@ -601,5 +649,9 @@ void (async () => {
   if (recentTitle) { recentTitle.textContent = msg.popupRecentSaves; }
   if (clearRecentsButton) { clearRecentsButton.textContent = msg.popupClearAll; }
   if (openOptionsButton) { openOptionsButton.textContent = msg.popupSettings; }
+  const promoTitle = document.querySelector("#promo-slot-title");
+  if (promoTitle) { promoTitle.textContent = msg.popupPromoTitle; }
+  const promoDescription = document.querySelector("#promo-slot-description");
+  if (promoDescription) { promoDescription.textContent = msg.popupPromoDescription; }
   await refreshPopupState(true);
 })();

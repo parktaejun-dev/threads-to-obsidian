@@ -6,8 +6,55 @@ export interface ExtractorConfig {
 
 export interface ExtensionOptions {
   filenamePattern: string;
+  savePathPattern: string;
   includeImages: boolean;
   obsidianFolderLabel: string | null;
+  aiOrganization: AiOrganizationSettings;
+}
+
+export const AI_PROVIDER_VALUES = ["openai", "openrouter", "deepseek", "gemini", "ollama", "custom"] as const;
+export type AiProvider = (typeof AI_PROVIDER_VALUES)[number];
+
+export type FrontmatterPrimitive = string | number | boolean | null;
+export type FrontmatterValue = FrontmatterPrimitive | FrontmatterPrimitive[];
+
+export interface AiOrganizationSettings {
+  provider: AiProvider;
+  enabled: boolean;
+  apiKey: string;
+  baseUrl: string;
+  model: string;
+  prompt: string;
+}
+
+export interface AiOrganizationResult {
+  summary: string | null;
+  tags: string[];
+  frontmatter: Record<string, FrontmatterValue>;
+}
+
+export type PlanTier = "free" | "pro";
+
+export type LicenseState = "none" | "valid" | "invalid" | "expired";
+export type LicenseActivationState = "none" | "active" | "required" | "seat_limit" | "revoked" | "offline";
+
+export interface LicensePayload {
+  plan: "pro";
+  holder: string | null;
+  issuedAt: string;
+  expiresAt: string | null;
+}
+
+export interface PlanStatus {
+  tier: PlanTier;
+  licenseState: LicenseState;
+  holder: string | null;
+  expiresAt: string | null;
+  activationState: LicenseActivationState;
+  seatLimit: number | null;
+  seatsUsed: number | null;
+  deviceLabel: string | null;
+  activatedAt: string | null;
 }
 
 export type SourceType = "text" | "image" | "video";
@@ -20,6 +67,7 @@ export interface AuthorReply {
   publishedAt: string | null;
   sourceType: SourceType;
   imageUrls: string[];
+  videoUrl: string | null;
   externalUrl: string | null;
   thumbnailUrl: string | null;
 }
@@ -34,6 +82,7 @@ export interface ExtractedPost {
   capturedAt: string;
   sourceType: SourceType;
   imageUrls: string[];
+  videoUrl: string | null;
   externalUrl: string | null;
   quotedPostUrl: string | null;
   repliedToUrl: string | null;

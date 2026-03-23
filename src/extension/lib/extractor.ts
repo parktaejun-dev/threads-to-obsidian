@@ -226,6 +226,39 @@ function getVisibleImages(root: HTMLElement | null, author: string): string[] {
   return [];
 }
 
+function getVideoUrl(root: ParentNode | null): string | null {
+  if (!root) {
+    return null;
+  }
+
+  const videos = Array.from(root.querySelectorAll<HTMLVideoElement>("video"));
+  for (const video of videos) {
+    const candidates = [
+      video.currentSrc,
+      video.src,
+      ...Array.from(video.querySelectorAll<HTMLSourceElement>("source")).map((source) => source.src)
+    ];
+
+    for (const candidate of candidates) {
+      const value = candidate?.trim();
+      if (value && /^https?:\/\//i.test(value)) {
+        return value;
+      }
+    }
+  }
+
+  return null;
+}
+
+function getVideoPosterUrl(root: ParentNode | null): string | null {
+  if (!root) {
+    return null;
+  }
+
+  const poster = root.querySelector<HTMLVideoElement>("video")?.getAttribute("poster")?.trim();
+  return poster && /^https?:\/\//i.test(poster) ? poster : null;
+}
+
 function getExternalUrl(root: HTMLElement | null): string | null {
   if (!root) {
     return null;
@@ -279,8 +312,8 @@ function getPublishedAt(root: HTMLElement | null, document: Document, shortcode:
   return permalinkTime?.getAttribute("datetime") ?? null;
 }
 
-function detectSourceType(imageUrls: string[], scope: ParentNode | null): SourceType {
-  if (scope?.querySelector("video")) {
+function detectSourceType(imageUrls: string[], scope: ParentNode | null, videoUrl: string | null, videoPosterUrl: string | null): SourceType {
+  if (scope?.querySelector("video") && (videoUrl || videoPosterUrl)) {
     return "video";
   }
 
@@ -447,16 +480,20 @@ function extractAuthorReplies(document: Document, root: HTMLElement | null, auth
     }
 
     const imageUrls = getVisibleImages(candidate.block, author);
+    const videoUrl = getVideoUrl(candidate.block);
+    const videoPosterUrl = getVideoPosterUrl(candidate.block);
+    const sourceType = detectSourceType(imageUrls, candidate.block, videoUrl, videoPosterUrl);
     replies.push({
       author: candidate.blockAuthor,
       canonicalUrl: candidate.url,
       shortcode: extractShortcode(candidate.url),
       text,
       publishedAt: getPublishedAt(candidate.block, document, extractShortcode(candidate.url)),
-      sourceType: detectSourceType(imageUrls, candidate.block),
+      sourceType,
       imageUrls,
+      videoUrl,
       externalUrl: getExternalUrl(candidate.block),
-      thumbnailUrl: imageUrls[0] ?? null
+      thumbnailUrl: sourceType === "video" ? videoPosterUrl ?? imageUrls[0] ?? null : imageUrls[0] ?? null
     });
   }
 
@@ -475,15 +512,20 @@ export async function extractPostFromDocument(document: Document, pageUrl: strin
   const structuredText = getStructuredText(document, shortcode);
   const ogDescription = getMeta(document, 'meta[property="og:description"]');
   const domText = extractDomText(root, author, config);
-  const rawText = domText ?? structuredText ?? ogDescription ?? "";
-  const text = cleanTextLines(rawText, author, config) || ogDescription || document.title;
-  const thumbnailUrl = getMeta(document, 'meta[property="og:image"]');
+  const rawText = domText || structuredText || ogDescription || "";
+  const text = cleanTextLines(rawText, author, config) || ogDescription || "";
+  if (!text) {
+    throw new Error((await t()).errPostContentNotFound);
+  }
+  const ogThumbnailUrl = getMeta(document, 'meta[property="og:image"]');
   const imageUrls = getVisibleImages(root, author);
+  const videoUrl = getVideoUrl(root);
+  const videoPosterUrl = getVideoPosterUrl(root);
   const externalUrl = getExternalUrl(root);
   const related = getRelatedPostUrls(root, canonicalUrl);
   const title = getPostTitle(document, author, text, externalUrl);
   const capturedAt = new Date().toISOString();
-  const sourceType = detectSourceType(imageUrls, root);
+  const sourceType = detectSourceType(imageUrls, root, videoUrl, videoPosterUrl);
   const authorReplies = extractAuthorReplies(document, root, author, canonicalUrl, config);
   const partial: Omit<ExtractedPost, "contentHash"> = {
     canonicalUrl,
@@ -495,10 +537,11 @@ export async function extractPostFromDocument(document: Document, pageUrl: strin
     capturedAt,
     sourceType,
     imageUrls,
+    videoUrl,
     externalUrl,
     quotedPostUrl: related.quotedPostUrl,
     repliedToUrl: related.repliedToUrl,
-    thumbnailUrl,
+    thumbnailUrl: sourceType === "video" ? videoPosterUrl ?? ogThumbnailUrl ?? imageUrls[0] ?? null : ogThumbnailUrl,
     authorReplies,
     extractorVersion: config.version
   };

@@ -1,20 +1,34 @@
 import type { ExtractedPost } from "./types";
 
 export const OPTIONAL_MEDIA_ORIGINS = ["https://*.cdninstagram.com/*", "https://*.fbcdn.net/*"];
-export const IMAGES_DISABLED_WARNING = "이미지 다운로드가 꺼져 있어 원격 URL을 사용했습니다.";
-export const IMAGE_PERMISSION_WARNING = "추가 이미지 권한이 없어 원격 URL을 사용했습니다.";
+export const MEDIA_DISABLED_WARNING = "이미지/동영상 저장이 꺼져 있어 원격 URL을 사용했습니다.";
+export const MEDIA_PERMISSION_WARNING = "추가 미디어 권한이 없어 원격 URL을 사용했습니다.";
 
 export interface ImageDownloadPolicy {
   allowImageDownloads: boolean;
   fallbackWarning: string;
 }
 
-function hasAnyImages(post: ExtractedPost): boolean {
-  return post.imageUrls.length > 0 || post.authorReplies.some((reply) => reply.imageUrls.length > 0);
+function hasAnyMedia(post: ExtractedPost): boolean {
+  return (
+    post.imageUrls.length > 0 ||
+    Boolean(post.videoUrl) ||
+    (post.sourceType === "video" && Boolean(post.thumbnailUrl)) ||
+    post.authorReplies.some((reply) => reply.imageUrls.length > 0 || Boolean(reply.videoUrl) || (reply.sourceType === "video" && Boolean(reply.thumbnailUrl)))
+  );
 }
 
 function requiresOptionalMediaPermission(post: ExtractedPost): boolean {
-  const urls = [...post.imageUrls, ...post.authorReplies.flatMap((reply) => reply.imageUrls)];
+  const urls = [
+    ...post.imageUrls,
+    ...(post.sourceType === "video" ? [post.thumbnailUrl] : []),
+    post.videoUrl,
+    ...post.authorReplies.flatMap((reply) => [
+      ...reply.imageUrls,
+      ...(reply.sourceType === "video" ? [reply.thumbnailUrl] : []),
+      reply.videoUrl
+    ])
+  ].filter(Boolean) as string[];
 
   return urls.some((url) => {
     try {
@@ -55,37 +69,37 @@ export async function resolveImageDownloadPolicy(
   includeImages: boolean,
   requestPermission: boolean
 ): Promise<ImageDownloadPolicy> {
-  if (!includeImages || !hasAnyImages(post)) {
+  if (!includeImages || !hasAnyMedia(post)) {
     return {
       allowImageDownloads: false,
-      fallbackWarning: IMAGES_DISABLED_WARNING
+      fallbackWarning: MEDIA_DISABLED_WARNING
     };
   }
 
   if (!requiresOptionalMediaPermission(post)) {
     return {
       allowImageDownloads: true,
-      fallbackWarning: IMAGES_DISABLED_WARNING
+      fallbackWarning: MEDIA_DISABLED_WARNING
     };
   }
 
   if (await hasOptionalMediaPermission()) {
     return {
       allowImageDownloads: true,
-      fallbackWarning: IMAGES_DISABLED_WARNING
+      fallbackWarning: MEDIA_DISABLED_WARNING
     };
   }
 
   if (!requestPermission) {
     return {
       allowImageDownloads: false,
-      fallbackWarning: IMAGE_PERMISSION_WARNING
+      fallbackWarning: MEDIA_PERMISSION_WARNING
     };
   }
 
   const granted = await requestOptionalMediaPermission();
   return {
     allowImageDownloads: granted,
-    fallbackWarning: granted ? IMAGES_DISABLED_WARNING : IMAGE_PERMISSION_WARNING
+    fallbackWarning: granted ? MEDIA_DISABLED_WARNING : MEDIA_PERMISSION_WARNING
   };
 }

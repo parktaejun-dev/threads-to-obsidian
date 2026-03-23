@@ -67,7 +67,7 @@ const videoFixture = `
         <a href="https://www.threads.com/@filmer/post/VID777"><time datetime="2026-03-08T08:00:00.000Z">3시간</time></a>
         <div>filmer</div>
         <div>영상 설명</div>
-        <video controls></video>
+        <video controls src="https://cdn.example.com/video.mp4" poster="https://cdn.example.com/thumb.jpg"></video>
         <button>댓글 1</button>
       </article>
     </main>
@@ -332,6 +332,7 @@ test("video permalink falls back to thumbnail metadata", async () => {
   const post = await extractPostFromDocument(dom.window.document, dom.window.location.href);
 
   assert.equal(post.sourceType, "video");
+  assert.equal(post.videoUrl, "https://cdn.example.com/video.mp4");
   assert.equal(post.thumbnailUrl, "https://cdn.example.com/thumb.jpg");
 });
 

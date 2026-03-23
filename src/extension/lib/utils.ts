@@ -56,6 +56,10 @@ export function sanitizeFilenamePart(value: string): string {
     .slice(0, 60);
 }
 
+function truncateFilenamePart(value: string, maxLength: number): string {
+  return value.slice(0, maxLength).replace(/_+$/g, "");
+}
+
 export function extractFirstSentence(text: string): string {
   const normalized = decodeEscapedJsonString(text).trim();
   if (!normalized) {
@@ -75,16 +79,35 @@ export function extractFirstSentence(text: string): string {
   return (sentenceMatch?.[1] ?? firstBlock).trim();
 }
 
-export function buildArchiveBaseName(pattern: string, post: ExtractedPost): string {
+function resolvePatternTokens(pattern: string, post: ExtractedPost): string {
   const date = (post.publishedAt ?? post.capturedAt).slice(0, 10);
   const firstSentence = extractFirstSentence(post.text) || post.title || post.shortcode;
-  const resolved = pattern
+  const sanitizedFirstSentence = sanitizeFilenamePart(firstSentence);
+  return pattern
     .replaceAll("{date}", sanitizeFilenamePart(date))
     .replaceAll("{author}", sanitizeFilenamePart(post.author))
-    .replaceAll("{first_sentence}", sanitizeFilenamePart(firstSentence))
+    .replaceAll("{first_sentence_20}", truncateFilenamePart(sanitizedFirstSentence, 20))
+    .replaceAll("{first_sentence}", sanitizedFirstSentence)
     .replaceAll("{shortcode}", sanitizeFilenamePart(post.shortcode));
+}
+
+export function buildArchiveBaseName(pattern: string, post: ExtractedPost): string {
+  const resolved = resolvePatternTokens(pattern, post);
+  const firstSentence = extractFirstSentence(post.text) || post.title || post.shortcode;
 
   return resolved || `${sanitizeFilenamePart(post.author)}_${sanitizeFilenamePart(firstSentence)}`;
+}
+
+export function buildPathPatternParts(pattern: string, post: ExtractedPost): string[] {
+  if (!pattern.trim()) {
+    return [];
+  }
+
+  return resolvePatternTokens(pattern, post)
+    .replace(/\\/g, "/")
+    .split("/")
+    .map((part) => sanitizeFilenamePart(part.trim()))
+    .filter(Boolean);
 }
 
 export function buildZipFilename(pattern: string, post: ExtractedPost): string {

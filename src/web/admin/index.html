@@ -1,0 +1,339 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Threads to Obsidian Pro Admin</title>
+    <link rel="stylesheet" href="/admin/styles.css" />
+  </head>
+  <body>
+    <main class="admin-shell">
+      <header class="admin-hero">
+        <div>
+          <p class="eyebrow">Admin Portal</p>
+          <h1 data-i18n="adminH1">Payments, issuance, and delivery</h1>
+          <p class="lead" data-i18n="adminLead">
+            Manage accepted payment methods, review purchase requests, issue signed Pro keys, and
+            keep an auditable history for manual email delivery.
+          </p>
+        </div>
+        <div class="token-widget">
+          <label for="admin-token" data-i18n="tokenLabel">Admin token</label>
+          <div class="token-input">
+            <input id="admin-token" type="password" autocomplete="off" placeholder="Bearer token" />
+            <button id="token-apply" type="button" data-i18n="tokenApply">Apply</button>
+          </div>
+          <p id="token-status" class="token-status" data-i18n="tokenStatusDefault">Token required for /api/admin/*</p>
+          <div class="web-lang-switch">
+            <button class="web-lang-btn" data-web-locale="ko" type="button">한국어</button>
+            <button class="web-lang-btn" data-web-locale="en" type="button">English</button>
+          </div>
+        </div>
+      </header>
+
+      <section class="dashboard-grid">
+        <article class="stat-card">
+          <p class="stat-label" data-i18n="statPending">Pending orders</p>
+          <p id="stat-pending" class="stat-value">—</p>
+        </article>
+        <article class="stat-card">
+          <p class="stat-label" data-i18n="statPaid">Paid, awaiting key</p>
+          <p id="stat-paid" class="stat-value">—</p>
+        </article>
+        <article class="stat-card">
+          <p class="stat-label" data-i18n="statIssued">Issued keys</p>
+          <p id="stat-issued" class="stat-value">—</p>
+        </article>
+        <article class="stat-card">
+          <p class="stat-label" data-i18n="statMethods">Active payment methods</p>
+          <p id="stat-methods" class="stat-value">—</p>
+        </article>
+        <article class="stat-card">
+          <p class="stat-label" data-i18n="statWebhookProcessed">Webhook processed</p>
+          <p id="stat-webhook-processed" class="stat-value">—</p>
+        </article>
+        <article class="stat-card">
+          <p class="stat-label" data-i18n="statWebhookIgnored">Webhook ignored</p>
+          <p id="stat-webhook-ignored" class="stat-value">—</p>
+        </article>
+        <article class="stat-card">
+          <p class="stat-label" data-i18n="statWebhookRejected">Webhook rejected</p>
+          <p id="stat-webhook-rejected" class="stat-value">—</p>
+        </article>
+        <article class="stat-card">
+          <p class="stat-label" data-i18n="statWebhookDuplicates">Webhook retries detected</p>
+          <p id="stat-webhook-duplicates" class="stat-value">—</p>
+        </article>
+        <article class="stat-card">
+          <p class="stat-label" data-i18n="statDeliveryReady">Awaiting delivery</p>
+          <p id="stat-delivery-ready" class="stat-value">—</p>
+        </article>
+        <article class="stat-card">
+          <p class="stat-label" data-i18n="statDeliverySent">Delivered</p>
+          <p id="stat-delivery-sent" class="stat-value">—</p>
+        </article>
+      </section>
+
+      <section class="panel" id="revenue-panel">
+        <header>
+          <div>
+            <h2 data-i18n="revenueTitle">Revenue</h2>
+            <p class="section-copy" data-i18n="revenueCopy">Estimated from completed payments. May differ from actual amounts received.</p>
+          </div>
+          <p id="mailer-status" class="token-status"></p>
+        </header>
+        <div class="revenue-grid">
+          <div class="revenue-stat">
+            <p class="stat-label" data-i18n="revenueEstimate">Estimated revenue</p>
+            <p id="rev-estimate" class="stat-value">—</p>
+          </div>
+          <div class="revenue-stat">
+            <p class="stat-label" data-i18n="revenueTotalOrders">Total orders</p>
+            <p id="rev-total-orders" class="stat-value">—</p>
+          </div>
+          <div class="revenue-stat">
+            <p class="stat-label" data-i18n="revenuePaid">Paid</p>
+            <p id="rev-paid" class="stat-value">—</p>
+          </div>
+          <div class="revenue-stat">
+            <p class="stat-label" data-i18n="revenueIssued">Keys issued</p>
+            <p id="rev-issued" class="stat-value">—</p>
+          </div>
+          <div class="revenue-stat">
+            <p class="stat-label" data-i18n="revenueRevoked">Revoked keys</p>
+            <p id="rev-revoked" class="stat-value">—</p>
+          </div>
+          <div class="revenue-stat">
+            <p class="stat-label" data-i18n="revenueReadyToSend">Awaiting delivery</p>
+            <p id="rev-ready-to-send" class="stat-value">—</p>
+          </div>
+          <div class="revenue-stat">
+            <p class="stat-label" data-i18n="revenueSent">Delivered</p>
+            <p id="rev-sent" class="stat-value">—</p>
+          </div>
+        </div>
+        <div class="revenue-tables">
+          <div>
+            <h3 class="revenue-table-title" data-i18n="revenueByMethod">By payment method</h3>
+            <div class="table-wrapper">
+              <table>
+                <thead>
+                  <tr>
+                    <th data-i18n="colName">Name</th>
+                    <th data-i18n="colOrders">Orders</th>
+                    <th data-i18n="colPaid">Paid</th>
+                  </tr>
+                </thead>
+                <tbody id="rev-by-method"></tbody>
+              </table>
+            </div>
+          </div>
+          <div>
+            <h3 class="revenue-table-title" data-i18n="revenueByMonth">Monthly orders</h3>
+            <div class="table-wrapper">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Month</th>
+                    <th data-i18n="colOrders">Orders</th>
+                    <th data-i18n="colIssued">Issued</th>
+                  </tr>
+                </thead>
+                <tbody id="rev-by-month"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <header>
+          <div>
+            <h2 data-i18n="paymentMethodsTitle">Payment methods</h2>
+            <p class="section-copy" data-i18n="paymentMethodsCopy">Public landing page reads only enabled methods from here.</p>
+          </div>
+          <button id="reload-all" class="ghost" type="button" data-i18n="reloadBtn">Reload dashboard</button>
+        </header>
+        <div class="panel-content">
+          <div class="table-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th data-i18n="colName">Name</th>
+                  <th data-i18n="colSummary">Summary</th>
+                  <th data-i18n="colAction">Action</th>
+                  <th data-i18n="colEnabled">Enabled</th>
+                  <th data-i18n="colActions">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="method-list"></tbody>
+            </table>
+          </div>
+
+          <form id="method-form" class="stack-form">
+            <div class="grid-two">
+              <label>
+                <span data-i18n="methodNameLabel">Method name</span>
+                <input name="name" required placeholder="Bank Transfer" />
+              </label>
+              <label>
+                <span data-i18n="methodSortLabel">Sort order</span>
+                <input name="sortOrder" type="number" value="10" />
+              </label>
+            </div>
+            <label>
+              <span data-i18n="methodSummaryLabel">Summary</span>
+              <input name="summary" required placeholder="Manual confirmation, good for local sales" />
+            </label>
+            <label>
+              <span data-i18n="methodInstructionsLabel">Instructions</span>
+              <textarea
+                name="instructions"
+                rows="3"
+                placeholder="How the buyer should complete or confirm payment"
+              ></textarea>
+            </label>
+            <div class="grid-two">
+              <label>
+                <span data-i18n="methodCtaLabel">CTA label</span>
+                <input name="actionLabel" placeholder="Request purchase" />
+              </label>
+              <label>
+                <span data-i18n="methodActionUrlLabel">External action URL</span>
+                <input name="actionUrl" placeholder="https://..." />
+              </label>
+            </div>
+            <label class="switcher">
+              <input type="checkbox" name="enabled" checked />
+              <span data-i18n="methodEnabledLabel">Enabled</span>
+            </label>
+            <button type="submit" data-i18n="addMethodBtn">Add payment method</button>
+          </form>
+        </div>
+      </section>
+
+      <section class="panel">
+        <header>
+          <div>
+            <h2 data-i18n="ordersTitle">Purchase requests</h2>
+            <p class="section-copy" data-i18n="ordersCopy">Mark payment, issue a key, then copy the email draft.</p>
+          </div>
+        </header>
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th data-i18n="colBuyer">Buyer</th>
+                <th data-i18n="colMethod">Method</th>
+                <th data-i18n="colStatus">Status</th>
+                <th data-i18n="colCreated">Created</th>
+                <th data-i18n="colActions">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="orders-list"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel split">
+        <div>
+          <header>
+            <h2 data-i18n="licensesTitle">Issued keys</h2>
+            <p class="section-copy" data-i18n="licensesCopy">Every generated key is stored with preview, holder, and status.</p>
+          </header>
+          <div class="table-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th data-i18n="colHolder">Holder</th>
+                  <th data-i18n="colIssuedAt">Issued at</th>
+                  <th data-i18n="colPreview">Preview</th>
+                  <th data-i18n="colStatus">Status</th>
+                  <th data-i18n="colActions">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="license-history"></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="key-panel">
+          <h3 data-i18n="emailDraftTitle">Email delivery draft</h3>
+          <p class="section-copy" data-i18n="emailDraftCopy">
+            Email works well for this product because it is simple, auditable, and fits paste-in
+            offline keys.
+          </p>
+          <label>
+            <span data-i18n="emailPreviewLabel">Preview</span>
+            <textarea id="email-preview" rows="12" readonly></textarea>
+          </label>
+          <button id="copy-email" type="button" data-i18n="copyEmailBtn">Copy email draft</button>
+          <p id="email-status" class="token-status" data-i18n="emailStatusDefault">Select an issued order to preview delivery text.</p>
+        </div>
+      </section>
+
+      <section class="panel">
+        <header>
+          <div>
+            <h2 data-i18n="historyTitle">History</h2>
+            <p class="section-copy" data-i18n="historyCopy">Recent key, payment, and webhook events (including rejected/duplicate/ignored cases).</p>
+          </div>
+        </header>
+        <div class="history-controls">
+          <label>
+            <span data-i18n="filterKindLabel">Kind</span>
+            <select id="history-filter-kind">
+              <option value="" data-i18n="allOption">All</option>
+              <option value="webhook_processed">webhook_processed</option>
+              <option value="webhook_ignored">webhook_ignored</option>
+              <option value="webhook_rejected">webhook_rejected</option>
+              <option value="order_created">order_created</option>
+              <option value="order_paid">order_paid</option>
+              <option value="license_issued">license_issued</option>
+              <option value="license_revoked">license_revoked</option>
+              <option value="payment_method_created">payment_method_created</option>
+              <option value="payment_method_updated">payment_method_updated</option>
+            </select>
+          </label>
+          <label>
+            <span data-i18n="filterProviderLabel">Provider</span>
+            <select id="history-filter-provider">
+              <option value="" data-i18n="allOption">All</option>
+              <option value="stableorder">stableorder</option>
+              <option value="stripe">stripe</option>
+              <option value="paypal">paypal</option>
+            </select>
+          </label>
+          <label>
+            <span data-i18n="filterReasonLabel">Reason</span>
+            <select id="history-filter-reason">
+              <option value="" data-i18n="allOption">All</option>
+              <option value="signature_rejected">signature_rejected</option>
+              <option value="order_not_found">order_not_found</option>
+              <option value="payment_not_completed">payment_not_completed</option>
+              <option value="already_processed">already_processed</option>
+              <option value="issued">issued</option>
+              <option value="no_change">no_change</option>
+              <option value="payment_marked">payment_marked</option>
+            </select>
+          </label>
+        </div>
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th data-i18n="colWhen">When</th>
+                <th data-i18n="colEventKind">Event kind</th>
+                <th data-i18n="colProvider">Provider</th>
+                <th data-i18n="colEventId">Event ID</th>
+                <th data-i18n="colReason">Reason</th>
+                <th data-i18n="colMessage">Message</th>
+              </tr>
+            </thead>
+            <tbody id="history-list"></tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+    <script type="module" src="/assets/admin.js"></script>
+  </body>
+</html>

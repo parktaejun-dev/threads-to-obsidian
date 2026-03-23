@@ -1,0 +1,27 @@
+- article [ref=e2]:
+  - generic [ref=e3]:
+    - generic [ref=e4]:
+      - paragraph [ref=e5]: Options
+      - heading "Free is already enough. Pro adds organization automation." [level=1] [ref=e6]
+    - generic [ref=e8]:
+      - generic [ref=e9]: English
+      - generic [ref=e10]: 한국어
+  - generic [ref=e11]:
+    - paragraph [ref=e12]: Use a Pro key to unlock advanced save rules on this browser only. No sign-in required.
+    - generic [ref=e13]:
+      - generic [ref=e14]:
+        - generic [ref=e15]: "Free: save + images + replies + duplicates"
+        - generic [ref=e16]: "Pro: filename rules + folder routing"
+      - generic [ref=e17]: "Pro active: saved posts now follow your vault organization rules."
+    - generic [ref=e18]:
+      - generic [ref=e19]:
+        - generic [ref=e20]:
+          - strong [ref=e21]: Filename Pattern
+          - generic [ref=e22]: Pro
+        - generic [ref=e23]: "{date}-{author}-{first_sentence}"
+      - generic [ref=e24]:
+        - generic [ref=e25]:
+          - strong [ref=e26]: Save Subfolder Pattern
+          - generic [ref=e27]: Pro
+        - generic [ref=e28]: "Inbox/{date}"
+      - generic [ref=e29]: Unlock organization rules

@@ -37,8 +37,57 @@ body {
 .header-top {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
   gap: 12px;
+}
+
+.header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 6px;
+}
+
+.language-switch {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: #fafafa;
+  min-width: 152px;
+}
+
+.language-option {
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  min-height: 30px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  text-align: center;
+  transition: background-color 0.15s, color 0.15s;
+}
+
+.language-option:hover {
+  color: var(--text);
+}
+
+.language-option-active {
+  background: var(--text);
+  color: #ffffff;
 }
 
 .eyebrow {
@@ -97,12 +146,14 @@ body {
 
 .primary-button:hover,
 .secondary-button:hover,
-.header-button:hover {
+.header-button:hover,
+.language-option:hover {
   opacity: 0.8;
 }
 
 .header-button {
   width: auto;
+  min-height: 34px;
   border: 1px solid var(--border);
   background: var(--bg);
   color: var(--text);
@@ -130,6 +181,40 @@ body {
 
 .recent-card {
   padding: 0;
+}
+
+.promo-slot {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.promo-slot-card {
+  min-height: 76px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: linear-gradient(180deg, #fcfcfc 0%, #f7f7f7 100%);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+}
+
+.promo-slot-title {
+  margin: 0;
+  color: var(--text);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.promo-slot-description {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
 }
 
 .card-head {

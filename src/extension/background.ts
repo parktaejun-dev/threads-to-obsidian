@@ -2,7 +2,7 @@ import { BUNDLED_EXTRACTOR_CONFIG, DEFAULT_OPTIONS } from "./lib/config";
 import { t } from "./lib/i18n";
 import { resolveImageDownloadPolicy } from "./lib/media-permissions";
 import { buildZipPackage } from "./lib/package";
-import { clearRecentSaves, findDuplicateSave, findRecentSaveById, getOptions, getRecentSaves, removeRecentSaveById, setOptions, upsertRecentSave } from "./lib/storage";
+import { clearRecentSaves, findDuplicateSave, findRecentSaveById, getEffectiveOptions, getOptions, getRecentSaves, removeRecentSaveById, setOptions, upsertRecentSave } from "./lib/storage";
 import type { ExtractPostRequest, PopupRequest, PopupState, RecentSave, SaveStatus } from "./lib/types";
 import { isSupportedPermalink } from "./lib/utils";
 
@@ -139,7 +139,7 @@ async function saveCurrentPost(
   try {
     const post = await extractPostFromTab(tab);
     const duplicate = await findDuplicateSave(post.canonicalUrl, post.contentHash);
-    const options = await getOptions();
+    const options = await getEffectiveOptions();
     const imagePolicy =
       imageOverride && typeof imageOverride.allowImageDownloads === "boolean" && imageOverride.imageFallbackWarning
         ? {
@@ -151,7 +151,9 @@ async function saveCurrentPost(
       post,
       options.filenamePattern,
       imagePolicy.allowImageDownloads,
-      imagePolicy.fallbackWarning
+      imagePolicy.fallbackWarning,
+      options.savePathPattern,
+      options.aiOrganization
     );
     await downloadBlob(packaged.blob, packaged.zipFilename);
     const recent =
@@ -213,7 +215,7 @@ async function redownloadSave(
 
   broadcastStatus({ kind: "saving", message: msg.statusResaving });
   try {
-    const options = await getOptions();
+    const options = await getEffectiveOptions();
     const imagePolicy =
       imageOverride && typeof imageOverride.allowImageDownloads === "boolean" && imageOverride.imageFallbackWarning
         ? {
@@ -225,7 +227,9 @@ async function redownloadSave(
       recentSave.post,
       options.filenamePattern,
       imagePolicy.allowImageDownloads,
-      imagePolicy.fallbackWarning
+      imagePolicy.fallbackWarning,
+      options.savePathPattern,
+      options.aiOrganization
     );
     await downloadBlob(packaged.blob, packaged.zipFilename);
 

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { IMAGE_PERMISSION_WARNING, resolveImageDownloadPolicy } from "../src/extension/lib/media-permissions";
+import { MEDIA_PERMISSION_WARNING, resolveImageDownloadPolicy } from "../src/extension/lib/media-permissions";
 import type { ExtractedPost } from "../src/extension/lib/types";
 
 const basePost: ExtractedPost = {
@@ -13,6 +13,7 @@ const basePost: ExtractedPost = {
   capturedAt: "2026-03-08T08:01:00.000Z",
   sourceType: "image",
   imageUrls: ["https://scontent-icn2-1.cdninstagram.com/v/test.jpg"],
+  videoUrl: null,
   externalUrl: null,
   quotedPostUrl: null,
   repliedToUrl: null,
@@ -66,7 +67,7 @@ test("image download policy falls back to remote urls when optional media permis
     const policy = await resolveImageDownloadPolicy(basePost, true, true);
 
     assert.equal(policy.allowImageDownloads, false);
-    assert.equal(policy.fallbackWarning, IMAGE_PERMISSION_WARNING);
+    assert.equal(policy.fallbackWarning, MEDIA_PERMISSION_WARNING);
   } finally {
     globalThis.chrome = originalChrome;
   }

@@ -271,7 +271,7 @@ export interface RecentSave {
 - `savedVia`
   - 최근 저장의 재시도 동작 기준
 - `savedRelativePath`
-  - 예: `Sources/Threads/2026-03-08_writer_ABC123/2026-03-08_writer_ABC123.md`
+  - 예: `Sources/Threads/writer_첫문장예시/01. writer_첫문장예시.md`
   - 향후 `vault에서 열기` 또는 경로 노출 UI의 기반
 - `warning`
   - 일부 이미지 원격 URL fallback 등 상태 기록
@@ -284,11 +284,10 @@ export interface RecentSave {
 
 ```text
 Sources/Threads/
-  2026-03-08_writer_ABC123/
-    2026-03-08_writer_ABC123.md
-    assets/
-      post-image-01.jpg
-      reply-01-image-01.jpg
+  writer_첫문장예시/
+    01. writer_첫문장예시.md
+    02. image-01.jpg
+    03. reply-01-image-01.jpg
 ```
 
 이 구조를 유지해야 하는 이유:
@@ -301,11 +300,10 @@ Sources/Threads/
 
 1. `archiveBaseName = buildArchiveBaseName(filenamePattern, post)`
 2. 루트 디렉터리 아래 `archiveBaseName` 하위 폴더 확보
-3. `assets` 하위 폴더 확보
-4. 이미지 fetch 및 바이너리 준비
+3. 이미지/영상 fetch 및 바이너리 준비
 5. Markdown 생성
-6. `${archiveBaseName}.md` 쓰기
-7. 이미지 파일 쓰기
+6. `01. <archiveName>.md` 쓰기
+7. 첨부 파일 쓰기
 
 ### 8.3 충돌 정책
 

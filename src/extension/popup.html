@@ -14,8 +14,11 @@
             <p class="eyebrow">Threads to Obsidian</p>
             <h1 id="header-title">현재 글 저장</h1>
           </div>
-          <div style="display:flex;gap:6px;align-items:center">
-            <button id="lang-toggle" class="header-button" type="button">EN</button>
+          <div class="header-actions">
+            <div id="language-switch" class="language-switch" role="group">
+              <button class="language-option" data-locale="ko" type="button">한국어</button>
+              <button class="language-option" data-locale="en" type="button">English</button>
+            </div>
             <button id="open-options" class="header-button" type="button">설정</button>
           </div>
         </div>
@@ -36,6 +39,13 @@
         <ul id="recent-list" class="recent-list">
           <li class="empty"></li>
         </ul>
+      </section>
+
+      <section class="promo-slot">
+        <div class="promo-slot-card">
+          <p id="promo-slot-title" class="promo-slot-title">향후 확장 영역</p>
+          <p id="promo-slot-description" class="promo-slot-description">추후 안내와 추천이 들어갈 자리를 미리 확보해 두었습니다.</p>
+        </div>
       </section>
     </main>
 

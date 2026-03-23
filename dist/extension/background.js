@@ -2397,10 +2397,62 @@ var require_jszip_min = __commonJS({
 });
 
 // src/extension/lib/config.ts
+var DEFAULT_AI_ORGANIZATION_PROMPT = "Summarize the post in 1-3 sentences. Add up to 5 concise tags. Add only useful flat frontmatter fields when confident, such as topic, language, sentiment, or source_kind.";
+var AI_PROVIDER_PRESETS = {
+  openai: {
+    baseUrl: "https://api.openai.com/v1",
+    model: "gpt-4.1-mini",
+    apiKeyOptional: false,
+    transport: "openai"
+  },
+  openrouter: {
+    baseUrl: "https://openrouter.ai/api/v1",
+    model: "openai/gpt-4.1-mini",
+    apiKeyOptional: false,
+    transport: "openai"
+  },
+  deepseek: {
+    baseUrl: "https://api.deepseek.com/v1",
+    model: "deepseek-chat",
+    apiKeyOptional: false,
+    transport: "openai"
+  },
+  gemini: {
+    baseUrl: "https://generativelanguage.googleapis.com/v1beta",
+    model: "gemini-2.0-flash",
+    apiKeyOptional: false,
+    transport: "gemini"
+  },
+  ollama: {
+    baseUrl: "http://localhost:11434/v1",
+    model: "llama3.2",
+    apiKeyOptional: true,
+    transport: "openai"
+  },
+  custom: {
+    baseUrl: "https://api.openai.com/v1",
+    model: "gpt-4.1-mini",
+    apiKeyOptional: false,
+    transport: "openai"
+  }
+};
+function getAiProviderPreset(provider) {
+  return AI_PROVIDER_PRESETS[provider];
+}
+var DEFAULT_AI_ORGANIZATION_SETTINGS = {
+  provider: "openai",
+  enabled: false,
+  apiKey: "",
+  baseUrl: AI_PROVIDER_PRESETS.openai.baseUrl,
+  model: AI_PROVIDER_PRESETS.openai.model,
+  prompt: DEFAULT_AI_ORGANIZATION_PROMPT
+};
 var DEFAULT_OPTIONS = {
-  filenamePattern: "{author}_{first_sentence}",
+  filenamePattern: "{author}_{first_sentence_20}",
+  savePathPattern: "",
   includeImages: true,
-  obsidianFolderLabel: null
+  obsidianFolderLabel: null,
+  aiOrganization: DEFAULT_AI_ORGANIZATION_SETTINGS
 };
 var BUNDLED_EXTRACTOR_CONFIG = {
   version: "2026-03-08",
@@ -2411,15 +2463,20 @@ var BUNDLED_EXTRACTOR_CONFIG = {
 // src/extension/lib/i18n.ts
 var LOCALE_KEY = "app-locale";
 var ko = {
+  uiLanguageLabel: "\uC5B8\uC5B4",
+  uiLanguageKo: "\uD55C\uAD6D\uC5B4",
+  uiLanguageEn: "English",
   popupTitle: "\uD604\uC7AC \uAE00 \uC800\uC7A5",
   popupSave: "\uD604\uC7AC \uAE00 \uC800\uC7A5",
   popupSettings: "\uC124\uC815",
+  popupPromoTitle: "\uD5A5\uD6C4 \uD655\uC7A5 \uC601\uC5ED",
+  popupPromoDescription: "\uCD94\uD6C4 \uC548\uB0B4\uC640 \uCD94\uCC9C\uC774 \uB4E4\uC5B4\uAC08 \uC790\uB9AC\uB97C \uBBF8\uB9AC \uD655\uBCF4\uD574 \uB450\uC5C8\uC2B5\uB2C8\uB2E4.",
   popupSubtitleDirect: "\uC5F0\uACB0\uB41C Obsidian \uD3F4\uB354\uC5D0 \uBC14\uB85C \uC800\uC7A5\uD569\uB2C8\uB2E4.",
-  popupSubtitleDownload: "\uC5F0\uACB0\uB41C \uD3F4\uB354\uAC00 \uC5C6\uC5B4\uC11C \uB2E4\uC6B4\uB85C\uB4DC \uD30C\uC77C\uB85C \uC800\uC7A5\uD569\uB2C8\uB2E4. \uC124\uC815\uC5D0\uC11C \uD3F4\uB354\uB97C \uC5F0\uACB0\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.",
+  popupSubtitleDownload: "\uC800\uC7A5 \uD3F4\uB354\uAC00 \uC5C6\uC5B4 \uD30C\uC77C\uB85C \uB2E4\uC6B4\uB85C\uB4DC\uD569\uB2C8\uB2E4. \uC124\uC815\uC5D0\uC11C \uD3F4\uB354\uB97C \uC5F0\uACB0\uD558\uC138\uC694.",
   popupSubtitleConnected: "\uC5F0\uACB0\uB41C Obsidian \uD3F4\uB354\uC5D0 \uBC14\uB85C \uC800\uC7A5\uD569\uB2C8\uB2E4.",
   popupSubtitlePermissionCheck: "\uC5F0\uACB0\uB41C \uD3F4\uB354\uAC00 \uC788\uC9C0\uB9CC \uAD8C\uD55C\uC744 \uB2E4\uC2DC \uD655\uC778\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.",
-  popupSubtitleNoFolder: "\uC5F0\uACB0\uB41C \uD3F4\uB354\uAC00 \uC788\uC73C\uBA74 \uBC14\uB85C \uC800\uC7A5\uD558\uACE0, \uC5C6\uC73C\uBA74 \uB2E4\uC6B4\uB85C\uB4DC \uD30C\uC77C\uB85C \uC800\uC7A5\uD569\uB2C8\uB2E4.",
-  popupSubtitleUnsupported: "\uC774 \uBE0C\uB77C\uC6B0\uC800\uC5D0\uC11C\uB294 \uB2E4\uC6B4\uB85C\uB4DC \uD30C\uC77C\uB85C \uC800\uC7A5\uD569\uB2C8\uB2E4.",
+  popupSubtitleNoFolder: "\uC5F0\uACB0\uB41C \uD3F4\uB354\uAC00 \uC788\uC73C\uBA74 \uBC14\uB85C \uC800\uC7A5\uD558\uACE0, \uC5C6\uC73C\uBA74 \uD30C\uC77C\uB85C \uB2E4\uC6B4\uB85C\uB4DC\uD569\uB2C8\uB2E4.",
+  popupSubtitleUnsupported: "\uC774 \uBE0C\uB77C\uC6B0\uC800\uC5D0\uC11C\uB294 \uD30C\uC77C\uB85C \uB2E4\uC6B4\uB85C\uB4DC\uD569\uB2C8\uB2E4.",
   popupRecentSaves: "\uCD5C\uADFC \uC800\uC7A5",
   popupClearAll: "\uC804\uCCB4 \uC0AD\uC81C",
   popupEmpty: "\uC544\uC9C1 \uC800\uC7A5\uD55C \uAE00\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.",
@@ -2429,28 +2486,38 @@ var ko = {
   popupDelete: "\uC0AD\uC81C",
   statusReady: "\uAC1C\uBCC4 \uD3EC\uC2A4\uD2B8 \uD398\uC774\uC9C0\uC5D0\uC11C \uC800\uC7A5\uD560 \uC900\uBE44\uAC00 \uB418\uC5C8\uC2B5\uB2C8\uB2E4.",
   statusReadyDirect: "\uC900\uBE44 \uC644\uB8CC. \uBC84\uD2BC\uC744 \uB204\uB974\uBA74 \uC5F0\uACB0\uB41C Obsidian \uD3F4\uB354\uC5D0 \uBC14\uB85C \uC800\uC7A5\uD569\uB2C8\uB2E4.",
-  statusReadyDownload: "\uC900\uBE44 \uC644\uB8CC. \uBC84\uD2BC\uC744 \uB204\uB974\uBA74 \uB2E4\uC6B4\uB85C\uB4DC \uD30C\uC77C\uB85C \uC800\uC7A5\uD569\uB2C8\uB2E4.",
+  statusReadyDownload: "\uC900\uBE44 \uC644\uB8CC. \uBC84\uD2BC\uC744 \uB204\uB974\uBA74 \uD30C\uC77C\uB85C \uB2E4\uC6B4\uB85C\uB4DC\uD569\uB2C8\uB2E4.",
   statusUnsupported: "\uAC1C\uBCC4 \uD3EC\uC2A4\uD2B8 \uD398\uC774\uC9C0\uB97C \uBA3C\uC800 \uC5F4\uC5B4\uC8FC\uC138\uC694.",
   statusNoTab: "\uD65C\uC131 \uD0ED\uC744 \uCC3E\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4.",
-  statusSaving: "\uC800\uC7A5 \uC791\uC5C5\uC744 \uC2DC\uC791\uD569\uB2C8\uB2E4\u2026",
+  statusSaving: "\uC800\uC7A5\uD558\uB294 \uC911\u2026",
   statusSavedDirect: "Obsidian \uD3F4\uB354\uC5D0 \uBC14\uB85C \uC800\uC7A5\uD588\uC2B5\uB2C8\uB2E4.",
-  statusSavedZip: "\uC800\uC7A5 \uC644\uB8CC. ZIP \uB2E4\uC6B4\uB85C\uB4DC\uB97C \uC2DC\uC791\uD588\uC2B5\uB2C8\uB2E4.",
-  statusDuplicate: "\uC774\uBBF8 \uC800\uC7A5\uD55C \uAE00\uC774\uC9C0\uB9CC \uCD5C\uC2E0 \uCD94\uCD9C \uACB0\uACFC\uB85C \uB2E4\uC2DC \uC800\uC7A5\uD588\uC2B5\uB2C8\uB2E4.",
-  statusDuplicateWarning: "\uC774\uBBF8 \uC800\uC7A5\uD55C \uAE00\uC774\uC9C0\uB9CC \uCD5C\uC2E0 \uCD94\uCD9C \uACB0\uACFC\uB85C \uB2E4\uC2DC \uC800\uC7A5\uD588\uC2B5\uB2C8\uB2E4: ",
+  statusSavedZip: "\uC800\uC7A5 \uC644\uB8CC. \uD30C\uC77C \uB2E4\uC6B4\uB85C\uB4DC\uB97C \uC2DC\uC791\uD588\uC2B5\uB2C8\uB2E4.",
+  statusDuplicate: "\uC774\uBBF8 \uC800\uC7A5\uD55C \uAE00\uC774\uC9C0\uB9CC \uCD5C\uC2E0 \uB0B4\uC6A9\uC73C\uB85C \uB36E\uC5B4\uC368 \uC800\uC7A5\uD588\uC2B5\uB2C8\uB2E4.",
+  statusDuplicateWarning: "\uC774\uBBF8 \uC800\uC7A5\uD55C \uAE00\uC774\uC9C0\uB9CC \uCD5C\uC2E0 \uB0B4\uC6A9\uC73C\uB85C \uB36E\uC5B4\uC368 \uC800\uC7A5\uD588\uC2B5\uB2C8\uB2E4: ",
   statusAlreadySaved: "\uC774\uBBF8 \uC800\uC7A5\uB41C \uAE00\uC785\uB2C8\uB2E4. \uB2E4\uC2DC \uC800\uC7A5\uD558\uB824\uBA74 \uCD5C\uADFC \uC800\uC7A5\uC5D0\uC11C '\uB2E4\uC2DC \uC800\uC7A5'\uC744 \uB20C\uB7EC\uC8FC\uC138\uC694.",
   statusError: "\uC54C \uC218 \uC5C6\uB294 \uC624\uB958\uAC00 \uBC1C\uC0DD\uD588\uC2B5\uB2C8\uB2E4.",
-  statusResaving: "\uC800\uC7A5\uB41C \uBA54\uD0C0\uB370\uC774\uD130\uB85C ZIP\uC744 \uB2E4\uC2DC \uB9CC\uB4E4\uACE0 \uC788\uC2B5\uB2C8\uB2E4\u2026",
-  statusResaved: "\uB2E4\uC2DC \uB2E4\uC6B4\uB85C\uB4DC\uB97C \uC2DC\uC791\uD588\uC2B5\uB2C8\uB2E4.",
+  statusResaving: "\uD30C\uC77C\uC744 \uB2E4\uC2DC \uB9CC\uB4DC\uB294 \uC911\u2026",
+  statusResaved: "\uB2E4\uC6B4\uB85C\uB4DC\uB97C \uB2E4\uC2DC \uC2DC\uC791\uD588\uC2B5\uB2C8\uB2E4.",
   statusRecentNotFound: "\uCD5C\uADFC \uC800\uC7A5 \uAE30\uB85D\uC744 \uCC3E\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4.",
   statusDeletedRecent: "\uCD5C\uADFC \uC800\uC7A5\uC5D0\uC11C \uC0AD\uC81C\uD588\uC2B5\uB2C8\uB2E4.",
   statusClearedRecents: "\uCD5C\uADFC \uC800\uC7A5\uC744 \uBAA8\uB450 \uC0AD\uC81C\uD588\uC2B5\uB2C8\uB2E4.",
-  statusExtractFailed: "\uCD94\uCD9C\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4.",
-  statusTabError: "\uD65C\uC131 \uD0ED \uC815\uBCF4\uB97C \uC77D\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4.",
-  statusRedownloadError: "\uC7AC\uB2E4\uC6B4\uB85C\uB4DC \uC911 \uC624\uB958\uAC00 \uBC1C\uC0DD\uD588\uC2B5\uB2C8\uB2E4.",
+  statusExtractFailed: "\uAE00 \uB0B4\uC6A9\uC744 \uC77D\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4.",
+  statusTabError: "\uD604\uC7AC \uD0ED \uC815\uBCF4\uB97C \uC77D\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4.",
+  statusRedownloadError: "\uB2E4\uC2DC \uB2E4\uC6B4\uB85C\uB4DC\uD558\uB294 \uC911 \uC624\uB958\uAC00 \uBC1C\uC0DD\uD588\uC2B5\uB2C8\uB2E4.",
   statusRetry: "\uB2E4\uC2DC \uC2DC\uB3C4",
   statusResaveButton: "\uB2E4\uC2DC \uC800\uC7A5",
-  optionsTitle: "\uC800\uC7A5 \uC124\uC815",
-  optionsSubtitle: "Obsidian \uD3F4\uB354\uB97C \uD55C \uBC88 \uC5F0\uACB0\uD558\uBA74 Threads \uAE00\uC744 vault \uC548\uC5D0 \uBC14\uB85C \uB123\uC2B5\uB2C8\uB2E4.",
+  optionsTitle: "Threads \uAE00\uC744 Obsidian\uC5D0 \uC800\uC7A5\uD558\uACE0 \uADDC\uCE59\uACFC AI\uB85C \uC815\uB9AC\uD558\uC138\uC694.",
+  optionsSubtitle: "\uBB34\uB8CC \uC800\uC7A5, \uD544\uC694\uD560 \uB54C\uB9CC Pro.",
+  optionsPlanSpotlightFreeTitle: "Free",
+  optionsPlanSpotlightFreeCopy: "\uAE30\uBCF8 \uC800\uC7A5 \uAE30\uB2A5\uC744 \uBC14\uB85C \uC0AC\uC6A9\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.",
+  optionsPlanSpotlightActiveTitle: "Pro \uD65C\uC131\uD654\uB428",
+  optionsPlanSpotlightActiveCopy: "\uC774 \uBE0C\uB77C\uC6B0\uC800\uC5D0\uC11C Pro \uAE30\uB2A5\uC744 \uC0AC\uC6A9\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.",
+  optionsPlanSpotlightNeedsActivationTitle: "Pro \uD65C\uC131\uD654 \uD544\uC694",
+  optionsPlanSpotlightNeedsActivationCopy: "\uD0A4\uB294 \uC720\uD6A8\uD558\uC9C0\uB9CC \uC544\uC9C1 \uC774 \uAE30\uAE30 seat\uAC00 \uD65C\uC131\uD654\uB418\uC9C0 \uC54A\uC558\uC2B5\uB2C8\uB2E4.",
+  optionsPlanSpotlightSeatMeta: "Seat {used}/{limit} \xB7 {device}",
+  optionsAdSlotLabel: "Ad",
+  optionsAdSlotTitle: "\uAD11\uACE0 \uC790\uB9AC",
+  optionsAdSlotCopy: "\uCD94\uD6C4 \uBC30\uB108 \uB610\uB294 \uC548\uB0B4\uAC00 \uB4E4\uC5B4\uAC08 \uC790\uB9AC\uC785\uB2C8\uB2E4.",
   optionsFolderSection: "Obsidian \uD3F4\uB354 \uC5F0\uACB0",
   optionsFolderStatus: "\uC5F0\uACB0\uB41C \uD3F4\uB354\uB97C \uD655\uC778\uD558\uB294 \uC911\uC785\uB2C8\uB2E4\u2026",
   optionsFolderLabel: "\uD604\uC7AC \uD3F4\uB354",
@@ -2458,25 +2525,105 @@ var ko = {
   optionsFolderConnect: "\uD3F4\uB354 \uC5F0\uACB0",
   optionsFolderDisconnect: "\uC5F0\uACB0 \uD574\uC81C",
   optionsFolderUnsupported: "\uC774 \uBE0C\uB77C\uC6B0\uC800\uC5D0\uC11C\uB294 \uD3F4\uB354 \uC5F0\uACB0\uC744 \uC9C0\uC6D0\uD558\uC9C0 \uC54A\uC74C",
-  optionsFolderUnsupportedStatus: "\uD604\uC7AC \uBE0C\uB77C\uC6B0\uC800\uC5D0\uC11C\uB294 \uD3F4\uB354\uC5D0 \uBC14\uB85C \uC800\uC7A5\uD560 \uC218 \uC5C6\uC5B4 \uB2E4\uC6B4\uB85C\uB4DC \uD30C\uC77C\uB85C \uC800\uC7A5\uD569\uB2C8\uB2E4.",
-  optionsFolderNotConnectedStatus: "\uC544\uC9C1 \uC5F0\uACB0\uB41C \uD3F4\uB354\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4. \uC800\uC7A5 \uBC84\uD2BC\uC744 \uB204\uB974\uBA74 \uB2E4\uC6B4\uB85C\uB4DC \uD30C\uC77C\uB85C \uC800\uC7A5\uD569\uB2C8\uB2E4.",
-  optionsFolderReady: "\uC900\uBE44 \uC644\uB8CC. \uC800\uC7A5 \uBC84\uD2BC\uC744 \uB204\uB974\uBA74 \uC5F0\uACB0\uB41C \uD3F4\uB354\uC5D0 \uBC14\uB85C \uAE30\uB85D\uD569\uB2C8\uB2E4.",
-  optionsFolderPermissionCheck: "\uD3F4\uB354\uB294 \uC5F0\uACB0\uB418\uC5B4 \uC788\uC2B5\uB2C8\uB2E4. \uB2E4\uC74C \uC800\uC7A5 \uB54C \uAD8C\uD55C\uC744 \uD55C \uBC88 \uB354 \uD655\uC778\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.",
-  optionsFolderPermissionLost: "\uD3F4\uB354 \uAD8C\uD55C\uC774 \uC0AC\uB77C\uC84C\uC2B5\uB2C8\uB2E4. \uC800\uC7A5 \uC2DC \uB2E4\uC2DC \uC694\uCCAD\uD558\uAC70\uB098 \uD3F4\uB354\uB97C \uB2E4\uC2DC \uC5F0\uACB0\uD574 \uC8FC\uC138\uC694.",
-  optionsFolderChecked: "\uD3F4\uB354 \uC5F0\uACB0 \uC0C1\uD0DC\uB97C \uD655\uC778\uD588\uC2B5\uB2C8\uB2E4. \uC800\uC7A5 \uC2DC \uBC14\uB85C \uC800\uC7A5\uC744 \uC2DC\uB3C4\uD569\uB2C8\uB2E4.",
+  optionsFolderUnsupportedStatus: "\uC774 \uBE0C\uB77C\uC6B0\uC800\uC5D0\uC11C\uB294 \uD3F4\uB354\uC5D0 \uC9C1\uC811 \uC800\uC7A5\uD560 \uC218 \uC5C6\uC5B4 \uD30C\uC77C\uB85C \uB2E4\uC6B4\uB85C\uB4DC\uD569\uB2C8\uB2E4.",
+  optionsFolderNotConnectedStatus: "\uC800\uC7A5 \uD3F4\uB354\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4. \uC800\uC7A5\uD558\uBA74 \uD30C\uC77C\uB85C \uB2E4\uC6B4\uB85C\uB4DC\uB429\uB2C8\uB2E4.",
+  optionsFolderReady: "\uD3F4\uB354\uAC00 \uC5F0\uACB0\uB410\uC2B5\uB2C8\uB2E4. \uC800\uC7A5 \uBC84\uD2BC\uC744 \uB204\uB974\uBA74 \uBC14\uB85C \uAE30\uB85D\uB429\uB2C8\uB2E4.",
+  optionsFolderPermissionCheck: "\uD3F4\uB354\uAC00 \uC5F0\uACB0\uB410\uC2B5\uB2C8\uB2E4. \uB2E4\uC74C \uC800\uC7A5 \uC2DC \uD3F4\uB354 \uC811\uADFC \uAD8C\uD55C\uC744 \uD655\uC778\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.",
+  optionsFolderPermissionLost: "\uD3F4\uB354 \uC811\uADFC \uAD8C\uD55C\uC774 \uC5C6\uC2B5\uB2C8\uB2E4. \uD3F4\uB354\uB97C \uB2E4\uC2DC \uC5F0\uACB0\uD574 \uC8FC\uC138\uC694.",
+  optionsFolderChecked: "\uD3F4\uB354 \uC5F0\uACB0\uC744 \uD655\uC778\uD588\uC2B5\uB2C8\uB2E4. \uC800\uC7A5 \uBC84\uD2BC\uC744 \uB204\uB974\uBA74 \uBC14\uB85C \uAE30\uB85D\uB429\uB2C8\uB2E4.",
   optionsFolderCancelled: "\uD3F4\uB354 \uC120\uD0DD\uC744 \uCDE8\uC18C\uD588\uC2B5\uB2C8\uB2E4.",
   optionsFolderError: "\uD3F4\uB354 \uC5F0\uACB0 \uC911 \uC624\uB958\uAC00 \uBC1C\uC0DD\uD588\uC2B5\uB2C8\uB2E4.",
-  optionsFileRules: "\uD30C\uC77C \uC800\uC7A5 \uADDC\uCE59",
-  optionsFilenamePattern: "\uD30C\uC77C\uBA85 \uD328\uD134",
-  optionsFilenameTokens: "\uC0AC\uC6A9 \uAC00\uB2A5\uD55C \uD1A0\uD070: {date}, {author}, {first_sentence}, {shortcode}",
-  optionsIncludeImages: "\uC774\uBBF8\uC9C0\uB97C \uAC19\uC774 \uC800\uC7A5",
+  optionsFolderConnectedSuccess: '"{folder}" \uD3F4\uB354\uB97C \uC5F0\uACB0\uD588\uC2B5\uB2C8\uB2E4.',
+  optionsFolderPathLabel: "\uD604\uC7AC \uC800\uC7A5 \uC704\uCE58",
+  optionsFolderPathHint: "\uC808\uB300\uACBD\uB85C\uB294 \uC77D\uC744 \uC218 \uC5C6\uC5B4 \uC5F0\uACB0\uB41C \uD3F4\uB354 \uAE30\uC900\uC73C\uB85C\uB9CC \uD45C\uC2DC\uD569\uB2C8\uB2E4.",
+  optionsFolderPathUnavailable: "\uD3F4\uB354 \uC5F0\uACB0 \uD6C4 \uD45C\uC2DC",
+  optionsBasicSection: "\uAE30\uBCF8 \uC800\uC7A5",
+  optionsBasicSubtitle: "",
+  optionsCompareSection: "Free vs Pro",
+  optionsProSection: "Pro \uC124\uC815",
+  optionsProSubtitle: "\uD544\uC694\uD560 \uB54C\uB9CC \uC5F4\uC5B4 \uC124\uC815\uD558\uC138\uC694. \uADDC\uCE59\uACFC AI \uC815\uB9AC\uB97C \uC5EC\uAE30\uC11C \uCF2D\uB2C8\uB2E4.",
+  optionsProAiNote: "AI\uB294 \uC790\uB3D9\uC73C\uB85C \uC81C\uACF5\uB418\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4. \uC790\uC2E0\uC758 API \uD0A4\uB97C \uB123\uC5B4\uC57C \uB3D9\uC791\uD569\uB2C8\uB2E4.",
+  optionsProCompareFree: "Free",
+  optionsProComparePro: "Pro",
+  compareRowSave: "\uC800\uC7A5",
+  compareRowImages: "\uC774\uBBF8\uC9C0 \uD3EC\uD568",
+  compareRowReplies: "\uC5F0\uC18D \uB2F5\uAE00",
+  compareRowDuplicates: "\uC911\uBCF5 \uAC74\uB108\uB700",
+  compareRowFilename: "\uD30C\uC77C \uC774\uB984 \uADDC\uCE59",
+  compareRowFolder: "\uC800\uC7A5 \uD3F4\uB354 \uC9C0\uC815",
+  compareRowAiSummary: "AI \uC694\uC57D",
+  compareRowAiTags: "AI \uD0DC\uADF8",
+  compareRowAiFrontmatter: "AI frontmatter",
+  optionsProBadgeFree: "Free",
+  optionsProBadgeActive: "Pro",
+  optionsProStatusFree: "\uC9C0\uAE08\uC740 Free \uC0C1\uD0DC\uC785\uB2C8\uB2E4. \uC800\uC7A5\uC740 \uADF8\uB300\uB85C \uB418\uACE0, \uD544\uC694\uD560 \uB54C\uB9CC Pro\uB97C \uCF1C\uBA74 \uB429\uB2C8\uB2E4.",
+  optionsProStatusActive: "Pro \uD65C\uC131\uD654\uB428. \uC544\uB798 \uADDC\uCE59\uACFC AI \uC124\uC815\uC744 \uC0AC\uC6A9\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.",
+  optionsProStatusExpired: "\uC774 Pro \uD0A4\uB294 \uB9CC\uB8CC\uB418\uC5C8\uC2B5\uB2C8\uB2E4. Free \uC800\uC7A5\uC740 \uACC4\uC18D \uC0AC\uC6A9\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.",
+  optionsProStatusInvalid: "\uC720\uD6A8\uD558\uC9C0 \uC54A\uC740 Pro \uD0A4\uC785\uB2C8\uB2E4. Free \uC800\uC7A5\uC740 \uACC4\uC18D \uC0AC\uC6A9\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.",
+  optionsProStatusSeatLimit: "\uC774 Pro \uD0A4\uB294 \uC774\uBBF8 3\uB300\uC5D0\uC11C \uD65C\uC131\uD654\uB418\uC5B4 \uC788\uC2B5\uB2C8\uB2E4. \uB2E4\uB978 \uAE30\uAE30\uC5D0\uC11C \uBA3C\uC800 \uD574\uC81C\uD574 \uC8FC\uC138\uC694.",
+  optionsProStatusNeedsActivation: "\uC720\uD6A8\uD55C Pro \uD0A4\uC774\uC9C0\uB9CC \uC544\uC9C1 \uC774 \uAE30\uAE30 seat\uAC00 \uD65C\uC131\uD654\uB418\uC9C0 \uC54A\uC558\uC2B5\uB2C8\uB2E4.",
+  optionsProStatusOffline: "\uC11C\uBC84\uC5D0 \uC5F0\uACB0\uD558\uC9C0 \uBABB\uD588\uC9C0\uB9CC, \uCD5C\uADFC \uD65C\uC131\uD654 \uC0C1\uD0DC\uB97C \uAE30\uC900\uC73C\uB85C \uACC4\uC18D \uC0AC\uC6A9\uD569\uB2C8\uB2E4.",
+  optionsProStatusRevoked: "\uC774 Pro \uD0A4\uB294 \uB354 \uC774\uC0C1 \uC0AC\uC6A9\uD560 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4.",
+  optionsProHolderLabel: "\uB300\uC0C1",
+  optionsProExpiresLabel: "\uB9CC\uB8CC",
+  optionsProUnlockLabel: "Pro \uD0A4 \uC785\uB825",
+  optionsProUnlockHint: "\uAD6C\uB9E4 \uD6C4 \uBC1B\uC740 Pro \uD0A4\uB97C \uBD99\uC5EC\uB123\uC73C\uBA74 \uC774 \uBE0C\uB77C\uC6B0\uC800\uC5D0\uC11C \uBC14\uB85C \uC801\uC6A9\uB429\uB2C8\uB2E4.",
+  optionsProUnlockPlaceholder: "Pro \uD0A4\uB97C \uBD99\uC5EC\uB123\uC73C\uC138\uC694",
+  optionsProSalesLink: "Pro \uAD6C\uB9E4\uD558\uAE30",
+  optionsProActivate: "Pro \uD65C\uC131\uD654",
+  optionsProClear: "\uC81C\uAC70",
+  optionsProActivated: "Pro\uAC00 \uD65C\uC131\uD654\uB410\uC2B5\uB2C8\uB2E4.",
+  optionsProRemoved: "Pro \uD0A4\uB97C \uC81C\uAC70\uD588\uC2B5\uB2C8\uB2E4.",
+  optionsProEmptyKey: "\uBA3C\uC800 Pro \uD0A4\uB97C \uC785\uB825\uD574 \uC8FC\uC138\uC694.",
+  optionsProLocalOnly: "\uC800\uC7A5\uD55C \uAE00\uC740 \uB0B4 \uAE30\uAE30\uC5D0\uB9CC \uBCF4\uAD00\uB418\uBA70, \uB85C\uADF8\uC778 \uC5C6\uC774 \uC0AC\uC6A9\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.",
+  optionsFileRules: "\uD30C\uC77C \uADDC\uCE59",
+  optionsFilenamePattern: "\uD30C\uC77C \uC774\uB984 \uADDC\uCE59",
+  optionsFilenamePatternLocked: "Free\uB294 \uAE30\uBCF8 \uD30C\uC77C \uC774\uB984\uC73C\uB85C \uC800\uC7A5\uB429\uB2C8\uB2E4. Pro\uC5D0\uC11C \uC6D0\uD558\uB294 \uADDC\uCE59\uC73C\uB85C \uBC14\uAFC0 \uC218 \uC788\uC2B5\uB2C8\uB2E4.",
+  optionsSavePathPattern: "\uC800\uC7A5 \uD3F4\uB354 \uACBD\uB85C",
+  optionsSavePathTokens: "\uC608\uC2DC: Inbox/{date} \xB7 Threads/{author}",
+  optionsSavePathLocked: "Free\uB294 \uC5F0\uACB0\uD55C \uD3F4\uB354\uC5D0 \uBC14\uB85C \uC800\uC7A5\uB429\uB2C8\uB2E4. Pro\uC5D0\uC11C \uB0A0\uC9DC\xB7\uC791\uC131\uC790 \uAE30\uC900\uC73C\uB85C \uD558\uC704 \uD3F4\uB354\uB97C \uC790\uB3D9 \uC9C0\uC815\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.",
+  optionsFilenameTokens: "\uC0AC\uC6A9 \uAC00\uB2A5: {date}, {author}, {first_sentence}, {first_sentence_20}, {shortcode}",
+  optionsAiSection: "AI \uC815\uB9AC",
+  optionsAiSubtitle: "Provider\uB97C \uACE0\uB974\uBA74 \uAE30\uBCF8 Base URL\uACFC \uBAA8\uB378\uC774 \uC790\uB3D9\uC73C\uB85C \uB4E4\uC5B4\uAC11\uB2C8\uB2E4.",
+  optionsAiQuickstart: "\uB300\uBD80\uBD84\uC740 Provider\uC640 API \uD0A4\uB9CC \uC120\uD0DD\uD558\uBA74 \uB429\uB2C8\uB2E4. \uBC14\uAFBC \uB4A4\uC5D0\uB294 \uC544\uB798\uC5D0\uC11C \uC124\uC815 \uC800\uC7A5\uC744 \uB20C\uB7EC\uC57C \uBC18\uC601\uB429\uB2C8\uB2E4.",
+  optionsAiAdvancedSummary: "\uACE0\uAE09 \uC124\uC815 \uC5F4\uAE30",
+  optionsAiEnable: "AI \uC815\uB9AC \uC0AC\uC6A9",
+  optionsAiProvider: "Provider",
+  optionsAiProviderHint: "OpenAI, OpenRouter, DeepSeek, Gemini, Ollama\uB294 preset\uC73C\uB85C \uBC14\uB85C \uC2DC\uC791\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4. Custom\uC740 OpenAI \uD638\uD658 \uC5D4\uB4DC\uD3EC\uC778\uD2B8\uC6A9\uC785\uB2C8\uB2E4.",
+  optionsAiProviderOpenAi: "OpenAI",
+  optionsAiProviderOpenRouter: "OpenRouter",
+  optionsAiProviderDeepSeek: "DeepSeek",
+  optionsAiProviderGemini: "Gemini",
+  optionsAiProviderOllama: "Ollama",
+  optionsAiProviderCustom: "Custom",
+  optionsAiApiKey: "API \uD0A4",
+  optionsAiApiKeyHint: "Gemini \uD0A4\uB294 \uBCF4\uD1B5 AIza..., OpenAI/OpenRouter/DeepSeek \uD0A4\uB294 \uBCF4\uD1B5 sk-... \uD615\uD0DC\uC785\uB2C8\uB2E4. Ollama \uAC19\uC740 \uB85C\uCEEC \uC5D4\uB4DC\uD3EC\uC778\uD2B8\uB294 \uBE44\uC6CC\uB458 \uC218 \uC788\uC2B5\uB2C8\uB2E4.",
+  optionsAiApiKeyRequired: "\uC120\uD0DD\uD55C provider\uB294 API \uD0A4\uAC00 \uD544\uC694\uD569\uB2C8\uB2E4.",
+  optionsAiKeyMismatchGemini: "Gemini provider\uC5D0\uB294 Google Gemini API \uD0A4\uAC00 \uD544\uC694\uD569\uB2C8\uB2E4. \uC9C0\uAE08 \uD0A4\uB294 OpenAI-compatible \uACC4\uC5F4\uCC98\uB7FC \uBCF4\uC785\uB2C8\uB2E4.",
+  optionsAiKeyMismatchOpenAi: "OpenAI/OpenRouter/DeepSeek provider\uC5D0\uB294 Gemini \uD0A4(AIza...)\uAC00 \uC544\uB2C8\uB77C \uD574\uB2F9 provider \uD0A4\uB97C \uB123\uC5B4\uC57C \uD569\uB2C8\uB2E4.",
+  optionsAiBaseUrl: "Base URL",
+  optionsAiBaseUrlHint: "\uC608\uC2DC: https://api.openai.com/v1 \xB7 https://openrouter.ai/api/v1 \xB7 https://api.deepseek.com/v1 \xB7 http://localhost:11434/v1",
+  optionsAiModel: "\uBAA8\uB378 \uC774\uB984",
+  optionsAiModelHint: "\uC608\uC2DC: gpt-4.1-mini \xB7 openai/gpt-4.1-mini \xB7 llama3.2",
+  optionsAiPrompt: "\uC815\uB9AC \uADDC\uCE59 \uD504\uB86C\uD504\uD2B8",
+  optionsAiPromptHint: "\uC694\uC57D \uAE38\uC774, \uD0DC\uADF8 \uC2A4\uD0C0\uC77C, \uC6D0\uD558\uB294 frontmatter \uD544\uB4DC\uB97C \uC790\uC720\uB86D\uAC8C \uC801\uC5B4\uC8FC\uC138\uC694.",
+  optionsAiLocked: "AI \uC815\uB9AC\uB294 Pro\uC5D0\uC11C\uB9CC \uC0AC\uC6A9\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.",
+  optionsAiInvalidBaseUrl: "AI Base URL \uD615\uC2DD\uC774 \uC62C\uBC14\uB974\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4.",
+  optionsAiPermissionDenied: "\uC120\uD0DD\uD55C AI \uC5D4\uB4DC\uD3EC\uC778\uD2B8 \uAD8C\uD55C\uC774 \uC5C6\uC5B4 \uC800\uC7A5\uD558\uC9C0 \uC54A\uC558\uC2B5\uB2C8\uB2E4.",
+  optionsAiSaved: "AI \uC124\uC815\uACFC \uAD8C\uD55C\uC744 \uC800\uC7A5\uD588\uC2B5\uB2C8\uB2E4.",
+  optionsIncludeImages: "\uC774\uBBF8\uC9C0/\uB3D9\uC601\uC0C1\uC744 \uAC19\uC774 \uC800\uC7A5",
   optionsSave: "\uC124\uC815 \uC800\uC7A5",
   optionsSaved: "\uC124\uC815\uC744 \uC800\uC7A5\uD588\uC2B5\uB2C8\uB2E4.",
+  optionsPendingSave: "\uBCC0\uACBD\uB428. \uC544\uB798 \uC124\uC815 \uC800\uC7A5\uC744 \uB20C\uB7EC\uC57C \uC801\uC6A9\uB429\uB2C8\uB2E4.",
   optionsNoChanges: "\uC544\uC9C1 \uBCC0\uACBD \uC0AC\uD56D\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.",
   optionsStep1: "1. Obsidian \uD3F4\uB354 \uC5F0\uACB0",
-  optionsStep2: "2. Threads \uAE00 \uC5F4\uAE30",
-  optionsStep3: "3. \uC800\uC7A5 \uBC84\uD2BC \uB204\uB974\uAE30",
+  optionsStep2: "2. \uBA3C\uC800 \uBB34\uB8CC\uB85C \uC800\uC7A5\uD574\uBCF4\uAE30",
+  optionsStep3: "3. \uADDC\uCE59 \uB610\uB294 AI \uC815\uB9AC\uAC00 \uD544\uC694\uD558\uBA74 Pro \uD65C\uC131\uD654",
   mdImageLabel: "\uC774\uBBF8\uC9C0",
+  mdVideoLabel: "\uB3D9\uC601\uC0C1",
+  mdVideoThumbnailLabel: "\uB3D9\uC601\uC0C1 \uC378\uB124\uC77C",
+  mdVideoOnThreads: "Threads\uC5D0\uC11C \uBCF4\uAE30",
+  mdSavedVideoFile: "\uC800\uC7A5\uD55C \uC601\uC0C1 \uD30C\uC77C",
   mdReplySection: "\uC791\uC131\uC790 \uC5F0\uC18D \uB2F5\uAE00",
   mdReplyLabel: "\uB2F5\uAE00",
   mdReplyImageLabel: "\uB2F5\uAE00 \uC774\uBBF8\uC9C0",
@@ -2485,27 +2632,37 @@ var ko = {
   mdPublishedAt: "\uAC8C\uC2DC \uC2DC\uAC01",
   mdExternalLink: "\uC678\uBD80 \uB9C1\uD06C",
   mdWarning: "\uACBD\uACE0",
-  warnImageAccessFailed: "\uC77C\uBD80 \uC774\uBBF8\uC9C0\uC5D0 \uC811\uADFC\uD558\uC9C0 \uBABB\uD574 \uC6D0\uACA9 URL\uC744 \uC0AC\uC6A9\uD588\uC2B5\uB2C8\uB2E4.",
-  warnImageDownloadOff: "\uC774\uBBF8\uC9C0 \uB2E4\uC6B4\uB85C\uB4DC\uAC00 \uAEBC\uC838 \uC788\uC5B4 \uC6D0\uACA9 URL\uC744 \uC0AC\uC6A9\uD588\uC2B5\uB2C8\uB2E4.",
+  mdSummary: "AI \uC694\uC57D",
+  warnImageAccessFailed: "\uC77C\uBD80 \uC774\uBBF8\uC9C0/\uB3D9\uC601\uC0C1\uC744 \uC800\uC7A5\uD558\uC9C0 \uBABB\uD574 \uC6D0\uBCF8 \uB9C1\uD06C\uB97C \uC0AC\uC6A9\uD588\uC2B5\uB2C8\uB2E4.",
+  warnImageDownloadOff: "\uC774\uBBF8\uC9C0/\uB3D9\uC601\uC0C1 \uC800\uC7A5\uC774 \uAEBC\uC838 \uC788\uC5B4 \uC6D0\uBCF8 \uB9C1\uD06C\uB97C \uC0AC\uC6A9\uD588\uC2B5\uB2C8\uB2E4.",
+  warnAiFailed: "AI \uC815\uB9AC\uC5D0 \uC2E4\uD328\uD574 \uC6D0\uBB38\uB9CC \uC800\uC7A5\uD588\uC2B5\uB2C8\uB2E4: {reason}",
+  warnAiPermissionMissing: "AI \uC5D4\uB4DC\uD3EC\uC778\uD2B8 \uAD8C\uD55C\uC774 \uC5C6\uC5B4 \uC6D0\uBB38\uB9CC \uC800\uC7A5\uD588\uC2B5\uB2C8\uB2E4. \uC124\uC815\uC5D0\uC11C AI \uC139\uC158\uC744 \uB2E4\uC2DC \uC800\uC7A5\uD574 \uC8FC\uC138\uC694.",
+  warnAiMissingModel: "AI \uBAA8\uB378 \uC774\uB984\uC774 \uC5C6\uC5B4 \uC6D0\uBB38\uB9CC \uC800\uC7A5\uD588\uC2B5\uB2C8\uB2E4.",
   errBrowserUnsupported: "\uC774 \uBE0C\uB77C\uC6B0\uC800\uC5D0\uC11C\uB294 Obsidian \uD3F4\uB354\uC5D0 \uBC14\uB85C \uC800\uC7A5\uD560 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4.",
   errFolderNameFailed: "\uC800\uC7A5\uD560 \uD3F4\uB354 \uC774\uB984\uC744 \uACB0\uC815\uD558\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4.",
   errInvalidPath: "\uC798\uBABB\uB41C \uD30C\uC77C \uACBD\uB85C\uC785\uB2C8\uB2E4.",
   fallbackNoFolder: "\uC5F0\uACB0\uB41C \uD3F4\uB354\uAC00 \uC5C6\uC5B4",
   fallbackPermissionDenied: "\uD3F4\uB354 \uAD8C\uD55C\uC774 \uC5C6\uC5B4",
   fallbackDirectFailed: "\uD3F4\uB354\uC5D0 \uC800\uC7A5\uD558\uC9C0 \uBABB\uD574",
-  fallbackZipMessage: " \uB2E4\uC6B4\uB85C\uB4DC \uD30C\uC77C\uB85C \uB300\uC2E0 \uC800\uC7A5\uD588\uC2B5\uB2C8\uB2E4.",
-  errNotPermalink: "\uAC1C\uBCC4 \uD3EC\uC2A4\uD2B8 \uD398\uC774\uC9C0\uB97C \uBA3C\uC800 \uC5F4\uC5B4\uC8FC\uC138\uC694."
+  fallbackZipMessage: " \uD30C\uC77C\uB85C \uB2E4\uC6B4\uB85C\uB4DC\uD588\uC2B5\uB2C8\uB2E4.",
+  errNotPermalink: "\uAC1C\uBCC4 \uD3EC\uC2A4\uD2B8 \uD398\uC774\uC9C0\uB97C \uBA3C\uC800 \uC5F4\uC5B4\uC8FC\uC138\uC694.",
+  errPostContentNotFound: "\uAC8C\uC2DC\uBB3C \uB0B4\uC6A9\uC744 \uBD88\uB7EC\uC62C \uC218 \uC5C6\uC2B5\uB2C8\uB2E4. \uB85C\uADF8\uC778 \uC0C1\uD0DC\uB97C \uD655\uC778\uD574 \uC8FC\uC138\uC694."
 };
 var en = {
+  uiLanguageLabel: "Language",
+  uiLanguageKo: "\uD55C\uAD6D\uC5B4",
+  uiLanguageEn: "English",
   popupTitle: "Save Current Post",
   popupSave: "Save Current Post",
   popupSettings: "Settings",
+  popupPromoTitle: "Reserved Area",
+  popupPromoDescription: "This space is reserved for future guidance and recommendations.",
   popupSubtitleDirect: "Saving directly to your connected Obsidian folder.",
-  popupSubtitleDownload: "No folder connected. Saving as a download file. Connect a folder in settings.",
+  popupSubtitleDownload: "No folder connected. Saving as a download. Connect a folder in settings.",
   popupSubtitleConnected: "Saving directly to your connected Obsidian folder.",
   popupSubtitlePermissionCheck: "Folder connected, but permission may need re-confirmation.",
   popupSubtitleNoFolder: "Saves directly when a folder is connected, otherwise downloads a file.",
-  popupSubtitleUnsupported: "This browser only supports download file saves.",
+  popupSubtitleUnsupported: "This browser only supports file downloads.",
   popupRecentSaves: "Recent Saves",
   popupClearAll: "Clear All",
   popupEmpty: "No saved posts yet.",
@@ -2515,28 +2672,38 @@ var en = {
   popupDelete: "Delete",
   statusReady: "Ready to save from a post permalink page.",
   statusReadyDirect: "Ready. Press to save directly to your Obsidian folder.",
-  statusReadyDownload: "Ready. Press to save as a download file.",
+  statusReadyDownload: "Ready. Press to download the file.",
   statusUnsupported: "Please open an individual post page first.",
   statusNoTab: "Could not find an active tab.",
-  statusSaving: "Starting save\u2026",
+  statusSaving: "Saving\u2026",
   statusSavedDirect: "Saved directly to your Obsidian folder.",
-  statusSavedZip: "Saved. ZIP download started.",
-  statusDuplicate: "Already saved, but re-saved with the latest extraction.",
-  statusDuplicateWarning: "Already saved, re-saved with latest extraction: ",
+  statusSavedZip: "Saved. Download started.",
+  statusDuplicate: "Already saved \u2014 updated with the latest content.",
+  statusDuplicateWarning: "Already saved, updated: ",
   statusAlreadySaved: "This post is already saved. Use 'Re-save' from recent saves to save again.",
   statusError: "An unknown error occurred.",
-  statusResaving: "Rebuilding ZIP from saved metadata\u2026",
-  statusResaved: "Re-download started.",
+  statusResaving: "Preparing your file\u2026",
+  statusResaved: "Download started.",
   statusRecentNotFound: "Could not find the recent save record.",
   statusDeletedRecent: "Deleted from recent saves.",
   statusClearedRecents: "All recent saves cleared.",
-  statusExtractFailed: "Extraction failed.",
+  statusExtractFailed: "Could not read the post.",
   statusTabError: "Could not read active tab information.",
   statusRedownloadError: "Error during re-download.",
   statusRetry: "Retry",
   statusResaveButton: "Re-save",
-  optionsTitle: "Save Settings",
-  optionsSubtitle: "Connect your Obsidian folder once to save Threads posts directly into your vault.",
+  optionsTitle: "Save Threads posts to Obsidian, with auto-organize.",
+  optionsSubtitle: "Free saving, Pro only when needed.",
+  optionsPlanSpotlightFreeTitle: "Free",
+  optionsPlanSpotlightFreeCopy: "Basic saving is ready to use.",
+  optionsPlanSpotlightActiveTitle: "Pro active",
+  optionsPlanSpotlightActiveCopy: "Pro features are enabled on this browser.",
+  optionsPlanSpotlightNeedsActivationTitle: "Pro needs activation",
+  optionsPlanSpotlightNeedsActivationCopy: "The key is valid, but this device does not have an active seat yet.",
+  optionsPlanSpotlightSeatMeta: "Seat {used}/{limit} \xB7 {device}",
+  optionsAdSlotLabel: "Ad",
+  optionsAdSlotTitle: "Ad placeholder",
+  optionsAdSlotCopy: "Reserved for a future banner or announcement.",
   optionsFolderSection: "Connect Obsidian Folder",
   optionsFolderStatus: "Checking connected folder\u2026",
   optionsFolderLabel: "Current Folder",
@@ -2545,24 +2712,104 @@ var en = {
   optionsFolderDisconnect: "Disconnect",
   optionsFolderUnsupported: "Folder connection not supported in this browser",
   optionsFolderUnsupportedStatus: "This browser cannot save directly to a folder. Files will be downloaded instead.",
-  optionsFolderNotConnectedStatus: "No folder connected yet. Files will be downloaded when you save.",
-  optionsFolderReady: "Ready. Files will be saved directly to the connected folder.",
-  optionsFolderPermissionCheck: "Folder is connected. Permission may be re-confirmed on next save.",
-  optionsFolderPermissionLost: "Folder permission lost. Please reconnect or grant permission on next save.",
+  optionsFolderNotConnectedStatus: "No folder connected. Files will be downloaded when you save.",
+  optionsFolderReady: "Folder connected. Files will be saved directly.",
+  optionsFolderPermissionCheck: "Folder connected. Permission may be re-confirmed on next save.",
+  optionsFolderPermissionLost: "Folder permission lost. Please reconnect your folder.",
   optionsFolderChecked: "Folder connection verified. Direct save will be attempted.",
   optionsFolderCancelled: "Folder selection cancelled.",
   optionsFolderError: "Error connecting folder.",
-  optionsFileRules: "File Save Rules",
-  optionsFilenamePattern: "Filename Pattern",
-  optionsFilenameTokens: "Available tokens: {date}, {author}, {first_sentence}, {shortcode}",
-  optionsIncludeImages: "Save images together",
+  optionsFolderConnectedSuccess: 'Connected the "{folder}" folder.',
+  optionsFolderPathLabel: "Current Save Location",
+  optionsFolderPathHint: "The browser cannot expose the OS absolute path, so this stays relative to the connected folder.",
+  optionsFolderPathUnavailable: "Shown after you connect a folder",
+  optionsBasicSection: "Basic Saving",
+  optionsBasicSubtitle: "",
+  optionsCompareSection: "Free vs Pro",
+  optionsProSection: "Pro Settings",
+  optionsProSubtitle: "Open only when needed. This is where rules and AI organization live.",
+  optionsProAiNote: "AI is not included automatically. It runs only after you add your own API key.",
+  optionsProCompareFree: "Free",
+  optionsProComparePro: "Pro",
+  compareRowSave: "Save",
+  compareRowImages: "Images",
+  compareRowReplies: "Thread replies",
+  compareRowDuplicates: "Skip duplicates",
+  compareRowFilename: "File name format",
+  compareRowFolder: "Save folder",
+  compareRowAiSummary: "AI summary",
+  compareRowAiTags: "AI tags",
+  compareRowAiFrontmatter: "AI frontmatter",
+  optionsProBadgeFree: "Free",
+  optionsProBadgeActive: "Pro",
+  optionsProStatusFree: "You are on Free. Saving already works, and Pro is only needed when you want rules or AI.",
+  optionsProStatusActive: "Pro active. Rule-based organization and AI are available below.",
+  optionsProStatusExpired: "This Pro key has expired. Free saving still works.",
+  optionsProStatusInvalid: "This Pro key is not valid. Free saving still works.",
+  optionsProStatusSeatLimit: "This Pro key is already active on 3 devices. Release one on another device first.",
+  optionsProStatusNeedsActivation: "The Pro key is valid, but this device does not have an active seat yet.",
+  optionsProStatusOffline: "Could not reach the server, so the most recent activation state is being used.",
+  optionsProStatusRevoked: "This Pro key can no longer be used.",
+  optionsProHolderLabel: "Holder",
+  optionsProExpiresLabel: "Expires",
+  optionsProUnlockLabel: "Pro key",
+  optionsProUnlockHint: "Paste the Pro key from your purchase email to activate on this browser.",
+  optionsProUnlockPlaceholder: "Paste your Pro key here",
+  optionsProSalesLink: "Get Pro",
+  optionsProActivate: "Activate Pro",
+  optionsProClear: "Remove",
+  optionsProActivated: "Pro activated.",
+  optionsProRemoved: "The Pro key has been removed.",
+  optionsProEmptyKey: "Enter a Pro key first.",
+  optionsProLocalOnly: "Your posts stay on your device. No sign-in required.",
+  optionsFileRules: "File Rules",
+  optionsFilenamePattern: "File Name Format",
+  optionsFilenamePatternLocked: "Free uses a default file name. Pro lets you set your own format.",
+  optionsSavePathPattern: "Subfolder Path",
+  optionsSavePathTokens: "Examples: Inbox/{date} \xB7 Threads/{author}",
+  optionsSavePathLocked: "Free saves to the root of your connected folder. Pro lets you automatically sort into subfolders by date, author, or topic.",
+  optionsFilenameTokens: "Available: {date}, {author}, {first_sentence}, {first_sentence_20}, {shortcode}",
+  optionsAiSection: "AI Organization",
+  optionsAiSubtitle: "Choose a provider and the default base URL and model are filled in for you.",
+  optionsAiQuickstart: "Most users only need a provider and API key. After changing them, press Save Settings below to apply them.",
+  optionsAiAdvancedSummary: "Show advanced settings",
+  optionsAiEnable: "Enable AI organization",
+  optionsAiProvider: "Provider",
+  optionsAiProviderHint: "OpenAI, OpenRouter, DeepSeek, Gemini, and Ollama can start from presets. Custom is for any OpenAI-compatible endpoint.",
+  optionsAiProviderOpenAi: "OpenAI",
+  optionsAiProviderOpenRouter: "OpenRouter",
+  optionsAiProviderDeepSeek: "DeepSeek",
+  optionsAiProviderGemini: "Gemini",
+  optionsAiProviderOllama: "Ollama",
+  optionsAiProviderCustom: "Custom",
+  optionsAiApiKey: "API key",
+  optionsAiApiKeyHint: "Gemini keys usually start with AIza, while OpenAI/OpenRouter/DeepSeek keys usually start with sk-. Leave this blank only for local endpoints like Ollama when no key is required.",
+  optionsAiApiKeyRequired: "The selected provider requires an API key.",
+  optionsAiKeyMismatchGemini: "Gemini needs a Google Gemini API key. The current key looks like an OpenAI-compatible key.",
+  optionsAiKeyMismatchOpenAi: "OpenAI/OpenRouter/DeepSeek providers require their own key, not a Gemini key that starts with AIza.",
+  optionsAiBaseUrl: "Base URL",
+  optionsAiBaseUrlHint: "Examples: https://api.openai.com/v1 \xB7 https://openrouter.ai/api/v1 \xB7 https://api.deepseek.com/v1 \xB7 http://localhost:11434/v1",
+  optionsAiModel: "Model name",
+  optionsAiModelHint: "Examples: gpt-4.1-mini \xB7 openai/gpt-4.1-mini \xB7 llama3.2",
+  optionsAiPrompt: "Organization prompt",
+  optionsAiPromptHint: "Describe your summary length, tag style, and desired frontmatter fields.",
+  optionsAiLocked: "AI organization is available in Pro only.",
+  optionsAiInvalidBaseUrl: "The AI base URL is not valid.",
+  optionsAiPermissionDenied: "Permission for the selected AI endpoint was denied, so settings were not saved.",
+  optionsAiSaved: "AI settings and endpoint permission saved.",
+  optionsIncludeImages: "Save images and video files",
   optionsSave: "Save Settings",
   optionsSaved: "Settings saved.",
+  optionsPendingSave: "Changed. Press Save Settings below to apply it.",
   optionsNoChanges: "No changes yet.",
   optionsStep1: "1. Connect Obsidian folder",
-  optionsStep2: "2. Open a Threads post",
-  optionsStep3: "3. Press Save",
+  optionsStep2: "2. Try saving for free first",
+  optionsStep3: "3. Activate Pro when you want rules or AI organization",
   mdImageLabel: "Image",
+  mdVideoLabel: "Video",
+  mdVideoThumbnailLabel: "Video thumbnail",
+  mdVideoOnThreads: "Open on Threads",
+  mdSavedVideoFile: "Saved video file",
   mdReplySection: "Author Replies",
   mdReplyLabel: "Reply",
   mdReplyImageLabel: "Reply image",
@@ -2571,8 +2818,12 @@ var en = {
   mdPublishedAt: "Published at",
   mdExternalLink: "External link",
   mdWarning: "Warning",
-  warnImageAccessFailed: "Some images could not be accessed; remote URLs were used.",
-  warnImageDownloadOff: "Image download is off; remote URLs were used.",
+  mdSummary: "AI Summary",
+  warnImageAccessFailed: "Some images or videos couldn't be saved; original links were kept.",
+  warnImageDownloadOff: "Image/video saving is off; original links were kept.",
+  warnAiFailed: "AI organization failed, so the original note was saved instead: {reason}",
+  warnAiPermissionMissing: "AI endpoint permission is missing, so the original note was saved. Re-save the AI section in settings.",
+  warnAiMissingModel: "No AI model name is configured, so the original note was saved.",
   errBrowserUnsupported: "This browser cannot save directly to an Obsidian folder.",
   errFolderNameFailed: "Could not determine a folder name for saving.",
   errInvalidPath: "Invalid file path.",
@@ -2580,7 +2831,8 @@ var en = {
   fallbackPermissionDenied: "No folder permission,",
   fallbackDirectFailed: "Could not save to folder,",
   fallbackZipMessage: " saved as download instead.",
-  errNotPermalink: "Please open an individual post page first."
+  errNotPermalink: "Please open an individual post page first.",
+  errPostContentNotFound: "Could not load post content. Please make sure you are logged in."
 };
 var dictionaries = { ko, en };
 var currentLocale = null;
@@ -2611,13 +2863,22 @@ async function t() {
 
 // src/extension/lib/media-permissions.ts
 var OPTIONAL_MEDIA_ORIGINS = ["https://*.cdninstagram.com/*", "https://*.fbcdn.net/*"];
-var IMAGES_DISABLED_WARNING = "\uC774\uBBF8\uC9C0 \uB2E4\uC6B4\uB85C\uB4DC\uAC00 \uAEBC\uC838 \uC788\uC5B4 \uC6D0\uACA9 URL\uC744 \uC0AC\uC6A9\uD588\uC2B5\uB2C8\uB2E4.";
-var IMAGE_PERMISSION_WARNING = "\uCD94\uAC00 \uC774\uBBF8\uC9C0 \uAD8C\uD55C\uC774 \uC5C6\uC5B4 \uC6D0\uACA9 URL\uC744 \uC0AC\uC6A9\uD588\uC2B5\uB2C8\uB2E4.";
-function hasAnyImages(post) {
-  return post.imageUrls.length > 0 || post.authorReplies.some((reply) => reply.imageUrls.length > 0);
+var MEDIA_DISABLED_WARNING = "\uC774\uBBF8\uC9C0/\uB3D9\uC601\uC0C1 \uC800\uC7A5\uC774 \uAEBC\uC838 \uC788\uC5B4 \uC6D0\uACA9 URL\uC744 \uC0AC\uC6A9\uD588\uC2B5\uB2C8\uB2E4.";
+var MEDIA_PERMISSION_WARNING = "\uCD94\uAC00 \uBBF8\uB514\uC5B4 \uAD8C\uD55C\uC774 \uC5C6\uC5B4 \uC6D0\uACA9 URL\uC744 \uC0AC\uC6A9\uD588\uC2B5\uB2C8\uB2E4.";
+function hasAnyMedia(post) {
+  return post.imageUrls.length > 0 || Boolean(post.videoUrl) || post.sourceType === "video" && Boolean(post.thumbnailUrl) || post.authorReplies.some((reply) => reply.imageUrls.length > 0 || Boolean(reply.videoUrl) || reply.sourceType === "video" && Boolean(reply.thumbnailUrl));
 }
 function requiresOptionalMediaPermission(post) {
-  const urls = [...post.imageUrls, ...post.authorReplies.flatMap((reply) => reply.imageUrls)];
+  const urls = [
+    ...post.imageUrls,
+    ...post.sourceType === "video" ? [post.thumbnailUrl] : [],
+    post.videoUrl,
+    ...post.authorReplies.flatMap((reply) => [
+      ...reply.imageUrls,
+      ...reply.sourceType === "video" ? [reply.thumbnailUrl] : [],
+      reply.videoUrl
+    ])
+  ].filter(Boolean);
   return urls.some((url) => {
     try {
       const hostname = new URL(url).hostname.toLowerCase();
@@ -2648,39 +2909,382 @@ async function requestOptionalMediaPermission() {
   }
 }
 async function resolveImageDownloadPolicy(post, includeImages, requestPermission) {
-  if (!includeImages || !hasAnyImages(post)) {
+  if (!includeImages || !hasAnyMedia(post)) {
     return {
       allowImageDownloads: false,
-      fallbackWarning: IMAGES_DISABLED_WARNING
+      fallbackWarning: MEDIA_DISABLED_WARNING
     };
   }
   if (!requiresOptionalMediaPermission(post)) {
     return {
       allowImageDownloads: true,
-      fallbackWarning: IMAGES_DISABLED_WARNING
+      fallbackWarning: MEDIA_DISABLED_WARNING
     };
   }
   if (await hasOptionalMediaPermission()) {
     return {
       allowImageDownloads: true,
-      fallbackWarning: IMAGES_DISABLED_WARNING
+      fallbackWarning: MEDIA_DISABLED_WARNING
     };
   }
   if (!requestPermission) {
     return {
       allowImageDownloads: false,
-      fallbackWarning: IMAGE_PERMISSION_WARNING
+      fallbackWarning: MEDIA_PERMISSION_WARNING
     };
   }
   const granted = await requestOptionalMediaPermission();
   return {
     allowImageDownloads: granted,
-    fallbackWarning: granted ? IMAGES_DISABLED_WARNING : IMAGE_PERMISSION_WARNING
+    fallbackWarning: granted ? MEDIA_DISABLED_WARNING : MEDIA_PERMISSION_WARNING
   };
 }
 
 // src/extension/lib/package.ts
 var import_jszip = __toESM(require_jszip_min(), 1);
+
+// src/extension/lib/llm.ts
+var RESERVED_FRONTMATTER_KEYS = /* @__PURE__ */ new Set([
+  "title",
+  "author",
+  "tags",
+  "summary",
+  "canonical_url",
+  "shortcode",
+  "published_at",
+  "captured_at",
+  "source_type",
+  "has_images",
+  "has_external_url",
+  "quoted_post_url",
+  "replied_to_url",
+  "author_reply_count"
+]);
+function normalizeBaseUrl(baseUrl) {
+  const normalized = baseUrl.trim();
+  if (!normalized) {
+    throw new Error("Missing AI base URL.");
+  }
+  const parsed = new URL(normalized);
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+    throw new Error("Unsupported AI base URL protocol.");
+  }
+  parsed.hash = "";
+  return parsed.toString().replace(/\/+$/, "");
+}
+function getAiPermissionPattern(baseUrl) {
+  const parsed = new URL(normalizeBaseUrl(baseUrl));
+  return `${parsed.protocol}//${parsed.hostname}/*`;
+}
+async function hasAiHostPermission(baseUrl) {
+  if (!chrome.permissions?.contains) {
+    return false;
+  }
+  try {
+    return await chrome.permissions.contains({
+      origins: [getAiPermissionPattern(baseUrl)]
+    });
+  } catch {
+    return false;
+  }
+}
+function isFlatPrimitiveArray(value) {
+  return Array.isArray(value) && value.every((item) => item === null || ["string", "number", "boolean"].includes(typeof item));
+}
+function sanitizeFrontmatterKey(key) {
+  return key.trim().toLowerCase().replace(/[^a-z0-9_-]+/g, "_").replace(/_{2,}/g, "_").replace(/^_+|_+$/g, "").slice(0, 40);
+}
+function sanitizeFrontmatterValue(value) {
+  if (value === null) {
+    return null;
+  }
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    return trimmed ? trimmed.slice(0, 500) : null;
+  }
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : null;
+  }
+  if (typeof value === "boolean") {
+    return value;
+  }
+  if (isFlatPrimitiveArray(value)) {
+    const items = value.map((item) => sanitizeFrontmatterValue(item)).filter((item) => item !== null).slice(0, 12);
+    return items.length > 0 ? items : null;
+  }
+  return null;
+}
+function extractTextContent(content) {
+  if (typeof content === "string") {
+    return content;
+  }
+  if (Array.isArray(content)) {
+    return content.map((item) => item.text ?? "").join("\n").trim();
+  }
+  return "";
+}
+function extractGeminiTextContent(parts) {
+  if (!Array.isArray(parts)) {
+    return "";
+  }
+  return parts.map((part) => part.text ?? "").join("\n").trim();
+}
+function extractJsonCandidate(raw) {
+  const fenceMatch = raw.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  if (fenceMatch?.[1]) {
+    return fenceMatch[1].trim();
+  }
+  const start = raw.indexOf("{");
+  if (start < 0) {
+    return raw.trim();
+  }
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+  for (let index = start; index < raw.length; index += 1) {
+    const char = raw[index];
+    if (inString) {
+      if (escaped) {
+        escaped = false;
+      } else if (char === "\\") {
+        escaped = true;
+      } else if (char === '"') {
+        inString = false;
+      }
+      continue;
+    }
+    if (char === '"') {
+      inString = true;
+      continue;
+    }
+    if (char === "{") {
+      depth += 1;
+    } else if (char === "}") {
+      depth -= 1;
+      if (depth === 0) {
+        return raw.slice(start, index + 1).trim();
+      }
+    }
+  }
+  return raw.trim();
+}
+function buildPrompt(post, settings) {
+  const replyBlock = post.authorReplies.length > 0 ? post.authorReplies.map(
+    (reply, index) => `Reply ${index + 1}
+Author: @${reply.author}
+Published: ${reply.publishedAt ?? "unknown"}
+Text:
+${reply.text}`
+  ).join("\n\n") : "None";
+  return [
+    "Return JSON only.",
+    "",
+    "Schema:",
+    "{",
+    '  "summary": "string | null",',
+    '  "tags": ["string"],',
+    '  "frontmatter": { "flat_key": "string | number | boolean | null | array" }',
+    "}",
+    "",
+    "Rules:",
+    "- Keep summary concise and factual.",
+    "- tags should be short, lowercase, and reusable in Obsidian.",
+    "- frontmatter must be flat. No nested objects.",
+    "- Do not repeat default fields like title, author, canonical_url, shortcode, tags, or summary inside frontmatter.",
+    "- If unsure, return null or an empty array/object.",
+    "",
+    `User rules:
+${settings.prompt.trim() || "No extra rules."}`,
+    "",
+    "Post:",
+    `Author: @${post.author}`,
+    `Canonical URL: ${post.canonicalUrl}`,
+    `Published: ${post.publishedAt ?? "unknown"}`,
+    `Source type: ${post.sourceType}`,
+    `External URL: ${post.externalUrl ?? "none"}`,
+    "",
+    "Main text:",
+    post.text,
+    "",
+    "Author replies:",
+    replyBlock
+  ].join("\n");
+}
+function sanitizeTags(value) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  const seen = /* @__PURE__ */ new Set();
+  const tags = [];
+  for (const item of value) {
+    if (typeof item !== "string") {
+      continue;
+    }
+    const normalized = item.trim().toLowerCase().replace(/^#+/, "").replace(/\s+/g, "-").replace(/[^a-z0-9_\-가-힣]+/g, "").replace(/-{2,}/g, "-").replace(/^-+|-+$/g, "").slice(0, 40);
+    if (!normalized || seen.has(normalized)) {
+      continue;
+    }
+    seen.add(normalized);
+    tags.push(normalized);
+    if (tags.length >= 8) {
+      break;
+    }
+  }
+  return tags;
+}
+function sanitizeResult(raw) {
+  const parsed = typeof raw === "object" && raw ? raw : {};
+  const summary = typeof parsed.summary === "string" && parsed.summary.trim() ? parsed.summary.trim().slice(0, 600) : null;
+  const tags = sanitizeTags(parsed.tags);
+  const frontmatterInput = typeof parsed.frontmatter === "object" && parsed.frontmatter && !Array.isArray(parsed.frontmatter) ? parsed.frontmatter : {};
+  const frontmatter = {};
+  for (const [rawKey, rawValue] of Object.entries(frontmatterInput)) {
+    const key = sanitizeFrontmatterKey(rawKey);
+    if (!key || RESERVED_FRONTMATTER_KEYS.has(key)) {
+      continue;
+    }
+    const value = sanitizeFrontmatterValue(rawValue);
+    if (value === null) {
+      continue;
+    }
+    frontmatter[key] = value;
+  }
+  return { summary, tags, frontmatter };
+}
+function summarizeAiError(error, settings, normalizedBaseUrl) {
+  if (!(error instanceof Error)) {
+    return "Unknown error";
+  }
+  const baseMessage = error.message.trim().slice(0, 120) || "Unknown error";
+  if (!settings || !normalizedBaseUrl) {
+    return baseMessage;
+  }
+  return `${settings.provider} @ ${normalizedBaseUrl}: ${baseMessage}`.slice(0, 180);
+}
+function normalizeGeminiModel(model) {
+  return model.trim().replace(/^models\//, "");
+}
+async function requestOpenAiCompatibleCompletion(normalizedBaseUrl, model, prompt, apiKey, signal) {
+  const headers = {
+    "content-type": "application/json"
+  };
+  if (apiKey.trim()) {
+    headers.authorization = `Bearer ${apiKey.trim()}`;
+  }
+  const response = await fetch(`${normalizedBaseUrl}/chat/completions`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({
+      model,
+      temperature: 0.1,
+      messages: [
+        {
+          role: "system",
+          content: "You convert Threads posts into clean Obsidian metadata. Output JSON only."
+        },
+        {
+          role: "user",
+          content: prompt
+        }
+      ]
+    }),
+    signal
+  });
+  const payload = await response.json().catch(() => null);
+  if (!response.ok) {
+    const reason = payload?.error?.message || response.statusText || `HTTP ${response.status}`;
+    throw new Error(reason);
+  }
+  const rawContent = extractTextContent(payload?.choices?.[0]?.message?.content);
+  if (!rawContent) {
+    throw new Error("Empty AI response");
+  }
+  return rawContent;
+}
+async function requestGeminiCompletion(normalizedBaseUrl, model, prompt, apiKey, signal) {
+  const normalizedModel = normalizeGeminiModel(model);
+  const requestUrl = new URL(`${normalizedBaseUrl}/models/${encodeURIComponent(normalizedModel)}:generateContent`);
+  if (apiKey.trim()) {
+    requestUrl.searchParams.set("key", apiKey.trim());
+  }
+  const response = await fetch(requestUrl.toString(), {
+    method: "POST",
+    headers: {
+      "content-type": "application/json"
+    },
+    body: JSON.stringify({
+      systemInstruction: {
+        parts: [
+          {
+            text: "You convert Threads posts into clean Obsidian metadata. Output JSON only."
+          }
+        ]
+      },
+      contents: [
+        {
+          role: "user",
+          parts: [
+            {
+              text: prompt
+            }
+          ]
+        }
+      ],
+      generationConfig: {
+        temperature: 0.1,
+        responseMimeType: "application/json"
+      }
+    }),
+    signal
+  });
+  const payload = await response.json().catch(() => null);
+  if (!response.ok) {
+    const reason = payload?.error?.message || response.statusText || `HTTP ${response.status}`;
+    throw new Error(reason);
+  }
+  const rawContent = extractGeminiTextContent(payload?.candidates?.[0]?.content?.parts);
+  if (!rawContent) {
+    throw new Error("Empty AI response");
+  }
+  return rawContent;
+}
+async function organizePostWithAi(post, settings) {
+  if (!settings.enabled) {
+    return { result: null, warning: null };
+  }
+  let normalizedBaseUrl = "";
+  try {
+    normalizedBaseUrl = normalizeBaseUrl(settings.baseUrl);
+    const model = settings.model.trim();
+    if (!model) {
+      return { result: null, warning: (await t()).warnAiMissingModel };
+    }
+    if (!await hasAiHostPermission(normalizedBaseUrl)) {
+      return { result: null, warning: (await t()).warnAiPermissionMissing };
+    }
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 2e4);
+    const prompt = buildPrompt(post, settings);
+    const transport = getAiProviderPreset(settings.provider).transport;
+    try {
+      const rawContent = transport === "gemini" ? await requestGeminiCompletion(normalizedBaseUrl, model, prompt, settings.apiKey, controller.signal) : await requestOpenAiCompatibleCompletion(normalizedBaseUrl, model, prompt, settings.apiKey, controller.signal);
+      const candidate = extractJsonCandidate(rawContent);
+      const parsed = JSON.parse(candidate);
+      const result = sanitizeResult(parsed);
+      if (!result.summary && result.tags.length === 0 && Object.keys(result.frontmatter).length === 0) {
+        return { result: null, warning: null };
+      }
+      return { result, warning: null };
+    } finally {
+      clearTimeout(timeout);
+    }
+  } catch (error) {
+    return {
+      result: null,
+      warning: (await t()).warnAiFailed.replace("{reason}", summarizeAiError(error, settings, normalizedBaseUrl))
+    };
+  }
+}
 
 // src/extension/lib/markdown.ts
 function formatYamlStringValue(value) {
@@ -2695,6 +3299,27 @@ function formatYamlDateValue(value) {
   }
   return value;
 }
+function formatYamlString(value) {
+  return JSON.stringify(value);
+}
+function formatFrontmatterPrimitive(value) {
+  if (value === null) {
+    return "null";
+  }
+  if (typeof value === "string") {
+    return formatYamlString(value);
+  }
+  return String(value);
+}
+function renderFrontmatterField(key, value) {
+  if (Array.isArray(value)) {
+    if (value.length === 0) {
+      return [`${key}: []`];
+    }
+    return [`${key}:`, ...value.map((item) => `  - ${formatFrontmatterPrimitive(item)}`)];
+  }
+  return [`${key}: ${formatFrontmatterPrimitive(value)}`];
+}
 function renderImageBlock(refs, labelPrefix) {
   const lines = [];
   for (const [index, ref] of refs.entries()) {
@@ -2702,7 +3327,21 @@ function renderImageBlock(refs, labelPrefix) {
   }
   return lines;
 }
-async function renderReplySection(post, imageRefs) {
+function renderVideoBlock(videoRef, canonicalUrl, msg) {
+  if (!videoRef) {
+    return [];
+  }
+  const lines = [`## ${msg.mdVideoLabel}`, "", `${msg.mdVideoOnThreads}: ${canonicalUrl}`];
+  if (videoRef.file && !/^https?:\/\//i.test(videoRef.file)) {
+    lines.push(`${msg.mdSavedVideoFile}: ${videoRef.file}`);
+  }
+  lines.push("");
+  if (videoRef.thumbnail) {
+    lines.push(`![${msg.mdVideoThumbnailLabel}](${videoRef.thumbnail})`, "");
+  }
+  return lines;
+}
+async function renderReplySection(post, mediaRefs) {
   if (post.authorReplies.length === 0) {
     return [];
   }
@@ -2718,29 +3357,45 @@ async function renderReplySection(post, imageRefs) {
       section.push(`${msg.mdExternalLink}: ${reply.externalUrl}`);
     }
     section.push("", reply.text.trim(), "");
-    section.push(...renderImageBlock(imageRefs.replyImages[index] ?? [], `${msg.mdReplyImageLabel} ${index + 1}`));
+    const replyVideoRef = mediaRefs.replyVideos[index] ?? null;
+    if (reply.sourceType === "video") {
+      section.push(`${msg.mdVideoOnThreads}: ${reply.canonicalUrl}`);
+      if (replyVideoRef?.file && !/^https?:\/\//i.test(replyVideoRef.file)) {
+        section.push(`${msg.mdSavedVideoFile}: ${replyVideoRef.file}`);
+      }
+      section.push("");
+      if (replyVideoRef?.thumbnail) {
+        section.push(`![${msg.mdVideoThumbnailLabel}](${replyVideoRef.thumbnail})`, "");
+      }
+    }
+    section.push(...renderImageBlock(mediaRefs.replyImages[index] ?? [], `${msg.mdReplyImageLabel} ${index + 1}`));
   });
   return section;
 }
-async function renderMarkdown(post, imageRefs, warning) {
+async function renderMarkdown(post, mediaRefs, warning, aiResult = null) {
   const msg = await t();
   const hasImages = post.imageUrls.length > 0 || post.authorReplies.some((reply) => reply.imageUrls.length > 0);
   const hasExternalUrl = Boolean(post.externalUrl || post.authorReplies.some((reply) => reply.externalUrl));
+  const tags = Array.from(/* @__PURE__ */ new Set(["threads", ...aiResult?.tags ?? []]));
   const frontmatter = [
     "---",
     `title: ${formatYamlStringValue(post.title)}`,
     `author: ${formatYamlStringValue(post.author)}`,
-    "tags: [threads]",
+    ...renderFrontmatterField("tags", tags),
+    ...aiResult?.summary ? renderFrontmatterField("summary", aiResult.summary) : [],
     `canonical_url: ${formatYamlStringValue(post.canonicalUrl)}`,
     `shortcode: ${formatYamlStringValue(post.shortcode)}`,
     `published_at: ${formatYamlDateValue(post.publishedAt)}`,
     `captured_at: ${formatYamlDateValue(post.capturedAt)}`,
     `source_type: ${formatYamlStringValue(post.sourceType)}`,
+    ...post.sourceType === "video" && post.thumbnailUrl ? renderFrontmatterField("thumbnail_url", post.thumbnailUrl) : [],
+    ...post.sourceType === "video" && post.videoUrl ? renderFrontmatterField("video_url", post.videoUrl) : [],
     `has_images: ${hasImages}`,
     `has_external_url: ${hasExternalUrl}`,
     `quoted_post_url: ${formatYamlStringValue(post.quotedPostUrl)}`,
     `replied_to_url: ${formatYamlStringValue(post.repliedToUrl)}`,
     `author_reply_count: ${post.authorReplies.length}`,
+    ...Object.entries(aiResult?.frontmatter ?? {}).flatMap(([key, value]) => renderFrontmatterField(key, value)),
     "---",
     ""
   ];
@@ -2754,12 +3409,20 @@ async function renderMarkdown(post, imageRefs, warning) {
   if (warning) {
     body.push(`${msg.mdWarning}: ${warning}`);
   }
-  body.push("", post.text.trim(), "");
-  if (imageRefs.postImages.length > 0) {
-    body.push(`## ${msg.mdImageLabel}`, "");
-    body.push(...renderImageBlock(imageRefs.postImages, msg.mdImageLabel));
+  if (aiResult?.summary) {
+    body.push("", `## ${msg.mdSummary}`, "", aiResult.summary, "");
+  } else {
+    body.push("");
   }
-  body.push(...await renderReplySection(post, imageRefs));
+  body.push(post.text.trim(), "");
+  if (post.sourceType === "video") {
+    body.push(...renderVideoBlock(mediaRefs.postVideo, post.canonicalUrl, msg));
+  }
+  if (mediaRefs.postImages.length > 0) {
+    body.push(`## ${msg.mdImageLabel}`, "");
+    body.push(...renderImageBlock(mediaRefs.postImages, msg.mdImageLabel));
+  }
+  body.push(...await renderReplySection(post, mediaRefs));
   return [...frontmatter, ...body].join("\n").trimEnd() + "\n";
 }
 
@@ -2770,6 +3433,9 @@ function isSupportedPermalink(url) {
 }
 function sanitizeFilenamePart(value) {
   return value.replace(/[\\/:*?"<>|]+/g, "").replace(/[.!?。！？]+$/g, "").replace(/\s+/g, "_").replace(/_+/g, "_").replace(/^_+|_+$/g, "").slice(0, 60);
+}
+function truncateFilenamePart(value, maxLength) {
+  return value.slice(0, maxLength).replace(/_+$/g, "");
 }
 function extractFirstSentence(text) {
   const normalized = decodeEscapedJsonString(text).trim();
@@ -2783,11 +3449,22 @@ function extractFirstSentence(text) {
   const sentenceMatch = firstBlock.match(/^(.+?[.!?。！？])(?:\s|$)/u);
   return (sentenceMatch?.[1] ?? firstBlock).trim();
 }
-function buildArchiveBaseName(pattern, post) {
+function resolvePatternTokens(pattern, post) {
   const date = (post.publishedAt ?? post.capturedAt).slice(0, 10);
   const firstSentence = extractFirstSentence(post.text) || post.title || post.shortcode;
-  const resolved = pattern.replaceAll("{date}", sanitizeFilenamePart(date)).replaceAll("{author}", sanitizeFilenamePart(post.author)).replaceAll("{first_sentence}", sanitizeFilenamePart(firstSentence)).replaceAll("{shortcode}", sanitizeFilenamePart(post.shortcode));
+  const sanitizedFirstSentence = sanitizeFilenamePart(firstSentence);
+  return pattern.replaceAll("{date}", sanitizeFilenamePart(date)).replaceAll("{author}", sanitizeFilenamePart(post.author)).replaceAll("{first_sentence_20}", truncateFilenamePart(sanitizedFirstSentence, 20)).replaceAll("{first_sentence}", sanitizedFirstSentence).replaceAll("{shortcode}", sanitizeFilenamePart(post.shortcode));
+}
+function buildArchiveBaseName(pattern, post) {
+  const resolved = resolvePatternTokens(pattern, post);
+  const firstSentence = extractFirstSentence(post.text) || post.title || post.shortcode;
   return resolved || `${sanitizeFilenamePart(post.author)}_${sanitizeFilenamePart(firstSentence)}`;
+}
+function buildPathPatternParts(pattern, post) {
+  if (!pattern.trim()) {
+    return [];
+  }
+  return resolvePatternTokens(pattern, post).replace(/\\/g, "/").split("/").map((part) => sanitizeFilenamePart(part.trim())).filter(Boolean);
 }
 function buildZipFilename(pattern, post) {
   return `${buildArchiveBaseName(pattern, post)}.zip`;
@@ -2813,6 +3490,12 @@ function decodeEscapedJsonString(value) {
 }
 
 // src/extension/lib/package.ts
+function prefixAssetBasePath(orderPrefix, basename) {
+  return `${orderPrefix}. ${basename}`;
+}
+function buildArchiveNoteFilename(archiveName) {
+  return `01. ${archiveName}.md`;
+}
 function guessExtension(url, contentType) {
   if (contentType?.includes("png")) {
     return "png";
@@ -2829,74 +3512,144 @@ function guessExtension(url, contentType) {
   const match = url.match(/\.([a-zA-Z0-9]+)(?:[?#]|$)/);
   return match?.[1]?.toLowerCase() ?? "jpg";
 }
-function hasAnyImages2(post) {
-  return post.imageUrls.length > 0 || post.authorReplies.some((reply) => reply.imageUrls.length > 0);
+function hasAnyMedia2(post) {
+  return post.imageUrls.length > 0 || Boolean(post.videoUrl) || post.sourceType === "video" && Boolean(post.thumbnailUrl) || post.authorReplies.some((reply) => reply.imageUrls.length > 0 || Boolean(reply.videoUrl) || reply.sourceType === "video" && Boolean(reply.thumbnailUrl));
 }
-async function collectImageAssets(imageUrls, assetStem, includeImages, fallbackWarning) {
+async function collectRemoteAsset(url, assetBasePath, includeImages, fallbackWarning) {
+  if (!url) {
+    return { ref: null, assetFiles: [], warning: null };
+  }
+  if (!includeImages) {
+    return {
+      ref: url,
+      assetFiles: [],
+      warning: fallbackWarning
+    };
+  }
+  try {
+    const response = await fetch(url, { cache: "no-store" });
+    if (!response.ok) {
+      throw new Error("asset fetch failed");
+    }
+    const contentType = response.headers.get("content-type");
+    const blob = await response.blob();
+    const extension = guessExtension(url, contentType);
+    const relativePath = `${assetBasePath}.${extension}`;
+    return {
+      ref: relativePath,
+      assetFiles: [{ relativePath, blob }],
+      warning: null
+    };
+  } catch {
+    return {
+      ref: url,
+      assetFiles: [],
+      warning: (await t()).warnImageAccessFailed
+    };
+  }
+}
+async function collectImageAssets(imageUrls, assetBasename, includeImages, fallbackWarning) {
   const refs = [];
   const assetFiles = [];
   let warning = null;
-  if (!includeImages) {
-    refs.push(...imageUrls);
-    if (imageUrls.length > 0) {
-      warning = fallbackWarning;
-    }
-    return { refs, assetFiles, warning };
-  }
   for (const [index, imageUrl] of imageUrls.entries()) {
-    try {
-      const response = await fetch(imageUrl, { cache: "no-store" });
-      if (!response.ok) {
-        throw new Error(`image ${index + 1} failed`);
-      }
-      const contentType = response.headers.get("content-type");
-      const blob = await response.blob();
-      const extension = guessExtension(imageUrl, contentType);
-      const relativePath = `assets/${assetStem}-${String(index + 1).padStart(2, "0")}.${extension}`;
-      assetFiles.push({ relativePath, blob });
-      refs.push(relativePath);
-    } catch {
-      warning = (await t()).warnImageAccessFailed;
-      refs.push(imageUrl);
+    const result = await collectRemoteAsset(imageUrl, `${assetBasename}-${String(index + 1).padStart(2, "0")}`, includeImages, fallbackWarning);
+    if (result.ref) {
+      refs.push(result.ref);
     }
+    assetFiles.push(...result.assetFiles);
+    warning = warning ?? result.warning;
   }
   return { refs, assetFiles, warning };
 }
-async function buildArchiveBundle(post, filenamePattern, includeImages, fallbackWarning) {
+async function collectVideoAssets(videoUrl, thumbnailUrl, assetBasePath, includeImages, fallbackWarning) {
+  const [videoResult, thumbnailResult] = await Promise.all([
+    collectRemoteAsset(videoUrl, assetBasePath, includeImages, fallbackWarning),
+    collectRemoteAsset(thumbnailUrl, `${assetBasePath}-thumb`, includeImages, fallbackWarning)
+  ]);
+  return {
+    file: videoResult.ref,
+    thumbnail: thumbnailResult.ref,
+    assetFiles: [...videoResult.assetFiles, ...thumbnailResult.assetFiles],
+    warning: videoResult.warning ?? thumbnailResult.warning
+  };
+}
+async function buildArchiveBundle(post, filenamePattern, includeImages, fallbackWarning, aiOrganization) {
   const resolvedFallbackWarning = fallbackWarning ?? (await t()).warnImageDownloadOff;
   const archiveName = buildArchiveBaseName(filenamePattern, post);
-  const postImages = await collectImageAssets(post.imageUrls, "post-image", includeImages, resolvedFallbackWarning);
+  const ai = aiOrganization ? await organizePostWithAi(post, aiOrganization) : { result: null, warning: null };
+  const postImages = await collectImageAssets(
+    post.imageUrls,
+    prefixAssetBasePath("02", "image"),
+    includeImages,
+    resolvedFallbackWarning
+  );
+  const postVideo = post.sourceType === "video" ? await collectVideoAssets(
+    post.videoUrl,
+    post.thumbnailUrl,
+    prefixAssetBasePath("02", "video"),
+    includeImages,
+    resolvedFallbackWarning
+  ) : null;
   const replyImages = await Promise.all(
     post.authorReplies.map(
-      (reply, index) => collectImageAssets(reply.imageUrls, `reply-${String(index + 1).padStart(2, "0")}-image`, includeImages, resolvedFallbackWarning)
+      (reply, index) => collectImageAssets(
+        reply.imageUrls,
+        prefixAssetBasePath("03", `reply-${String(index + 1).padStart(2, "0")}-image`),
+        includeImages,
+        resolvedFallbackWarning
+      )
+    )
+  );
+  const replyVideos = await Promise.all(
+    post.authorReplies.map(
+      (reply, index) => reply.sourceType === "video" ? collectVideoAssets(
+        reply.videoUrl,
+        reply.thumbnailUrl,
+        prefixAssetBasePath("03", `reply-${String(index + 1).padStart(2, "0")}-video`),
+        includeImages,
+        resolvedFallbackWarning
+      ) : Promise.resolve(null)
     )
   );
   let warning = null;
-  if (!includeImages && hasAnyImages2(post)) {
+  if (!includeImages && hasAnyMedia2(post)) {
     warning = resolvedFallbackWarning;
   }
-  warning ??= postImages.warning ?? replyImages.find((result) => result.warning)?.warning ?? null;
+  const noteWarning = warning ?? postImages.warning ?? postVideo?.warning ?? replyImages.find((result) => result.warning)?.warning ?? replyVideos.find((result) => result?.warning)?.warning ?? null;
+  const userWarnings = [noteWarning, ai.warning].filter(Boolean);
+  warning = userWarnings.length > 0 ? userWarnings.join(" | ") : null;
   const markdownContent = await renderMarkdown(
     post,
     {
       postImages: postImages.refs,
-      replyImages: replyImages.map((result) => result.refs)
+      postVideo: postVideo ? { thumbnail: postVideo.thumbnail, file: postVideo.file } : null,
+      replyImages: replyImages.map((result) => result.refs),
+      replyVideos: replyVideos.map((result) => result ? { thumbnail: result.thumbnail, file: result.file } : null)
     },
-    warning
+    noteWarning,
+    ai.result
   );
   return {
     archiveName,
     markdownContent,
-    assetFiles: [...postImages.assetFiles, ...replyImages.flatMap((result) => result.assetFiles)],
-    warning
+    assetFiles: [
+      ...postImages.assetFiles,
+      ...postVideo?.assetFiles ?? [],
+      ...replyImages.flatMap((result) => result.assetFiles),
+      ...replyVideos.flatMap((result) => result?.assetFiles ?? [])
+    ],
+    warning,
+    noteWarning
   };
 }
-async function buildZipPackage(post, filenamePattern, includeImages, fallbackWarning = "\uC774\uBBF8\uC9C0 \uB2E4\uC6B4\uB85C\uB4DC\uAC00 \uAEBC\uC838 \uC788\uC5B4 \uC6D0\uACA9 URL\uC744 \uC0AC\uC6A9\uD588\uC2B5\uB2C8\uB2E4.") {
-  const bundle = await buildArchiveBundle(post, filenamePattern, includeImages, fallbackWarning);
+async function buildZipPackage(post, filenamePattern, includeImages, fallbackWarning = "\uC774\uBBF8\uC9C0/\uB3D9\uC601\uC0C1 \uC800\uC7A5\uC774 \uAEBC\uC838 \uC788\uC5B4 \uC6D0\uACA9 URL\uC744 \uC0AC\uC6A9\uD588\uC2B5\uB2C8\uB2E4.", savePathPattern = "", aiOrganization) {
+  const bundle = await buildArchiveBundle(post, filenamePattern, includeImages, fallbackWarning, aiOrganization);
   const zip = new import_jszip.default();
-  zip.file(`${bundle.archiveName}/${bundle.archiveName}.md`, bundle.markdownContent);
+  const archiveRoot = [...buildPathPatternParts(savePathPattern, post), bundle.archiveName].join("/");
+  zip.file(`${archiveRoot}/${buildArchiveNoteFilename(bundle.archiveName)}`, bundle.markdownContent);
   for (const file of bundle.assetFiles) {
-    zip.file(`${bundle.archiveName}/${file.relativePath}`, await file.blob.arrayBuffer());
+    zip.file(`${archiveRoot}/${file.relativePath}`, await file.blob.arrayBuffer());
   }
   return {
     blob: await zip.generateAsync({ type: "blob" }),
@@ -2906,20 +3659,226 @@ async function buildZipPackage(post, filenamePattern, includeImages, fallbackWar
   };
 }
 
+// src/extension/lib/license.ts
+var PRO_LICENSE_PUBLIC_KEY = {
+  kty: "EC",
+  x: "sACfUItyPveEEvzTzJRpeoBqpsg7DBTcmidebSuJ29U",
+  y: "lv68pNMuUrDUT0SgjTTmWigwcItjIBtRqE3pRxdSKLM",
+  crv: "P-256"
+};
+var cachedPublicKey = null;
+function toBase64UrlBytes(value) {
+  const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
+  const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, "=");
+  const binary = atob(padded);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+  return bytes;
+}
+function decodePayloadSegment(segment) {
+  try {
+    const bytes = toBase64UrlBytes(segment);
+    const raw = new TextDecoder().decode(bytes);
+    const parsed = JSON.parse(raw);
+    if (parsed.plan !== "pro" || typeof parsed.issuedAt !== "string") {
+      return null;
+    }
+    if (parsed.expiresAt !== null && parsed.expiresAt !== void 0 && typeof parsed.expiresAt !== "string") {
+      return null;
+    }
+    if (parsed.holder !== null && parsed.holder !== void 0 && typeof parsed.holder !== "string") {
+      return null;
+    }
+    return {
+      plan: "pro",
+      holder: parsed.holder ?? null,
+      issuedAt: parsed.issuedAt,
+      expiresAt: parsed.expiresAt ?? null
+    };
+  } catch {
+    return null;
+  }
+}
+function hasExpired(payload) {
+  if (!payload.expiresAt) {
+    return false;
+  }
+  const expiresAt = Date.parse(payload.expiresAt);
+  if (!Number.isFinite(expiresAt)) {
+    return true;
+  }
+  return expiresAt < Date.now();
+}
+async function importPublicKey(publicKey) {
+  return await crypto.subtle.importKey(
+    "jwk",
+    publicKey,
+    {
+      name: "ECDSA",
+      namedCurve: "P-256"
+    },
+    false,
+    ["verify"]
+  );
+}
+async function getPublicKey(publicKey = PRO_LICENSE_PUBLIC_KEY) {
+  if (publicKey !== PRO_LICENSE_PUBLIC_KEY) {
+    return await importPublicKey(publicKey);
+  }
+  cachedPublicKey ??= importPublicKey(publicKey);
+  return await cachedPublicKey;
+}
+async function validateProLicenseToken(token, publicKey = PRO_LICENSE_PUBLIC_KEY) {
+  const normalized = token.trim();
+  if (!normalized) {
+    return { state: "none", payload: null };
+  }
+  const [payloadSegment, signatureSegment, ...rest] = normalized.split(".");
+  if (!payloadSegment || !signatureSegment || rest.length > 0) {
+    return { state: "invalid", payload: null };
+  }
+  const payload = decodePayloadSegment(payloadSegment);
+  if (!payload) {
+    return { state: "invalid", payload: null };
+  }
+  try {
+    const key = await getPublicKey(publicKey);
+    const signatureBytes = toBase64UrlBytes(signatureSegment);
+    const signature = new Uint8Array(signatureBytes.length);
+    signature.set(signatureBytes);
+    const data = new TextEncoder().encode(payloadSegment);
+    const verified = await crypto.subtle.verify(
+      {
+        name: "ECDSA",
+        hash: "SHA-256"
+      },
+      key,
+      signature,
+      data
+    );
+    if (!verified) {
+      return { state: "invalid", payload: null };
+    }
+  } catch {
+    return { state: "invalid", payload: null };
+  }
+  if (hasExpired(payload)) {
+    return { state: "expired", payload };
+  }
+  return { state: "valid", payload };
+}
+
+// src/extension/lib/pro-device.ts
+var PRO_DEVICE_KEY = "pro-device";
+function inferBrowserName() {
+  const ua = navigator.userAgent;
+  if (/Edg\//.test(ua)) {
+    return "Edge";
+  }
+  if (/Chrome\//.test(ua)) {
+    return "Chrome";
+  }
+  if (/Firefox\//.test(ua)) {
+    return "Firefox";
+  }
+  if (/Safari\//.test(ua)) {
+    return "Safari";
+  }
+  return "Browser";
+}
+function inferPlatformLabel() {
+  const value = (
+    // userAgentData isn't always available in extension pages.
+    (navigator.userAgentData?.platform ?? navigator.platform ?? "").trim()
+  );
+  if (!value) {
+    return "device";
+  }
+  return value.replace(/^Mac/i, "macOS").replace(/^Win/i, "Windows");
+}
+function buildDeviceLabel() {
+  return `${inferBrowserName()} on ${inferPlatformLabel()}`;
+}
+async function getOrCreateProDevice() {
+  const stored = await chrome.storage.local.get(PRO_DEVICE_KEY);
+  const existing = stored[PRO_DEVICE_KEY];
+  if (existing?.id && existing.label) {
+    return existing;
+  }
+  const created = {
+    id: crypto.randomUUID(),
+    label: buildDeviceLabel(),
+    createdAt: (/* @__PURE__ */ new Date()).toISOString()
+  };
+  await chrome.storage.local.set({ [PRO_DEVICE_KEY]: created });
+  return created;
+}
+
+// src/extension/lib/pro-activation.ts
+var PRO_ACTIVATION_ORIGIN = "https://threads-obsidian.dahanda.dev";
+var PRO_ACTIVATION_BASE = `${PRO_ACTIVATION_ORIGIN}/api/public/licenses`;
+async function postActivation(path, payload) {
+  const response = await fetch(`${PRO_ACTIVATION_BASE}${path}`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json"
+    },
+    body: JSON.stringify(payload)
+  });
+  const json = await response.json().catch(() => null);
+  if (!response.ok && json && typeof json === "object" && "ok" in json) {
+    return json;
+  }
+  if (!response.ok) {
+    throw new Error(json && typeof json === "object" && "error" in json && json.error || `Activation request failed (${response.status})`);
+  }
+  return json;
+}
+async function getServerLicenseStatus(token, deviceId, deviceLabel) {
+  return await postActivation("/status", { token, deviceId, deviceLabel });
+}
+function mapServerFailureToActivationState(reason) {
+  if (reason === "seat_limit") {
+    return "seat_limit";
+  }
+  if (reason === "revoked") {
+    return "revoked";
+  }
+  return "required";
+}
+
 // src/extension/lib/storage.ts
 var OPTIONS_KEY = "options";
 var RECENT_SAVES_KEY = "recent-saves";
+var LICENSE_KEY = "pro-license";
 var LEGACY_DEFAULT_FILENAME_PATTERN = "{date}__{author}__{shortcode}";
 var PREVIOUS_DEFAULT_FILENAME_PATTERN = "{date}_{author}_{shortcode}";
+var OLD_FIRST_SENTENCE_DEFAULT_FILENAME_PATTERN = "{author}_{first_sentence}";
+var PREVIOUS_SHORTCODE_DEFAULT_FILENAME_PATTERN = "{author}_{shortcode}";
 var MAX_RECENT_SAVES = 10;
+var PLAN_STATUS_TTL_MS = 5 * 6e4;
+function mergeOptionsWithDefaults(options) {
+  return {
+    ...DEFAULT_OPTIONS,
+    ...options,
+    aiOrganization: {
+      ...DEFAULT_OPTIONS.aiOrganization,
+      ...options?.aiOrganization ?? {}
+    }
+  };
+}
 function normalizeRecentSave(item) {
   const archiveName = item.archiveName ?? item.zipFilename?.replace(/\.zip$/i, "") ?? "";
   const post = {
     ...item.post,
+    videoUrl: item.post.videoUrl ?? null,
     title: decodeEscapedJsonString(item.post.title),
     text: decodeEscapedJsonString(item.post.text),
     authorReplies: item.post.authorReplies.map((reply) => ({
       ...reply,
+      videoUrl: reply.videoUrl ?? null,
       text: decodeEscapedJsonString(reply.text)
     }))
   };
@@ -2935,9 +3894,10 @@ function normalizeRecentSave(item) {
 }
 async function getOptions() {
   const stored = await chrome.storage.local.get(OPTIONS_KEY);
-  const merged = { ...DEFAULT_OPTIONS, ...stored[OPTIONS_KEY] };
+  const storedOptions = stored[OPTIONS_KEY];
+  const merged = mergeOptionsWithDefaults(storedOptions);
   let shouldPersist = false;
-  if (!merged.filenamePattern || merged.filenamePattern === LEGACY_DEFAULT_FILENAME_PATTERN || merged.filenamePattern === PREVIOUS_DEFAULT_FILENAME_PATTERN) {
+  if (!merged.filenamePattern || merged.filenamePattern === LEGACY_DEFAULT_FILENAME_PATTERN || merged.filenamePattern === PREVIOUS_DEFAULT_FILENAME_PATTERN || merged.filenamePattern === OLD_FIRST_SENTENCE_DEFAULT_FILENAME_PATTERN || merged.filenamePattern === PREVIOUS_SHORTCODE_DEFAULT_FILENAME_PATTERN) {
     merged.filenamePattern = DEFAULT_OPTIONS.filenamePattern;
     shouldPersist = true;
   }
@@ -2945,13 +3905,140 @@ async function getOptions() {
     merged.obsidianFolderLabel = DEFAULT_OPTIONS.obsidianFolderLabel;
     shouldPersist = true;
   }
+  if (merged.savePathPattern === void 0) {
+    merged.savePathPattern = DEFAULT_OPTIONS.savePathPattern;
+    shouldPersist = true;
+  }
+  if (!storedOptions?.aiOrganization) {
+    shouldPersist = true;
+  } else {
+    const expectedAiKeys = Object.keys(DEFAULT_OPTIONS.aiOrganization);
+    for (const key of expectedAiKeys) {
+      if (storedOptions.aiOrganization[key] === void 0) {
+        shouldPersist = true;
+        break;
+      }
+    }
+  }
   if (shouldPersist) {
     await chrome.storage.local.set({ [OPTIONS_KEY]: merged });
   }
   return merged;
 }
 async function setOptions(options) {
-  await chrome.storage.local.set({ [OPTIONS_KEY]: { ...DEFAULT_OPTIONS, ...options } });
+  await chrome.storage.local.set({ [OPTIONS_KEY]: mergeOptionsWithDefaults(options) });
+}
+function buildPlanStatus(licenseState, payload, overrides = {}) {
+  return {
+    tier: licenseState === "valid" && payload && overrides.activationState === "active" ? "pro" : "free",
+    licenseState,
+    holder: payload?.holder ?? null,
+    expiresAt: payload?.expiresAt ?? null,
+    activationState: overrides.activationState ?? "none",
+    seatLimit: overrides.seatLimit ?? null,
+    seatsUsed: overrides.seatsUsed ?? null,
+    deviceLabel: overrides.deviceLabel ?? null,
+    activatedAt: overrides.activatedAt ?? null
+  };
+}
+function isActivationFresh(record) {
+  if (!record?.validatedAt) {
+    return false;
+  }
+  return Date.now() - Date.parse(record.validatedAt) < PLAN_STATUS_TTL_MS;
+}
+async function readStoredLicenseRecord() {
+  const stored = await chrome.storage.local.get(LICENSE_KEY);
+  return stored[LICENSE_KEY] ?? null;
+}
+async function writeStoredLicenseRecord(record) {
+  await chrome.storage.local.set({ [LICENSE_KEY]: record });
+}
+async function getPlanStatus() {
+  const record = await readStoredLicenseRecord();
+  if (!record?.key) {
+    return buildPlanStatus("none", null);
+  }
+  const validation = await validateProLicenseToken(record.key);
+  if (validation.state !== "valid" || !validation.payload) {
+    return buildPlanStatus(validation.state, validation.payload);
+  }
+  if (isActivationFresh(record.activation)) {
+    const activation = record.activation;
+    return buildPlanStatus("valid", validation.payload, {
+      activationState: "active",
+      seatLimit: activation?.seatLimit ?? null,
+      seatsUsed: activation?.seatsUsed ?? null,
+      deviceLabel: activation?.deviceLabel ?? null,
+      activatedAt: activation?.activatedAt ?? null
+    });
+  }
+  const device = await getOrCreateProDevice();
+  try {
+    const server = await getServerLicenseStatus(record.key, device.id, device.label);
+    if (server.ok) {
+      const nextRecord2 = {
+        ...record,
+        payload: validation.payload,
+        activation: {
+          state: "active",
+          deviceId: server.deviceId,
+          deviceLabel: server.deviceLabel,
+          seatLimit: server.seatLimit,
+          seatsUsed: server.seatsUsed,
+          activatedAt: server.activatedAt,
+          validatedAt: (/* @__PURE__ */ new Date()).toISOString()
+        }
+      };
+      await writeStoredLicenseRecord(nextRecord2);
+      return buildPlanStatus("valid", validation.payload, {
+        activationState: "active",
+        seatLimit: server.seatLimit,
+        seatsUsed: server.seatsUsed,
+        deviceLabel: server.deviceLabel,
+        activatedAt: server.activatedAt
+      });
+    }
+    const nextRecord = {
+      ...record,
+      payload: validation.payload,
+      activation: null
+    };
+    await writeStoredLicenseRecord(nextRecord);
+    return buildPlanStatus("valid", validation.payload, {
+      activationState: mapServerFailureToActivationState(server.reason),
+      seatLimit: server.seatLimit,
+      seatsUsed: server.seatsUsed
+    });
+  } catch {
+    if (record.activation) {
+      return buildPlanStatus("valid", validation.payload, {
+        activationState: "active",
+        seatLimit: record.activation.seatLimit,
+        seatsUsed: record.activation.seatsUsed,
+        deviceLabel: record.activation.deviceLabel,
+        activatedAt: record.activation.activatedAt
+      });
+    }
+    return buildPlanStatus("valid", validation.payload, {
+      activationState: "offline"
+    });
+  }
+}
+async function getEffectiveOptions() {
+  const [options, planStatus] = await Promise.all([getOptions(), getPlanStatus()]);
+  if (planStatus.tier === "pro") {
+    return options;
+  }
+  return {
+    ...options,
+    filenamePattern: DEFAULT_OPTIONS.filenamePattern,
+    savePathPattern: DEFAULT_OPTIONS.savePathPattern,
+    aiOrganization: {
+      ...options.aiOrganization,
+      enabled: false
+    }
+  };
 }
 async function getRecentSaves() {
   const stored = await chrome.storage.local.get(RECENT_SAVES_KEY);
@@ -3095,7 +4182,7 @@ async function saveCurrentPost(tab, allowDuplicate = false, imageOverride) {
   try {
     const post = await extractPostFromTab(tab);
     const duplicate = await findDuplicateSave(post.canonicalUrl, post.contentHash);
-    const options = await getOptions();
+    const options = await getEffectiveOptions();
     const imagePolicy = imageOverride && typeof imageOverride.allowImageDownloads === "boolean" && imageOverride.imageFallbackWarning ? {
       allowImageDownloads: imageOverride.allowImageDownloads,
       fallbackWarning: imageOverride.imageFallbackWarning
@@ -3104,7 +4191,9 @@ async function saveCurrentPost(tab, allowDuplicate = false, imageOverride) {
       post,
       options.filenamePattern,
       imagePolicy.allowImageDownloads,
-      imagePolicy.fallbackWarning
+      imagePolicy.fallbackWarning,
+      options.savePathPattern,
+      options.aiOrganization
     );
     await downloadBlob(packaged.blob, packaged.zipFilename);
     const recent = duplicate && !allowDuplicate ? {
@@ -3149,7 +4238,7 @@ async function redownloadSave(saveId, successMessage, imageOverride) {
   }
   broadcastStatus({ kind: "saving", message: msg.statusResaving });
   try {
-    const options = await getOptions();
+    const options = await getEffectiveOptions();
     const imagePolicy = imageOverride && typeof imageOverride.allowImageDownloads === "boolean" && imageOverride.imageFallbackWarning ? {
       allowImageDownloads: imageOverride.allowImageDownloads,
       fallbackWarning: imageOverride.imageFallbackWarning
@@ -3158,7 +4247,9 @@ async function redownloadSave(saveId, successMessage, imageOverride) {
       recentSave.post,
       options.filenamePattern,
       imagePolicy.allowImageDownloads,
-      imagePolicy.fallbackWarning
+      imagePolicy.fallbackWarning,
+      options.savePathPattern,
+      options.aiOrganization
     );
     await downloadBlob(packaged.blob, packaged.zipFilename);
     const updatedSave = {

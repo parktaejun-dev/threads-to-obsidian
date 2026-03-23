@@ -1,8 +1,9 @@
 import JSZip from "jszip";
-import type { ExtractedPost, PackagedResult } from "./types";
+import { organizePostWithAi } from "./llm";
+import type { AiOrganizationSettings, ExtractedPost, PackagedResult } from "./types";
 import { t } from "./i18n";
 import { renderMarkdown } from "./markdown";
-import { buildArchiveBaseName, buildZipFilename } from "./utils";
+import { buildArchiveBaseName, buildPathPatternParts, buildZipFilename } from "./utils";
 
 export interface ArchiveAssetFile {
   relativePath: string;
@@ -14,6 +15,15 @@ export interface ArchiveBundle {
   markdownContent: string;
   assetFiles: ArchiveAssetFile[];
   warning: string | null;
+  noteWarning: string | null;
+}
+
+function prefixAssetBasePath(orderPrefix: string, basename: string): string {
+  return `${orderPrefix}. ${basename}`;
+}
+
+export function buildArchiveNoteFilename(archiveName: string): string {
+  return `01. ${archiveName}.md`;
 }
 
 function guessExtension(url: string, contentType: string | null): string {
@@ -34,13 +44,60 @@ function guessExtension(url: string, contentType: string | null): string {
   return match?.[1]?.toLowerCase() ?? "jpg";
 }
 
-function hasAnyImages(post: ExtractedPost): boolean {
-  return post.imageUrls.length > 0 || post.authorReplies.some((reply) => reply.imageUrls.length > 0);
+function hasAnyMedia(post: ExtractedPost): boolean {
+  return (
+    post.imageUrls.length > 0 ||
+    Boolean(post.videoUrl) ||
+    (post.sourceType === "video" && Boolean(post.thumbnailUrl)) ||
+    post.authorReplies.some((reply) => reply.imageUrls.length > 0 || Boolean(reply.videoUrl) || (reply.sourceType === "video" && Boolean(reply.thumbnailUrl)))
+  );
+}
+
+async function collectRemoteAsset(
+  url: string | null,
+  assetBasePath: string,
+  includeImages: boolean,
+  fallbackWarning: string
+): Promise<{ ref: string | null; assetFiles: ArchiveAssetFile[]; warning: string | null }> {
+  if (!url) {
+    return { ref: null, assetFiles: [], warning: null };
+  }
+
+  if (!includeImages) {
+    return {
+      ref: url,
+      assetFiles: [],
+      warning: fallbackWarning
+    };
+  }
+
+  try {
+    const response = await fetch(url, { cache: "no-store" });
+    if (!response.ok) {
+      throw new Error("asset fetch failed");
+    }
+
+    const contentType = response.headers.get("content-type");
+    const blob = await response.blob();
+    const extension = guessExtension(url, contentType);
+    const relativePath = `${assetBasePath}.${extension}`;
+    return {
+      ref: relativePath,
+      assetFiles: [{ relativePath, blob }],
+      warning: null
+    };
+  } catch {
+    return {
+      ref: url,
+      assetFiles: [],
+      warning: (await t()).warnImageAccessFailed
+    };
+  }
 }
 
 async function collectImageAssets(
   imageUrls: string[],
-  assetStem: string,
+  assetBasename: string,
   includeImages: boolean,
   fallbackWarning: string
 ): Promise<{ refs: string[]; assetFiles: ArchiveAssetFile[]; warning: string | null }> {
@@ -48,70 +105,125 @@ async function collectImageAssets(
   const assetFiles: ArchiveAssetFile[] = [];
   let warning: string | null = null;
 
-  if (!includeImages) {
-    refs.push(...imageUrls);
-    if (imageUrls.length > 0) {
-      warning = fallbackWarning;
-    }
-    return { refs, assetFiles, warning };
-  }
-
   for (const [index, imageUrl] of imageUrls.entries()) {
-    try {
-      const response = await fetch(imageUrl, { cache: "no-store" });
-      if (!response.ok) {
-        throw new Error(`image ${index + 1} failed`);
-      }
-      const contentType = response.headers.get("content-type");
-      const blob = await response.blob();
-      const extension = guessExtension(imageUrl, contentType);
-      const relativePath = `assets/${assetStem}-${String(index + 1).padStart(2, "0")}.${extension}`;
-      assetFiles.push({ relativePath, blob });
-      refs.push(relativePath);
-    } catch {
-      warning = (await t()).warnImageAccessFailed;
-      refs.push(imageUrl);
+    const result = await collectRemoteAsset(imageUrl, `${assetBasename}-${String(index + 1).padStart(2, "0")}`, includeImages, fallbackWarning);
+    if (result.ref) {
+      refs.push(result.ref);
     }
+    assetFiles.push(...result.assetFiles);
+    warning = warning ?? result.warning;
   }
 
   return { refs, assetFiles, warning };
+}
+
+async function collectVideoAssets(
+  videoUrl: string | null,
+  thumbnailUrl: string | null,
+  assetBasePath: string,
+  includeImages: boolean,
+  fallbackWarning: string
+): Promise<{ file: string | null; thumbnail: string | null; assetFiles: ArchiveAssetFile[]; warning: string | null }> {
+  const [videoResult, thumbnailResult] = await Promise.all([
+    collectRemoteAsset(videoUrl, assetBasePath, includeImages, fallbackWarning),
+    collectRemoteAsset(thumbnailUrl, `${assetBasePath}-thumb`, includeImages, fallbackWarning)
+  ]);
+
+  return {
+    file: videoResult.ref,
+    thumbnail: thumbnailResult.ref,
+    assetFiles: [...videoResult.assetFiles, ...thumbnailResult.assetFiles],
+    warning: videoResult.warning ?? thumbnailResult.warning
+  };
 }
 
 export async function buildArchiveBundle(
   post: ExtractedPost,
   filenamePattern: string,
   includeImages: boolean,
-  fallbackWarning?: string
+  fallbackWarning?: string,
+  aiOrganization?: AiOrganizationSettings
 ): Promise<ArchiveBundle> {
   const resolvedFallbackWarning = fallbackWarning ?? (await t()).warnImageDownloadOff;
   const archiveName = buildArchiveBaseName(filenamePattern, post);
-  const postImages = await collectImageAssets(post.imageUrls, "post-image", includeImages, resolvedFallbackWarning);
+  const ai = aiOrganization ? await organizePostWithAi(post, aiOrganization) : { result: null, warning: null };
+  const postImages = await collectImageAssets(
+    post.imageUrls,
+    prefixAssetBasePath("02", "image"),
+    includeImages,
+    resolvedFallbackWarning
+  );
+  const postVideo =
+    post.sourceType === "video"
+      ? await collectVideoAssets(
+          post.videoUrl,
+          post.thumbnailUrl,
+          prefixAssetBasePath("02", "video"),
+          includeImages,
+          resolvedFallbackWarning
+        )
+      : null;
   const replyImages = await Promise.all(
     post.authorReplies.map((reply, index) =>
-      collectImageAssets(reply.imageUrls, `reply-${String(index + 1).padStart(2, "0")}-image`, includeImages, resolvedFallbackWarning)
+      collectImageAssets(
+        reply.imageUrls,
+        prefixAssetBasePath("03", `reply-${String(index + 1).padStart(2, "0")}-image`),
+        includeImages,
+        resolvedFallbackWarning
+      )
+    )
+  );
+  const replyVideos = await Promise.all(
+    post.authorReplies.map((reply, index) =>
+      reply.sourceType === "video"
+        ? collectVideoAssets(
+            reply.videoUrl,
+            reply.thumbnailUrl,
+            prefixAssetBasePath("03", `reply-${String(index + 1).padStart(2, "0")}-video`),
+            includeImages,
+            resolvedFallbackWarning
+          )
+        : Promise.resolve(null)
     )
   );
 
   let warning: string | null = null;
-  if (!includeImages && hasAnyImages(post)) {
+  if (!includeImages && hasAnyMedia(post)) {
     warning = resolvedFallbackWarning;
   }
-  warning ??= postImages.warning ?? replyImages.find((result) => result.warning)?.warning ?? null;
+  const noteWarning =
+    warning ??
+    postImages.warning ??
+    postVideo?.warning ??
+    replyImages.find((result) => result.warning)?.warning ??
+    replyVideos.find((result) => result?.warning)?.warning ??
+    null;
+  const userWarnings = [noteWarning, ai.warning].filter(Boolean) as string[];
+  warning = userWarnings.length > 0 ? userWarnings.join(" | ") : null;
 
   const markdownContent = await renderMarkdown(
     post,
     {
       postImages: postImages.refs,
-      replyImages: replyImages.map((result) => result.refs)
+      postVideo: postVideo ? { thumbnail: postVideo.thumbnail, file: postVideo.file } : null,
+      replyImages: replyImages.map((result) => result.refs),
+      replyVideos: replyVideos.map((result) => (result ? { thumbnail: result.thumbnail, file: result.file } : null))
     },
-    warning
+    noteWarning,
+    ai.result
   );
 
   return {
     archiveName,
     markdownContent,
-    assetFiles: [...postImages.assetFiles, ...replyImages.flatMap((result) => result.assetFiles)],
-    warning
+    assetFiles: [
+      ...postImages.assetFiles,
+      ...(postVideo?.assetFiles ?? []),
+      ...replyImages.flatMap((result) => result.assetFiles),
+      ...replyVideos.flatMap((result) => result?.assetFiles ?? [])
+    ],
+    warning,
+    noteWarning
   };
 }
 
@@ -119,14 +231,17 @@ export async function buildZipPackage(
   post: ExtractedPost,
   filenamePattern: string,
   includeImages: boolean,
-  fallbackWarning = "이미지 다운로드가 꺼져 있어 원격 URL을 사용했습니다."
+  fallbackWarning = "이미지/동영상 저장이 꺼져 있어 원격 URL을 사용했습니다.",
+  savePathPattern = "",
+  aiOrganization?: AiOrganizationSettings
 ): Promise<PackagedResult> {
-  const bundle = await buildArchiveBundle(post, filenamePattern, includeImages, fallbackWarning);
+  const bundle = await buildArchiveBundle(post, filenamePattern, includeImages, fallbackWarning, aiOrganization);
   const zip = new JSZip();
+  const archiveRoot = [...buildPathPatternParts(savePathPattern, post), bundle.archiveName].join("/");
 
-  zip.file(`${bundle.archiveName}/${bundle.archiveName}.md`, bundle.markdownContent);
+  zip.file(`${archiveRoot}/${buildArchiveNoteFilename(bundle.archiveName)}`, bundle.markdownContent);
   for (const file of bundle.assetFiles) {
-    zip.file(`${bundle.archiveName}/${file.relativePath}`, await file.blob.arrayBuffer());
+    zip.file(`${archiveRoot}/${file.relativePath}`, await file.blob.arrayBuffer());
   }
 
   return {
