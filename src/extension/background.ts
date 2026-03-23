@@ -170,6 +170,24 @@ async function saveCurrentPost(
     const post = await extractPostFromTab(tab);
     const options = await getEffectiveOptions();
     if (options.saveTarget === "notion") {
+      const resolvedMediaPolicy =
+        options.notion.uploadMedia &&
+        options.includeImages &&
+        !(imageOverride && typeof imageOverride.allowImageDownloads === "boolean" && imageOverride.imageFallbackWarning)
+          ? await resolveImageDownloadPolicy(post, options.includeImages, true)
+          : null;
+      const mediaPolicy =
+        options.notion.uploadMedia && options.includeImages
+          ? imageOverride && typeof imageOverride.allowImageDownloads === "boolean" && imageOverride.imageFallbackWarning
+            ? {
+                allowMediaDownloads: imageOverride.allowImageDownloads,
+                fallbackWarning: imageOverride.imageFallbackWarning
+              }
+            : {
+                allowMediaDownloads: resolvedMediaPolicy?.allowImageDownloads ?? false,
+                fallbackWarning: resolvedMediaPolicy?.fallbackWarning ?? ""
+              }
+          : undefined;
       const duplicate = await findDuplicateSave(post.canonicalUrl, post.contentHash, "notion");
       if (duplicate && !allowDuplicate) {
         const alreadySaved: SaveStatus = {
@@ -182,7 +200,7 @@ async function saveCurrentPost(
         return alreadySaved;
       }
 
-      const notionResult = await savePostToNotion(post, options.notion, options.includeImages, options.aiOrganization);
+      const notionResult = await savePostToNotion(post, options.notion, options.includeImages, options.aiOrganization, mediaPolicy);
       const recent = duplicate && allowDuplicate
         ? {
             ...duplicate,
@@ -296,7 +314,25 @@ async function redownloadSave(
   try {
     const options = await getEffectiveOptions();
     if (recentSave.saveTarget === "notion") {
-      const notionResult = await savePostToNotion(recentSave.post, options.notion, options.includeImages, options.aiOrganization);
+      const resolvedMediaPolicy =
+        options.notion.uploadMedia &&
+        options.includeImages &&
+        !(imageOverride && typeof imageOverride.allowImageDownloads === "boolean" && imageOverride.imageFallbackWarning)
+          ? await resolveImageDownloadPolicy(recentSave.post, options.includeImages, true)
+          : null;
+      const mediaPolicy =
+        options.notion.uploadMedia && options.includeImages
+          ? imageOverride && typeof imageOverride.allowImageDownloads === "boolean" && imageOverride.imageFallbackWarning
+            ? {
+                allowMediaDownloads: imageOverride.allowImageDownloads,
+                fallbackWarning: imageOverride.imageFallbackWarning
+              }
+            : {
+                allowMediaDownloads: resolvedMediaPolicy?.allowImageDownloads ?? false,
+                fallbackWarning: resolvedMediaPolicy?.fallbackWarning ?? ""
+              }
+          : undefined;
+      const notionResult = await savePostToNotion(recentSave.post, options.notion, options.includeImages, options.aiOrganization, mediaPolicy);
       const updatedSave: RecentSave = {
         ...recentSave,
         saveTarget: "notion",

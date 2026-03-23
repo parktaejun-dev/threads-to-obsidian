@@ -15,7 +15,8 @@ Threads 글을 PC Chrome에서 Obsidian 또는 Notion으로 저장하는 Chrome 
 ### 주요 기능
 
 - **Obsidian 직접 저장** — 연결된 폴더에 마크다운 + 이미지를 바로 기록
-- **Notion 저장** — parent page 또는 data source에 새 페이지로 저장
+- **Notion 저장** — Free는 parent page에, Pro는 data source까지 저장
+- **Pro Notion 고급 저장** — data source 매핑과 Notion 내부 미디어 업로드 지원
 - **ZIP 다운로드 폴백** — 폴더 연결 없이도 ZIP 파일로 저장 가능
 - **Pro 규칙 기반 정리** — 파일명 패턴과 저장 경로 패턴을 내 규칙대로 적용
 - **Pro AI 정리** — 사용자 LLM 키로 요약, 태그, 추가 frontmatter 생성
@@ -72,7 +73,8 @@ topic: "선택적으로 AI가 생성한 추가 frontmatter"
 ### Notion 출력 형식
 
 - parent page 저장: 지정한 Notion 페이지 아래에 새 하위 페이지 생성
-- data source 저장: 제목, URL, 작성자, 날짜, 태그, 답글 수 같은 필드를 가능한 범위에서 자동 매핑
+- Pro data source 저장: 제목, URL, 작성자, 날짜, 태그, 답글 수 같은 필드를 가능한 범위에서 자동 매핑
+- Pro에서는 이미지/동영상을 원격 링크 대신 Notion 파일로 업로드 가능
 - 본문은 frontmatter 없이 Notion용 markdown으로 전송
 
 ### 개발자용 빌드
@@ -216,7 +218,8 @@ A Chrome extension that saves Threads posts to Obsidian or Notion from desktop C
 ### Features
 
 - **Direct Obsidian Save** — Write Markdown + images directly to a connected vault folder
-- **Notion Save** — Create a new page under a parent page or inside a data source
+- **Notion Save** — Free saves under a parent page, and Pro adds data-source saves
+- **Pro Notion Advanced Save** — Enable data source mapping and Notion-managed media uploads
 - **ZIP Download Fallback** — Save as ZIP when no folder is connected
 - **Pro Rule-based Organization** — Apply your own file-name and save-path patterns
 - **Pro AI Organization** — Generate summaries, tags, and extra frontmatter using your own LLM key
@@ -270,7 +273,8 @@ Post body text...
 ### Notion Output
 
 - Parent-page mode creates a new child page under the configured Notion page
-- Data-source mode creates a new entry/page and auto-maps fields such as title, source URL, author, dates, tags, and reply count when supported
+- Pro data-source mode creates a new entry/page and auto-maps fields such as title, source URL, author, dates, tags, and reply count when supported
+- Pro can upload images and videos into Notion-managed files instead of leaving them as remote links
 - The body is sent as Notion markdown without YAML frontmatter
 
 ### Developer Build

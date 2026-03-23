@@ -21,8 +21,8 @@
 | `permissions` | Requests optional host access only when the user enables image downloads, Notion saving, or a custom AI endpoint. |
 | Host permission: `threads.com`, `threads.net` | Required for the content script to run on Threads post pages and extract post content from the DOM. |
 | Host permission: `threads-obsidian.dahanda.dev` | Required for Pro license activation, status checks, and seat release against the developer-controlled licensing service. No saved post content is sent there. |
-| Optional host permission: `cdninstagram.com`, `fbcdn.net` | Used only when the user has image saving enabled. Fetches public image binaries from Meta's CDNs for local storage. |
-| Optional host permission: `api.notion.com` | Used only when the user enables Notion saving. Sends the explicitly saved post content to the user's own Notion workspace. |
+| Optional host permission: `cdninstagram.com`, `fbcdn.net` | Used only when the user has image saving enabled or enables Pro Notion media upload. Fetches public media binaries from Meta's CDNs for local storage or direct upload to Notion. |
+| Optional host permission: `api.notion.com` | Used only when the user enables Notion saving. Sends the explicitly saved post content to the user's own Notion workspace and, in Pro mode, can upload related media files into Notion-managed storage. |
 | Optional host permission: custom AI endpoint (`https://*/*`, `http://*/*` requested per-origin) | Used only when the user enables AI organization and saves settings for a specific OpenAI-compatible endpoint. Allows the extension to call the user-selected LLM API directly from the browser with the user's own key. |
 
 ---
@@ -33,7 +33,7 @@
 
 Use wording that matches the implementation exactly:
 
-> The extension primarily processes saved Threads content locally on the user's device. When the user chooses Notion saving, the extension sends the explicitly saved post content directly to the user's Notion workspace. When the user enables AI organization, the extension sends the explicitly saved post content directly to the user-selected LLM endpoint using the user's own API key or local endpoint configuration. When the user activates or validates a Pro key, the extension sends the Pro token and device activation metadata to the developer-controlled licensing endpoint. The extension does not send analytics or browsing telemetry to the developer.
+> The extension primarily processes saved Threads content locally on the user's device. When the user chooses Notion saving, the extension sends the explicitly saved post content directly to the user's Notion workspace. In Pro mode, if the user enables Notion media upload, the extension also uploads related image and video files into Notion-managed storage. When the user enables AI organization, the extension sends the explicitly saved post content directly to the user-selected LLM endpoint using the user's own API key or local endpoint configuration. When the user activates or validates a Pro key, the extension sends the Pro token and device activation metadata to the developer-controlled licensing endpoint. The extension does not send analytics or browsing telemetry to the developer.
 
 ### Specific data use disclosures
 
@@ -47,7 +47,7 @@ Use wording that matches the implementation exactly:
 | Location | No | — |
 | Web history / browsing activity | Limited local handling only | The extension checks the active tab URL to confirm a supported Threads permalink and stores the permalink URL of posts the user explicitly saves in local recent-save history. |
 | User activity | Limited feature operations only | The extension records local recent-save history and Pro activation status to support user-triggered saves and license management. |
-| Website content | Yes | Post text, author name, permalink URL, reply content, visible external links, and image URLs from the Threads page the user explicitly saves. Stored locally, written to the user's local files, or sent directly to the user's Notion workspace and optional AI endpoint when those features are enabled. |
+| Website content | Yes | Post text, author name, permalink URL, reply content, visible external links, and media URLs from the Threads page the user explicitly saves. Stored locally, written to the user's local files, or sent directly to the user's Notion workspace and optional AI endpoint when those features are enabled. In Pro mode, media binaries may also be uploaded to Notion-managed storage. |
 
 ### Remote code
 
@@ -79,14 +79,16 @@ Use the public GitHub URL:
 > **How it works:**
 > 1. Open any public Threads post permalink in Chrome.
 > 2. Choose your default save target in the extension settings.
-> 3. For Obsidian, connect a local vault folder once. For Notion, paste an internal integration token and choose a parent page or data source.
+> 3. For Obsidian, connect a local vault folder once. For Notion, paste an internal integration token and choose a parent page. Pro can also target a data source.
 > 4. Click the extension icon and save the current post.
 > 5. The post is written either to your local archive, to a ZIP download, or to your Notion workspace.
 >
 > **Features:**
 > - Obsidian direct save with optional local image downloads
 > - ZIP fallback when direct local save is unavailable
-> - Notion save to either a parent page or a data source
+> - Free Notion save to a parent page
+> - Pro Notion save to a data source with property mapping
+> - Pro upload of images and videos into Notion-managed storage
 > - Automatic mapping of common Notion fields such as title, source URL, author, dates, tags, and reply count when supported
 > - Optional Pro AI organization using the user's own LLM key for summaries, tags, and extra metadata
 > - Author's self-thread replies preserved together
@@ -94,6 +96,6 @@ Use the public GitHub URL:
 > - Keyboard shortcut support (`Alt+Shift+S`)
 > - Recent save history in the popup
 >
-> **Privacy-first:** The extension works locally by default. Saved post content is sent out only when you explicitly use Notion saving or AI organization. Pro activation requests send only licensing metadata, not saved post content. See the privacy policy for details.
+> **Privacy-first:** The extension works locally by default. Saved post content is sent out only when you explicitly use Notion saving or AI organization. In Pro mode, Notion media upload also sends related media files to your Notion workspace. Pro activation requests send only licensing metadata, not saved post content. See the privacy policy for details.
 >
 > **Requirements:** Desktop Chrome/Chromium. Only public Threads permalink pages are supported.

@@ -94,7 +94,8 @@ export const DEFAULT_OPTIONS: ExtensionOptions = {
     token: "",
     parentType: "page",
     parentPageId: "",
-    dataSourceId: ""
+    dataSourceId: "",
+    uploadMedia: false
   },
   aiOrganization: DEFAULT_AI_ORGANIZATION_SETTINGS
 };

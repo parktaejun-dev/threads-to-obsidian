@@ -68,7 +68,8 @@ test("savePostToNotion posts markdown to the Notion API", async () => {
         token: "secret_test_token",
         parentType: "page",
         parentPageId: "https://www.notion.so/My-page-123456781234123412341234567890ab",
-        dataSourceId: ""
+        dataSourceId: "",
+        uploadMedia: false
       },
       true
     );
@@ -167,7 +168,8 @@ test("savePostToNotion maps supported fields when saving to a data source", asyn
         token: "secret_test_token",
         parentType: "data_source",
         parentPageId: "",
-        dataSourceId: "https://www.notion.so/My-ds-1a44be1209534631b4989e5817518db8"
+        dataSourceId: "https://www.notion.so/My-ds-1a44be1209534631b4989e5817518db8",
+        uploadMedia: false
       },
       true
     );
@@ -182,6 +184,136 @@ test("savePostToNotion maps supported fields when saving to a data source", asyn
     assert.deepEqual(createRequest?.body.properties["replies-prop"].number, 1);
     assert.deepEqual(createRequest?.body.properties["images-prop"].checkbox, true);
     assert.deepEqual(createRequest?.body.properties["tags-prop"].multi_select[0].name, "threads");
+  } finally {
+    globalThis.fetch = originalFetch;
+    (globalThis as { chrome?: typeof chrome }).chrome = previousChrome;
+  }
+});
+
+test("savePostToNotion uploads media files and appends uploaded blocks when enabled", async () => {
+  const originalFetch = globalThis.fetch;
+  const previousChrome = (globalThis as { chrome?: typeof chrome }).chrome;
+  const fetchCalls: Array<{ url: string; method: string; body: unknown; contentType: string | null }> = [];
+
+  (globalThis as { chrome?: typeof chrome }).chrome = {
+    permissions: {
+      async contains() {
+        return true;
+      }
+    }
+  } as unknown as typeof chrome;
+
+  globalThis.fetch = async (input, init) => {
+    const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+    fetchCalls.push({
+      url,
+      method: init?.method ?? "GET",
+      body: init?.body ?? null,
+      contentType: init?.headers ? new Headers(init.headers).get("content-type") : null
+    });
+
+    if (url === "https://cdn.example.com/image-1.jpg") {
+      return new Response(new Uint8Array([1, 2, 3, 4]), {
+        headers: {
+          "content-type": "image/jpeg"
+        }
+      });
+    }
+
+    if (url === "https://api.notion.com/v1/file_uploads") {
+      return new Response(
+        JSON.stringify({
+          id: "file-upload-1",
+          status: "pending",
+          upload_url: "https://api.notion.com/v1/file_uploads/file-upload-1/send"
+        }),
+        {
+          headers: {
+            "content-type": "application/json"
+          }
+        }
+      );
+    }
+
+    if (url === "https://api.notion.com/v1/file_uploads/file-upload-1/send") {
+      return new Response(
+        JSON.stringify({
+          id: "file-upload-1",
+          status: "uploaded"
+        }),
+        {
+          headers: {
+            "content-type": "application/json"
+          }
+        }
+      );
+    }
+
+    if (url === "https://api.notion.com/v1/pages") {
+      return new Response(
+        JSON.stringify({
+          id: "page-789",
+          url: "https://www.notion.so/page-789"
+        }),
+        {
+          headers: {
+            "content-type": "application/json"
+          }
+        }
+      );
+    }
+
+    if (url === "https://api.notion.com/v1/blocks/page-789/children") {
+      return new Response(
+        JSON.stringify({
+          results: []
+        }),
+        {
+          headers: {
+            "content-type": "application/json"
+          }
+        }
+      );
+    }
+
+    throw new Error(`Unexpected fetch: ${url}`);
+  };
+
+  try {
+    const result = await savePostToNotion(
+      basePost,
+      {
+        token: "secret_test_token",
+        parentType: "page",
+        parentPageId: "https://www.notion.so/My-page-123456781234123412341234567890ab",
+        dataSourceId: "",
+        uploadMedia: true
+      },
+      true,
+      undefined,
+      {
+        allowMediaDownloads: true,
+        fallbackWarning: "fallback"
+      }
+    );
+
+    assert.equal(result.pageId, "page-789");
+    const createRequest = fetchCalls.find((call) => call.url === "https://api.notion.com/v1/pages");
+    assert.ok(createRequest);
+    const createBody = JSON.parse(String(createRequest?.body ?? "{}"));
+    assert.equal(createBody.markdown.includes("https://cdn.example.com/image-1.jpg"), false);
+
+    const sendRequest = fetchCalls.find((call) => call.url.endsWith("/file-upload-1/send"));
+    assert.ok(sendRequest);
+    assert.equal(sendRequest?.contentType, null);
+    assert.ok(sendRequest?.body instanceof FormData);
+
+    const appendRequest = fetchCalls.find((call) => call.url.endsWith("/blocks/page-789/children"));
+    assert.ok(appendRequest);
+    const appendBody = JSON.parse(String(appendRequest?.body ?? "{}"));
+    assert.equal(appendBody.children[0].type, "heading_2");
+    assert.equal(appendBody.children[2].type, "image");
+    assert.equal(appendBody.children[2].image.file_upload.id, "file-upload-1");
   } finally {
     globalThis.fetch = originalFetch;
     (globalThis as { chrome?: typeof chrome }).chrome = previousChrome;

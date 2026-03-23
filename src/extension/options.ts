@@ -17,6 +17,7 @@ const notionToken = document.querySelector<HTMLInputElement>("#notion-token");
 const notionParentPage = document.querySelector<HTMLInputElement>("#notion-parent-page");
 const notionDataSourceField = document.querySelector<HTMLElement>("#notion-data-source-field");
 const notionDataSource = document.querySelector<HTMLInputElement>("#notion-data-source");
+const notionUploadMedia = document.querySelector<HTMLInputElement>("#notion-upload-media");
 const includeImages = document.querySelector<HTMLInputElement>("#include-images");
 const saveStatus = document.querySelector<HTMLParagraphElement>("#save-status");
 const folderSection = document.querySelector<HTMLElement>("#folder-section");
@@ -47,6 +48,8 @@ const cmpReplies = document.querySelector<HTMLTableCellElement>("#cmp-replies");
 const cmpDupes = document.querySelector<HTMLTableCellElement>("#cmp-dupes");
 const cmpFilename = document.querySelector<HTMLTableCellElement>("#cmp-filename");
 const cmpFolder = document.querySelector<HTMLTableCellElement>("#cmp-folder");
+const cmpNotionDataSource = document.querySelector<HTMLTableCellElement>("#cmp-notion-data-source");
+const cmpNotionMediaUpload = document.querySelector<HTMLTableCellElement>("#cmp-notion-media-upload");
 const cmpAiSummary = document.querySelector<HTMLTableCellElement>("#cmp-ai-summary");
 const cmpAiTags = document.querySelector<HTMLTableCellElement>("#cmp-ai-tags");
 const cmpAiFrontmatter = document.querySelector<HTMLTableCellElement>("#cmp-ai-frontmatter");
@@ -83,6 +86,7 @@ const DIRTY_FIELD_IDS = new Set([
   "notion-token",
   "notion-parent-page",
   "notion-data-source",
+  "notion-upload-media",
   "filename-pattern",
   "save-path-pattern",
   "include-images",
@@ -148,11 +152,42 @@ function renderNotionParentState(): void {
   notionDataSourceField?.classList.toggle("hidden", parentType !== "data_source");
 }
 
+function renderNotionPlanState(): void {
+  const isPro = currentPlan.tier === "pro";
+  const dataSourceOption = notionParentType?.querySelector<HTMLOptionElement>('option[value="data_source"]');
+  if (dataSourceOption) {
+    dataSourceOption.disabled = !isPro;
+  }
+
+  if (!isPro && notionParentType?.value === "data_source") {
+    notionParentType.value = "page";
+  }
+
+  if (notionUploadMedia) {
+    notionUploadMedia.disabled = !isPro;
+    if (!isPro) {
+      notionUploadMedia.checked = false;
+    }
+  }
+
+  const dataSourceLockHint = document.querySelector<HTMLElement>("#notion-data-source-lock-hint");
+  if (dataSourceLockHint) {
+    dataSourceLockHint.textContent = isPro ? "" : msg.optionsNotionDataSourceLocked;
+  }
+
+  const uploadMediaLockHint = document.querySelector<HTMLElement>("#notion-upload-media-lock-hint");
+  if (uploadMediaLockHint) {
+    uploadMediaLockHint.textContent = isPro ? "" : msg.optionsNotionUploadMediaLocked;
+  }
+
+  renderNotionParentState();
+}
+
 function renderSaveTargetState(): void {
   currentSaveTarget = getCurrentSaveTarget();
   folderSection?.classList.toggle("hidden", currentSaveTarget !== "obsidian");
   notionSection?.classList.toggle("hidden", currentSaveTarget !== "notion");
-  renderNotionParentState();
+  renderNotionPlanState();
 }
 
 function isAiProvider(value: string | null | undefined): value is AiProvider {
@@ -283,6 +318,8 @@ function applyStaticMessages(): void {
   if (cmpDupes) { cmpDupes.textContent = msg.compareRowDuplicates; }
   if (cmpFilename) { cmpFilename.textContent = msg.compareRowFilename; }
   if (cmpFolder) { cmpFolder.textContent = msg.compareRowFolder; }
+  if (cmpNotionDataSource) { cmpNotionDataSource.textContent = msg.compareRowNotionDataSource; }
+  if (cmpNotionMediaUpload) { cmpNotionMediaUpload.textContent = msg.compareRowNotionMediaUpload; }
   if (cmpAiSummary) { cmpAiSummary.textContent = msg.compareRowAiSummary; }
   if (cmpAiTags) { cmpAiTags.textContent = msg.compareRowAiTags; }
   if (cmpAiFrontmatter) { cmpAiFrontmatter.textContent = msg.compareRowAiFrontmatter; }
@@ -339,6 +376,10 @@ function applyStaticMessages(): void {
   if (notionDataSourceLabelEl) { notionDataSourceLabelEl.textContent = msg.optionsNotionDataSource; }
   const notionDataSourceHintEl = document.querySelector("#notion-data-source-hint");
   if (notionDataSourceHintEl) { notionDataSourceHintEl.textContent = msg.optionsNotionDataSourceHint; }
+  const notionUploadMediaLabelEl = document.querySelector("#notion-upload-media-label");
+  if (notionUploadMediaLabelEl) { notionUploadMediaLabelEl.textContent = msg.optionsNotionUploadMedia; }
+  const notionUploadMediaHintEl = document.querySelector("#notion-upload-media-hint");
+  if (notionUploadMediaHintEl) { notionUploadMediaHintEl.textContent = msg.optionsNotionUploadMediaHint; }
   const patternLabelEl = document.querySelector("#pattern-label");
   if (patternLabelEl) { patternLabelEl.textContent = msg.optionsFilenamePattern; }
   const tokensEl = document.querySelector("#tokens-hint");
@@ -416,6 +457,7 @@ function applyOptions(options: ExtensionOptions): void {
     !notionToken ||
     !notionParentPage ||
     !notionDataSource ||
+    !notionUploadMedia ||
     !includeImages ||
     !aiEnabled ||
     !aiProvider ||
@@ -432,6 +474,7 @@ function applyOptions(options: ExtensionOptions): void {
   notionToken.value = options.notion.token;
   notionParentPage.value = options.notion.parentPageId;
   notionDataSource.value = options.notion.dataSourceId;
+  notionUploadMedia.checked = options.notion.uploadMedia;
   filenamePattern.value = options.filenamePattern;
   savePathPattern.value = options.savePathPattern;
   includeImages.checked = options.includeImages;
@@ -584,6 +627,7 @@ function applyPlanState(plan: PlanStatus): void {
 
   applyPlanSpotlight(plan);
   renderFolderPathPreview();
+  renderSaveTargetState();
 }
 
 async function refreshPlanState(): Promise<void> {
@@ -752,6 +796,7 @@ form?.addEventListener("submit", async (event) => {
     !notionToken ||
     !notionParentPage ||
     !notionDataSource ||
+    !notionUploadMedia ||
     !includeImages ||
     !aiEnabled ||
     !aiProvider ||
@@ -857,9 +902,10 @@ form?.addEventListener("submit", async (event) => {
     includeImages: includeImages.checked,
     notion: {
       token: trimmedNotionToken,
-      parentType: nextNotionParentType,
+      parentType: currentPlan.tier === "pro" ? nextNotionParentType : "page",
       parentPageId: normalizedNotionParentPage,
-      dataSourceId: normalizedNotionDataSource
+      dataSourceId: currentPlan.tier === "pro" ? normalizedNotionDataSource : "",
+      uploadMedia: currentPlan.tier === "pro" ? notionUploadMedia.checked : false
     },
     aiOrganization: nextAiOrganization
   };

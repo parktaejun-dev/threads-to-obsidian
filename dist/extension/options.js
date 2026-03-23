@@ -2472,7 +2472,8 @@ var DEFAULT_OPTIONS = {
     token: "",
     parentType: "page",
     parentPageId: "",
-    dataSourceId: ""
+    dataSourceId: "",
+    uploadMedia: false
   },
   aiOrganization: DEFAULT_AI_ORGANIZATION_SETTINGS
 };
@@ -2564,7 +2565,7 @@ var ko = {
   optionsSaveTargetObsidian: "Obsidian",
   optionsSaveTargetNotion: "Notion",
   optionsNotionSection: "Notion \uC5F0\uACB0",
-  optionsNotionSubtitle: "Notion\uC740 API\uB85C \uC0C8 \uD398\uC774\uC9C0\uB97C \uB9CC\uB4ED\uB2C8\uB2E4. parent page \uC800\uC7A5\uACFC data source \uC800\uC7A5\uC744 \uBAA8\uB450 \uC9C0\uC6D0\uD569\uB2C8\uB2E4.",
+  optionsNotionSubtitle: "Notion\uC740 API\uB85C \uC0C8 \uD398\uC774\uC9C0\uB97C \uB9CC\uB4ED\uB2C8\uB2E4. Free\uB294 parent page \uC800\uC7A5, Pro\uB294 data source \uC800\uC7A5\uACFC \uB0B4\uBD80 \uBBF8\uB514\uC5B4 \uC5C5\uB85C\uB4DC\uB97C \uC9C0\uC6D0\uD569\uB2C8\uB2E4.",
   optionsNotionParentType: "\uC800\uC7A5 \uBC29\uC2DD",
   optionsNotionParentTypeHint: "Page \uC544\uB798 \uC0C8 \uD398\uC774\uC9C0\uB97C \uB9CC\uB4E4\uAC70\uB098, data source\uC5D0 \uC0C8 row/page\uB97C \uB9CC\uB4E4 \uC218 \uC788\uC2B5\uB2C8\uB2E4.",
   optionsNotionParentTypePage: "Parent page",
@@ -2575,6 +2576,10 @@ var ko = {
   optionsNotionParentPageHint: "Notion \uD398\uC774\uC9C0 URL \uC804\uCCB4\uB97C \uBD99\uC5EC\uB123\uC5B4\uB3C4 \uB418\uACE0, page ID\uB9CC \uB123\uC5B4\uB3C4 \uB429\uB2C8\uB2E4.",
   optionsNotionDataSource: "Data source ID \uB610\uB294 URL",
   optionsNotionDataSourceHint: "Notion data source URL \uC804\uCCB4 \uB610\uB294 data source ID\uB97C \uB123\uC2B5\uB2C8\uB2E4. \uC800\uC7A5 \uC2DC \uC81C\uBAA9/\uD0DC\uADF8/\uB0A0\uC9DC \uAC19\uC740 \uC18D\uC131\uC744 \uC790\uB3D9 \uB9E4\uD551\uD569\uB2C8\uB2E4.",
+  optionsNotionDataSourceLocked: "Data source \uC800\uC7A5\uC740 Pro\uC5D0\uC11C \uC0AC\uC6A9\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.",
+  optionsNotionUploadMedia: "Notion \uC6CC\uD06C\uC2A4\uD398\uC774\uC2A4\uC5D0 \uBBF8\uB514\uC5B4 \uC5C5\uB85C\uB4DC",
+  optionsNotionUploadMediaHint: "\uC774\uBBF8\uC9C0\uC640 \uB3D9\uC601\uC0C1\uC744 \uC6D0\uACA9 \uB9C1\uD06C \uB300\uC2E0 Notion \uD30C\uC77C\uB85C \uC5C5\uB85C\uB4DC\uD569\uB2C8\uB2E4. \uC5C5\uB85C\uB4DC\uC5D0 \uC2E4\uD328\uD558\uBA74 \uB9C1\uD06C \uBC29\uC2DD\uC73C\uB85C \uC800\uC7A5\uD569\uB2C8\uB2E4.",
+  optionsNotionUploadMediaLocked: "Notion \uB0B4\uBD80 \uBBF8\uB514\uC5B4 \uC5C5\uB85C\uB4DC\uB294 Pro\uC5D0\uC11C \uC0AC\uC6A9\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.",
   optionsNotionTokenRequired: "Notion \uC800\uC7A5\uC744 \uC4F0\uB824\uBA74 integration token\uC774 \uD544\uC694\uD569\uB2C8\uB2E4.",
   optionsNotionParentPageRequired: "Notion \uC800\uC7A5\uC744 \uC4F0\uB824\uBA74 parent page ID \uB610\uB294 URL\uC774 \uD544\uC694\uD569\uB2C8\uB2E4.",
   optionsNotionInvalidPage: "Notion parent page ID \uB610\uB294 URL \uD615\uC2DD\uC774 \uC62C\uBC14\uB974\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4.",
@@ -2595,6 +2600,8 @@ var ko = {
   compareRowDuplicates: "\uC911\uBCF5 \uAC74\uB108\uB700",
   compareRowFilename: "\uD30C\uC77C \uC774\uB984 \uADDC\uCE59",
   compareRowFolder: "\uC800\uC7A5 \uD3F4\uB354 \uC9C0\uC815",
+  compareRowNotionDataSource: "Notion data source \uC800\uC7A5",
+  compareRowNotionMediaUpload: "Notion \uB0B4\uBD80 \uBBF8\uB514\uC5B4 \uC5C5\uB85C\uB4DC",
   compareRowAiSummary: "AI \uC694\uC57D",
   compareRowAiTags: "AI \uD0DC\uADF8",
   compareRowAiFrontmatter: "AI frontmatter",
@@ -2671,6 +2678,7 @@ var ko = {
   mdReplySection: "\uC791\uC131\uC790 \uC5F0\uC18D \uB2F5\uAE00",
   mdReplyLabel: "\uB2F5\uAE00",
   mdReplyImageLabel: "\uB2F5\uAE00 \uC774\uBBF8\uC9C0",
+  mdUploadedMediaSection: "\uC5C5\uB85C\uB4DC\uD55C \uBBF8\uB514\uC5B4",
   mdSource: "\uC6D0\uBB38",
   mdAuthor: "\uC791\uC131\uC790",
   mdPublishedAt: "\uAC8C\uC2DC \uC2DC\uAC01",
@@ -2682,6 +2690,7 @@ var ko = {
   warnAiFailed: "AI \uC815\uB9AC\uC5D0 \uC2E4\uD328\uD574 \uC6D0\uBB38\uB9CC \uC800\uC7A5\uD588\uC2B5\uB2C8\uB2E4: {reason}",
   warnAiPermissionMissing: "AI \uC5D4\uB4DC\uD3EC\uC778\uD2B8 \uAD8C\uD55C\uC774 \uC5C6\uC5B4 \uC6D0\uBB38\uB9CC \uC800\uC7A5\uD588\uC2B5\uB2C8\uB2E4. \uC124\uC815\uC5D0\uC11C AI \uC139\uC158\uC744 \uB2E4\uC2DC \uC800\uC7A5\uD574 \uC8FC\uC138\uC694.",
   warnAiMissingModel: "AI \uBAA8\uB378 \uC774\uB984\uC774 \uC5C6\uC5B4 \uC6D0\uBB38\uB9CC \uC800\uC7A5\uD588\uC2B5\uB2C8\uB2E4.",
+  warnNotionMediaUploadFailed: "Notion \uBBF8\uB514\uC5B4 \uC5C5\uB85C\uB4DC\uC5D0 \uC2E4\uD328\uD574 \uC6D0\uBCF8 \uB9C1\uD06C\uB85C \uC800\uC7A5\uD588\uC2B5\uB2C8\uB2E4.",
   errBrowserUnsupported: "\uC774 \uBE0C\uB77C\uC6B0\uC800\uC5D0\uC11C\uB294 Obsidian \uD3F4\uB354\uC5D0 \uBC14\uB85C \uC800\uC7A5\uD560 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4.",
   errFolderNameFailed: "\uC800\uC7A5\uD560 \uD3F4\uB354 \uC774\uB984\uC744 \uACB0\uC815\uD558\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4.",
   errInvalidPath: "\uC798\uBABB\uB41C \uD30C\uC77C \uACBD\uB85C\uC785\uB2C8\uB2E4.",
@@ -2785,7 +2794,7 @@ var en = {
   optionsSaveTargetObsidian: "Obsidian",
   optionsSaveTargetNotion: "Notion",
   optionsNotionSection: "Notion Connection",
-  optionsNotionSubtitle: "Notion creates new pages through the API. Both parent-page saving and data-source saving are supported.",
+  optionsNotionSubtitle: "Notion creates new pages through the API. Free supports parent-page saving, while Pro adds data-source saving and managed media uploads.",
   optionsNotionParentType: "Save mode",
   optionsNotionParentTypeHint: "Create a new page under a page, or create a new entry/page inside a data source.",
   optionsNotionParentTypePage: "Parent page",
@@ -2796,6 +2805,10 @@ var en = {
   optionsNotionParentPageHint: "You can paste a full Notion page URL or just the page ID.",
   optionsNotionDataSource: "Data source ID or URL",
   optionsNotionDataSourceHint: "Paste a full Notion data source URL or just its ID. Title, tags, dates, and similar properties are mapped automatically when possible.",
+  optionsNotionDataSourceLocked: "Data source saving is available in Pro only.",
+  optionsNotionUploadMedia: "Upload media into Notion",
+  optionsNotionUploadMediaHint: "Upload images and videos as Notion-managed files instead of leaving them as remote links. If upload fails, the save falls back to links.",
+  optionsNotionUploadMediaLocked: "Notion-managed media upload is available in Pro only.",
   optionsNotionTokenRequired: "A Notion integration token is required to use Notion saving.",
   optionsNotionParentPageRequired: "A Notion parent page ID or URL is required to use Notion saving.",
   optionsNotionInvalidPage: "The Notion parent page ID or URL format is not valid.",
@@ -2816,6 +2829,8 @@ var en = {
   compareRowDuplicates: "Skip duplicates",
   compareRowFilename: "File name format",
   compareRowFolder: "Save folder",
+  compareRowNotionDataSource: "Notion data source",
+  compareRowNotionMediaUpload: "Notion media upload",
   compareRowAiSummary: "AI summary",
   compareRowAiTags: "AI tags",
   compareRowAiFrontmatter: "AI frontmatter",
@@ -2892,6 +2907,7 @@ var en = {
   mdReplySection: "Author Replies",
   mdReplyLabel: "Reply",
   mdReplyImageLabel: "Reply image",
+  mdUploadedMediaSection: "Uploaded media",
   mdSource: "Source",
   mdAuthor: "Author",
   mdPublishedAt: "Published at",
@@ -2903,6 +2919,7 @@ var en = {
   warnAiFailed: "AI organization failed, so the original note was saved instead: {reason}",
   warnAiPermissionMissing: "AI endpoint permission is missing, so the original note was saved. Re-save the AI section in settings.",
   warnAiMissingModel: "No AI model name is configured, so the original note was saved.",
+  warnNotionMediaUploadFailed: "Notion media upload failed, so remote links were saved instead.",
   errBrowserUnsupported: "This browser cannot save directly to an Obsidian folder.",
   errFolderNameFailed: "Could not determine a folder name for saving.",
   errInvalidPath: "Invalid file path.",
@@ -3108,6 +3125,8 @@ async function clearObsidianDirectoryHandle() {
 
 // src/extension/lib/notion.ts
 var NOTION_HOST_PATTERN = "https://api.notion.com/*";
+var SINGLE_PART_UPLOAD_LIMIT_BYTES = 20 * 1024 * 1024;
+var MULTI_PART_CHUNK_BYTES = 10 * 1024 * 1024;
 function normalizeUuid(value) {
   const compact = value.replace(/-/g, "").toLowerCase();
   if (!/^[0-9a-f]{32}$/.test(compact)) {
@@ -3584,6 +3603,7 @@ var notionToken = document.querySelector("#notion-token");
 var notionParentPage = document.querySelector("#notion-parent-page");
 var notionDataSourceField = document.querySelector("#notion-data-source-field");
 var notionDataSource = document.querySelector("#notion-data-source");
+var notionUploadMedia = document.querySelector("#notion-upload-media");
 var includeImages = document.querySelector("#include-images");
 var saveStatus = document.querySelector("#save-status");
 var folderSection = document.querySelector("#folder-section");
@@ -3614,6 +3634,8 @@ var cmpReplies = document.querySelector("#cmp-replies");
 var cmpDupes = document.querySelector("#cmp-dupes");
 var cmpFilename = document.querySelector("#cmp-filename");
 var cmpFolder = document.querySelector("#cmp-folder");
+var cmpNotionDataSource = document.querySelector("#cmp-notion-data-source");
+var cmpNotionMediaUpload = document.querySelector("#cmp-notion-media-upload");
 var cmpAiSummary = document.querySelector("#cmp-ai-summary");
 var cmpAiTags = document.querySelector("#cmp-ai-tags");
 var cmpAiFrontmatter = document.querySelector("#cmp-ai-frontmatter");
@@ -3649,6 +3671,7 @@ var DIRTY_FIELD_IDS = /* @__PURE__ */ new Set([
   "notion-token",
   "notion-parent-page",
   "notion-data-source",
+  "notion-upload-media",
   "filename-pattern",
   "save-path-pattern",
   "include-images",
@@ -3698,11 +3721,36 @@ function renderNotionParentState() {
   notionParentPage?.parentElement?.classList.toggle("hidden", parentType !== "page");
   notionDataSourceField?.classList.toggle("hidden", parentType !== "data_source");
 }
+function renderNotionPlanState() {
+  const isPro = currentPlan.tier === "pro";
+  const dataSourceOption = notionParentType?.querySelector('option[value="data_source"]');
+  if (dataSourceOption) {
+    dataSourceOption.disabled = !isPro;
+  }
+  if (!isPro && notionParentType?.value === "data_source") {
+    notionParentType.value = "page";
+  }
+  if (notionUploadMedia) {
+    notionUploadMedia.disabled = !isPro;
+    if (!isPro) {
+      notionUploadMedia.checked = false;
+    }
+  }
+  const dataSourceLockHint = document.querySelector("#notion-data-source-lock-hint");
+  if (dataSourceLockHint) {
+    dataSourceLockHint.textContent = isPro ? "" : msg.optionsNotionDataSourceLocked;
+  }
+  const uploadMediaLockHint = document.querySelector("#notion-upload-media-lock-hint");
+  if (uploadMediaLockHint) {
+    uploadMediaLockHint.textContent = isPro ? "" : msg.optionsNotionUploadMediaLocked;
+  }
+  renderNotionParentState();
+}
 function renderSaveTargetState() {
   currentSaveTarget = getCurrentSaveTarget();
   folderSection?.classList.toggle("hidden", currentSaveTarget !== "obsidian");
   notionSection?.classList.toggle("hidden", currentSaveTarget !== "notion");
-  renderNotionParentState();
+  renderNotionPlanState();
 }
 function isAiProvider(value) {
   return AI_PROVIDER_VALUES.some((provider) => provider === value);
@@ -3858,6 +3906,12 @@ function applyStaticMessages() {
   if (cmpFolder) {
     cmpFolder.textContent = msg.compareRowFolder;
   }
+  if (cmpNotionDataSource) {
+    cmpNotionDataSource.textContent = msg.compareRowNotionDataSource;
+  }
+  if (cmpNotionMediaUpload) {
+    cmpNotionMediaUpload.textContent = msg.compareRowNotionMediaUpload;
+  }
   if (cmpAiSummary) {
     cmpAiSummary.textContent = msg.compareRowAiSummary;
   }
@@ -3974,6 +4028,14 @@ function applyStaticMessages() {
   if (notionDataSourceHintEl) {
     notionDataSourceHintEl.textContent = msg.optionsNotionDataSourceHint;
   }
+  const notionUploadMediaLabelEl = document.querySelector("#notion-upload-media-label");
+  if (notionUploadMediaLabelEl) {
+    notionUploadMediaLabelEl.textContent = msg.optionsNotionUploadMedia;
+  }
+  const notionUploadMediaHintEl = document.querySelector("#notion-upload-media-hint");
+  if (notionUploadMediaHintEl) {
+    notionUploadMediaHintEl.textContent = msg.optionsNotionUploadMediaHint;
+  }
   const patternLabelEl = document.querySelector("#pattern-label");
   if (patternLabelEl) {
     patternLabelEl.textContent = msg.optionsFilenamePattern;
@@ -4081,7 +4143,7 @@ function applyLanguageSwitch(locale) {
   }
 }
 function applyOptions(options) {
-  if (!filenamePattern || !savePathPattern || !saveTarget || !notionParentType || !notionToken || !notionParentPage || !notionDataSource || !includeImages || !aiEnabled || !aiProvider || !aiApiKey || !aiBaseUrl || !aiModel || !aiPrompt) {
+  if (!filenamePattern || !savePathPattern || !saveTarget || !notionParentType || !notionToken || !notionParentPage || !notionDataSource || !notionUploadMedia || !includeImages || !aiEnabled || !aiProvider || !aiApiKey || !aiBaseUrl || !aiModel || !aiPrompt) {
     return;
   }
   saveTarget.value = options.saveTarget;
@@ -4089,6 +4151,7 @@ function applyOptions(options) {
   notionToken.value = options.notion.token;
   notionParentPage.value = options.notion.parentPageId;
   notionDataSource.value = options.notion.dataSourceId;
+  notionUploadMedia.checked = options.notion.uploadMedia;
   filenamePattern.value = options.filenamePattern;
   savePathPattern.value = options.savePathPattern;
   includeImages.checked = options.includeImages;
@@ -4211,6 +4274,7 @@ function applyPlanState(plan) {
   }
   applyPlanSpotlight(plan);
   renderFolderPathPreview();
+  renderSaveTargetState();
 }
 async function refreshPlanState() {
   applyPlanState(await getPlanStatus());
@@ -4346,7 +4410,7 @@ clearProButton?.addEventListener("click", async () => {
 });
 form?.addEventListener("submit", async (event) => {
   event.preventDefault();
-  if (!filenamePattern || !savePathPattern || !saveTarget || !notionParentType || !notionToken || !notionParentPage || !notionDataSource || !includeImages || !aiEnabled || !aiProvider || !aiApiKey || !aiBaseUrl || !aiModel || !aiPrompt) {
+  if (!filenamePattern || !savePathPattern || !saveTarget || !notionParentType || !notionToken || !notionParentPage || !notionDataSource || !notionUploadMedia || !includeImages || !aiEnabled || !aiProvider || !aiApiKey || !aiBaseUrl || !aiModel || !aiPrompt) {
     return;
   }
   const currentOptions = await getOptions();
@@ -4433,9 +4497,10 @@ form?.addEventListener("submit", async (event) => {
     includeImages: includeImages.checked,
     notion: {
       token: trimmedNotionToken,
-      parentType: nextNotionParentType,
+      parentType: currentPlan.tier === "pro" ? nextNotionParentType : "page",
       parentPageId: normalizedNotionParentPage,
-      dataSourceId: normalizedNotionDataSource
+      dataSourceId: currentPlan.tier === "pro" ? normalizedNotionDataSource : "",
+      uploadMedia: currentPlan.tier === "pro" ? notionUploadMedia.checked : false
     },
     aiOrganization: nextAiOrganization
   };

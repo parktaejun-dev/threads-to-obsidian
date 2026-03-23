@@ -332,6 +332,12 @@ export async function getEffectiveOptions(): Promise<ExtensionOptions> {
     ...options,
     filenamePattern: DEFAULT_OPTIONS.filenamePattern,
     savePathPattern: DEFAULT_OPTIONS.savePathPattern,
+    notion: {
+      ...options.notion,
+      parentType: DEFAULT_OPTIONS.notion.parentType,
+      dataSourceId: DEFAULT_OPTIONS.notion.dataSourceId,
+      uploadMedia: DEFAULT_OPTIONS.notion.uploadMedia
+    },
     aiOrganization: {
       ...options.aiOrganization,
       enabled: false

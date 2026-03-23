@@ -1,12 +1,17 @@
 import { t } from "./i18n";
-import { buildNotionBundle } from "./package";
-import type { AiOrganizationResult, AiOrganizationSettings, ExtractedPost, NotionSettings } from "./types";
+import { organizePostWithAi } from "./llm";
+import { renderNotionMarkdown, type MarkdownMediaRefs } from "./markdown";
+import type { AiOrganizationResult, AiOrganizationSettings, AuthorReply, ExtractedPost, NotionSettings } from "./types";
 
 const NOTION_API_URL = "https://api.notion.com/v1/pages";
+const NOTION_BLOCKS_API_URL = "https://api.notion.com/v1/blocks";
 const NOTION_DATA_SOURCE_API_URL = "https://api.notion.com/v1/data_sources";
+const NOTION_FILE_UPLOAD_API_URL = "https://api.notion.com/v1/file_uploads";
 const NOTION_HOST_PATTERN = "https://api.notion.com/*";
 const NOTION_VERSION = "2026-03-11";
 const RICH_TEXT_CHUNK_LENGTH = 2000;
+const SINGLE_PART_UPLOAD_LIMIT_BYTES = 20 * 1024 * 1024;
+const MULTI_PART_CHUNK_BYTES = 10 * 1024 * 1024;
 
 interface NotionErrorResponse {
   code?: string;
@@ -40,6 +45,28 @@ interface NotionPropertySchema {
 interface NotionDataSourceResponse {
   id?: string;
   properties?: Record<string, NotionPropertySchema>;
+}
+
+interface NotionFileUploadResponse {
+  id?: string;
+  status?: string;
+  upload_url?: string;
+}
+
+interface NotionMediaPolicy {
+  allowMediaDownloads: boolean;
+  fallbackWarning: string;
+}
+
+interface UploadedNotionMediaFile {
+  fileUploadId: string;
+  kind: "image" | "video";
+  label: string;
+}
+
+interface UploadedNotionMediaGroup {
+  heading: string;
+  files: UploadedNotionMediaFile[];
 }
 
 export interface NotionSaveResult {
@@ -158,8 +185,44 @@ function chunkRichText(value: string): Array<{ type: "text"; text: { content: st
   return chunks;
 }
 
+function buildNotionMediaRefs(post: ExtractedPost, includeImages: boolean): MarkdownMediaRefs {
+  return {
+    postImages: includeImages ? [...post.imageUrls] : [],
+    postVideo:
+      includeImages && post.sourceType === "video"
+        ? {
+            file: post.videoUrl,
+            thumbnail: post.thumbnailUrl
+          }
+        : null,
+    replyImages: post.authorReplies.map((reply) => (includeImages ? [...reply.imageUrls] : [])),
+    replyVideos: post.authorReplies.map((reply) =>
+      includeImages && reply.sourceType === "video"
+        ? {
+            file: reply.videoUrl,
+            thumbnail: reply.thumbnailUrl
+          }
+        : null
+    )
+  };
+}
+
 function getConfiguredTargetId(settings: NotionSettings): string {
   return settings.parentType === "data_source" ? settings.dataSourceId : settings.parentPageId;
+}
+
+function hasAnyMedia(post: ExtractedPost): boolean {
+  return (
+    post.imageUrls.length > 0 ||
+    Boolean(post.videoUrl) ||
+    (post.sourceType === "video" && Boolean(post.thumbnailUrl)) ||
+    post.authorReplies.some((reply) => reply.imageUrls.length > 0 || Boolean(reply.videoUrl) || (reply.sourceType === "video" && Boolean(reply.thumbnailUrl)))
+  );
+}
+
+function combineWarnings(...values: Array<string | null | undefined>): string | null {
+  const unique = Array.from(new Set(values.map((value) => value?.trim()).filter(Boolean) as string[]));
+  return unique.length > 0 ? unique.join(" | ") : null;
 }
 
 async function notionRequest<T>(url: string, token: string, init?: RequestInit): Promise<T> {
@@ -171,6 +234,25 @@ async function notionRequest<T>(url: string, token: string, init?: RequestInit):
       "notion-version": NOTION_VERSION,
       ...(init?.headers ?? {})
     }
+  });
+
+  const retryAfter = response.headers.get("retry-after");
+  const responseBody = (await response.json().catch(() => null)) as (T & NotionErrorResponse) | null;
+  if (!response.ok) {
+    throw new Error(await mapNotionError(response.status, responseBody, retryAfter));
+  }
+
+  return (responseBody ?? {}) as T;
+}
+
+async function notionUploadRequest<T>(url: string, token: string, formData: FormData): Promise<T> {
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${token}`,
+      "notion-version": NOTION_VERSION
+    },
+    body: formData
   });
 
   const retryAfter = response.headers.get("retry-after");
@@ -344,11 +426,234 @@ function buildDataSourceProperties(
   return properties;
 }
 
+async function renderBundle(
+  post: ExtractedPost,
+  includeImages: boolean,
+  aiOrganization: AiOrganizationSettings | undefined,
+  inlineMedia: boolean
+): Promise<{ title: string; markdownContent: string; aiResult: AiOrganizationResult | null; warning: string | null }> {
+  const ai = aiOrganization ? await organizePostWithAi(post, aiOrganization) : { result: null, warning: null };
+  const mediaRefs = buildNotionMediaRefs(post, includeImages && inlineMedia);
+  const markdownContent = await renderNotionMarkdown(post, mediaRefs, ai.warning, ai.result);
+
+  return {
+    title: post.title,
+    markdownContent,
+    aiResult: ai.result,
+    warning: ai.warning
+  };
+}
+
+function guessExtension(url: string, contentType: string | null): string {
+  if (contentType?.includes("png")) {
+    return "png";
+  }
+  if (contentType?.includes("webp")) {
+    return "webp";
+  }
+  if (contentType?.includes("gif")) {
+    return "gif";
+  }
+  if (contentType?.includes("mp4")) {
+    return "mp4";
+  }
+  if (contentType?.includes("quicktime")) {
+    return "mov";
+  }
+
+  const match = url.match(/\.([a-zA-Z0-9]+)(?:[?#]|$)/);
+  return match?.[1]?.toLowerCase() ?? "bin";
+}
+
+function sanitizeUploadFilename(label: string, url: string, contentType: string | null): string {
+  const extension = guessExtension(url, contentType);
+  const baseName = label
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 80) || "threads-media";
+  return baseName.includes(".") ? baseName : `${baseName}.${extension}`;
+}
+
+async function fetchMediaBlob(url: string, label: string): Promise<{ blob: Blob; filename: string }> {
+  const response = await fetch(url, { cache: "no-store" });
+  if (!response.ok) {
+    throw new Error(`media_fetch_failed:${label}`);
+  }
+
+  const blob = await response.blob();
+  const filename = sanitizeUploadFilename(label, url, response.headers.get("content-type"));
+  return { blob, filename };
+}
+
+async function createFileUpload(token: string, filename: string, contentType: string, blobSize: number, numberOfParts?: number): Promise<NotionFileUploadResponse> {
+  return await notionRequest<NotionFileUploadResponse>(NOTION_FILE_UPLOAD_API_URL, token, {
+    method: "POST",
+    body: JSON.stringify({
+      mode: numberOfParts && numberOfParts > 1 ? "multi_part" : "single_part",
+      filename,
+      content_type: contentType,
+      ...(numberOfParts && numberOfParts > 1 ? { number_of_parts: numberOfParts } : { content_length: blobSize })
+    })
+  });
+}
+
+async function completeFileUpload(token: string, fileUploadId: string): Promise<void> {
+  await notionRequest<NotionFileUploadResponse>(`${NOTION_FILE_UPLOAD_API_URL}/${fileUploadId}/complete`, token, {
+    method: "POST",
+    body: JSON.stringify({})
+  });
+}
+
+async function uploadBlobToNotion(token: string, blob: Blob, filename: string): Promise<string> {
+  const contentType = blob.type || "application/octet-stream";
+  const numberOfParts = blob.size > SINGLE_PART_UPLOAD_LIMIT_BYTES ? Math.ceil(blob.size / MULTI_PART_CHUNK_BYTES) : 1;
+  const fileUpload = await createFileUpload(token, filename, contentType, blob.size, numberOfParts);
+  if (!fileUpload.id) {
+    throw new Error("missing_file_upload_id");
+  }
+
+  const uploadUrl = fileUpload.upload_url || `${NOTION_FILE_UPLOAD_API_URL}/${fileUpload.id}/send`;
+  if (numberOfParts === 1) {
+    const formData = new FormData();
+    formData.append("file", blob, filename);
+    await notionUploadRequest<NotionFileUploadResponse>(uploadUrl, token, formData);
+    return fileUpload.id;
+  }
+
+  let offset = 0;
+  let partNumber = 1;
+  while (offset < blob.size) {
+    const nextChunk = blob.slice(offset, Math.min(offset + MULTI_PART_CHUNK_BYTES, blob.size), contentType);
+    const formData = new FormData();
+    formData.append("part_number", String(partNumber));
+    formData.append("file", nextChunk, filename);
+    await notionUploadRequest<NotionFileUploadResponse>(uploadUrl, token, formData);
+    offset += MULTI_PART_CHUNK_BYTES;
+    partNumber += 1;
+  }
+
+  await completeFileUpload(token, fileUpload.id);
+  return fileUpload.id;
+}
+
+async function uploadRemoteMediaFile(token: string, url: string, label: string, kind: "image" | "video"): Promise<UploadedNotionMediaFile> {
+  const { blob, filename } = await fetchMediaBlob(url, label);
+  const fileUploadId = await uploadBlobToNotion(token, blob, filename);
+  return { fileUploadId, kind, label };
+}
+
+async function buildUploadedMediaGroups(
+  token: string,
+  post: ExtractedPost,
+  replyLabel: string
+): Promise<UploadedNotionMediaGroup[]> {
+  const groups: UploadedNotionMediaGroup[] = [];
+
+  const postFiles: UploadedNotionMediaFile[] = [];
+  for (const [index, imageUrl] of post.imageUrls.entries()) {
+    postFiles.push(await uploadRemoteMediaFile(token, imageUrl, `post-image-${index + 1}`, "image"));
+  }
+  if (post.sourceType === "video" && post.videoUrl) {
+    postFiles.push(await uploadRemoteMediaFile(token, post.videoUrl, "post-video", "video"));
+    if (post.thumbnailUrl) {
+      postFiles.push(await uploadRemoteMediaFile(token, post.thumbnailUrl, "post-video-thumbnail", "image"));
+    }
+  }
+  if (postFiles.length > 0) {
+    groups.push({
+      heading: post.title,
+      files: postFiles
+    });
+  }
+
+  for (const [index, reply] of post.authorReplies.entries()) {
+    const replyFiles = await uploadReplyMediaFiles(token, reply, index);
+    if (replyFiles.length > 0) {
+      groups.push({
+        heading: `${replyLabel} ${index + 1}`,
+        files: replyFiles
+      });
+    }
+  }
+
+  return groups;
+}
+
+async function uploadReplyMediaFiles(token: string, reply: AuthorReply, replyIndex: number): Promise<UploadedNotionMediaFile[]> {
+  const files: UploadedNotionMediaFile[] = [];
+  for (const [index, imageUrl] of reply.imageUrls.entries()) {
+    files.push(await uploadRemoteMediaFile(token, imageUrl, `reply-${replyIndex + 1}-image-${index + 1}`, "image"));
+  }
+  if (reply.sourceType === "video" && reply.videoUrl) {
+    files.push(await uploadRemoteMediaFile(token, reply.videoUrl, `reply-${replyIndex + 1}-video`, "video"));
+    if (reply.thumbnailUrl) {
+      files.push(await uploadRemoteMediaFile(token, reply.thumbnailUrl, `reply-${replyIndex + 1}-video-thumbnail`, "image"));
+    }
+  }
+  return files;
+}
+
+function buildHeadingBlock(level: 2 | 3, text: string): Record<string, unknown> {
+  const type = level === 2 ? "heading_2" : "heading_3";
+  return {
+    object: "block",
+    type,
+    [type]: {
+      rich_text: chunkRichText(text)
+    }
+  };
+}
+
+function buildFileBlock(file: UploadedNotionMediaFile): Record<string, unknown> {
+  return {
+    object: "block",
+    type: file.kind,
+    [file.kind]: {
+      type: "file_upload",
+      file_upload: {
+        id: file.fileUploadId
+      },
+      caption: chunkRichText(file.label)
+    }
+  };
+}
+
+function buildUploadedMediaBlocks(groups: UploadedNotionMediaGroup[], sectionTitle: string): Record<string, unknown>[] {
+  const blocks: Record<string, unknown>[] = [];
+  if (groups.length === 0) {
+    return blocks;
+  }
+
+  blocks.push(buildHeadingBlock(2, sectionTitle));
+  for (const group of groups) {
+    blocks.push(buildHeadingBlock(3, group.heading));
+    blocks.push(...group.files.map((file) => buildFileBlock(file)));
+  }
+  return blocks;
+}
+
+async function appendBlockChildren(token: string, blockId: string, children: Record<string, unknown>[]): Promise<void> {
+  if (children.length === 0) {
+    return;
+  }
+
+  await notionRequest<Record<string, unknown>>(`${NOTION_BLOCKS_API_URL}/${blockId}/children`, token, {
+    method: "PATCH",
+    body: JSON.stringify({
+      children
+    })
+  });
+}
+
 export async function savePostToNotion(
   post: ExtractedPost,
   settings: NotionSettings,
   includeImages: boolean,
-  aiOrganization?: AiOrganizationSettings
+  aiOrganization?: AiOrganizationSettings,
+  mediaPolicy?: NotionMediaPolicy
 ): Promise<NotionSaveResult> {
   const msg = await t();
   const token = settings.token.trim();
@@ -361,7 +666,25 @@ export async function savePostToNotion(
     throw new Error(msg.errNotionPermissionMissing);
   }
 
-  const bundle = await buildNotionBundle(post, includeImages, aiOrganization);
+  let uploadedMediaBlocks: Record<string, unknown>[] = [];
+  let mediaWarning: string | null = null;
+  let inlineMedia = includeImages;
+
+  if (includeImages && settings.uploadMedia && hasAnyMedia(post)) {
+    if (mediaPolicy && !mediaPolicy.allowMediaDownloads) {
+      mediaWarning = mediaPolicy.fallbackWarning;
+    } else {
+      try {
+        const uploadedMediaGroups = await buildUploadedMediaGroups(token, post, msg.mdReplyLabel);
+        uploadedMediaBlocks = buildUploadedMediaBlocks(uploadedMediaGroups, msg.mdUploadedMediaSection);
+        inlineMedia = false;
+      } catch {
+        mediaWarning = combineWarnings(mediaPolicy?.fallbackWarning, msg.warnNotionMediaUploadFailed);
+      }
+    }
+  }
+
+  const bundle = await renderBundle(post, includeImages, aiOrganization, inlineMedia);
   let properties: Record<string, unknown> | undefined;
   let parent: Record<string, string>;
 
@@ -390,10 +713,18 @@ export async function savePostToNotion(
     throw new Error(msg.errNotionRequestFailed);
   }
 
+  if (uploadedMediaBlocks.length > 0) {
+    try {
+      await appendBlockChildren(token, responseBody.id, uploadedMediaBlocks);
+    } catch {
+      mediaWarning = combineWarnings(mediaWarning, msg.warnNotionMediaUploadFailed);
+    }
+  }
+
   return {
     pageId: responseBody.id,
     pageUrl: responseBody.url,
     title: bundle.title,
-    warning: bundle.warning
+    warning: combineWarnings(bundle.warning, mediaWarning)
   };
 }

@@ -43,6 +43,7 @@ export interface NotionSettings {
   parentType: NotionParentType;
   parentPageId: string;
   dataSourceId: string;
+  uploadMedia: boolean;
 }
 
 export type PlanTier = "free" | "pro";

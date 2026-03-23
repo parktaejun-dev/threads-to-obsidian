@@ -2457,7 +2457,8 @@ var DEFAULT_OPTIONS = {
     token: "",
     parentType: "page",
     parentPageId: "",
-    dataSourceId: ""
+    dataSourceId: "",
+    uploadMedia: false
   },
   aiOrganization: DEFAULT_AI_ORGANIZATION_SETTINGS
 };
@@ -2554,7 +2555,7 @@ var ko = {
   optionsSaveTargetObsidian: "Obsidian",
   optionsSaveTargetNotion: "Notion",
   optionsNotionSection: "Notion \uC5F0\uACB0",
-  optionsNotionSubtitle: "Notion\uC740 API\uB85C \uC0C8 \uD398\uC774\uC9C0\uB97C \uB9CC\uB4ED\uB2C8\uB2E4. parent page \uC800\uC7A5\uACFC data source \uC800\uC7A5\uC744 \uBAA8\uB450 \uC9C0\uC6D0\uD569\uB2C8\uB2E4.",
+  optionsNotionSubtitle: "Notion\uC740 API\uB85C \uC0C8 \uD398\uC774\uC9C0\uB97C \uB9CC\uB4ED\uB2C8\uB2E4. Free\uB294 parent page \uC800\uC7A5, Pro\uB294 data source \uC800\uC7A5\uACFC \uB0B4\uBD80 \uBBF8\uB514\uC5B4 \uC5C5\uB85C\uB4DC\uB97C \uC9C0\uC6D0\uD569\uB2C8\uB2E4.",
   optionsNotionParentType: "\uC800\uC7A5 \uBC29\uC2DD",
   optionsNotionParentTypeHint: "Page \uC544\uB798 \uC0C8 \uD398\uC774\uC9C0\uB97C \uB9CC\uB4E4\uAC70\uB098, data source\uC5D0 \uC0C8 row/page\uB97C \uB9CC\uB4E4 \uC218 \uC788\uC2B5\uB2C8\uB2E4.",
   optionsNotionParentTypePage: "Parent page",
@@ -2565,6 +2566,10 @@ var ko = {
   optionsNotionParentPageHint: "Notion \uD398\uC774\uC9C0 URL \uC804\uCCB4\uB97C \uBD99\uC5EC\uB123\uC5B4\uB3C4 \uB418\uACE0, page ID\uB9CC \uB123\uC5B4\uB3C4 \uB429\uB2C8\uB2E4.",
   optionsNotionDataSource: "Data source ID \uB610\uB294 URL",
   optionsNotionDataSourceHint: "Notion data source URL \uC804\uCCB4 \uB610\uB294 data source ID\uB97C \uB123\uC2B5\uB2C8\uB2E4. \uC800\uC7A5 \uC2DC \uC81C\uBAA9/\uD0DC\uADF8/\uB0A0\uC9DC \uAC19\uC740 \uC18D\uC131\uC744 \uC790\uB3D9 \uB9E4\uD551\uD569\uB2C8\uB2E4.",
+  optionsNotionDataSourceLocked: "Data source \uC800\uC7A5\uC740 Pro\uC5D0\uC11C \uC0AC\uC6A9\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.",
+  optionsNotionUploadMedia: "Notion \uC6CC\uD06C\uC2A4\uD398\uC774\uC2A4\uC5D0 \uBBF8\uB514\uC5B4 \uC5C5\uB85C\uB4DC",
+  optionsNotionUploadMediaHint: "\uC774\uBBF8\uC9C0\uC640 \uB3D9\uC601\uC0C1\uC744 \uC6D0\uACA9 \uB9C1\uD06C \uB300\uC2E0 Notion \uD30C\uC77C\uB85C \uC5C5\uB85C\uB4DC\uD569\uB2C8\uB2E4. \uC5C5\uB85C\uB4DC\uC5D0 \uC2E4\uD328\uD558\uBA74 \uB9C1\uD06C \uBC29\uC2DD\uC73C\uB85C \uC800\uC7A5\uD569\uB2C8\uB2E4.",
+  optionsNotionUploadMediaLocked: "Notion \uB0B4\uBD80 \uBBF8\uB514\uC5B4 \uC5C5\uB85C\uB4DC\uB294 Pro\uC5D0\uC11C \uC0AC\uC6A9\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.",
   optionsNotionTokenRequired: "Notion \uC800\uC7A5\uC744 \uC4F0\uB824\uBA74 integration token\uC774 \uD544\uC694\uD569\uB2C8\uB2E4.",
   optionsNotionParentPageRequired: "Notion \uC800\uC7A5\uC744 \uC4F0\uB824\uBA74 parent page ID \uB610\uB294 URL\uC774 \uD544\uC694\uD569\uB2C8\uB2E4.",
   optionsNotionInvalidPage: "Notion parent page ID \uB610\uB294 URL \uD615\uC2DD\uC774 \uC62C\uBC14\uB974\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4.",
@@ -2585,6 +2590,8 @@ var ko = {
   compareRowDuplicates: "\uC911\uBCF5 \uAC74\uB108\uB700",
   compareRowFilename: "\uD30C\uC77C \uC774\uB984 \uADDC\uCE59",
   compareRowFolder: "\uC800\uC7A5 \uD3F4\uB354 \uC9C0\uC815",
+  compareRowNotionDataSource: "Notion data source \uC800\uC7A5",
+  compareRowNotionMediaUpload: "Notion \uB0B4\uBD80 \uBBF8\uB514\uC5B4 \uC5C5\uB85C\uB4DC",
   compareRowAiSummary: "AI \uC694\uC57D",
   compareRowAiTags: "AI \uD0DC\uADF8",
   compareRowAiFrontmatter: "AI frontmatter",
@@ -2661,6 +2668,7 @@ var ko = {
   mdReplySection: "\uC791\uC131\uC790 \uC5F0\uC18D \uB2F5\uAE00",
   mdReplyLabel: "\uB2F5\uAE00",
   mdReplyImageLabel: "\uB2F5\uAE00 \uC774\uBBF8\uC9C0",
+  mdUploadedMediaSection: "\uC5C5\uB85C\uB4DC\uD55C \uBBF8\uB514\uC5B4",
   mdSource: "\uC6D0\uBB38",
   mdAuthor: "\uC791\uC131\uC790",
   mdPublishedAt: "\uAC8C\uC2DC \uC2DC\uAC01",
@@ -2672,6 +2680,7 @@ var ko = {
   warnAiFailed: "AI \uC815\uB9AC\uC5D0 \uC2E4\uD328\uD574 \uC6D0\uBB38\uB9CC \uC800\uC7A5\uD588\uC2B5\uB2C8\uB2E4: {reason}",
   warnAiPermissionMissing: "AI \uC5D4\uB4DC\uD3EC\uC778\uD2B8 \uAD8C\uD55C\uC774 \uC5C6\uC5B4 \uC6D0\uBB38\uB9CC \uC800\uC7A5\uD588\uC2B5\uB2C8\uB2E4. \uC124\uC815\uC5D0\uC11C AI \uC139\uC158\uC744 \uB2E4\uC2DC \uC800\uC7A5\uD574 \uC8FC\uC138\uC694.",
   warnAiMissingModel: "AI \uBAA8\uB378 \uC774\uB984\uC774 \uC5C6\uC5B4 \uC6D0\uBB38\uB9CC \uC800\uC7A5\uD588\uC2B5\uB2C8\uB2E4.",
+  warnNotionMediaUploadFailed: "Notion \uBBF8\uB514\uC5B4 \uC5C5\uB85C\uB4DC\uC5D0 \uC2E4\uD328\uD574 \uC6D0\uBCF8 \uB9C1\uD06C\uB85C \uC800\uC7A5\uD588\uC2B5\uB2C8\uB2E4.",
   errBrowserUnsupported: "\uC774 \uBE0C\uB77C\uC6B0\uC800\uC5D0\uC11C\uB294 Obsidian \uD3F4\uB354\uC5D0 \uBC14\uB85C \uC800\uC7A5\uD560 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4.",
   errFolderNameFailed: "\uC800\uC7A5\uD560 \uD3F4\uB354 \uC774\uB984\uC744 \uACB0\uC815\uD558\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4.",
   errInvalidPath: "\uC798\uBABB\uB41C \uD30C\uC77C \uACBD\uB85C\uC785\uB2C8\uB2E4.",
@@ -2775,7 +2784,7 @@ var en = {
   optionsSaveTargetObsidian: "Obsidian",
   optionsSaveTargetNotion: "Notion",
   optionsNotionSection: "Notion Connection",
-  optionsNotionSubtitle: "Notion creates new pages through the API. Both parent-page saving and data-source saving are supported.",
+  optionsNotionSubtitle: "Notion creates new pages through the API. Free supports parent-page saving, while Pro adds data-source saving and managed media uploads.",
   optionsNotionParentType: "Save mode",
   optionsNotionParentTypeHint: "Create a new page under a page, or create a new entry/page inside a data source.",
   optionsNotionParentTypePage: "Parent page",
@@ -2786,6 +2795,10 @@ var en = {
   optionsNotionParentPageHint: "You can paste a full Notion page URL or just the page ID.",
   optionsNotionDataSource: "Data source ID or URL",
   optionsNotionDataSourceHint: "Paste a full Notion data source URL or just its ID. Title, tags, dates, and similar properties are mapped automatically when possible.",
+  optionsNotionDataSourceLocked: "Data source saving is available in Pro only.",
+  optionsNotionUploadMedia: "Upload media into Notion",
+  optionsNotionUploadMediaHint: "Upload images and videos as Notion-managed files instead of leaving them as remote links. If upload fails, the save falls back to links.",
+  optionsNotionUploadMediaLocked: "Notion-managed media upload is available in Pro only.",
   optionsNotionTokenRequired: "A Notion integration token is required to use Notion saving.",
   optionsNotionParentPageRequired: "A Notion parent page ID or URL is required to use Notion saving.",
   optionsNotionInvalidPage: "The Notion parent page ID or URL format is not valid.",
@@ -2806,6 +2819,8 @@ var en = {
   compareRowDuplicates: "Skip duplicates",
   compareRowFilename: "File name format",
   compareRowFolder: "Save folder",
+  compareRowNotionDataSource: "Notion data source",
+  compareRowNotionMediaUpload: "Notion media upload",
   compareRowAiSummary: "AI summary",
   compareRowAiTags: "AI tags",
   compareRowAiFrontmatter: "AI frontmatter",
@@ -2882,6 +2897,7 @@ var en = {
   mdReplySection: "Author Replies",
   mdReplyLabel: "Reply",
   mdReplyImageLabel: "Reply image",
+  mdUploadedMediaSection: "Uploaded media",
   mdSource: "Source",
   mdAuthor: "Author",
   mdPublishedAt: "Published at",
@@ -2893,6 +2909,7 @@ var en = {
   warnAiFailed: "AI organization failed, so the original note was saved instead: {reason}",
   warnAiPermissionMissing: "AI endpoint permission is missing, so the original note was saved. Re-save the AI section in settings.",
   warnAiMissingModel: "No AI model name is configured, so the original note was saved.",
+  warnNotionMediaUploadFailed: "Notion media upload failed, so remote links were saved instead.",
   errBrowserUnsupported: "This browser cannot save directly to an Obsidian folder.",
   errFolderNameFailed: "Could not determine a folder name for saving.",
   errInvalidPath: "Invalid file path.",
@@ -3016,9 +3033,6 @@ async function resolveImageDownloadPolicy(post, includeImages, requestPermission
     fallbackWarning: granted ? MEDIA_DISABLED_WARNING : MEDIA_PERMISSION_WARNING
   };
 }
-
-// src/extension/lib/package.ts
-var import_jszip = __toESM(require_jszip_min(), 1);
 
 // src/extension/lib/llm.ts
 var RESERVED_FRONTMATTER_KEYS = /* @__PURE__ */ new Set([
@@ -3512,271 +3526,16 @@ async function renderNotionMarkdown(post, mediaRefs, warning, aiResult = null) {
   return body.join("\n").trimEnd() + "\n";
 }
 
-// src/extension/lib/utils.ts
-var THREADS_PERMALINK_RE = /^https:\/\/www\.threads\.(?:com|net)\/@[^/]+\/post\/[^/?#]+/i;
-function isSupportedPermalink(url) {
-  return THREADS_PERMALINK_RE.test(url);
-}
-function sanitizeFilenamePart(value) {
-  return value.replace(/[\\/:*?"<>|]+/g, "").replace(/[.!?。！？]+$/g, "").replace(/\s+/g, "_").replace(/_+/g, "_").replace(/^_+|_+$/g, "").slice(0, 60);
-}
-function truncateFilenamePart(value, maxLength) {
-  return value.slice(0, maxLength).replace(/_+$/g, "");
-}
-function extractFirstSentence(text) {
-  const normalized = decodeEscapedJsonString(text).trim();
-  if (!normalized) {
-    return "";
-  }
-  const firstBlock = normalized.split(/\n+/).map((line) => line.trim()).find(Boolean);
-  if (!firstBlock) {
-    return "";
-  }
-  const sentenceMatch = firstBlock.match(/^(.+?[.!?。！？])(?:\s|$)/u);
-  return (sentenceMatch?.[1] ?? firstBlock).trim();
-}
-function resolvePatternTokens(pattern, post) {
-  const date = (post.publishedAt ?? post.capturedAt).slice(0, 10);
-  const firstSentence = extractFirstSentence(post.text) || post.title || post.shortcode;
-  const sanitizedFirstSentence = sanitizeFilenamePart(firstSentence);
-  return pattern.replaceAll("{date}", sanitizeFilenamePart(date)).replaceAll("{author}", sanitizeFilenamePart(post.author)).replaceAll("{first_sentence_20}", truncateFilenamePart(sanitizedFirstSentence, 20)).replaceAll("{first_sentence}", sanitizedFirstSentence).replaceAll("{shortcode}", sanitizeFilenamePart(post.shortcode));
-}
-function buildArchiveBaseName(pattern, post) {
-  const resolved = resolvePatternTokens(pattern, post);
-  const firstSentence = extractFirstSentence(post.text) || post.title || post.shortcode;
-  return resolved || `${sanitizeFilenamePart(post.author)}_${sanitizeFilenamePart(firstSentence)}`;
-}
-function buildPathPatternParts(pattern, post) {
-  if (!pattern.trim()) {
-    return [];
-  }
-  return resolvePatternTokens(pattern, post).replace(/\\/g, "/").split("/").map((part) => sanitizeFilenamePart(part.trim())).filter(Boolean);
-}
-function buildZipFilename(pattern, post) {
-  return `${buildArchiveBaseName(pattern, post)}.zip`;
-}
-function decodeEscapedJsonString(value) {
-  let current = value;
-  for (let attempt = 0; attempt < 3; attempt += 1) {
-    if (!/\\u[0-9a-fA-F]{4}|\\[nrt"\\/]/.test(current)) {
-      return current;
-    }
-    try {
-      const parsed = JSON.parse(`"${current}"`);
-      if (parsed === current) {
-        return current;
-      }
-      current = parsed;
-      continue;
-    } catch {
-      current = current.replaceAll("\\n", "\n").replaceAll("\\r", "\r").replaceAll("\\t", "	").replaceAll('\\"', '"').replaceAll("\\\\", "\\");
-    }
-  }
-  return current;
-}
-
-// src/extension/lib/package.ts
-function prefixAssetBasePath(orderPrefix, basename) {
-  return `${orderPrefix}. ${basename}`;
-}
-function buildArchiveNoteFilename(archiveName) {
-  return `01. ${archiveName}.md`;
-}
-function guessExtension(url, contentType) {
-  if (contentType?.includes("png")) {
-    return "png";
-  }
-  if (contentType?.includes("webp")) {
-    return "webp";
-  }
-  if (contentType?.includes("gif")) {
-    return "gif";
-  }
-  if (contentType?.includes("mp4")) {
-    return "mp4";
-  }
-  const match = url.match(/\.([a-zA-Z0-9]+)(?:[?#]|$)/);
-  return match?.[1]?.toLowerCase() ?? "jpg";
-}
-function hasAnyMedia2(post) {
-  return post.imageUrls.length > 0 || Boolean(post.videoUrl) || post.sourceType === "video" && Boolean(post.thumbnailUrl) || post.authorReplies.some((reply) => reply.imageUrls.length > 0 || Boolean(reply.videoUrl) || reply.sourceType === "video" && Boolean(reply.thumbnailUrl));
-}
-async function collectRemoteAsset(url, assetBasePath, includeImages, fallbackWarning) {
-  if (!url) {
-    return { ref: null, assetFiles: [], warning: null };
-  }
-  if (!includeImages) {
-    return {
-      ref: url,
-      assetFiles: [],
-      warning: fallbackWarning
-    };
-  }
-  try {
-    const response = await fetch(url, { cache: "no-store" });
-    if (!response.ok) {
-      throw new Error("asset fetch failed");
-    }
-    const contentType = response.headers.get("content-type");
-    const blob = await response.blob();
-    const extension = guessExtension(url, contentType);
-    const relativePath = `${assetBasePath}.${extension}`;
-    return {
-      ref: relativePath,
-      assetFiles: [{ relativePath, blob }],
-      warning: null
-    };
-  } catch {
-    return {
-      ref: url,
-      assetFiles: [],
-      warning: (await t()).warnImageAccessFailed
-    };
-  }
-}
-async function collectImageAssets(imageUrls, assetBasename, includeImages, fallbackWarning) {
-  const refs = [];
-  const assetFiles = [];
-  let warning = null;
-  for (const [index, imageUrl] of imageUrls.entries()) {
-    const result = await collectRemoteAsset(imageUrl, `${assetBasename}-${String(index + 1).padStart(2, "0")}`, includeImages, fallbackWarning);
-    if (result.ref) {
-      refs.push(result.ref);
-    }
-    assetFiles.push(...result.assetFiles);
-    warning = warning ?? result.warning;
-  }
-  return { refs, assetFiles, warning };
-}
-async function collectVideoAssets(videoUrl, thumbnailUrl, assetBasePath, includeImages, fallbackWarning) {
-  const [videoResult, thumbnailResult] = await Promise.all([
-    collectRemoteAsset(videoUrl, assetBasePath, includeImages, fallbackWarning),
-    collectRemoteAsset(thumbnailUrl, `${assetBasePath}-thumb`, includeImages, fallbackWarning)
-  ]);
-  return {
-    file: videoResult.ref,
-    thumbnail: thumbnailResult.ref,
-    assetFiles: [...videoResult.assetFiles, ...thumbnailResult.assetFiles],
-    warning: videoResult.warning ?? thumbnailResult.warning
-  };
-}
-async function buildArchiveBundle(post, filenamePattern, includeImages, fallbackWarning, aiOrganization) {
-  const resolvedFallbackWarning = fallbackWarning ?? (await t()).warnImageDownloadOff;
-  const archiveName = buildArchiveBaseName(filenamePattern, post);
-  const ai = aiOrganization ? await organizePostWithAi(post, aiOrganization) : { result: null, warning: null };
-  const postImages = await collectImageAssets(
-    post.imageUrls,
-    prefixAssetBasePath("02", "image"),
-    includeImages,
-    resolvedFallbackWarning
-  );
-  const postVideo = post.sourceType === "video" ? await collectVideoAssets(
-    post.videoUrl,
-    post.thumbnailUrl,
-    prefixAssetBasePath("02", "video"),
-    includeImages,
-    resolvedFallbackWarning
-  ) : null;
-  const replyImages = await Promise.all(
-    post.authorReplies.map(
-      (reply, index) => collectImageAssets(
-        reply.imageUrls,
-        prefixAssetBasePath("03", `reply-${String(index + 1).padStart(2, "0")}-image`),
-        includeImages,
-        resolvedFallbackWarning
-      )
-    )
-  );
-  const replyVideos = await Promise.all(
-    post.authorReplies.map(
-      (reply, index) => reply.sourceType === "video" ? collectVideoAssets(
-        reply.videoUrl,
-        reply.thumbnailUrl,
-        prefixAssetBasePath("03", `reply-${String(index + 1).padStart(2, "0")}-video`),
-        includeImages,
-        resolvedFallbackWarning
-      ) : Promise.resolve(null)
-    )
-  );
-  let warning = null;
-  if (!includeImages && hasAnyMedia2(post)) {
-    warning = resolvedFallbackWarning;
-  }
-  const noteWarning = warning ?? postImages.warning ?? postVideo?.warning ?? replyImages.find((result) => result.warning)?.warning ?? replyVideos.find((result) => result?.warning)?.warning ?? null;
-  const userWarnings = [noteWarning, ai.warning].filter(Boolean);
-  warning = userWarnings.length > 0 ? userWarnings.join(" | ") : null;
-  const markdownContent = await renderMarkdown(
-    post,
-    {
-      postImages: postImages.refs,
-      postVideo: postVideo ? { thumbnail: postVideo.thumbnail, file: postVideo.file } : null,
-      replyImages: replyImages.map((result) => result.refs),
-      replyVideos: replyVideos.map((result) => result ? { thumbnail: result.thumbnail, file: result.file } : null)
-    },
-    noteWarning,
-    ai.result
-  );
-  return {
-    archiveName,
-    markdownContent,
-    assetFiles: [
-      ...postImages.assetFiles,
-      ...postVideo?.assetFiles ?? [],
-      ...replyImages.flatMap((result) => result.assetFiles),
-      ...replyVideos.flatMap((result) => result?.assetFiles ?? [])
-    ],
-    warning,
-    noteWarning
-  };
-}
-function buildNotionMediaRefs(post, includeImages) {
-  return {
-    postImages: includeImages ? [...post.imageUrls] : [],
-    postVideo: post.sourceType === "video" ? {
-      file: post.videoUrl,
-      thumbnail: includeImages ? post.thumbnailUrl : null
-    } : null,
-    replyImages: post.authorReplies.map((reply) => includeImages ? [...reply.imageUrls] : []),
-    replyVideos: post.authorReplies.map(
-      (reply) => reply.sourceType === "video" ? {
-        file: reply.videoUrl,
-        thumbnail: includeImages ? reply.thumbnailUrl : null
-      } : null
-    )
-  };
-}
-async function buildNotionBundle(post, includeImages, aiOrganization) {
-  const ai = aiOrganization ? await organizePostWithAi(post, aiOrganization) : { result: null, warning: null };
-  const markdownContent = await renderNotionMarkdown(post, buildNotionMediaRefs(post, includeImages), ai.warning, ai.result);
-  return {
-    title: post.title,
-    markdownContent,
-    aiResult: ai.result,
-    warning: ai.warning
-  };
-}
-async function buildZipPackage(post, filenamePattern, includeImages, fallbackWarning = "\uC774\uBBF8\uC9C0/\uB3D9\uC601\uC0C1 \uC800\uC7A5\uC774 \uAEBC\uC838 \uC788\uC5B4 \uC6D0\uACA9 URL\uC744 \uC0AC\uC6A9\uD588\uC2B5\uB2C8\uB2E4.", savePathPattern = "", aiOrganization) {
-  const bundle = await buildArchiveBundle(post, filenamePattern, includeImages, fallbackWarning, aiOrganization);
-  const zip = new import_jszip.default();
-  const archiveRoot = [...buildPathPatternParts(savePathPattern, post), bundle.archiveName].join("/");
-  zip.file(`${archiveRoot}/${buildArchiveNoteFilename(bundle.archiveName)}`, bundle.markdownContent);
-  for (const file of bundle.assetFiles) {
-    zip.file(`${archiveRoot}/${file.relativePath}`, await file.blob.arrayBuffer());
-  }
-  return {
-    blob: await zip.generateAsync({ type: "blob" }),
-    zipFilename: buildZipFilename(filenamePattern, post),
-    archiveName: bundle.archiveName,
-    warning: bundle.warning
-  };
-}
-
 // src/extension/lib/notion.ts
 var NOTION_API_URL = "https://api.notion.com/v1/pages";
+var NOTION_BLOCKS_API_URL = "https://api.notion.com/v1/blocks";
 var NOTION_DATA_SOURCE_API_URL = "https://api.notion.com/v1/data_sources";
+var NOTION_FILE_UPLOAD_API_URL = "https://api.notion.com/v1/file_uploads";
 var NOTION_HOST_PATTERN = "https://api.notion.com/*";
 var NOTION_VERSION = "2026-03-11";
 var RICH_TEXT_CHUNK_LENGTH = 2e3;
+var SINGLE_PART_UPLOAD_LIMIT_BYTES = 20 * 1024 * 1024;
+var MULTI_PART_CHUNK_BYTES = 10 * 1024 * 1024;
 function normalizeUuid(value) {
   const compact = value.replace(/-/g, "").toLowerCase();
   if (!/^[0-9a-f]{32}$/.test(compact)) {
@@ -3851,8 +3610,31 @@ function chunkRichText(value) {
   }
   return chunks;
 }
+function buildNotionMediaRefs(post, includeImages) {
+  return {
+    postImages: includeImages ? [...post.imageUrls] : [],
+    postVideo: includeImages && post.sourceType === "video" ? {
+      file: post.videoUrl,
+      thumbnail: post.thumbnailUrl
+    } : null,
+    replyImages: post.authorReplies.map((reply) => includeImages ? [...reply.imageUrls] : []),
+    replyVideos: post.authorReplies.map(
+      (reply) => includeImages && reply.sourceType === "video" ? {
+        file: reply.videoUrl,
+        thumbnail: reply.thumbnailUrl
+      } : null
+    )
+  };
+}
 function getConfiguredTargetId(settings) {
   return settings.parentType === "data_source" ? settings.dataSourceId : settings.parentPageId;
+}
+function hasAnyMedia2(post) {
+  return post.imageUrls.length > 0 || Boolean(post.videoUrl) || post.sourceType === "video" && Boolean(post.thumbnailUrl) || post.authorReplies.some((reply) => reply.imageUrls.length > 0 || Boolean(reply.videoUrl) || reply.sourceType === "video" && Boolean(reply.thumbnailUrl));
+}
+function combineWarnings(...values) {
+  const unique = Array.from(new Set(values.map((value) => value?.trim()).filter(Boolean)));
+  return unique.length > 0 ? unique.join(" | ") : null;
 }
 async function notionRequest(url, token, init) {
   const response = await fetch(url, {
@@ -3863,6 +3645,22 @@ async function notionRequest(url, token, init) {
       "notion-version": NOTION_VERSION,
       ...init?.headers ?? {}
     }
+  });
+  const retryAfter = response.headers.get("retry-after");
+  const responseBody = await response.json().catch(() => null);
+  if (!response.ok) {
+    throw new Error(await mapNotionError(response.status, responseBody, retryAfter));
+  }
+  return responseBody ?? {};
+}
+async function notionUploadRequest(url, token, formData) {
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${token}`,
+      "notion-version": NOTION_VERSION
+    },
+    body: formData
   });
   const retryAfter = response.headers.get("retry-after");
   const responseBody = await response.json().catch(() => null);
@@ -3990,7 +3788,189 @@ function buildDataSourceProperties(schema, post, aiResult) {
   }
   return properties;
 }
-async function savePostToNotion(post, settings, includeImages, aiOrganization) {
+async function renderBundle(post, includeImages, aiOrganization, inlineMedia) {
+  const ai = aiOrganization ? await organizePostWithAi(post, aiOrganization) : { result: null, warning: null };
+  const mediaRefs = buildNotionMediaRefs(post, includeImages && inlineMedia);
+  const markdownContent = await renderNotionMarkdown(post, mediaRefs, ai.warning, ai.result);
+  return {
+    title: post.title,
+    markdownContent,
+    aiResult: ai.result,
+    warning: ai.warning
+  };
+}
+function guessExtension(url, contentType) {
+  if (contentType?.includes("png")) {
+    return "png";
+  }
+  if (contentType?.includes("webp")) {
+    return "webp";
+  }
+  if (contentType?.includes("gif")) {
+    return "gif";
+  }
+  if (contentType?.includes("mp4")) {
+    return "mp4";
+  }
+  if (contentType?.includes("quicktime")) {
+    return "mov";
+  }
+  const match = url.match(/\.([a-zA-Z0-9]+)(?:[?#]|$)/);
+  return match?.[1]?.toLowerCase() ?? "bin";
+}
+function sanitizeUploadFilename(label, url, contentType) {
+  const extension = guessExtension(url, contentType);
+  const baseName = label.trim().toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/-+/g, "-").replace(/^-+|-+$/g, "").slice(0, 80) || "threads-media";
+  return baseName.includes(".") ? baseName : `${baseName}.${extension}`;
+}
+async function fetchMediaBlob(url, label) {
+  const response = await fetch(url, { cache: "no-store" });
+  if (!response.ok) {
+    throw new Error(`media_fetch_failed:${label}`);
+  }
+  const blob = await response.blob();
+  const filename = sanitizeUploadFilename(label, url, response.headers.get("content-type"));
+  return { blob, filename };
+}
+async function createFileUpload(token, filename, contentType, blobSize, numberOfParts) {
+  return await notionRequest(NOTION_FILE_UPLOAD_API_URL, token, {
+    method: "POST",
+    body: JSON.stringify({
+      mode: numberOfParts && numberOfParts > 1 ? "multi_part" : "single_part",
+      filename,
+      content_type: contentType,
+      ...numberOfParts && numberOfParts > 1 ? { number_of_parts: numberOfParts } : { content_length: blobSize }
+    })
+  });
+}
+async function completeFileUpload(token, fileUploadId) {
+  await notionRequest(`${NOTION_FILE_UPLOAD_API_URL}/${fileUploadId}/complete`, token, {
+    method: "POST",
+    body: JSON.stringify({})
+  });
+}
+async function uploadBlobToNotion(token, blob, filename) {
+  const contentType = blob.type || "application/octet-stream";
+  const numberOfParts = blob.size > SINGLE_PART_UPLOAD_LIMIT_BYTES ? Math.ceil(blob.size / MULTI_PART_CHUNK_BYTES) : 1;
+  const fileUpload = await createFileUpload(token, filename, contentType, blob.size, numberOfParts);
+  if (!fileUpload.id) {
+    throw new Error("missing_file_upload_id");
+  }
+  const uploadUrl = fileUpload.upload_url || `${NOTION_FILE_UPLOAD_API_URL}/${fileUpload.id}/send`;
+  if (numberOfParts === 1) {
+    const formData = new FormData();
+    formData.append("file", blob, filename);
+    await notionUploadRequest(uploadUrl, token, formData);
+    return fileUpload.id;
+  }
+  let offset = 0;
+  let partNumber = 1;
+  while (offset < blob.size) {
+    const nextChunk = blob.slice(offset, Math.min(offset + MULTI_PART_CHUNK_BYTES, blob.size), contentType);
+    const formData = new FormData();
+    formData.append("part_number", String(partNumber));
+    formData.append("file", nextChunk, filename);
+    await notionUploadRequest(uploadUrl, token, formData);
+    offset += MULTI_PART_CHUNK_BYTES;
+    partNumber += 1;
+  }
+  await completeFileUpload(token, fileUpload.id);
+  return fileUpload.id;
+}
+async function uploadRemoteMediaFile(token, url, label, kind) {
+  const { blob, filename } = await fetchMediaBlob(url, label);
+  const fileUploadId = await uploadBlobToNotion(token, blob, filename);
+  return { fileUploadId, kind, label };
+}
+async function buildUploadedMediaGroups(token, post, replyLabel) {
+  const groups = [];
+  const postFiles = [];
+  for (const [index, imageUrl] of post.imageUrls.entries()) {
+    postFiles.push(await uploadRemoteMediaFile(token, imageUrl, `post-image-${index + 1}`, "image"));
+  }
+  if (post.sourceType === "video" && post.videoUrl) {
+    postFiles.push(await uploadRemoteMediaFile(token, post.videoUrl, "post-video", "video"));
+    if (post.thumbnailUrl) {
+      postFiles.push(await uploadRemoteMediaFile(token, post.thumbnailUrl, "post-video-thumbnail", "image"));
+    }
+  }
+  if (postFiles.length > 0) {
+    groups.push({
+      heading: post.title,
+      files: postFiles
+    });
+  }
+  for (const [index, reply] of post.authorReplies.entries()) {
+    const replyFiles = await uploadReplyMediaFiles(token, reply, index);
+    if (replyFiles.length > 0) {
+      groups.push({
+        heading: `${replyLabel} ${index + 1}`,
+        files: replyFiles
+      });
+    }
+  }
+  return groups;
+}
+async function uploadReplyMediaFiles(token, reply, replyIndex) {
+  const files = [];
+  for (const [index, imageUrl] of reply.imageUrls.entries()) {
+    files.push(await uploadRemoteMediaFile(token, imageUrl, `reply-${replyIndex + 1}-image-${index + 1}`, "image"));
+  }
+  if (reply.sourceType === "video" && reply.videoUrl) {
+    files.push(await uploadRemoteMediaFile(token, reply.videoUrl, `reply-${replyIndex + 1}-video`, "video"));
+    if (reply.thumbnailUrl) {
+      files.push(await uploadRemoteMediaFile(token, reply.thumbnailUrl, `reply-${replyIndex + 1}-video-thumbnail`, "image"));
+    }
+  }
+  return files;
+}
+function buildHeadingBlock(level, text) {
+  const type = level === 2 ? "heading_2" : "heading_3";
+  return {
+    object: "block",
+    type,
+    [type]: {
+      rich_text: chunkRichText(text)
+    }
+  };
+}
+function buildFileBlock(file) {
+  return {
+    object: "block",
+    type: file.kind,
+    [file.kind]: {
+      type: "file_upload",
+      file_upload: {
+        id: file.fileUploadId
+      },
+      caption: chunkRichText(file.label)
+    }
+  };
+}
+function buildUploadedMediaBlocks(groups, sectionTitle) {
+  const blocks = [];
+  if (groups.length === 0) {
+    return blocks;
+  }
+  blocks.push(buildHeadingBlock(2, sectionTitle));
+  for (const group of groups) {
+    blocks.push(buildHeadingBlock(3, group.heading));
+    blocks.push(...group.files.map((file) => buildFileBlock(file)));
+  }
+  return blocks;
+}
+async function appendBlockChildren(token, blockId, children) {
+  if (children.length === 0) {
+    return;
+  }
+  await notionRequest(`${NOTION_BLOCKS_API_URL}/${blockId}/children`, token, {
+    method: "PATCH",
+    body: JSON.stringify({
+      children
+    })
+  });
+}
+async function savePostToNotion(post, settings, includeImages, aiOrganization, mediaPolicy) {
   const msg = await t();
   const token = settings.token.trim();
   if (!token) {
@@ -4000,7 +3980,23 @@ async function savePostToNotion(post, settings, includeImages, aiOrganization) {
   if (!await hasNotionHostPermission()) {
     throw new Error(msg.errNotionPermissionMissing);
   }
-  const bundle = await buildNotionBundle(post, includeImages, aiOrganization);
+  let uploadedMediaBlocks = [];
+  let mediaWarning = null;
+  let inlineMedia = includeImages;
+  if (includeImages && settings.uploadMedia && hasAnyMedia2(post)) {
+    if (mediaPolicy && !mediaPolicy.allowMediaDownloads) {
+      mediaWarning = mediaPolicy.fallbackWarning;
+    } else {
+      try {
+        const uploadedMediaGroups = await buildUploadedMediaGroups(token, post, msg.mdReplyLabel);
+        uploadedMediaBlocks = buildUploadedMediaBlocks(uploadedMediaGroups, msg.mdUploadedMediaSection);
+        inlineMedia = false;
+      } catch {
+        mediaWarning = combineWarnings(mediaPolicy?.fallbackWarning, msg.warnNotionMediaUploadFailed);
+      }
+    }
+  }
+  const bundle = await renderBundle(post, includeImages, aiOrganization, inlineMedia);
   let properties;
   let parent;
   if (settings.parentType === "data_source") {
@@ -4025,10 +4021,253 @@ async function savePostToNotion(post, settings, includeImages, aiOrganization) {
   if (!responseBody?.id || !responseBody.url) {
     throw new Error(msg.errNotionRequestFailed);
   }
+  if (uploadedMediaBlocks.length > 0) {
+    try {
+      await appendBlockChildren(token, responseBody.id, uploadedMediaBlocks);
+    } catch {
+      mediaWarning = combineWarnings(mediaWarning, msg.warnNotionMediaUploadFailed);
+    }
+  }
   return {
     pageId: responseBody.id,
     pageUrl: responseBody.url,
     title: bundle.title,
+    warning: combineWarnings(bundle.warning, mediaWarning)
+  };
+}
+
+// src/extension/lib/package.ts
+var import_jszip = __toESM(require_jszip_min(), 1);
+
+// src/extension/lib/utils.ts
+var THREADS_PERMALINK_RE = /^https:\/\/www\.threads\.(?:com|net)\/@[^/]+\/post\/[^/?#]+/i;
+function isSupportedPermalink(url) {
+  return THREADS_PERMALINK_RE.test(url);
+}
+function sanitizeFilenamePart(value) {
+  return value.replace(/[\\/:*?"<>|]+/g, "").replace(/[.!?。！？]+$/g, "").replace(/\s+/g, "_").replace(/_+/g, "_").replace(/^_+|_+$/g, "").slice(0, 60);
+}
+function truncateFilenamePart(value, maxLength) {
+  return value.slice(0, maxLength).replace(/_+$/g, "");
+}
+function extractFirstSentence(text) {
+  const normalized = decodeEscapedJsonString(text).trim();
+  if (!normalized) {
+    return "";
+  }
+  const firstBlock = normalized.split(/\n+/).map((line) => line.trim()).find(Boolean);
+  if (!firstBlock) {
+    return "";
+  }
+  const sentenceMatch = firstBlock.match(/^(.+?[.!?。！？])(?:\s|$)/u);
+  return (sentenceMatch?.[1] ?? firstBlock).trim();
+}
+function resolvePatternTokens(pattern, post) {
+  const date = (post.publishedAt ?? post.capturedAt).slice(0, 10);
+  const firstSentence = extractFirstSentence(post.text) || post.title || post.shortcode;
+  const sanitizedFirstSentence = sanitizeFilenamePart(firstSentence);
+  return pattern.replaceAll("{date}", sanitizeFilenamePart(date)).replaceAll("{author}", sanitizeFilenamePart(post.author)).replaceAll("{first_sentence_20}", truncateFilenamePart(sanitizedFirstSentence, 20)).replaceAll("{first_sentence}", sanitizedFirstSentence).replaceAll("{shortcode}", sanitizeFilenamePart(post.shortcode));
+}
+function buildArchiveBaseName(pattern, post) {
+  const resolved = resolvePatternTokens(pattern, post);
+  const firstSentence = extractFirstSentence(post.text) || post.title || post.shortcode;
+  return resolved || `${sanitizeFilenamePart(post.author)}_${sanitizeFilenamePart(firstSentence)}`;
+}
+function buildPathPatternParts(pattern, post) {
+  if (!pattern.trim()) {
+    return [];
+  }
+  return resolvePatternTokens(pattern, post).replace(/\\/g, "/").split("/").map((part) => sanitizeFilenamePart(part.trim())).filter(Boolean);
+}
+function buildZipFilename(pattern, post) {
+  return `${buildArchiveBaseName(pattern, post)}.zip`;
+}
+function decodeEscapedJsonString(value) {
+  let current = value;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    if (!/\\u[0-9a-fA-F]{4}|\\[nrt"\\/]/.test(current)) {
+      return current;
+    }
+    try {
+      const parsed = JSON.parse(`"${current}"`);
+      if (parsed === current) {
+        return current;
+      }
+      current = parsed;
+      continue;
+    } catch {
+      current = current.replaceAll("\\n", "\n").replaceAll("\\r", "\r").replaceAll("\\t", "	").replaceAll('\\"', '"').replaceAll("\\\\", "\\");
+    }
+  }
+  return current;
+}
+
+// src/extension/lib/package.ts
+function prefixAssetBasePath(orderPrefix, basename) {
+  return `${orderPrefix}. ${basename}`;
+}
+function buildArchiveNoteFilename(archiveName) {
+  return `01. ${archiveName}.md`;
+}
+function guessExtension2(url, contentType) {
+  if (contentType?.includes("png")) {
+    return "png";
+  }
+  if (contentType?.includes("webp")) {
+    return "webp";
+  }
+  if (contentType?.includes("gif")) {
+    return "gif";
+  }
+  if (contentType?.includes("mp4")) {
+    return "mp4";
+  }
+  const match = url.match(/\.([a-zA-Z0-9]+)(?:[?#]|$)/);
+  return match?.[1]?.toLowerCase() ?? "jpg";
+}
+function hasAnyMedia3(post) {
+  return post.imageUrls.length > 0 || Boolean(post.videoUrl) || post.sourceType === "video" && Boolean(post.thumbnailUrl) || post.authorReplies.some((reply) => reply.imageUrls.length > 0 || Boolean(reply.videoUrl) || reply.sourceType === "video" && Boolean(reply.thumbnailUrl));
+}
+async function collectRemoteAsset(url, assetBasePath, includeImages, fallbackWarning) {
+  if (!url) {
+    return { ref: null, assetFiles: [], warning: null };
+  }
+  if (!includeImages) {
+    return {
+      ref: url,
+      assetFiles: [],
+      warning: fallbackWarning
+    };
+  }
+  try {
+    const response = await fetch(url, { cache: "no-store" });
+    if (!response.ok) {
+      throw new Error("asset fetch failed");
+    }
+    const contentType = response.headers.get("content-type");
+    const blob = await response.blob();
+    const extension = guessExtension2(url, contentType);
+    const relativePath = `${assetBasePath}.${extension}`;
+    return {
+      ref: relativePath,
+      assetFiles: [{ relativePath, blob }],
+      warning: null
+    };
+  } catch {
+    return {
+      ref: url,
+      assetFiles: [],
+      warning: (await t()).warnImageAccessFailed
+    };
+  }
+}
+async function collectImageAssets(imageUrls, assetBasename, includeImages, fallbackWarning) {
+  const refs = [];
+  const assetFiles = [];
+  let warning = null;
+  for (const [index, imageUrl] of imageUrls.entries()) {
+    const result = await collectRemoteAsset(imageUrl, `${assetBasename}-${String(index + 1).padStart(2, "0")}`, includeImages, fallbackWarning);
+    if (result.ref) {
+      refs.push(result.ref);
+    }
+    assetFiles.push(...result.assetFiles);
+    warning = warning ?? result.warning;
+  }
+  return { refs, assetFiles, warning };
+}
+async function collectVideoAssets(videoUrl, thumbnailUrl, assetBasePath, includeImages, fallbackWarning) {
+  const [videoResult, thumbnailResult] = await Promise.all([
+    collectRemoteAsset(videoUrl, assetBasePath, includeImages, fallbackWarning),
+    collectRemoteAsset(thumbnailUrl, `${assetBasePath}-thumb`, includeImages, fallbackWarning)
+  ]);
+  return {
+    file: videoResult.ref,
+    thumbnail: thumbnailResult.ref,
+    assetFiles: [...videoResult.assetFiles, ...thumbnailResult.assetFiles],
+    warning: videoResult.warning ?? thumbnailResult.warning
+  };
+}
+async function buildArchiveBundle(post, filenamePattern, includeImages, fallbackWarning, aiOrganization) {
+  const resolvedFallbackWarning = fallbackWarning ?? (await t()).warnImageDownloadOff;
+  const archiveName = buildArchiveBaseName(filenamePattern, post);
+  const ai = aiOrganization ? await organizePostWithAi(post, aiOrganization) : { result: null, warning: null };
+  const postImages = await collectImageAssets(
+    post.imageUrls,
+    prefixAssetBasePath("02", "image"),
+    includeImages,
+    resolvedFallbackWarning
+  );
+  const postVideo = post.sourceType === "video" ? await collectVideoAssets(
+    post.videoUrl,
+    post.thumbnailUrl,
+    prefixAssetBasePath("02", "video"),
+    includeImages,
+    resolvedFallbackWarning
+  ) : null;
+  const replyImages = await Promise.all(
+    post.authorReplies.map(
+      (reply, index) => collectImageAssets(
+        reply.imageUrls,
+        prefixAssetBasePath("03", `reply-${String(index + 1).padStart(2, "0")}-image`),
+        includeImages,
+        resolvedFallbackWarning
+      )
+    )
+  );
+  const replyVideos = await Promise.all(
+    post.authorReplies.map(
+      (reply, index) => reply.sourceType === "video" ? collectVideoAssets(
+        reply.videoUrl,
+        reply.thumbnailUrl,
+        prefixAssetBasePath("03", `reply-${String(index + 1).padStart(2, "0")}-video`),
+        includeImages,
+        resolvedFallbackWarning
+      ) : Promise.resolve(null)
+    )
+  );
+  let warning = null;
+  if (!includeImages && hasAnyMedia3(post)) {
+    warning = resolvedFallbackWarning;
+  }
+  const noteWarning = warning ?? postImages.warning ?? postVideo?.warning ?? replyImages.find((result) => result.warning)?.warning ?? replyVideos.find((result) => result?.warning)?.warning ?? null;
+  const userWarnings = [noteWarning, ai.warning].filter(Boolean);
+  warning = userWarnings.length > 0 ? userWarnings.join(" | ") : null;
+  const markdownContent = await renderMarkdown(
+    post,
+    {
+      postImages: postImages.refs,
+      postVideo: postVideo ? { thumbnail: postVideo.thumbnail, file: postVideo.file } : null,
+      replyImages: replyImages.map((result) => result.refs),
+      replyVideos: replyVideos.map((result) => result ? { thumbnail: result.thumbnail, file: result.file } : null)
+    },
+    noteWarning,
+    ai.result
+  );
+  return {
+    archiveName,
+    markdownContent,
+    assetFiles: [
+      ...postImages.assetFiles,
+      ...postVideo?.assetFiles ?? [],
+      ...replyImages.flatMap((result) => result.assetFiles),
+      ...replyVideos.flatMap((result) => result?.assetFiles ?? [])
+    ],
+    warning,
+    noteWarning
+  };
+}
+async function buildZipPackage(post, filenamePattern, includeImages, fallbackWarning = "\uC774\uBBF8\uC9C0/\uB3D9\uC601\uC0C1 \uC800\uC7A5\uC774 \uAEBC\uC838 \uC788\uC5B4 \uC6D0\uACA9 URL\uC744 \uC0AC\uC6A9\uD588\uC2B5\uB2C8\uB2E4.", savePathPattern = "", aiOrganization) {
+  const bundle = await buildArchiveBundle(post, filenamePattern, includeImages, fallbackWarning, aiOrganization);
+  const zip = new import_jszip.default();
+  const archiveRoot = [...buildPathPatternParts(savePathPattern, post), bundle.archiveName].join("/");
+  zip.file(`${archiveRoot}/${buildArchiveNoteFilename(bundle.archiveName)}`, bundle.markdownContent);
+  for (const file of bundle.assetFiles) {
+    zip.file(`${archiveRoot}/${file.relativePath}`, await file.blob.arrayBuffer());
+  }
+  return {
+    blob: await zip.generateAsync({ type: "blob" }),
+    zipFilename: buildZipFilename(filenamePattern, post),
+    archiveName: bundle.archiveName,
     warning: bundle.warning
   };
 }
@@ -4431,6 +4670,12 @@ async function getEffectiveOptions() {
     ...options,
     filenamePattern: DEFAULT_OPTIONS.filenamePattern,
     savePathPattern: DEFAULT_OPTIONS.savePathPattern,
+    notion: {
+      ...options.notion,
+      parentType: DEFAULT_OPTIONS.notion.parentType,
+      dataSourceId: DEFAULT_OPTIONS.notion.dataSourceId,
+      uploadMedia: DEFAULT_OPTIONS.notion.uploadMedia
+    },
     aiOrganization: {
       ...options.aiOrganization,
       enabled: false
@@ -4605,6 +4850,14 @@ async function saveCurrentPost(tab, allowDuplicate = false, imageOverride) {
     const post = await extractPostFromTab(tab);
     const options = await getEffectiveOptions();
     if (options.saveTarget === "notion") {
+      const resolvedMediaPolicy = options.notion.uploadMedia && options.includeImages && !(imageOverride && typeof imageOverride.allowImageDownloads === "boolean" && imageOverride.imageFallbackWarning) ? await resolveImageDownloadPolicy(post, options.includeImages, true) : null;
+      const mediaPolicy = options.notion.uploadMedia && options.includeImages ? imageOverride && typeof imageOverride.allowImageDownloads === "boolean" && imageOverride.imageFallbackWarning ? {
+        allowMediaDownloads: imageOverride.allowImageDownloads,
+        fallbackWarning: imageOverride.imageFallbackWarning
+      } : {
+        allowMediaDownloads: resolvedMediaPolicy?.allowImageDownloads ?? false,
+        fallbackWarning: resolvedMediaPolicy?.fallbackWarning ?? ""
+      } : void 0;
       const duplicate2 = await findDuplicateSave(post.canonicalUrl, post.contentHash, "notion");
       if (duplicate2 && !allowDuplicate) {
         const alreadySaved = {
@@ -4616,7 +4869,7 @@ async function saveCurrentPost(tab, allowDuplicate = false, imageOverride) {
         broadcastStatus(alreadySaved);
         return alreadySaved;
       }
-      const notionResult = await savePostToNotion(post, options.notion, options.includeImages, options.aiOrganization);
+      const notionResult = await savePostToNotion(post, options.notion, options.includeImages, options.aiOrganization, mediaPolicy);
       const recent2 = duplicate2 && allowDuplicate ? {
         ...duplicate2,
         saveTarget: "notion",
@@ -4706,7 +4959,15 @@ async function redownloadSave(saveId, successMessage, imageOverride) {
   try {
     const options = await getEffectiveOptions();
     if (recentSave.saveTarget === "notion") {
-      const notionResult = await savePostToNotion(recentSave.post, options.notion, options.includeImages, options.aiOrganization);
+      const resolvedMediaPolicy = options.notion.uploadMedia && options.includeImages && !(imageOverride && typeof imageOverride.allowImageDownloads === "boolean" && imageOverride.imageFallbackWarning) ? await resolveImageDownloadPolicy(recentSave.post, options.includeImages, true) : null;
+      const mediaPolicy = options.notion.uploadMedia && options.includeImages ? imageOverride && typeof imageOverride.allowImageDownloads === "boolean" && imageOverride.imageFallbackWarning ? {
+        allowMediaDownloads: imageOverride.allowImageDownloads,
+        fallbackWarning: imageOverride.imageFallbackWarning
+      } : {
+        allowMediaDownloads: resolvedMediaPolicy?.allowImageDownloads ?? false,
+        fallbackWarning: resolvedMediaPolicy?.fallbackWarning ?? ""
+      } : void 0;
+      const notionResult = await savePostToNotion(recentSave.post, options.notion, options.includeImages, options.aiOrganization, mediaPolicy);
       const updatedSave2 = {
         ...recentSave,
         saveTarget: "notion",

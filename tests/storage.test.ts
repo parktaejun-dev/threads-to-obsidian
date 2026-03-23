@@ -88,6 +88,7 @@ test("legacy default filename patterns migrate to the truncated first sentence d
   assert.equal(options.notion.parentType, "page");
   assert.equal(options.notion.parentPageId, "");
   assert.equal(options.notion.dataSourceId, "");
+  assert.equal(options.notion.uploadMedia, false);
 });
 
 test("old first sentence default filename pattern migrates to the truncated first sentence default", async () => {

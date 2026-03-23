@@ -43,10 +43,18 @@ test("free tier should fall back to default advanced options even if custom opti
   try {
     // Store custom options directly.
     storageState.set("options", {
+      saveTarget: "notion",
       filenamePattern: "{date}_{author}_{shortcode}",
       includeImages: true,
       obsidianFolderLabel: null,
       savePathPattern: "Sources/Threads/{author}",
+      notion: {
+        token: "secret",
+        parentType: "data_source",
+        parentPageId: "page-123",
+        dataSourceId: "ds-123",
+        uploadMedia: true
+      },
       aiOrganization: {
         enabled: true,
         apiKey: "test-key",
@@ -59,6 +67,10 @@ test("free tier should fall back to default advanced options even if custom opti
     const effective = await storageMod.getEffectiveOptions();
     assert.equal(effective.filenamePattern, configMod.DEFAULT_OPTIONS.filenamePattern);
     assert.equal(effective.savePathPattern, configMod.DEFAULT_OPTIONS.savePathPattern);
+    assert.equal(effective.saveTarget, "notion");
+    assert.equal(effective.notion.parentType, "page");
+    assert.equal(effective.notion.dataSourceId, configMod.DEFAULT_OPTIONS.notion.dataSourceId);
+    assert.equal(effective.notion.uploadMedia, false);
     assert.equal(effective.aiOrganization.enabled, false);
   } finally {
     (globalThis as any).chrome = previousChrome;
@@ -89,10 +101,18 @@ test("pro tier should use stored advanced options", async (t) => {
   (globalThis as any).chrome = createChromeStorageStub(storageState);
   try {
     storageState.set("options", {
+      saveTarget: "notion",
       filenamePattern: "{date}_{author}_{shortcode}",
       includeImages: true,
       obsidianFolderLabel: null,
       savePathPattern: "Sources/Threads/{author}",
+      notion: {
+        token: "secret",
+        parentType: "data_source",
+        parentPageId: "page-123",
+        dataSourceId: "ds-123",
+        uploadMedia: true
+      },
       aiOrganization: {
         enabled: true,
         apiKey: "test-key",
@@ -108,6 +128,8 @@ test("pro tier should use stored advanced options", async (t) => {
     const effective = await storageMod.getEffectiveOptions();
     assert.equal(effective.filenamePattern, configMod.DEFAULT_OPTIONS.filenamePattern);
     assert.equal(effective.savePathPattern, configMod.DEFAULT_OPTIONS.savePathPattern);
+    assert.equal(effective.notion.parentType, "page");
+    assert.equal(effective.notion.uploadMedia, false);
     assert.equal(effective.aiOrganization.enabled, false);
 
     // Sanity: pro tier should not change baseline defaults.
@@ -247,6 +269,7 @@ test("options migration should fill missing savePathPattern with default", async
     assert.equal(options.savePathPattern, configMod.DEFAULT_OPTIONS.savePathPattern);
     assert.equal(options.notion.parentType, configMod.DEFAULT_OPTIONS.notion.parentType);
     assert.equal(options.notion.dataSourceId, configMod.DEFAULT_OPTIONS.notion.dataSourceId);
+    assert.equal(options.notion.uploadMedia, configMod.DEFAULT_OPTIONS.notion.uploadMedia);
     assert.equal(options.aiOrganization.provider, configMod.DEFAULT_OPTIONS.aiOrganization.provider);
     assert.equal(options.aiOrganization.baseUrl, configMod.DEFAULT_OPTIONS.aiOrganization.baseUrl);
   } finally {

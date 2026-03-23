@@ -101,6 +101,10 @@ export interface Messages {
     optionsNotionParentPageHint: string;
     optionsNotionDataSource: string;
     optionsNotionDataSourceHint: string;
+    optionsNotionDataSourceLocked: string;
+    optionsNotionUploadMedia: string;
+    optionsNotionUploadMediaHint: string;
+    optionsNotionUploadMediaLocked: string;
     optionsNotionTokenRequired: string;
     optionsNotionParentPageRequired: string;
     optionsNotionInvalidPage: string;
@@ -121,6 +125,8 @@ export interface Messages {
     compareRowDuplicates: string;
     compareRowFilename: string;
     compareRowFolder: string;
+    compareRowNotionDataSource: string;
+    compareRowNotionMediaUpload: string;
     compareRowAiSummary: string;
     compareRowAiTags: string;
     compareRowAiFrontmatter: string;
@@ -198,6 +204,7 @@ export interface Messages {
     mdReplySection: string;
     mdReplyLabel: string;
     mdReplyImageLabel: string;
+    mdUploadedMediaSection: string;
     mdSource: string;
     mdAuthor: string;
     mdPublishedAt: string;
@@ -210,6 +217,7 @@ export interface Messages {
     warnAiFailed: string;
     warnAiPermissionMissing: string;
     warnAiMissingModel: string;
+    warnNotionMediaUploadFailed: string;
     // direct save errors
     errBrowserUnsupported: string;
     errFolderNameFailed: string;
@@ -317,7 +325,7 @@ const ko: Messages = {
     optionsSaveTargetObsidian: "Obsidian",
     optionsSaveTargetNotion: "Notion",
     optionsNotionSection: "Notion 연결",
-    optionsNotionSubtitle: "Notion은 API로 새 페이지를 만듭니다. parent page 저장과 data source 저장을 모두 지원합니다.",
+    optionsNotionSubtitle: "Notion은 API로 새 페이지를 만듭니다. Free는 parent page 저장, Pro는 data source 저장과 내부 미디어 업로드를 지원합니다.",
     optionsNotionParentType: "저장 방식",
     optionsNotionParentTypeHint: "Page 아래 새 페이지를 만들거나, data source에 새 row/page를 만들 수 있습니다.",
     optionsNotionParentTypePage: "Parent page",
@@ -328,6 +336,10 @@ const ko: Messages = {
     optionsNotionParentPageHint: "Notion 페이지 URL 전체를 붙여넣어도 되고, page ID만 넣어도 됩니다.",
     optionsNotionDataSource: "Data source ID 또는 URL",
     optionsNotionDataSourceHint: "Notion data source URL 전체 또는 data source ID를 넣습니다. 저장 시 제목/태그/날짜 같은 속성을 자동 매핑합니다.",
+    optionsNotionDataSourceLocked: "Data source 저장은 Pro에서 사용할 수 있습니다.",
+    optionsNotionUploadMedia: "Notion 워크스페이스에 미디어 업로드",
+    optionsNotionUploadMediaHint: "이미지와 동영상을 원격 링크 대신 Notion 파일로 업로드합니다. 업로드에 실패하면 링크 방식으로 저장합니다.",
+    optionsNotionUploadMediaLocked: "Notion 내부 미디어 업로드는 Pro에서 사용할 수 있습니다.",
     optionsNotionTokenRequired: "Notion 저장을 쓰려면 integration token이 필요합니다.",
     optionsNotionParentPageRequired: "Notion 저장을 쓰려면 parent page ID 또는 URL이 필요합니다.",
     optionsNotionInvalidPage: "Notion parent page ID 또는 URL 형식이 올바르지 않습니다.",
@@ -348,6 +360,8 @@ const ko: Messages = {
     compareRowDuplicates: "중복 건너뜀",
     compareRowFilename: "파일 이름 규칙",
     compareRowFolder: "저장 폴더 지정",
+    compareRowNotionDataSource: "Notion data source 저장",
+    compareRowNotionMediaUpload: "Notion 내부 미디어 업로드",
     compareRowAiSummary: "AI 요약",
     compareRowAiTags: "AI 태그",
     compareRowAiFrontmatter: "AI frontmatter",
@@ -424,6 +438,7 @@ const ko: Messages = {
     mdReplySection: "작성자 연속 답글",
     mdReplyLabel: "답글",
     mdReplyImageLabel: "답글 이미지",
+    mdUploadedMediaSection: "업로드한 미디어",
     mdSource: "원문",
     mdAuthor: "작성자",
     mdPublishedAt: "게시 시각",
@@ -435,6 +450,7 @@ const ko: Messages = {
     warnAiFailed: "AI 정리에 실패해 원문만 저장했습니다: {reason}",
     warnAiPermissionMissing: "AI 엔드포인트 권한이 없어 원문만 저장했습니다. 설정에서 AI 섹션을 다시 저장해 주세요.",
     warnAiMissingModel: "AI 모델 이름이 없어 원문만 저장했습니다.",
+    warnNotionMediaUploadFailed: "Notion 미디어 업로드에 실패해 원본 링크로 저장했습니다.",
     errBrowserUnsupported: "이 브라우저에서는 Obsidian 폴더에 바로 저장할 수 없습니다.",
     errFolderNameFailed: "저장할 폴더 이름을 결정하지 못했습니다.",
     errInvalidPath: "잘못된 파일 경로입니다.",
@@ -539,7 +555,7 @@ const en: Messages = {
     optionsSaveTargetObsidian: "Obsidian",
     optionsSaveTargetNotion: "Notion",
     optionsNotionSection: "Notion Connection",
-    optionsNotionSubtitle: "Notion creates new pages through the API. Both parent-page saving and data-source saving are supported.",
+    optionsNotionSubtitle: "Notion creates new pages through the API. Free supports parent-page saving, while Pro adds data-source saving and managed media uploads.",
     optionsNotionParentType: "Save mode",
     optionsNotionParentTypeHint: "Create a new page under a page, or create a new entry/page inside a data source.",
     optionsNotionParentTypePage: "Parent page",
@@ -550,6 +566,10 @@ const en: Messages = {
     optionsNotionParentPageHint: "You can paste a full Notion page URL or just the page ID.",
     optionsNotionDataSource: "Data source ID or URL",
     optionsNotionDataSourceHint: "Paste a full Notion data source URL or just its ID. Title, tags, dates, and similar properties are mapped automatically when possible.",
+    optionsNotionDataSourceLocked: "Data source saving is available in Pro only.",
+    optionsNotionUploadMedia: "Upload media into Notion",
+    optionsNotionUploadMediaHint: "Upload images and videos as Notion-managed files instead of leaving them as remote links. If upload fails, the save falls back to links.",
+    optionsNotionUploadMediaLocked: "Notion-managed media upload is available in Pro only.",
     optionsNotionTokenRequired: "A Notion integration token is required to use Notion saving.",
     optionsNotionParentPageRequired: "A Notion parent page ID or URL is required to use Notion saving.",
     optionsNotionInvalidPage: "The Notion parent page ID or URL format is not valid.",
@@ -570,6 +590,8 @@ const en: Messages = {
     compareRowDuplicates: "Skip duplicates",
     compareRowFilename: "File name format",
     compareRowFolder: "Save folder",
+    compareRowNotionDataSource: "Notion data source",
+    compareRowNotionMediaUpload: "Notion media upload",
     compareRowAiSummary: "AI summary",
     compareRowAiTags: "AI tags",
     compareRowAiFrontmatter: "AI frontmatter",
@@ -646,6 +668,7 @@ const en: Messages = {
     mdReplySection: "Author Replies",
     mdReplyLabel: "Reply",
     mdReplyImageLabel: "Reply image",
+    mdUploadedMediaSection: "Uploaded media",
     mdSource: "Source",
     mdAuthor: "Author",
     mdPublishedAt: "Published at",
@@ -657,6 +680,7 @@ const en: Messages = {
     warnAiFailed: "AI organization failed, so the original note was saved instead: {reason}",
     warnAiPermissionMissing: "AI endpoint permission is missing, so the original note was saved. Re-save the AI section in settings.",
     warnAiMissingModel: "No AI model name is configured, so the original note was saved.",
+    warnNotionMediaUploadFailed: "Notion media upload failed, so remote links were saved instead.",
     errBrowserUnsupported: "This browser cannot save directly to an Obsidian folder.",
     errFolderNameFailed: "Could not determine a folder name for saving.",
     errInvalidPath: "Invalid file path.",

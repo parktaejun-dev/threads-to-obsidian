@@ -79,6 +79,7 @@
               <option value="data_source"></option>
             </select>
             <small id="notion-parent-type-hint"></small>
+            <small id="notion-data-source-lock-hint" class="field-note"></small>
           </label>
 
           <label class="field">
@@ -104,6 +105,15 @@
             <input id="notion-data-source" name="notionDataSource" type="text" autocomplete="off" spellcheck="false" />
             <small id="notion-data-source-hint"></small>
           </label>
+
+          <div class="field">
+            <label class="checkbox">
+              <input id="notion-upload-media" name="notionUploadMedia" type="checkbox" />
+              <span id="notion-upload-media-label"></span>
+            </label>
+            <small id="notion-upload-media-hint"></small>
+            <small id="notion-upload-media-lock-hint" class="field-note"></small>
+          </div>
         </div>
 
         <label class="checkbox">
@@ -129,6 +139,8 @@
             <tr><td id="cmp-dupes"></td><td class="cmp-check">✓</td><td class="cmp-check">✓</td></tr>
             <tr><td id="cmp-filename"></td><td class="cmp-dash">—</td><td class="cmp-check">✓</td></tr>
             <tr><td id="cmp-folder"></td><td class="cmp-dash">—</td><td class="cmp-check">✓</td></tr>
+            <tr><td id="cmp-notion-data-source"></td><td class="cmp-dash">—</td><td class="cmp-check">✓</td></tr>
+            <tr><td id="cmp-notion-media-upload"></td><td class="cmp-dash">—</td><td class="cmp-check">✓</td></tr>
             <tr><td id="cmp-ai-summary"></td><td class="cmp-dash">—</td><td class="cmp-check">✓</td></tr>
             <tr><td id="cmp-ai-tags"></td><td class="cmp-dash">—</td><td class="cmp-check">✓</td></tr>
             <tr><td id="cmp-ai-frontmatter"></td><td class="cmp-dash">—</td><td class="cmp-check">✓</td></tr>
