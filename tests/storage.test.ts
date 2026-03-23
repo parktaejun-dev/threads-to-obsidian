@@ -1,8 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { getAiProviderKeyMismatch } from "../src/extension/lib/config";
-import { getOptions, getRecentSaves } from "../src/extension/lib/storage";
-import type { ExtractedPost } from "../src/extension/lib/types";
+import { findDuplicateSave, getOptions, getRecentSaves, upsertRecentSave } from "../src/extension/lib/storage";
+import type { ExtractedPost, RecentSave } from "../src/extension/lib/types";
 
 const storageState = new Map<string, unknown>();
 
@@ -83,6 +83,11 @@ test("legacy default filename patterns migrate to the truncated first sentence d
   const options = await getOptions();
 
   assert.equal(options.filenamePattern, "{author}_{first_sentence_20}");
+  assert.equal(options.saveTarget, "obsidian");
+  assert.equal(options.notion.token, "");
+  assert.equal(options.notion.parentType, "page");
+  assert.equal(options.notion.parentPageId, "");
+  assert.equal(options.notion.dataSourceId, "");
 });
 
 test("old first sentence default filename pattern migrates to the truncated first sentence default", async () => {
@@ -124,4 +129,47 @@ test("AI provider mismatch detection ignores matching or custom key shapes", () 
   assert.equal(getAiProviderKeyMismatch("openrouter", "sk-or-v1-1234567890"), null);
   assert.equal(getAiProviderKeyMismatch("deepseek", "sk-1234567890abcdef"), null);
   assert.equal(getAiProviderKeyMismatch("custom", "AIzaSyExampleKey1234567890"), null);
+});
+
+test("recent saves keep separate records for Obsidian and Notion targets", async () => {
+  storageState.clear();
+  const obsidianSave: RecentSave = {
+    id: "obsidian-1",
+    saveTarget: "obsidian",
+    canonicalUrl: basePost.canonicalUrl,
+    shortcode: basePost.shortcode,
+    author: basePost.author,
+    title: basePost.title,
+    downloadedAt: basePost.capturedAt,
+    archiveName: "writer_on_threads",
+    contentHash: basePost.contentHash,
+    status: "complete",
+    savedVia: "direct",
+    savedRelativePath: "Inbox/writer_on_threads/01. writer_on_threads.md",
+    remotePageId: null,
+    remotePageUrl: null,
+    warning: null,
+    post: basePost
+  };
+  const notionSave: RecentSave = {
+    ...obsidianSave,
+    id: "notion-1",
+    saveTarget: "notion",
+    savedVia: "notion",
+    savedRelativePath: null,
+    remotePageId: "12345678-1234-1234-1234-1234567890ab",
+    remotePageUrl: "https://www.notion.so/example"
+  };
+
+  await upsertRecentSave(obsidianSave);
+  await upsertRecentSave(notionSave);
+
+  const recent = await getRecentSaves();
+  assert.equal(recent.length, 2);
+  assert.deepEqual(
+    recent.map((item) => item.saveTarget).sort(),
+    ["notion", "obsidian"]
+  );
+  assert.equal((await findDuplicateSave(basePost.canonicalUrl, basePost.contentHash, "obsidian"))?.id, "obsidian-1");
+  assert.equal((await findDuplicateSave(basePost.canonicalUrl, basePost.contentHash, "notion"))?.id, "notion-1");
 });

@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import JSZip from "jszip";
-import { buildArchiveNoteFilename, buildZipPackage } from "../src/extension/lib/package";
+import { buildArchiveNoteFilename, buildNotionBundle, buildZipPackage } from "../src/extension/lib/package";
 import type { ExtractedPost } from "../src/extension/lib/types";
 
 const basePost: ExtractedPost = {
@@ -187,4 +187,24 @@ test("zip packaging uses author and first sentence when configured", async () =>
 
   assert.equal(result.zipFilename, "writer_나는_1979년에_태어났다.zip");
   assert.ok(zip.file(`writer_나는_1979년에_태어났다/${buildArchiveNoteFilename("writer_나는_1979년에_태어났다")}`));
+});
+
+test("notion packaging renders body markdown without frontmatter and keeps remote media", async () => {
+  const result = await buildNotionBundle(
+    {
+      ...basePost,
+      imageUrls: ["https://cdn.example.com/image-1.jpg"],
+      sourceType: "video",
+      videoUrl: "https://cdn.example.com/thread-video.mp4",
+      thumbnailUrl: "https://cdn.example.com/thread-thumb.png"
+    },
+    true
+  );
+
+  assert.equal(result.title, "writer on Threads");
+  assert.equal(result.markdownContent.startsWith("---"), false);
+  assert.ok(result.markdownContent.includes("# writer on Threads"));
+  assert.ok(result.markdownContent.includes("Source: https://www.threads.com/@writer/post/ZIP123"));
+  assert.ok(result.markdownContent.includes("![Image 1](https://cdn.example.com/image-1.jpg)"));
+  assert.ok(result.markdownContent.includes("![Video thumbnail](https://cdn.example.com/thread-thumb.png)"));
 });

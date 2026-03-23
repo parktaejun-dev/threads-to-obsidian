@@ -2,7 +2,7 @@ import { DEFAULT_OPTIONS } from "./config";
 import { validateProLicenseToken } from "./license";
 import { getOrCreateProDevice } from "./pro-device";
 import { activateLicenseWithServer, getServerLicenseStatus, mapServerFailureToActivationState, releaseLicenseWithServer } from "./pro-activation";
-import type { ExtensionOptions, LicensePayload, PlanStatus, RecentSave } from "./types";
+import type { ExtensionOptions, LicensePayload, PlanStatus, RecentSave, SaveTarget } from "./types";
 import { decodeEscapedJsonString } from "./utils";
 
 const OPTIONS_KEY = "options";
@@ -36,6 +36,10 @@ function mergeOptionsWithDefaults(options: Partial<ExtensionOptions> | undefined
   return {
     ...DEFAULT_OPTIONS,
     ...options,
+    notion: {
+      ...DEFAULT_OPTIONS.notion,
+      ...(options?.notion ?? {})
+    },
     aiOrganization: {
       ...DEFAULT_OPTIONS.aiOrganization,
       ...(options?.aiOrganization ?? {})
@@ -45,6 +49,7 @@ function mergeOptionsWithDefaults(options: Partial<ExtensionOptions> | undefined
 
 function normalizeRecentSave(item: RecentSave & { zipFilename?: string }): RecentSave {
   const archiveName = item.archiveName ?? item.zipFilename?.replace(/\.zip$/i, "") ?? "";
+  const saveTarget = item.saveTarget ?? (item.savedVia === "notion" ? "notion" : "obsidian");
   const post = {
     ...item.post,
     videoUrl: item.post.videoUrl ?? null,
@@ -60,8 +65,11 @@ function normalizeRecentSave(item: RecentSave & { zipFilename?: string }): Recen
   return {
     ...item,
     archiveName,
+    saveTarget,
     savedVia: item.savedVia ?? "zip",
     savedRelativePath: item.savedRelativePath ?? null,
+    remotePageId: item.remotePageId ?? null,
+    remotePageUrl: item.remotePageUrl ?? null,
     warning: item.warning ?? null,
     post,
     title: decodeEscapedJsonString(item.title)
@@ -90,9 +98,26 @@ export async function getOptions(): Promise<ExtensionOptions> {
     shouldPersist = true;
   }
 
+  if (merged.saveTarget === undefined) {
+    merged.saveTarget = DEFAULT_OPTIONS.saveTarget;
+    shouldPersist = true;
+  }
+
   if (merged.savePathPattern === undefined) {
     merged.savePathPattern = DEFAULT_OPTIONS.savePathPattern;
     shouldPersist = true;
+  }
+
+  if (!storedOptions?.notion) {
+    shouldPersist = true;
+  } else {
+    const expectedNotionKeys = Object.keys(DEFAULT_OPTIONS.notion) as Array<keyof ExtensionOptions["notion"]>;
+    for (const key of expectedNotionKeys) {
+      if (storedOptions.notion[key] === undefined) {
+        shouldPersist = true;
+        break;
+      }
+    }
   }
 
   if (!storedOptions?.aiOrganization) {
@@ -323,7 +348,9 @@ export async function getRecentSaves(): Promise<RecentSave[]> {
 
 export async function upsertRecentSave(save: RecentSave): Promise<RecentSave[]> {
   const recent = await getRecentSaves();
-  const filtered = recent.filter((item) => item.id !== save.id && item.canonicalUrl !== save.canonicalUrl);
+  const filtered = recent.filter(
+    (item) => item.id !== save.id && !(item.canonicalUrl === save.canonicalUrl && item.saveTarget === save.saveTarget)
+  );
   filtered.unshift(save);
   const next = filtered.slice(0, MAX_RECENT_SAVES);
   await chrome.storage.local.set({ [RECENT_SAVES_KEY]: next });
@@ -347,12 +374,12 @@ export async function clearRecentSaves(): Promise<void> {
   await chrome.storage.local.set({ [RECENT_SAVES_KEY]: [] });
 }
 
-export async function findDuplicateSave(canonicalUrl: string, contentHash: string): Promise<RecentSave | null> {
+export async function findDuplicateSave(canonicalUrl: string, contentHash: string, saveTarget: SaveTarget): Promise<RecentSave | null> {
   const recent = await getRecentSaves();
-  return recent.find((item) => item.canonicalUrl === canonicalUrl && item.contentHash === contentHash) ?? null;
+  return recent.find((item) => item.canonicalUrl === canonicalUrl && item.contentHash === contentHash && item.saveTarget === saveTarget) ?? null;
 }
 
-export async function findRecentSaveByUrl(canonicalUrl: string): Promise<RecentSave | null> {
+export async function findRecentSaveByUrl(canonicalUrl: string, saveTarget: SaveTarget): Promise<RecentSave | null> {
   const recent = await getRecentSaves();
-  return recent.find((item) => item.canonicalUrl === canonicalUrl) ?? null;
+  return recent.find((item) => item.canonicalUrl === canonicalUrl && item.saveTarget === saveTarget) ?? null;
 }

@@ -2463,10 +2463,17 @@ var DEFAULT_AI_ORGANIZATION_SETTINGS = {
   prompt: DEFAULT_AI_ORGANIZATION_PROMPT
 };
 var DEFAULT_OPTIONS = {
+  saveTarget: "obsidian",
   filenamePattern: "{author}_{first_sentence_20}",
   savePathPattern: "",
   includeImages: true,
   obsidianFolderLabel: null,
+  notion: {
+    token: "",
+    parentType: "page",
+    parentPageId: "",
+    dataSourceId: ""
+  },
   aiOrganization: DEFAULT_AI_ORGANIZATION_SETTINGS
 };
 
@@ -2487,6 +2494,8 @@ var ko = {
   popupSubtitlePermissionCheck: "\uC5F0\uACB0\uB41C \uD3F4\uB354\uAC00 \uC788\uC9C0\uB9CC \uAD8C\uD55C\uC744 \uB2E4\uC2DC \uD655\uC778\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.",
   popupSubtitleNoFolder: "\uC5F0\uACB0\uB41C \uD3F4\uB354\uAC00 \uC788\uC73C\uBA74 \uBC14\uB85C \uC800\uC7A5\uD558\uACE0, \uC5C6\uC73C\uBA74 \uD30C\uC77C\uB85C \uB2E4\uC6B4\uB85C\uB4DC\uD569\uB2C8\uB2E4.",
   popupSubtitleUnsupported: "\uC774 \uBE0C\uB77C\uC6B0\uC800\uC5D0\uC11C\uB294 \uD30C\uC77C\uB85C \uB2E4\uC6B4\uB85C\uB4DC\uD569\uB2C8\uB2E4.",
+  popupSubtitleNotion: "\uC124\uC815\uD55C Notion \uB300\uC0C1\uC5D0 \uC0C8 \uD398\uC774\uC9C0\uB85C \uC800\uC7A5\uD569\uB2C8\uB2E4.",
+  popupSubtitleNotionSetup: "Notion \uC800\uC7A5\uC744 \uC4F0\uB824\uBA74 \uC124\uC815\uC5D0\uC11C \uD1A0\uD070\uACFC \uC800\uC7A5 \uB300\uC0C1\uC744 \uBA3C\uC800 \uC785\uB825\uD558\uC138\uC694.",
   popupRecentSaves: "\uCD5C\uADFC \uC800\uC7A5",
   popupClearAll: "\uC804\uCCB4 \uC0AD\uC81C",
   popupEmpty: "\uC544\uC9C1 \uC800\uC7A5\uD55C \uAE00\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.",
@@ -2502,12 +2511,15 @@ var ko = {
   statusSaving: "\uC800\uC7A5\uD558\uB294 \uC911\u2026",
   statusSavedDirect: "Obsidian \uD3F4\uB354\uC5D0 \uBC14\uB85C \uC800\uC7A5\uD588\uC2B5\uB2C8\uB2E4.",
   statusSavedZip: "\uC800\uC7A5 \uC644\uB8CC. \uD30C\uC77C \uB2E4\uC6B4\uB85C\uB4DC\uB97C \uC2DC\uC791\uD588\uC2B5\uB2C8\uB2E4.",
+  statusSavedNotion: "Notion\uC5D0 \uC800\uC7A5\uD588\uC2B5\uB2C8\uB2E4.",
   statusDuplicate: "\uC774\uBBF8 \uC800\uC7A5\uD55C \uAE00\uC774\uC9C0\uB9CC \uCD5C\uC2E0 \uB0B4\uC6A9\uC73C\uB85C \uB36E\uC5B4\uC368 \uC800\uC7A5\uD588\uC2B5\uB2C8\uB2E4.",
   statusDuplicateWarning: "\uC774\uBBF8 \uC800\uC7A5\uD55C \uAE00\uC774\uC9C0\uB9CC \uCD5C\uC2E0 \uB0B4\uC6A9\uC73C\uB85C \uB36E\uC5B4\uC368 \uC800\uC7A5\uD588\uC2B5\uB2C8\uB2E4: ",
   statusAlreadySaved: "\uC774\uBBF8 \uC800\uC7A5\uB41C \uAE00\uC785\uB2C8\uB2E4. \uB2E4\uC2DC \uC800\uC7A5\uD558\uB824\uBA74 \uCD5C\uADFC \uC800\uC7A5\uC5D0\uC11C '\uB2E4\uC2DC \uC800\uC7A5'\uC744 \uB20C\uB7EC\uC8FC\uC138\uC694.",
+  statusNotionSetupRequired: "Notion \uC800\uC7A5\uC744 \uC0AC\uC6A9\uD558\uB824\uBA74 \uC124\uC815\uC5D0\uC11C \uD1A0\uD070\uACFC \uC800\uC7A5 \uB300\uC0C1\uC744 \uBA3C\uC800 \uC785\uB825\uD558\uC138\uC694.",
   statusError: "\uC54C \uC218 \uC5C6\uB294 \uC624\uB958\uAC00 \uBC1C\uC0DD\uD588\uC2B5\uB2C8\uB2E4.",
   statusResaving: "\uD30C\uC77C\uC744 \uB2E4\uC2DC \uB9CC\uB4DC\uB294 \uC911\u2026",
   statusResaved: "\uB2E4\uC6B4\uB85C\uB4DC\uB97C \uB2E4\uC2DC \uC2DC\uC791\uD588\uC2B5\uB2C8\uB2E4.",
+  statusResavedNotion: "Notion\uC5D0 \uC0C8 \uD398\uC774\uC9C0\uB85C \uB2E4\uC2DC \uC800\uC7A5\uD588\uC2B5\uB2C8\uB2E4.",
   statusRecentNotFound: "\uCD5C\uADFC \uC800\uC7A5 \uAE30\uB85D\uC744 \uCC3E\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4.",
   statusDeletedRecent: "\uCD5C\uADFC \uC800\uC7A5\uC5D0\uC11C \uC0AD\uC81C\uD588\uC2B5\uB2C8\uB2E4.",
   statusClearedRecents: "\uCD5C\uADFC \uC800\uC7A5\uC744 \uBAA8\uB450 \uC0AD\uC81C\uD588\uC2B5\uB2C8\uB2E4.",
@@ -2516,7 +2528,7 @@ var ko = {
   statusRedownloadError: "\uB2E4\uC2DC \uB2E4\uC6B4\uB85C\uB4DC\uD558\uB294 \uC911 \uC624\uB958\uAC00 \uBC1C\uC0DD\uD588\uC2B5\uB2C8\uB2E4.",
   statusRetry: "\uB2E4\uC2DC \uC2DC\uB3C4",
   statusResaveButton: "\uB2E4\uC2DC \uC800\uC7A5",
-  optionsTitle: "Threads \uAE00\uC744 Obsidian\uC5D0 \uC800\uC7A5\uD558\uACE0 \uADDC\uCE59\uACFC AI\uB85C \uC815\uB9AC\uD558\uC138\uC694.",
+  optionsTitle: "Threads \uAE00\uC744 Obsidian \uB610\uB294 Notion\uC5D0 \uC800\uC7A5\uD558\uACE0 \uADDC\uCE59\uACFC AI\uB85C \uC815\uB9AC\uD558\uC138\uC694.",
   optionsSubtitle: "\uBB34\uB8CC \uC800\uC7A5, \uD544\uC694\uD560 \uB54C\uB9CC Pro.",
   optionsPlanSpotlightFreeTitle: "Free",
   optionsPlanSpotlightFreeCopy: "\uAE30\uBCF8 \uC800\uC7A5 \uAE30\uB2A5\uC744 \uBC14\uB85C \uC0AC\uC6A9\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.",
@@ -2547,6 +2559,28 @@ var ko = {
   optionsFolderPathLabel: "\uD604\uC7AC \uC800\uC7A5 \uC704\uCE58",
   optionsFolderPathHint: "\uC808\uB300\uACBD\uB85C\uB294 \uC77D\uC744 \uC218 \uC5C6\uC5B4 \uC5F0\uACB0\uB41C \uD3F4\uB354 \uAE30\uC900\uC73C\uB85C\uB9CC \uD45C\uC2DC\uD569\uB2C8\uB2E4.",
   optionsFolderPathUnavailable: "\uD3F4\uB354 \uC5F0\uACB0 \uD6C4 \uD45C\uC2DC",
+  optionsSaveTarget: "\uC800\uC7A5 \uB300\uC0C1",
+  optionsSaveTargetHint: "PC\uC5D0\uC11C\uB294 Obsidian \uB610\uB294 Notion \uC911 \uD558\uB098\uB97C \uAE30\uBCF8 \uC800\uC7A5 \uB300\uC0C1\uC73C\uB85C \uC120\uD0DD\uD569\uB2C8\uB2E4.",
+  optionsSaveTargetObsidian: "Obsidian",
+  optionsSaveTargetNotion: "Notion",
+  optionsNotionSection: "Notion \uC5F0\uACB0",
+  optionsNotionSubtitle: "Notion\uC740 API\uB85C \uC0C8 \uD398\uC774\uC9C0\uB97C \uB9CC\uB4ED\uB2C8\uB2E4. parent page \uC800\uC7A5\uACFC data source \uC800\uC7A5\uC744 \uBAA8\uB450 \uC9C0\uC6D0\uD569\uB2C8\uB2E4.",
+  optionsNotionParentType: "\uC800\uC7A5 \uBC29\uC2DD",
+  optionsNotionParentTypeHint: "Page \uC544\uB798 \uC0C8 \uD398\uC774\uC9C0\uB97C \uB9CC\uB4E4\uAC70\uB098, data source\uC5D0 \uC0C8 row/page\uB97C \uB9CC\uB4E4 \uC218 \uC788\uC2B5\uB2C8\uB2E4.",
+  optionsNotionParentTypePage: "Parent page",
+  optionsNotionParentTypeDataSource: "Data source",
+  optionsNotionToken: "Integration token",
+  optionsNotionTokenHint: "Notion internal integration \uD1A0\uD070\uC744 \uB123\uC2B5\uB2C8\uB2E4. \uC774 \uAC12\uC740 \uD604\uC7AC \uBE0C\uB77C\uC6B0\uC800 \uD504\uB85C\uD544\uC5D0\uB9CC \uC800\uC7A5\uB429\uB2C8\uB2E4.",
+  optionsNotionParentPage: "Parent page ID \uB610\uB294 URL",
+  optionsNotionParentPageHint: "Notion \uD398\uC774\uC9C0 URL \uC804\uCCB4\uB97C \uBD99\uC5EC\uB123\uC5B4\uB3C4 \uB418\uACE0, page ID\uB9CC \uB123\uC5B4\uB3C4 \uB429\uB2C8\uB2E4.",
+  optionsNotionDataSource: "Data source ID \uB610\uB294 URL",
+  optionsNotionDataSourceHint: "Notion data source URL \uC804\uCCB4 \uB610\uB294 data source ID\uB97C \uB123\uC2B5\uB2C8\uB2E4. \uC800\uC7A5 \uC2DC \uC81C\uBAA9/\uD0DC\uADF8/\uB0A0\uC9DC \uAC19\uC740 \uC18D\uC131\uC744 \uC790\uB3D9 \uB9E4\uD551\uD569\uB2C8\uB2E4.",
+  optionsNotionTokenRequired: "Notion \uC800\uC7A5\uC744 \uC4F0\uB824\uBA74 integration token\uC774 \uD544\uC694\uD569\uB2C8\uB2E4.",
+  optionsNotionParentPageRequired: "Notion \uC800\uC7A5\uC744 \uC4F0\uB824\uBA74 parent page ID \uB610\uB294 URL\uC774 \uD544\uC694\uD569\uB2C8\uB2E4.",
+  optionsNotionInvalidPage: "Notion parent page ID \uB610\uB294 URL \uD615\uC2DD\uC774 \uC62C\uBC14\uB974\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4.",
+  optionsNotionDataSourceRequired: "Notion data source \uC800\uC7A5\uC744 \uC4F0\uB824\uBA74 data source ID \uB610\uB294 URL\uC774 \uD544\uC694\uD569\uB2C8\uB2E4.",
+  optionsNotionInvalidDataSource: "Notion data source ID \uB610\uB294 URL \uD615\uC2DD\uC774 \uC62C\uBC14\uB974\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4.",
+  optionsNotionPermissionDenied: "Notion API \uC811\uADFC \uAD8C\uD55C\uC744 \uD5C8\uC6A9\uD558\uC9C0 \uC54A\uC544 \uC800\uC7A5\uD558\uC9C0 \uC54A\uC558\uC2B5\uB2C8\uB2E4.",
   optionsBasicSection: "\uAE30\uBCF8 \uC800\uC7A5",
   optionsBasicSubtitle: "",
   optionsCompareSection: "Free vs Pro",
@@ -2651,6 +2685,14 @@ var ko = {
   errBrowserUnsupported: "\uC774 \uBE0C\uB77C\uC6B0\uC800\uC5D0\uC11C\uB294 Obsidian \uD3F4\uB354\uC5D0 \uBC14\uB85C \uC800\uC7A5\uD560 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4.",
   errFolderNameFailed: "\uC800\uC7A5\uD560 \uD3F4\uB354 \uC774\uB984\uC744 \uACB0\uC815\uD558\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4.",
   errInvalidPath: "\uC798\uBABB\uB41C \uD30C\uC77C \uACBD\uB85C\uC785\uB2C8\uB2E4.",
+  errNotionTokenMissing: "Notion integration token\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.",
+  errNotionPermissionMissing: "Notion API \uAD8C\uD55C\uC774 \uC5C6\uC2B5\uB2C8\uB2E4. \uC124\uC815\uC5D0\uC11C \uB2E4\uC2DC \uC800\uC7A5\uD574 \uC8FC\uC138\uC694.",
+  errNotionUnauthorized: "Notion \uD1A0\uD070\uC774 \uC720\uD6A8\uD558\uC9C0 \uC54A\uAC70\uB098 \uB9CC\uB8CC\uB418\uC5C8\uC2B5\uB2C8\uB2E4.",
+  errNotionForbidden: "\uC120\uD0DD\uD55C Notion \uB300\uC0C1\uC5D0 \uC811\uADFC \uAD8C\uD55C\uC774 \uC5C6\uC2B5\uB2C8\uB2E4. page \uB610\uB294 data source\uB97C integration\uC5D0 \uC5F0\uACB0\uD588\uB294\uC9C0 \uD655\uC778\uD574 \uC8FC\uC138\uC694.",
+  errNotionParentNotFound: "\uC120\uD0DD\uD55C Notion page \uB610\uB294 data source\uB97C \uCC3E\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4. ID\uC640 \uC5F0\uACB0 \uC0C1\uD0DC\uB97C \uD655\uC778\uD574 \uC8FC\uC138\uC694.",
+  errNotionRateLimited: "Notion \uC694\uCCAD\uC774 \uB108\uBB34 \uB9CE\uC2B5\uB2C8\uB2E4. {seconds}\uCD08 \uD6C4 \uB2E4\uC2DC \uC2DC\uB3C4\uD574 \uC8FC\uC138\uC694.",
+  errNotionValidation: "Notion \uC694\uCCAD \uD615\uC2DD\uC774 \uC62C\uBC14\uB974\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4.",
+  errNotionRequestFailed: "Notion \uC800\uC7A5 \uC694\uCCAD\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4.",
   fallbackNoFolder: "\uC5F0\uACB0\uB41C \uD3F4\uB354\uAC00 \uC5C6\uC5B4",
   fallbackPermissionDenied: "\uD3F4\uB354 \uAD8C\uD55C\uC774 \uC5C6\uC5B4",
   fallbackDirectFailed: "\uD3F4\uB354\uC5D0 \uC800\uC7A5\uD558\uC9C0 \uBABB\uD574",
@@ -2673,6 +2715,8 @@ var en = {
   popupSubtitlePermissionCheck: "Folder connected, but permission may need re-confirmation.",
   popupSubtitleNoFolder: "Saves directly when a folder is connected, otherwise downloads a file.",
   popupSubtitleUnsupported: "This browser only supports file downloads.",
+  popupSubtitleNotion: "Saving to your configured Notion destination.",
+  popupSubtitleNotionSetup: "To use Notion saving, enter your token and destination in settings first.",
   popupRecentSaves: "Recent Saves",
   popupClearAll: "Clear All",
   popupEmpty: "No saved posts yet.",
@@ -2688,12 +2732,15 @@ var en = {
   statusSaving: "Saving\u2026",
   statusSavedDirect: "Saved directly to your Obsidian folder.",
   statusSavedZip: "Saved. Download started.",
+  statusSavedNotion: "Saved to Notion.",
   statusDuplicate: "Already saved \u2014 updated with the latest content.",
   statusDuplicateWarning: "Already saved, updated: ",
   statusAlreadySaved: "This post is already saved. Use 'Re-save' from recent saves to save again.",
+  statusNotionSetupRequired: "To use Notion saving, enter your token and destination in settings first.",
   statusError: "An unknown error occurred.",
   statusResaving: "Preparing your file\u2026",
   statusResaved: "Download started.",
+  statusResavedNotion: "Saved to Notion as a new page.",
   statusRecentNotFound: "Could not find the recent save record.",
   statusDeletedRecent: "Deleted from recent saves.",
   statusClearedRecents: "All recent saves cleared.",
@@ -2702,7 +2749,7 @@ var en = {
   statusRedownloadError: "Error during re-download.",
   statusRetry: "Retry",
   statusResaveButton: "Re-save",
-  optionsTitle: "Save Threads posts to Obsidian, with auto-organize.",
+  optionsTitle: "Save Threads posts to Obsidian or Notion, with auto-organize.",
   optionsSubtitle: "Free saving, Pro only when needed.",
   optionsPlanSpotlightFreeTitle: "Free",
   optionsPlanSpotlightFreeCopy: "Basic saving is ready to use.",
@@ -2733,6 +2780,28 @@ var en = {
   optionsFolderPathLabel: "Current Save Location",
   optionsFolderPathHint: "The browser cannot expose the OS absolute path, so this stays relative to the connected folder.",
   optionsFolderPathUnavailable: "Shown after you connect a folder",
+  optionsSaveTarget: "Save target",
+  optionsSaveTargetHint: "On PC, choose either Obsidian or Notion as the default destination.",
+  optionsSaveTargetObsidian: "Obsidian",
+  optionsSaveTargetNotion: "Notion",
+  optionsNotionSection: "Notion Connection",
+  optionsNotionSubtitle: "Notion creates new pages through the API. Both parent-page saving and data-source saving are supported.",
+  optionsNotionParentType: "Save mode",
+  optionsNotionParentTypeHint: "Create a new page under a page, or create a new entry/page inside a data source.",
+  optionsNotionParentTypePage: "Parent page",
+  optionsNotionParentTypeDataSource: "Data source",
+  optionsNotionToken: "Integration token",
+  optionsNotionTokenHint: "Paste your Notion internal integration token. It is stored only in this browser profile.",
+  optionsNotionParentPage: "Parent page ID or URL",
+  optionsNotionParentPageHint: "You can paste a full Notion page URL or just the page ID.",
+  optionsNotionDataSource: "Data source ID or URL",
+  optionsNotionDataSourceHint: "Paste a full Notion data source URL or just its ID. Title, tags, dates, and similar properties are mapped automatically when possible.",
+  optionsNotionTokenRequired: "A Notion integration token is required to use Notion saving.",
+  optionsNotionParentPageRequired: "A Notion parent page ID or URL is required to use Notion saving.",
+  optionsNotionInvalidPage: "The Notion parent page ID or URL format is not valid.",
+  optionsNotionDataSourceRequired: "A Notion data source ID or URL is required to use data source saving.",
+  optionsNotionInvalidDataSource: "The Notion data source ID or URL format is not valid.",
+  optionsNotionPermissionDenied: "Permission to access the Notion API was denied, so settings were not saved.",
   optionsBasicSection: "Basic Saving",
   optionsBasicSubtitle: "",
   optionsCompareSection: "Free vs Pro",
@@ -2837,6 +2906,14 @@ var en = {
   errBrowserUnsupported: "This browser cannot save directly to an Obsidian folder.",
   errFolderNameFailed: "Could not determine a folder name for saving.",
   errInvalidPath: "Invalid file path.",
+  errNotionTokenMissing: "No Notion integration token is configured.",
+  errNotionPermissionMissing: "Permission for the Notion API is missing. Re-save settings first.",
+  errNotionUnauthorized: "The Notion token is invalid or expired.",
+  errNotionForbidden: "This integration cannot access the selected Notion destination. Make sure the page or data source is shared with the integration.",
+  errNotionParentNotFound: "The selected Notion page or data source could not be found. Check the ID and connection.",
+  errNotionRateLimited: "Too many Notion requests. Try again in {seconds} seconds.",
+  errNotionValidation: "The Notion request is not valid.",
+  errNotionRequestFailed: "The Notion save request failed.",
   fallbackNoFolder: "No folder connected,",
   fallbackPermissionDenied: "No folder permission,",
   fallbackDirectFailed: "Could not save to folder,",
@@ -3027,6 +3104,43 @@ async function clearObsidianDirectoryHandle() {
       reject(transaction.error ?? new Error("\uD578\uB4E4\uC744 \uC0AD\uC81C\uD558\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4."));
     });
   });
+}
+
+// src/extension/lib/notion.ts
+var NOTION_HOST_PATTERN = "https://api.notion.com/*";
+function normalizeUuid(value) {
+  const compact = value.replace(/-/g, "").toLowerCase();
+  if (!/^[0-9a-f]{32}$/.test(compact)) {
+    throw new Error("invalid_notion_page_id");
+  }
+  return [
+    compact.slice(0, 8),
+    compact.slice(8, 12),
+    compact.slice(12, 16),
+    compact.slice(16, 20),
+    compact.slice(20, 32)
+  ].join("-");
+}
+function normalizeNotionPageIdInput(value) {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    throw new Error("missing_notion_page_id");
+  }
+  const match = trimmed.match(/[0-9a-f]{32}|[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}/i);
+  if (!match?.[0]) {
+    throw new Error("invalid_notion_page_id");
+  }
+  return normalizeUuid(match[0]);
+}
+async function requestNotionHostPermission() {
+  if (!chrome.permissions?.request) {
+    return false;
+  }
+  try {
+    return await chrome.permissions.request({ origins: [NOTION_HOST_PATTERN] });
+  } catch {
+    return false;
+  }
 }
 
 // src/extension/lib/license.ts
@@ -3237,6 +3351,10 @@ function mergeOptionsWithDefaults(options) {
   return {
     ...DEFAULT_OPTIONS,
     ...options,
+    notion: {
+      ...DEFAULT_OPTIONS.notion,
+      ...options?.notion ?? {}
+    },
     aiOrganization: {
       ...DEFAULT_OPTIONS.aiOrganization,
       ...options?.aiOrganization ?? {}
@@ -3256,9 +3374,24 @@ async function getOptions() {
     merged.obsidianFolderLabel = DEFAULT_OPTIONS.obsidianFolderLabel;
     shouldPersist = true;
   }
+  if (merged.saveTarget === void 0) {
+    merged.saveTarget = DEFAULT_OPTIONS.saveTarget;
+    shouldPersist = true;
+  }
   if (merged.savePathPattern === void 0) {
     merged.savePathPattern = DEFAULT_OPTIONS.savePathPattern;
     shouldPersist = true;
+  }
+  if (!storedOptions?.notion) {
+    shouldPersist = true;
+  } else {
+    const expectedNotionKeys = Object.keys(DEFAULT_OPTIONS.notion);
+    for (const key of expectedNotionKeys) {
+      if (storedOptions.notion[key] === void 0) {
+        shouldPersist = true;
+        break;
+      }
+    }
   }
   if (!storedOptions?.aiOrganization) {
     shouldPersist = true;
@@ -3444,8 +3577,16 @@ var AI_PROVIDER_VALUES = ["openai", "openrouter", "deepseek", "gemini", "ollama"
 var form = document.querySelector("#options-form");
 var filenamePattern = document.querySelector("#filename-pattern");
 var savePathPattern = document.querySelector("#save-path-pattern");
+var saveTarget = document.querySelector("#save-target");
+var notionSection = document.querySelector("#notion-section");
+var notionParentType = document.querySelector("#notion-parent-type");
+var notionToken = document.querySelector("#notion-token");
+var notionParentPage = document.querySelector("#notion-parent-page");
+var notionDataSourceField = document.querySelector("#notion-data-source-field");
+var notionDataSource = document.querySelector("#notion-data-source");
 var includeImages = document.querySelector("#include-images");
 var saveStatus = document.querySelector("#save-status");
+var folderSection = document.querySelector("#folder-section");
 var folderStatus = document.querySelector("#folder-status");
 var folderPathPreview = document.querySelector("#folder-path-preview");
 var connectFolderButton = document.querySelector("#connect-folder");
@@ -3501,7 +3642,13 @@ var currentPlan = {
   activatedAt: null
 };
 var connectedFolderName = null;
+var currentSaveTarget = DEFAULT_OPTIONS.saveTarget;
 var DIRTY_FIELD_IDS = /* @__PURE__ */ new Set([
+  "save-target",
+  "notion-parent-type",
+  "notion-token",
+  "notion-parent-page",
+  "notion-data-source",
   "filename-pattern",
   "save-path-pattern",
   "include-images",
@@ -3539,6 +3686,23 @@ function renderFolderPathPreview() {
   }
   const activePathPattern = currentPlan.tier === "pro" ? normalizePathPatternForDisplay(savePathPattern?.value.trim() ?? "") : "";
   folderPathPreview.textContent = activePathPattern ? `${connectedFolderName}/${activePathPattern}` : `${connectedFolderName}/`;
+}
+function getCurrentSaveTarget() {
+  return saveTarget?.value === "notion" ? "notion" : "obsidian";
+}
+function getCurrentNotionParentType() {
+  return notionParentType?.value === "data_source" ? "data_source" : "page";
+}
+function renderNotionParentState() {
+  const parentType = getCurrentNotionParentType();
+  notionParentPage?.parentElement?.classList.toggle("hidden", parentType !== "page");
+  notionDataSourceField?.classList.toggle("hidden", parentType !== "data_source");
+}
+function renderSaveTargetState() {
+  currentSaveTarget = getCurrentSaveTarget();
+  folderSection?.classList.toggle("hidden", currentSaveTarget !== "obsidian");
+  notionSection?.classList.toggle("hidden", currentSaveTarget !== "notion");
+  renderNotionParentState();
 }
 function isAiProvider(value) {
   return AI_PROVIDER_VALUES.some((provider) => provider === value);
@@ -3742,6 +3906,74 @@ function applyStaticMessages() {
   if (disconnectFolderButton) {
     disconnectFolderButton.textContent = msg.optionsFolderDisconnect;
   }
+  const saveTargetLabelEl = document.querySelector("#save-target-label");
+  if (saveTargetLabelEl) {
+    saveTargetLabelEl.textContent = msg.optionsSaveTarget;
+  }
+  const saveTargetHintEl = document.querySelector("#save-target-hint");
+  if (saveTargetHintEl) {
+    saveTargetHintEl.textContent = msg.optionsSaveTargetHint;
+  }
+  if (saveTarget) {
+    const obsidianOption = saveTarget.querySelector('option[value="obsidian"]');
+    const notionOption = saveTarget.querySelector('option[value="notion"]');
+    if (obsidianOption) {
+      obsidianOption.textContent = msg.optionsSaveTargetObsidian;
+    }
+    if (notionOption) {
+      notionOption.textContent = msg.optionsSaveTargetNotion;
+    }
+  }
+  const notionSectionTitleEl = document.querySelector("#notion-section-title");
+  if (notionSectionTitleEl) {
+    notionSectionTitleEl.textContent = msg.optionsNotionSection;
+  }
+  const notionSectionSubtitleEl = document.querySelector("#notion-section-subtitle");
+  if (notionSectionSubtitleEl) {
+    notionSectionSubtitleEl.textContent = msg.optionsNotionSubtitle;
+  }
+  const notionParentTypeLabelEl = document.querySelector("#notion-parent-type-label");
+  if (notionParentTypeLabelEl) {
+    notionParentTypeLabelEl.textContent = msg.optionsNotionParentType;
+  }
+  const notionParentTypeHintEl = document.querySelector("#notion-parent-type-hint");
+  if (notionParentTypeHintEl) {
+    notionParentTypeHintEl.textContent = msg.optionsNotionParentTypeHint;
+  }
+  if (notionParentType) {
+    const pageOption = notionParentType.querySelector('option[value="page"]');
+    const dataSourceOption = notionParentType.querySelector('option[value="data_source"]');
+    if (pageOption) {
+      pageOption.textContent = msg.optionsNotionParentTypePage;
+    }
+    if (dataSourceOption) {
+      dataSourceOption.textContent = msg.optionsNotionParentTypeDataSource;
+    }
+  }
+  const notionTokenLabelEl = document.querySelector("#notion-token-label");
+  if (notionTokenLabelEl) {
+    notionTokenLabelEl.textContent = msg.optionsNotionToken;
+  }
+  const notionTokenHintEl = document.querySelector("#notion-token-hint");
+  if (notionTokenHintEl) {
+    notionTokenHintEl.textContent = msg.optionsNotionTokenHint;
+  }
+  const notionParentPageLabelEl = document.querySelector("#notion-parent-page-label");
+  if (notionParentPageLabelEl) {
+    notionParentPageLabelEl.textContent = msg.optionsNotionParentPage;
+  }
+  const notionParentPageHintEl = document.querySelector("#notion-parent-page-hint");
+  if (notionParentPageHintEl) {
+    notionParentPageHintEl.textContent = msg.optionsNotionParentPageHint;
+  }
+  const notionDataSourceLabelEl = document.querySelector("#notion-data-source-label");
+  if (notionDataSourceLabelEl) {
+    notionDataSourceLabelEl.textContent = msg.optionsNotionDataSource;
+  }
+  const notionDataSourceHintEl = document.querySelector("#notion-data-source-hint");
+  if (notionDataSourceHintEl) {
+    notionDataSourceHintEl.textContent = msg.optionsNotionDataSourceHint;
+  }
   const patternLabelEl = document.querySelector("#pattern-label");
   if (patternLabelEl) {
     patternLabelEl.textContent = msg.optionsFilenamePattern;
@@ -3832,6 +4064,7 @@ async function applyLocale(nextLocale) {
   document.documentElement.lang = nextLocale;
   applyLanguageSwitch(nextLocale);
   applyStaticMessages();
+  renderSaveTargetState();
   await refreshPlanState();
   await refreshFolderState();
 }
@@ -3848,9 +4081,14 @@ function applyLanguageSwitch(locale) {
   }
 }
 function applyOptions(options) {
-  if (!filenamePattern || !savePathPattern || !includeImages || !aiEnabled || !aiProvider || !aiApiKey || !aiBaseUrl || !aiModel || !aiPrompt) {
+  if (!filenamePattern || !savePathPattern || !saveTarget || !notionParentType || !notionToken || !notionParentPage || !notionDataSource || !includeImages || !aiEnabled || !aiProvider || !aiApiKey || !aiBaseUrl || !aiModel || !aiPrompt) {
     return;
   }
+  saveTarget.value = options.saveTarget;
+  notionParentType.value = options.notion.parentType;
+  notionToken.value = options.notion.token;
+  notionParentPage.value = options.notion.parentPageId;
+  notionDataSource.value = options.notion.dataSourceId;
   filenamePattern.value = options.filenamePattern;
   savePathPattern.value = options.savePathPattern;
   includeImages.checked = options.includeImages;
@@ -3861,6 +4099,7 @@ function applyOptions(options) {
   aiModel.value = options.aiOrganization.model;
   aiPrompt.value = options.aiOrganization.prompt;
   syncAiAdvancedPanel(options.aiOrganization);
+  renderSaveTargetState();
   renderFolderPathPreview();
 }
 function formatPlanMeta(plan) {
@@ -4043,6 +4282,12 @@ disconnectFolderButton?.addEventListener("click", async () => {
   setSaveStatus(msg.optionsFolderDisconnect);
   await refreshFolderState();
 });
+saveTarget?.addEventListener("change", () => {
+  renderSaveTargetState();
+});
+notionParentType?.addEventListener("change", () => {
+  renderNotionParentState();
+});
 savePathPattern?.addEventListener("input", () => {
   renderFolderPathPreview();
 });
@@ -4101,13 +4346,18 @@ clearProButton?.addEventListener("click", async () => {
 });
 form?.addEventListener("submit", async (event) => {
   event.preventDefault();
-  if (!filenamePattern || !savePathPattern || !includeImages || !aiEnabled || !aiProvider || !aiApiKey || !aiBaseUrl || !aiModel || !aiPrompt) {
+  if (!filenamePattern || !savePathPattern || !saveTarget || !notionParentType || !notionToken || !notionParentPage || !notionDataSource || !includeImages || !aiEnabled || !aiProvider || !aiApiKey || !aiBaseUrl || !aiModel || !aiPrompt) {
     return;
   }
   const currentOptions = await getOptions();
+  const nextSaveTarget = getCurrentSaveTarget();
   const selectedProvider = getCurrentAiProvider();
   const providerPreset = getAiProviderPreset(selectedProvider);
   const trimmedApiKey = aiApiKey.value.trim();
+  const nextNotionParentType = getCurrentNotionParentType();
+  const trimmedNotionToken = notionToken.value.trim();
+  const trimmedNotionParentPage = notionParentPage.value.trim();
+  const trimmedNotionDataSource = notionDataSource.value.trim();
   const nextAiOrganization = {
     ...currentOptions.aiOrganization,
     provider: selectedProvider,
@@ -4117,6 +4367,42 @@ form?.addEventListener("submit", async (event) => {
     model: aiModel.value.trim() || providerPreset.model,
     prompt: aiPrompt.value.trim() || DEFAULT_AI_ORGANIZATION_PROMPT
   };
+  let normalizedNotionParentPage = trimmedNotionParentPage;
+  let normalizedNotionDataSource = trimmedNotionDataSource;
+  if (nextSaveTarget === "notion") {
+    if (!trimmedNotionToken) {
+      setSaveStatus(msg.optionsNotionTokenRequired);
+      return;
+    }
+    if (nextNotionParentType === "page") {
+      if (!trimmedNotionParentPage) {
+        setSaveStatus(msg.optionsNotionParentPageRequired);
+        return;
+      }
+      try {
+        normalizedNotionParentPage = normalizeNotionPageIdInput(trimmedNotionParentPage);
+      } catch {
+        setSaveStatus(msg.optionsNotionInvalidPage);
+        return;
+      }
+    } else {
+      if (!trimmedNotionDataSource) {
+        setSaveStatus(msg.optionsNotionDataSourceRequired);
+        return;
+      }
+      try {
+        normalizedNotionDataSource = normalizeNotionPageIdInput(trimmedNotionDataSource);
+      } catch {
+        setSaveStatus(msg.optionsNotionInvalidDataSource);
+        return;
+      }
+    }
+    const granted = await requestNotionHostPermission();
+    if (!granted) {
+      setSaveStatus(msg.optionsNotionPermissionDenied);
+      return;
+    }
+  }
   if (nextAiOrganization.enabled) {
     if (!providerPreset.apiKeyOptional && !trimmedApiKey) {
       setSaveStatus(msg.optionsAiApiKeyRequired);
@@ -4141,12 +4427,20 @@ form?.addEventListener("submit", async (event) => {
   }
   const nextOptions = {
     ...currentOptions,
+    saveTarget: nextSaveTarget,
     filenamePattern: filenamePattern.value.trim() || DEFAULT_OPTIONS.filenamePattern,
     savePathPattern: savePathPattern.value.trim(),
     includeImages: includeImages.checked,
+    notion: {
+      token: trimmedNotionToken,
+      parentType: nextNotionParentType,
+      parentPageId: normalizedNotionParentPage,
+      dataSourceId: normalizedNotionDataSource
+    },
     aiOrganization: nextAiOrganization
   };
   await setOptions(nextOptions);
+  renderSaveTargetState();
   setSaveStatus(nextAiOrganization.enabled ? msg.optionsAiSaved : msg.optionsSaved);
 });
 void (async () => {

@@ -2413,6 +2413,8 @@ var ko = {
   popupSubtitlePermissionCheck: "\uC5F0\uACB0\uB41C \uD3F4\uB354\uAC00 \uC788\uC9C0\uB9CC \uAD8C\uD55C\uC744 \uB2E4\uC2DC \uD655\uC778\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.",
   popupSubtitleNoFolder: "\uC5F0\uACB0\uB41C \uD3F4\uB354\uAC00 \uC788\uC73C\uBA74 \uBC14\uB85C \uC800\uC7A5\uD558\uACE0, \uC5C6\uC73C\uBA74 \uD30C\uC77C\uB85C \uB2E4\uC6B4\uB85C\uB4DC\uD569\uB2C8\uB2E4.",
   popupSubtitleUnsupported: "\uC774 \uBE0C\uB77C\uC6B0\uC800\uC5D0\uC11C\uB294 \uD30C\uC77C\uB85C \uB2E4\uC6B4\uB85C\uB4DC\uD569\uB2C8\uB2E4.",
+  popupSubtitleNotion: "\uC124\uC815\uD55C Notion \uB300\uC0C1\uC5D0 \uC0C8 \uD398\uC774\uC9C0\uB85C \uC800\uC7A5\uD569\uB2C8\uB2E4.",
+  popupSubtitleNotionSetup: "Notion \uC800\uC7A5\uC744 \uC4F0\uB824\uBA74 \uC124\uC815\uC5D0\uC11C \uD1A0\uD070\uACFC \uC800\uC7A5 \uB300\uC0C1\uC744 \uBA3C\uC800 \uC785\uB825\uD558\uC138\uC694.",
   popupRecentSaves: "\uCD5C\uADFC \uC800\uC7A5",
   popupClearAll: "\uC804\uCCB4 \uC0AD\uC81C",
   popupEmpty: "\uC544\uC9C1 \uC800\uC7A5\uD55C \uAE00\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.",
@@ -2428,12 +2430,15 @@ var ko = {
   statusSaving: "\uC800\uC7A5\uD558\uB294 \uC911\u2026",
   statusSavedDirect: "Obsidian \uD3F4\uB354\uC5D0 \uBC14\uB85C \uC800\uC7A5\uD588\uC2B5\uB2C8\uB2E4.",
   statusSavedZip: "\uC800\uC7A5 \uC644\uB8CC. \uD30C\uC77C \uB2E4\uC6B4\uB85C\uB4DC\uB97C \uC2DC\uC791\uD588\uC2B5\uB2C8\uB2E4.",
+  statusSavedNotion: "Notion\uC5D0 \uC800\uC7A5\uD588\uC2B5\uB2C8\uB2E4.",
   statusDuplicate: "\uC774\uBBF8 \uC800\uC7A5\uD55C \uAE00\uC774\uC9C0\uB9CC \uCD5C\uC2E0 \uB0B4\uC6A9\uC73C\uB85C \uB36E\uC5B4\uC368 \uC800\uC7A5\uD588\uC2B5\uB2C8\uB2E4.",
   statusDuplicateWarning: "\uC774\uBBF8 \uC800\uC7A5\uD55C \uAE00\uC774\uC9C0\uB9CC \uCD5C\uC2E0 \uB0B4\uC6A9\uC73C\uB85C \uB36E\uC5B4\uC368 \uC800\uC7A5\uD588\uC2B5\uB2C8\uB2E4: ",
   statusAlreadySaved: "\uC774\uBBF8 \uC800\uC7A5\uB41C \uAE00\uC785\uB2C8\uB2E4. \uB2E4\uC2DC \uC800\uC7A5\uD558\uB824\uBA74 \uCD5C\uADFC \uC800\uC7A5\uC5D0\uC11C '\uB2E4\uC2DC \uC800\uC7A5'\uC744 \uB20C\uB7EC\uC8FC\uC138\uC694.",
+  statusNotionSetupRequired: "Notion \uC800\uC7A5\uC744 \uC0AC\uC6A9\uD558\uB824\uBA74 \uC124\uC815\uC5D0\uC11C \uD1A0\uD070\uACFC \uC800\uC7A5 \uB300\uC0C1\uC744 \uBA3C\uC800 \uC785\uB825\uD558\uC138\uC694.",
   statusError: "\uC54C \uC218 \uC5C6\uB294 \uC624\uB958\uAC00 \uBC1C\uC0DD\uD588\uC2B5\uB2C8\uB2E4.",
   statusResaving: "\uD30C\uC77C\uC744 \uB2E4\uC2DC \uB9CC\uB4DC\uB294 \uC911\u2026",
   statusResaved: "\uB2E4\uC6B4\uB85C\uB4DC\uB97C \uB2E4\uC2DC \uC2DC\uC791\uD588\uC2B5\uB2C8\uB2E4.",
+  statusResavedNotion: "Notion\uC5D0 \uC0C8 \uD398\uC774\uC9C0\uB85C \uB2E4\uC2DC \uC800\uC7A5\uD588\uC2B5\uB2C8\uB2E4.",
   statusRecentNotFound: "\uCD5C\uADFC \uC800\uC7A5 \uAE30\uB85D\uC744 \uCC3E\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4.",
   statusDeletedRecent: "\uCD5C\uADFC \uC800\uC7A5\uC5D0\uC11C \uC0AD\uC81C\uD588\uC2B5\uB2C8\uB2E4.",
   statusClearedRecents: "\uCD5C\uADFC \uC800\uC7A5\uC744 \uBAA8\uB450 \uC0AD\uC81C\uD588\uC2B5\uB2C8\uB2E4.",
@@ -2442,7 +2447,7 @@ var ko = {
   statusRedownloadError: "\uB2E4\uC2DC \uB2E4\uC6B4\uB85C\uB4DC\uD558\uB294 \uC911 \uC624\uB958\uAC00 \uBC1C\uC0DD\uD588\uC2B5\uB2C8\uB2E4.",
   statusRetry: "\uB2E4\uC2DC \uC2DC\uB3C4",
   statusResaveButton: "\uB2E4\uC2DC \uC800\uC7A5",
-  optionsTitle: "Threads \uAE00\uC744 Obsidian\uC5D0 \uC800\uC7A5\uD558\uACE0 \uADDC\uCE59\uACFC AI\uB85C \uC815\uB9AC\uD558\uC138\uC694.",
+  optionsTitle: "Threads \uAE00\uC744 Obsidian \uB610\uB294 Notion\uC5D0 \uC800\uC7A5\uD558\uACE0 \uADDC\uCE59\uACFC AI\uB85C \uC815\uB9AC\uD558\uC138\uC694.",
   optionsSubtitle: "\uBB34\uB8CC \uC800\uC7A5, \uD544\uC694\uD560 \uB54C\uB9CC Pro.",
   optionsPlanSpotlightFreeTitle: "Free",
   optionsPlanSpotlightFreeCopy: "\uAE30\uBCF8 \uC800\uC7A5 \uAE30\uB2A5\uC744 \uBC14\uB85C \uC0AC\uC6A9\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.",
@@ -2473,6 +2478,28 @@ var ko = {
   optionsFolderPathLabel: "\uD604\uC7AC \uC800\uC7A5 \uC704\uCE58",
   optionsFolderPathHint: "\uC808\uB300\uACBD\uB85C\uB294 \uC77D\uC744 \uC218 \uC5C6\uC5B4 \uC5F0\uACB0\uB41C \uD3F4\uB354 \uAE30\uC900\uC73C\uB85C\uB9CC \uD45C\uC2DC\uD569\uB2C8\uB2E4.",
   optionsFolderPathUnavailable: "\uD3F4\uB354 \uC5F0\uACB0 \uD6C4 \uD45C\uC2DC",
+  optionsSaveTarget: "\uC800\uC7A5 \uB300\uC0C1",
+  optionsSaveTargetHint: "PC\uC5D0\uC11C\uB294 Obsidian \uB610\uB294 Notion \uC911 \uD558\uB098\uB97C \uAE30\uBCF8 \uC800\uC7A5 \uB300\uC0C1\uC73C\uB85C \uC120\uD0DD\uD569\uB2C8\uB2E4.",
+  optionsSaveTargetObsidian: "Obsidian",
+  optionsSaveTargetNotion: "Notion",
+  optionsNotionSection: "Notion \uC5F0\uACB0",
+  optionsNotionSubtitle: "Notion\uC740 API\uB85C \uC0C8 \uD398\uC774\uC9C0\uB97C \uB9CC\uB4ED\uB2C8\uB2E4. parent page \uC800\uC7A5\uACFC data source \uC800\uC7A5\uC744 \uBAA8\uB450 \uC9C0\uC6D0\uD569\uB2C8\uB2E4.",
+  optionsNotionParentType: "\uC800\uC7A5 \uBC29\uC2DD",
+  optionsNotionParentTypeHint: "Page \uC544\uB798 \uC0C8 \uD398\uC774\uC9C0\uB97C \uB9CC\uB4E4\uAC70\uB098, data source\uC5D0 \uC0C8 row/page\uB97C \uB9CC\uB4E4 \uC218 \uC788\uC2B5\uB2C8\uB2E4.",
+  optionsNotionParentTypePage: "Parent page",
+  optionsNotionParentTypeDataSource: "Data source",
+  optionsNotionToken: "Integration token",
+  optionsNotionTokenHint: "Notion internal integration \uD1A0\uD070\uC744 \uB123\uC2B5\uB2C8\uB2E4. \uC774 \uAC12\uC740 \uD604\uC7AC \uBE0C\uB77C\uC6B0\uC800 \uD504\uB85C\uD544\uC5D0\uB9CC \uC800\uC7A5\uB429\uB2C8\uB2E4.",
+  optionsNotionParentPage: "Parent page ID \uB610\uB294 URL",
+  optionsNotionParentPageHint: "Notion \uD398\uC774\uC9C0 URL \uC804\uCCB4\uB97C \uBD99\uC5EC\uB123\uC5B4\uB3C4 \uB418\uACE0, page ID\uB9CC \uB123\uC5B4\uB3C4 \uB429\uB2C8\uB2E4.",
+  optionsNotionDataSource: "Data source ID \uB610\uB294 URL",
+  optionsNotionDataSourceHint: "Notion data source URL \uC804\uCCB4 \uB610\uB294 data source ID\uB97C \uB123\uC2B5\uB2C8\uB2E4. \uC800\uC7A5 \uC2DC \uC81C\uBAA9/\uD0DC\uADF8/\uB0A0\uC9DC \uAC19\uC740 \uC18D\uC131\uC744 \uC790\uB3D9 \uB9E4\uD551\uD569\uB2C8\uB2E4.",
+  optionsNotionTokenRequired: "Notion \uC800\uC7A5\uC744 \uC4F0\uB824\uBA74 integration token\uC774 \uD544\uC694\uD569\uB2C8\uB2E4.",
+  optionsNotionParentPageRequired: "Notion \uC800\uC7A5\uC744 \uC4F0\uB824\uBA74 parent page ID \uB610\uB294 URL\uC774 \uD544\uC694\uD569\uB2C8\uB2E4.",
+  optionsNotionInvalidPage: "Notion parent page ID \uB610\uB294 URL \uD615\uC2DD\uC774 \uC62C\uBC14\uB974\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4.",
+  optionsNotionDataSourceRequired: "Notion data source \uC800\uC7A5\uC744 \uC4F0\uB824\uBA74 data source ID \uB610\uB294 URL\uC774 \uD544\uC694\uD569\uB2C8\uB2E4.",
+  optionsNotionInvalidDataSource: "Notion data source ID \uB610\uB294 URL \uD615\uC2DD\uC774 \uC62C\uBC14\uB974\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4.",
+  optionsNotionPermissionDenied: "Notion API \uC811\uADFC \uAD8C\uD55C\uC744 \uD5C8\uC6A9\uD558\uC9C0 \uC54A\uC544 \uC800\uC7A5\uD558\uC9C0 \uC54A\uC558\uC2B5\uB2C8\uB2E4.",
   optionsBasicSection: "\uAE30\uBCF8 \uC800\uC7A5",
   optionsBasicSubtitle: "",
   optionsCompareSection: "Free vs Pro",
@@ -2577,6 +2604,14 @@ var ko = {
   errBrowserUnsupported: "\uC774 \uBE0C\uB77C\uC6B0\uC800\uC5D0\uC11C\uB294 Obsidian \uD3F4\uB354\uC5D0 \uBC14\uB85C \uC800\uC7A5\uD560 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4.",
   errFolderNameFailed: "\uC800\uC7A5\uD560 \uD3F4\uB354 \uC774\uB984\uC744 \uACB0\uC815\uD558\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4.",
   errInvalidPath: "\uC798\uBABB\uB41C \uD30C\uC77C \uACBD\uB85C\uC785\uB2C8\uB2E4.",
+  errNotionTokenMissing: "Notion integration token\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.",
+  errNotionPermissionMissing: "Notion API \uAD8C\uD55C\uC774 \uC5C6\uC2B5\uB2C8\uB2E4. \uC124\uC815\uC5D0\uC11C \uB2E4\uC2DC \uC800\uC7A5\uD574 \uC8FC\uC138\uC694.",
+  errNotionUnauthorized: "Notion \uD1A0\uD070\uC774 \uC720\uD6A8\uD558\uC9C0 \uC54A\uAC70\uB098 \uB9CC\uB8CC\uB418\uC5C8\uC2B5\uB2C8\uB2E4.",
+  errNotionForbidden: "\uC120\uD0DD\uD55C Notion \uB300\uC0C1\uC5D0 \uC811\uADFC \uAD8C\uD55C\uC774 \uC5C6\uC2B5\uB2C8\uB2E4. page \uB610\uB294 data source\uB97C integration\uC5D0 \uC5F0\uACB0\uD588\uB294\uC9C0 \uD655\uC778\uD574 \uC8FC\uC138\uC694.",
+  errNotionParentNotFound: "\uC120\uD0DD\uD55C Notion page \uB610\uB294 data source\uB97C \uCC3E\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4. ID\uC640 \uC5F0\uACB0 \uC0C1\uD0DC\uB97C \uD655\uC778\uD574 \uC8FC\uC138\uC694.",
+  errNotionRateLimited: "Notion \uC694\uCCAD\uC774 \uB108\uBB34 \uB9CE\uC2B5\uB2C8\uB2E4. {seconds}\uCD08 \uD6C4 \uB2E4\uC2DC \uC2DC\uB3C4\uD574 \uC8FC\uC138\uC694.",
+  errNotionValidation: "Notion \uC694\uCCAD \uD615\uC2DD\uC774 \uC62C\uBC14\uB974\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4.",
+  errNotionRequestFailed: "Notion \uC800\uC7A5 \uC694\uCCAD\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4.",
   fallbackNoFolder: "\uC5F0\uACB0\uB41C \uD3F4\uB354\uAC00 \uC5C6\uC5B4",
   fallbackPermissionDenied: "\uD3F4\uB354 \uAD8C\uD55C\uC774 \uC5C6\uC5B4",
   fallbackDirectFailed: "\uD3F4\uB354\uC5D0 \uC800\uC7A5\uD558\uC9C0 \uBABB\uD574",
@@ -2599,6 +2634,8 @@ var en = {
   popupSubtitlePermissionCheck: "Folder connected, but permission may need re-confirmation.",
   popupSubtitleNoFolder: "Saves directly when a folder is connected, otherwise downloads a file.",
   popupSubtitleUnsupported: "This browser only supports file downloads.",
+  popupSubtitleNotion: "Saving to your configured Notion destination.",
+  popupSubtitleNotionSetup: "To use Notion saving, enter your token and destination in settings first.",
   popupRecentSaves: "Recent Saves",
   popupClearAll: "Clear All",
   popupEmpty: "No saved posts yet.",
@@ -2614,12 +2651,15 @@ var en = {
   statusSaving: "Saving\u2026",
   statusSavedDirect: "Saved directly to your Obsidian folder.",
   statusSavedZip: "Saved. Download started.",
+  statusSavedNotion: "Saved to Notion.",
   statusDuplicate: "Already saved \u2014 updated with the latest content.",
   statusDuplicateWarning: "Already saved, updated: ",
   statusAlreadySaved: "This post is already saved. Use 'Re-save' from recent saves to save again.",
+  statusNotionSetupRequired: "To use Notion saving, enter your token and destination in settings first.",
   statusError: "An unknown error occurred.",
   statusResaving: "Preparing your file\u2026",
   statusResaved: "Download started.",
+  statusResavedNotion: "Saved to Notion as a new page.",
   statusRecentNotFound: "Could not find the recent save record.",
   statusDeletedRecent: "Deleted from recent saves.",
   statusClearedRecents: "All recent saves cleared.",
@@ -2628,7 +2668,7 @@ var en = {
   statusRedownloadError: "Error during re-download.",
   statusRetry: "Retry",
   statusResaveButton: "Re-save",
-  optionsTitle: "Save Threads posts to Obsidian, with auto-organize.",
+  optionsTitle: "Save Threads posts to Obsidian or Notion, with auto-organize.",
   optionsSubtitle: "Free saving, Pro only when needed.",
   optionsPlanSpotlightFreeTitle: "Free",
   optionsPlanSpotlightFreeCopy: "Basic saving is ready to use.",
@@ -2659,6 +2699,28 @@ var en = {
   optionsFolderPathLabel: "Current Save Location",
   optionsFolderPathHint: "The browser cannot expose the OS absolute path, so this stays relative to the connected folder.",
   optionsFolderPathUnavailable: "Shown after you connect a folder",
+  optionsSaveTarget: "Save target",
+  optionsSaveTargetHint: "On PC, choose either Obsidian or Notion as the default destination.",
+  optionsSaveTargetObsidian: "Obsidian",
+  optionsSaveTargetNotion: "Notion",
+  optionsNotionSection: "Notion Connection",
+  optionsNotionSubtitle: "Notion creates new pages through the API. Both parent-page saving and data-source saving are supported.",
+  optionsNotionParentType: "Save mode",
+  optionsNotionParentTypeHint: "Create a new page under a page, or create a new entry/page inside a data source.",
+  optionsNotionParentTypePage: "Parent page",
+  optionsNotionParentTypeDataSource: "Data source",
+  optionsNotionToken: "Integration token",
+  optionsNotionTokenHint: "Paste your Notion internal integration token. It is stored only in this browser profile.",
+  optionsNotionParentPage: "Parent page ID or URL",
+  optionsNotionParentPageHint: "You can paste a full Notion page URL or just the page ID.",
+  optionsNotionDataSource: "Data source ID or URL",
+  optionsNotionDataSourceHint: "Paste a full Notion data source URL or just its ID. Title, tags, dates, and similar properties are mapped automatically when possible.",
+  optionsNotionTokenRequired: "A Notion integration token is required to use Notion saving.",
+  optionsNotionParentPageRequired: "A Notion parent page ID or URL is required to use Notion saving.",
+  optionsNotionInvalidPage: "The Notion parent page ID or URL format is not valid.",
+  optionsNotionDataSourceRequired: "A Notion data source ID or URL is required to use data source saving.",
+  optionsNotionInvalidDataSource: "The Notion data source ID or URL format is not valid.",
+  optionsNotionPermissionDenied: "Permission to access the Notion API was denied, so settings were not saved.",
   optionsBasicSection: "Basic Saving",
   optionsBasicSubtitle: "",
   optionsCompareSection: "Free vs Pro",
@@ -2763,6 +2825,14 @@ var en = {
   errBrowserUnsupported: "This browser cannot save directly to an Obsidian folder.",
   errFolderNameFailed: "Could not determine a folder name for saving.",
   errInvalidPath: "Invalid file path.",
+  errNotionTokenMissing: "No Notion integration token is configured.",
+  errNotionPermissionMissing: "Permission for the Notion API is missing. Re-save settings first.",
+  errNotionUnauthorized: "The Notion token is invalid or expired.",
+  errNotionForbidden: "This integration cannot access the selected Notion destination. Make sure the page or data source is shared with the integration.",
+  errNotionParentNotFound: "The selected Notion page or data source could not be found. Check the ID and connection.",
+  errNotionRateLimited: "Too many Notion requests. Try again in {seconds} seconds.",
+  errNotionValidation: "The Notion request is not valid.",
+  errNotionRequestFailed: "The Notion save request failed.",
   fallbackNoFolder: "No folder connected,",
   fallbackPermissionDenied: "No folder permission,",
   fallbackDirectFailed: "Could not save to folder,",
@@ -2856,10 +2926,17 @@ var DEFAULT_AI_ORGANIZATION_SETTINGS = {
   prompt: DEFAULT_AI_ORGANIZATION_PROMPT
 };
 var DEFAULT_OPTIONS = {
+  saveTarget: "obsidian",
   filenamePattern: "{author}_{first_sentence_20}",
   savePathPattern: "",
   includeImages: true,
   obsidianFolderLabel: null,
+  notion: {
+    token: "",
+    parentType: "page",
+    parentPageId: "",
+    dataSourceId: ""
+  },
   aiOrganization: DEFAULT_AI_ORGANIZATION_SETTINGS
 };
 var BUNDLED_EXTRACTOR_CONFIG = {
@@ -3297,6 +3374,34 @@ async function renderReplySection(post, mediaRefs) {
   });
   return section;
 }
+async function buildMarkdownBody(post, mediaRefs, warning, aiResult) {
+  const msg2 = await t();
+  const body = [`# ${post.title}`, "", `${msg2.mdSource}: ${post.canonicalUrl}`, `${msg2.mdAuthor}: @${post.author}`];
+  if (post.publishedAt) {
+    body.push(`${msg2.mdPublishedAt}: ${post.publishedAt}`);
+  }
+  if (post.externalUrl) {
+    body.push(`${msg2.mdExternalLink}: ${post.externalUrl}`);
+  }
+  if (warning) {
+    body.push(`${msg2.mdWarning}: ${warning}`);
+  }
+  if (aiResult?.summary) {
+    body.push("", `## ${msg2.mdSummary}`, "", aiResult.summary, "");
+  } else {
+    body.push("");
+  }
+  body.push(post.text.trim(), "");
+  if (post.sourceType === "video") {
+    body.push(...renderVideoBlock(mediaRefs.postVideo, post.canonicalUrl, msg2));
+  }
+  if (mediaRefs.postImages.length > 0) {
+    body.push(`## ${msg2.mdImageLabel}`, "");
+    body.push(...renderImageBlock(mediaRefs.postImages, msg2.mdImageLabel));
+  }
+  body.push(...await renderReplySection(post, mediaRefs));
+  return body;
+}
 async function renderMarkdown(post, mediaRefs, warning, aiResult = null) {
   const msg2 = await t();
   const hasImages = post.imageUrls.length > 0 || post.authorReplies.some((reply) => reply.imageUrls.length > 0);
@@ -3324,30 +3429,7 @@ async function renderMarkdown(post, mediaRefs, warning, aiResult = null) {
     "---",
     ""
   ];
-  const body = [`# ${post.title}`, "", `${msg2.mdSource}: ${post.canonicalUrl}`, `${msg2.mdAuthor}: @${post.author}`];
-  if (post.publishedAt) {
-    body.push(`${msg2.mdPublishedAt}: ${post.publishedAt}`);
-  }
-  if (post.externalUrl) {
-    body.push(`${msg2.mdExternalLink}: ${post.externalUrl}`);
-  }
-  if (warning) {
-    body.push(`${msg2.mdWarning}: ${warning}`);
-  }
-  if (aiResult?.summary) {
-    body.push("", `## ${msg2.mdSummary}`, "", aiResult.summary, "");
-  } else {
-    body.push("");
-  }
-  body.push(post.text.trim(), "");
-  if (post.sourceType === "video") {
-    body.push(...renderVideoBlock(mediaRefs.postVideo, post.canonicalUrl, msg2));
-  }
-  if (mediaRefs.postImages.length > 0) {
-    body.push(`## ${msg2.mdImageLabel}`, "");
-    body.push(...renderImageBlock(mediaRefs.postImages, msg2.mdImageLabel));
-  }
-  body.push(...await renderReplySection(post, mediaRefs));
+  const body = await buildMarkdownBody(post, mediaRefs, warning, aiResult);
   return [...frontmatter, ...body].join("\n").trimEnd() + "\n";
 }
 
@@ -3822,6 +3904,12 @@ async function resolveImageDownloadPolicy(post, includeImages, requestPermission
   };
 }
 
+// src/extension/lib/notion.ts
+function isNotionConfigured(settings) {
+  const targetId = settings.parentType === "data_source" ? settings.dataSourceId : settings.parentPageId;
+  return settings.token.trim().length > 0 && targetId.trim().length > 0;
+}
+
 // src/extension/lib/license.ts
 var PRO_LICENSE_PUBLIC_KEY = {
   kty: "EC",
@@ -4026,6 +4114,10 @@ function mergeOptionsWithDefaults(options) {
   return {
     ...DEFAULT_OPTIONS,
     ...options,
+    notion: {
+      ...DEFAULT_OPTIONS.notion,
+      ...options?.notion ?? {}
+    },
     aiOrganization: {
       ...DEFAULT_OPTIONS.aiOrganization,
       ...options?.aiOrganization ?? {}
@@ -4034,6 +4126,7 @@ function mergeOptionsWithDefaults(options) {
 }
 function normalizeRecentSave(item) {
   const archiveName = item.archiveName ?? item.zipFilename?.replace(/\.zip$/i, "") ?? "";
+  const saveTarget = item.saveTarget ?? (item.savedVia === "notion" ? "notion" : "obsidian");
   const post = {
     ...item.post,
     videoUrl: item.post.videoUrl ?? null,
@@ -4048,8 +4141,11 @@ function normalizeRecentSave(item) {
   return {
     ...item,
     archiveName,
+    saveTarget,
     savedVia: item.savedVia ?? "zip",
     savedRelativePath: item.savedRelativePath ?? null,
+    remotePageId: item.remotePageId ?? null,
+    remotePageUrl: item.remotePageUrl ?? null,
     warning: item.warning ?? null,
     post,
     title: decodeEscapedJsonString(item.title)
@@ -4068,9 +4164,24 @@ async function getOptions() {
     merged.obsidianFolderLabel = DEFAULT_OPTIONS.obsidianFolderLabel;
     shouldPersist = true;
   }
+  if (merged.saveTarget === void 0) {
+    merged.saveTarget = DEFAULT_OPTIONS.saveTarget;
+    shouldPersist = true;
+  }
   if (merged.savePathPattern === void 0) {
     merged.savePathPattern = DEFAULT_OPTIONS.savePathPattern;
     shouldPersist = true;
+  }
+  if (!storedOptions?.notion) {
+    shouldPersist = true;
+  } else {
+    const expectedNotionKeys = Object.keys(DEFAULT_OPTIONS.notion);
+    for (const key of expectedNotionKeys) {
+      if (storedOptions.notion[key] === void 0) {
+        shouldPersist = true;
+        break;
+      }
+    }
   }
   if (!storedOptions?.aiOrganization) {
     shouldPersist = true;
@@ -4208,19 +4319,21 @@ async function getRecentSaves() {
 }
 async function upsertRecentSave(save) {
   const recent = await getRecentSaves();
-  const filtered = recent.filter((item) => item.id !== save.id && item.canonicalUrl !== save.canonicalUrl);
+  const filtered = recent.filter(
+    (item) => item.id !== save.id && !(item.canonicalUrl === save.canonicalUrl && item.saveTarget === save.saveTarget)
+  );
   filtered.unshift(save);
   const next = filtered.slice(0, MAX_RECENT_SAVES);
   await chrome.storage.local.set({ [RECENT_SAVES_KEY]: next });
   return next;
 }
-async function findDuplicateSave(canonicalUrl, contentHash) {
+async function findDuplicateSave(canonicalUrl, contentHash, saveTarget) {
   const recent = await getRecentSaves();
-  return recent.find((item) => item.canonicalUrl === canonicalUrl && item.contentHash === contentHash) ?? null;
+  return recent.find((item) => item.canonicalUrl === canonicalUrl && item.contentHash === contentHash && item.saveTarget === saveTarget) ?? null;
 }
-async function findRecentSaveByUrl(canonicalUrl) {
+async function findRecentSaveByUrl(canonicalUrl, saveTarget) {
   const recent = await getRecentSaves();
-  return recent.find((item) => item.canonicalUrl === canonicalUrl) ?? null;
+  return recent.find((item) => item.canonicalUrl === canonicalUrl && item.saveTarget === saveTarget) ?? null;
 }
 
 // src/extension/popup.ts
@@ -4237,6 +4350,8 @@ var latestStatus = null;
 var cachedDirectoryHandle = null;
 var cachedDirectReady = false;
 var cachedPermissionState = "prompt";
+var cachedSaveTarget = "obsidian";
+var cachedNotionReady = false;
 var activeRecentSaves = [];
 var expandedSaveIds = /* @__PURE__ */ new Set();
 var msg;
@@ -4246,6 +4361,13 @@ function getIdleStatus(supported) {
     return {
       kind: "unsupported",
       message: msg.statusUnsupported
+    };
+  }
+  if (cachedSaveTarget === "notion") {
+    return {
+      kind: "idle",
+      message: cachedNotionReady ? msg.statusReady : msg.statusNotionSetupRequired,
+      canRetry: false
     };
   }
   return {
@@ -4392,12 +4514,23 @@ function renderRecentSaves(items) {
       setStatus(state.status);
       renderRecentSaves(state.recentSaves);
       if (saveButton) {
-        saveButton.disabled = !state.supported;
+        saveButton.disabled = !state.supported || cachedSaveTarget === "notion" && !cachedNotionReady;
       }
     });
   }
 }
-async function refreshDirectSaveState() {
+async function refreshSaveTargetState() {
+  const options = await getEffectiveOptions();
+  cachedSaveTarget = options.saveTarget;
+  if (cachedSaveTarget === "notion") {
+    cachedDirectoryHandle = null;
+    cachedDirectReady = false;
+    cachedPermissionState = "unsupported";
+    cachedNotionReady = isNotionConfigured(options.notion);
+    setSubtitle(cachedNotionReady ? msg.popupSubtitleNotion : msg.popupSubtitleNotionSetup);
+    return;
+  }
+  cachedNotionReady = false;
   if (!supportsFileSystemAccess()) {
     cachedDirectoryHandle = null;
     cachedDirectReady = false;
@@ -4421,12 +4554,12 @@ async function refreshDirectSaveState() {
 }
 async function refreshPopupState(useIdleStatus = false, overrideStatus) {
   const state = await chrome.runtime.sendMessage({ type: "get-popup-state" });
-  await refreshDirectSaveState();
+  await refreshSaveTargetState();
   const renderedRecentSaves = await repairVisibleRecentSaves(state);
   setStatus(overrideStatus ?? (useIdleStatus ? getIdleStatus(state.supported) : state.status));
   renderRecentSaves(renderedRecentSaves);
   if (saveButton) {
-    saveButton.disabled = !state.supported;
+    saveButton.disabled = !state.supported || cachedSaveTarget === "notion" && !cachedNotionReady;
   }
   return {
     ...state,
@@ -4492,9 +4625,10 @@ function mergeZipFallbackStatus(status, reason) {
   return status;
 }
 async function recordDirectSave(post, archiveName, savedRelativePath, warning) {
-  const duplicate = await findDuplicateSave(post.canonicalUrl, post.contentHash);
+  const duplicate = await findDuplicateSave(post.canonicalUrl, post.contentHash, "obsidian");
   const recent = duplicate ? {
     ...duplicate,
+    saveTarget: "obsidian",
     canonicalUrl: post.canonicalUrl,
     shortcode: post.shortcode,
     author: post.author,
@@ -4505,10 +4639,13 @@ async function recordDirectSave(post, archiveName, savedRelativePath, warning) {
     status: "complete",
     savedVia: "direct",
     savedRelativePath,
+    remotePageId: null,
+    remotePageUrl: null,
     warning,
     post
   } : {
     id: crypto.randomUUID(),
+    saveTarget: "obsidian",
     canonicalUrl: post.canonicalUrl,
     shortcode: post.shortcode,
     author: post.author,
@@ -4519,6 +4656,8 @@ async function recordDirectSave(post, archiveName, savedRelativePath, warning) {
     status: "complete",
     savedVia: "direct",
     savedRelativePath,
+    remotePageId: null,
+    remotePageUrl: null,
     warning,
     post
   };
@@ -4539,7 +4678,7 @@ async function tryDirectSaveCurrent() {
   cachedPermissionState = "granted";
   const options = await getEffectiveOptions();
   const post = await extractCurrentPost();
-  const existingSave = await findRecentSaveByUrl(post.canonicalUrl);
+  const existingSave = await findRecentSaveByUrl(post.canonicalUrl, "obsidian");
   if (existingSave) {
     return {
       status: {
@@ -4587,6 +4726,15 @@ async function resolveZipImageOverride(post) {
 async function saveCurrent() {
   setStatus({ kind: "saving", message: msg.statusSaving });
   try {
+    const options = await getEffectiveOptions();
+    if (options.saveTarget === "notion") {
+      const status = await chrome.runtime.sendMessage({
+        type: "save-current-post",
+        allowDuplicate: false
+      });
+      await refreshPopupState(false, status);
+      return;
+    }
     const directResult = await tryDirectSaveCurrent();
     if (directResult && "status" in directResult) {
       await refreshPopupState(false, directResult.status);
@@ -4612,6 +4760,14 @@ async function saveCurrent() {
 }
 async function resaveRecent(item) {
   setStatus({ kind: "saving", message: msg.statusResaving });
+  if (item.saveTarget === "notion") {
+    const status = await chrome.runtime.sendMessage({
+      type: "redownload-save",
+      saveId: item.id
+    });
+    await refreshPopupState(false, status);
+    return;
+  }
   if (item.savedVia === "zip") {
     const imageOverride = await resolveZipImageOverride(item.post);
     const status = await chrome.runtime.sendMessage({
@@ -4658,10 +4814,13 @@ async function resaveRecent(item) {
     );
     const updatedSave = {
       ...item,
+      saveTarget: "obsidian",
       downloadedAt: (/* @__PURE__ */ new Date()).toISOString(),
       archiveName: result.archiveName,
       savedVia: "direct",
       savedRelativePath: result.savedRelativePath,
+      remotePageId: null,
+      remotePageUrl: null,
       warning: result.warning,
       status: "complete"
     };
@@ -4719,11 +4878,11 @@ openOptionsButton?.addEventListener("click", async () => {
 clearRecentsButton?.addEventListener("click", async () => {
   const state = await chrome.runtime.sendMessage({ type: "clear-recent-saves" });
   expandedSaveIds.clear();
-  await refreshDirectSaveState();
+  await refreshSaveTargetState();
   setStatus(state.status);
   renderRecentSaves(state.recentSaves);
   if (saveButton) {
-    saveButton.disabled = !state.supported;
+    saveButton.disabled = !state.supported || cachedSaveTarget === "notion" && !cachedNotionReady;
   }
 });
 chrome.runtime.onMessage.addListener((message) => {

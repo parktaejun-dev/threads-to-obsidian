@@ -1,6 +1,7 @@
 import { BUNDLED_EXTRACTOR_CONFIG, DEFAULT_OPTIONS } from "./lib/config";
 import { t } from "./lib/i18n";
 import { resolveImageDownloadPolicy } from "./lib/media-permissions";
+import { savePostToNotion } from "./lib/notion";
 import { buildZipPackage } from "./lib/package";
 import { clearRecentSaves, findDuplicateSave, findRecentSaveById, getEffectiveOptions, getOptions, getRecentSaves, removeRecentSaveById, setOptions, upsertRecentSave } from "./lib/storage";
 import type { ExtractPostRequest, PopupRequest, PopupState, RecentSave, SaveStatus } from "./lib/types";
@@ -32,6 +33,7 @@ async function createUnsupportedState(url: string | null): Promise<SaveStatus> {
 async function createZipRecentSave(post: RecentSave["post"], archiveName: string, warning: string | null): Promise<RecentSave> {
   return {
     id: crypto.randomUUID(),
+    saveTarget: "obsidian",
     canonicalUrl: post.canonicalUrl,
     shortcode: post.shortcode,
     author: post.author,
@@ -42,6 +44,34 @@ async function createZipRecentSave(post: RecentSave["post"], archiveName: string
     status: "complete",
     savedVia: "zip",
     savedRelativePath: null,
+    remotePageId: null,
+    remotePageUrl: null,
+    warning,
+    post
+  };
+}
+
+async function createNotionRecentSave(
+  post: RecentSave["post"],
+  pageId: string,
+  pageUrl: string,
+  warning: string | null
+): Promise<RecentSave> {
+  return {
+    id: crypto.randomUUID(),
+    saveTarget: "notion",
+    canonicalUrl: post.canonicalUrl,
+    shortcode: post.shortcode,
+    author: post.author,
+    title: post.title,
+    downloadedAt: new Date().toISOString(),
+    archiveName: post.title,
+    contentHash: post.contentHash,
+    status: "complete",
+    savedVia: "notion",
+    savedRelativePath: null,
+    remotePageId: pageId,
+    remotePageUrl: pageUrl,
     warning,
     post
   };
@@ -138,8 +168,54 @@ async function saveCurrentPost(
 
   try {
     const post = await extractPostFromTab(tab);
-    const duplicate = await findDuplicateSave(post.canonicalUrl, post.contentHash);
     const options = await getEffectiveOptions();
+    if (options.saveTarget === "notion") {
+      const duplicate = await findDuplicateSave(post.canonicalUrl, post.contentHash, "notion");
+      if (duplicate && !allowDuplicate) {
+        const alreadySaved: SaveStatus = {
+          kind: "success",
+          message: msg.statusAlreadySaved,
+          saveId: duplicate.id,
+          canRetry: true
+        };
+        broadcastStatus(alreadySaved);
+        return alreadySaved;
+      }
+
+      const notionResult = await savePostToNotion(post, options.notion, options.includeImages, options.aiOrganization);
+      const recent = duplicate && allowDuplicate
+        ? {
+            ...duplicate,
+            saveTarget: "notion" as const,
+            canonicalUrl: post.canonicalUrl,
+            shortcode: post.shortcode,
+            author: post.author,
+            title: post.title,
+            downloadedAt: new Date().toISOString(),
+            archiveName: notionResult.title,
+            contentHash: post.contentHash,
+            status: "complete" as const,
+            savedVia: "notion" as const,
+            savedRelativePath: null,
+            remotePageId: notionResult.pageId,
+            remotePageUrl: notionResult.pageUrl,
+            warning: notionResult.warning,
+            post
+          }
+        : await createNotionRecentSave(post, notionResult.pageId, notionResult.pageUrl, notionResult.warning);
+      await upsertRecentSave(recent);
+
+      const success: SaveStatus = {
+        kind: "success",
+        message: notionResult.warning ? `${msg.statusSavedNotion}: ${notionResult.warning}` : msg.statusSavedNotion,
+        saveId: recent.id,
+        canRetry: true
+      };
+      broadcastStatus(success);
+      return success;
+    }
+
+    const duplicate = await findDuplicateSave(post.canonicalUrl, post.contentHash, "obsidian");
     const imagePolicy =
       imageOverride && typeof imageOverride.allowImageDownloads === "boolean" && imageOverride.imageFallbackWarning
         ? {
@@ -160,6 +236,7 @@ async function saveCurrentPost(
       duplicate && !allowDuplicate
         ? {
           ...duplicate,
+          saveTarget: "obsidian" as const,
           canonicalUrl: post.canonicalUrl,
           shortcode: post.shortcode,
           author: post.author,
@@ -170,6 +247,8 @@ async function saveCurrentPost(
           status: "complete" as const,
           savedVia: "zip" as const,
           savedRelativePath: null,
+          remotePageId: null,
+          remotePageUrl: null,
           warning: packaged.warning,
           post
         }
@@ -216,6 +295,30 @@ async function redownloadSave(
   broadcastStatus({ kind: "saving", message: msg.statusResaving });
   try {
     const options = await getEffectiveOptions();
+    if (recentSave.saveTarget === "notion") {
+      const notionResult = await savePostToNotion(recentSave.post, options.notion, options.includeImages, options.aiOrganization);
+      const updatedSave: RecentSave = {
+        ...recentSave,
+        saveTarget: "notion",
+        downloadedAt: new Date().toISOString(),
+        archiveName: notionResult.title,
+        savedVia: "notion",
+        savedRelativePath: null,
+        remotePageId: notionResult.pageId,
+        remotePageUrl: notionResult.pageUrl,
+        warning: notionResult.warning
+      };
+      await upsertRecentSave(updatedSave);
+      const success = {
+        kind: "success",
+        message: notionResult.warning ? `${msg.statusResavedNotion}: ${notionResult.warning}` : msg.statusResavedNotion,
+        saveId: updatedSave.id,
+        canRetry: true
+      } satisfies SaveStatus;
+      broadcastStatus(success);
+      return success;
+    }
+
     const imagePolicy =
       imageOverride && typeof imageOverride.allowImageDownloads === "boolean" && imageOverride.imageFallbackWarning
         ? {
@@ -235,10 +338,13 @@ async function redownloadSave(
 
     const updatedSave: RecentSave = {
       ...recentSave,
+      saveTarget: "obsidian",
       downloadedAt: new Date().toISOString(),
       archiveName: packaged.archiveName,
       savedVia: "zip",
       savedRelativePath: null,
+      remotePageId: null,
+      remotePageUrl: null,
       warning: packaged.warning
     };
     await upsertRecentSave(updatedSave);

@@ -3,14 +3,23 @@ import { pickDirectoryHandle, queryDirectoryPermission, supportsFileSystemAccess
 import { clearObsidianDirectoryHandle, getObsidianDirectoryRecord, setObsidianDirectoryHandle } from "./lib/fs-handle-store";
 import { type Locale, type Messages, getLocale, setLocale, t } from "./lib/i18n";
 import { getAiPermissionPattern, requestAiHostPermission } from "./lib/llm";
+import { normalizeNotionPageIdInput, requestNotionHostPermission } from "./lib/notion";
 import { activateProLicense, clearProLicense, getOptions, getPlanStatus, setOptions } from "./lib/storage";
-import { AI_PROVIDER_VALUES, type AiProvider, type ExtensionOptions, type PlanStatus } from "./lib/types";
+import { AI_PROVIDER_VALUES, type AiProvider, type ExtensionOptions, type NotionParentType, type PlanStatus, type SaveTarget } from "./lib/types";
 
 const form = document.querySelector<HTMLFormElement>("#options-form");
 const filenamePattern = document.querySelector<HTMLInputElement>("#filename-pattern");
 const savePathPattern = document.querySelector<HTMLInputElement>("#save-path-pattern");
+const saveTarget = document.querySelector<HTMLSelectElement>("#save-target");
+const notionSection = document.querySelector<HTMLElement>("#notion-section");
+const notionParentType = document.querySelector<HTMLSelectElement>("#notion-parent-type");
+const notionToken = document.querySelector<HTMLInputElement>("#notion-token");
+const notionParentPage = document.querySelector<HTMLInputElement>("#notion-parent-page");
+const notionDataSourceField = document.querySelector<HTMLElement>("#notion-data-source-field");
+const notionDataSource = document.querySelector<HTMLInputElement>("#notion-data-source");
 const includeImages = document.querySelector<HTMLInputElement>("#include-images");
 const saveStatus = document.querySelector<HTMLParagraphElement>("#save-status");
+const folderSection = document.querySelector<HTMLElement>("#folder-section");
 const folderStatus = document.querySelector<HTMLParagraphElement>("#folder-status");
 const folderPathPreview = document.querySelector<HTMLElement>("#folder-path-preview");
 const connectFolderButton = document.querySelector<HTMLButtonElement>("#connect-folder");
@@ -67,7 +76,13 @@ let currentPlan: PlanStatus = {
   activatedAt: null
 };
 let connectedFolderName: string | null = null;
+let currentSaveTarget: SaveTarget = DEFAULT_OPTIONS.saveTarget;
 const DIRTY_FIELD_IDS = new Set([
+  "save-target",
+  "notion-parent-type",
+  "notion-token",
+  "notion-parent-page",
+  "notion-data-source",
   "filename-pattern",
   "save-path-pattern",
   "include-images",
@@ -117,6 +132,27 @@ function renderFolderPathPreview(): void {
 
   const activePathPattern = currentPlan.tier === "pro" ? normalizePathPatternForDisplay(savePathPattern?.value.trim() ?? "") : "";
   folderPathPreview.textContent = activePathPattern ? `${connectedFolderName}/${activePathPattern}` : `${connectedFolderName}/`;
+}
+
+function getCurrentSaveTarget(): SaveTarget {
+  return saveTarget?.value === "notion" ? "notion" : "obsidian";
+}
+
+function getCurrentNotionParentType(): NotionParentType {
+  return notionParentType?.value === "data_source" ? "data_source" : "page";
+}
+
+function renderNotionParentState(): void {
+  const parentType = getCurrentNotionParentType();
+  notionParentPage?.parentElement?.classList.toggle("hidden", parentType !== "page");
+  notionDataSourceField?.classList.toggle("hidden", parentType !== "data_source");
+}
+
+function renderSaveTargetState(): void {
+  currentSaveTarget = getCurrentSaveTarget();
+  folderSection?.classList.toggle("hidden", currentSaveTarget !== "obsidian");
+  notionSection?.classList.toggle("hidden", currentSaveTarget !== "notion");
+  renderNotionParentState();
 }
 
 function isAiProvider(value: string | null | undefined): value is AiProvider {
@@ -267,6 +303,42 @@ function applyStaticMessages(): void {
   const folderPathHintEl = document.querySelector("#folder-path-hint");
   if (folderPathHintEl) { folderPathHintEl.textContent = msg.optionsFolderPathHint; }
   if (disconnectFolderButton) { disconnectFolderButton.textContent = msg.optionsFolderDisconnect; }
+  const saveTargetLabelEl = document.querySelector("#save-target-label");
+  if (saveTargetLabelEl) { saveTargetLabelEl.textContent = msg.optionsSaveTarget; }
+  const saveTargetHintEl = document.querySelector("#save-target-hint");
+  if (saveTargetHintEl) { saveTargetHintEl.textContent = msg.optionsSaveTargetHint; }
+  if (saveTarget) {
+    const obsidianOption = saveTarget.querySelector<HTMLOptionElement>('option[value="obsidian"]');
+    const notionOption = saveTarget.querySelector<HTMLOptionElement>('option[value="notion"]');
+    if (obsidianOption) { obsidianOption.textContent = msg.optionsSaveTargetObsidian; }
+    if (notionOption) { notionOption.textContent = msg.optionsSaveTargetNotion; }
+  }
+  const notionSectionTitleEl = document.querySelector("#notion-section-title");
+  if (notionSectionTitleEl) { notionSectionTitleEl.textContent = msg.optionsNotionSection; }
+  const notionSectionSubtitleEl = document.querySelector("#notion-section-subtitle");
+  if (notionSectionSubtitleEl) { notionSectionSubtitleEl.textContent = msg.optionsNotionSubtitle; }
+  const notionParentTypeLabelEl = document.querySelector("#notion-parent-type-label");
+  if (notionParentTypeLabelEl) { notionParentTypeLabelEl.textContent = msg.optionsNotionParentType; }
+  const notionParentTypeHintEl = document.querySelector("#notion-parent-type-hint");
+  if (notionParentTypeHintEl) { notionParentTypeHintEl.textContent = msg.optionsNotionParentTypeHint; }
+  if (notionParentType) {
+    const pageOption = notionParentType.querySelector<HTMLOptionElement>('option[value="page"]');
+    const dataSourceOption = notionParentType.querySelector<HTMLOptionElement>('option[value="data_source"]');
+    if (pageOption) { pageOption.textContent = msg.optionsNotionParentTypePage; }
+    if (dataSourceOption) { dataSourceOption.textContent = msg.optionsNotionParentTypeDataSource; }
+  }
+  const notionTokenLabelEl = document.querySelector("#notion-token-label");
+  if (notionTokenLabelEl) { notionTokenLabelEl.textContent = msg.optionsNotionToken; }
+  const notionTokenHintEl = document.querySelector("#notion-token-hint");
+  if (notionTokenHintEl) { notionTokenHintEl.textContent = msg.optionsNotionTokenHint; }
+  const notionParentPageLabelEl = document.querySelector("#notion-parent-page-label");
+  if (notionParentPageLabelEl) { notionParentPageLabelEl.textContent = msg.optionsNotionParentPage; }
+  const notionParentPageHintEl = document.querySelector("#notion-parent-page-hint");
+  if (notionParentPageHintEl) { notionParentPageHintEl.textContent = msg.optionsNotionParentPageHint; }
+  const notionDataSourceLabelEl = document.querySelector("#notion-data-source-label");
+  if (notionDataSourceLabelEl) { notionDataSourceLabelEl.textContent = msg.optionsNotionDataSource; }
+  const notionDataSourceHintEl = document.querySelector("#notion-data-source-hint");
+  if (notionDataSourceHintEl) { notionDataSourceHintEl.textContent = msg.optionsNotionDataSourceHint; }
   const patternLabelEl = document.querySelector("#pattern-label");
   if (patternLabelEl) { patternLabelEl.textContent = msg.optionsFilenamePattern; }
   const tokensEl = document.querySelector("#tokens-hint");
@@ -316,6 +388,7 @@ async function applyLocale(nextLocale: Locale): Promise<void> {
   document.documentElement.lang = nextLocale;
   applyLanguageSwitch(nextLocale);
   applyStaticMessages();
+  renderSaveTargetState();
   await refreshPlanState();
   await refreshFolderState();
 }
@@ -335,10 +408,30 @@ function applyLanguageSwitch(locale: Locale): void {
 }
 
 function applyOptions(options: ExtensionOptions): void {
-  if (!filenamePattern || !savePathPattern || !includeImages || !aiEnabled || !aiProvider || !aiApiKey || !aiBaseUrl || !aiModel || !aiPrompt) {
+  if (
+    !filenamePattern ||
+    !savePathPattern ||
+    !saveTarget ||
+    !notionParentType ||
+    !notionToken ||
+    !notionParentPage ||
+    !notionDataSource ||
+    !includeImages ||
+    !aiEnabled ||
+    !aiProvider ||
+    !aiApiKey ||
+    !aiBaseUrl ||
+    !aiModel ||
+    !aiPrompt
+  ) {
     return;
   }
 
+  saveTarget.value = options.saveTarget;
+  notionParentType.value = options.notion.parentType;
+  notionToken.value = options.notion.token;
+  notionParentPage.value = options.notion.parentPageId;
+  notionDataSource.value = options.notion.dataSourceId;
   filenamePattern.value = options.filenamePattern;
   savePathPattern.value = options.savePathPattern;
   includeImages.checked = options.includeImages;
@@ -349,6 +442,7 @@ function applyOptions(options: ExtensionOptions): void {
   aiModel.value = options.aiOrganization.model;
   aiPrompt.value = options.aiOrganization.prompt;
   syncAiAdvancedPanel(options.aiOrganization);
+  renderSaveTargetState();
   renderFolderPathPreview();
 }
 
@@ -574,6 +668,14 @@ disconnectFolderButton?.addEventListener("click", async () => {
   await refreshFolderState();
 });
 
+saveTarget?.addEventListener("change", () => {
+  renderSaveTargetState();
+});
+
+notionParentType?.addEventListener("change", () => {
+  renderNotionParentState();
+});
+
 savePathPattern?.addEventListener("input", () => {
   renderFolderPathPreview();
 });
@@ -642,14 +744,34 @@ clearProButton?.addEventListener("click", async () => {
 
 form?.addEventListener("submit", async (event) => {
   event.preventDefault();
-  if (!filenamePattern || !savePathPattern || !includeImages || !aiEnabled || !aiProvider || !aiApiKey || !aiBaseUrl || !aiModel || !aiPrompt) {
+  if (
+    !filenamePattern ||
+    !savePathPattern ||
+    !saveTarget ||
+    !notionParentType ||
+    !notionToken ||
+    !notionParentPage ||
+    !notionDataSource ||
+    !includeImages ||
+    !aiEnabled ||
+    !aiProvider ||
+    !aiApiKey ||
+    !aiBaseUrl ||
+    !aiModel ||
+    !aiPrompt
+  ) {
     return;
   }
 
   const currentOptions = await getOptions();
+  const nextSaveTarget = getCurrentSaveTarget();
   const selectedProvider = getCurrentAiProvider();
   const providerPreset = getAiProviderPreset(selectedProvider);
   const trimmedApiKey = aiApiKey.value.trim();
+  const nextNotionParentType = getCurrentNotionParentType();
+  const trimmedNotionToken = notionToken.value.trim();
+  const trimmedNotionParentPage = notionParentPage.value.trim();
+  const trimmedNotionDataSource = notionDataSource.value.trim();
   const nextAiOrganization = {
     ...currentOptions.aiOrganization,
     provider: selectedProvider,
@@ -659,6 +781,47 @@ form?.addEventListener("submit", async (event) => {
     model: aiModel.value.trim() || providerPreset.model,
     prompt: aiPrompt.value.trim() || DEFAULT_AI_ORGANIZATION_PROMPT
   };
+
+  let normalizedNotionParentPage = trimmedNotionParentPage;
+  let normalizedNotionDataSource = trimmedNotionDataSource;
+  if (nextSaveTarget === "notion") {
+    if (!trimmedNotionToken) {
+      setSaveStatus(msg.optionsNotionTokenRequired);
+      return;
+    }
+
+    if (nextNotionParentType === "page") {
+      if (!trimmedNotionParentPage) {
+        setSaveStatus(msg.optionsNotionParentPageRequired);
+        return;
+      }
+
+      try {
+        normalizedNotionParentPage = normalizeNotionPageIdInput(trimmedNotionParentPage);
+      } catch {
+        setSaveStatus(msg.optionsNotionInvalidPage);
+        return;
+      }
+    } else {
+      if (!trimmedNotionDataSource) {
+        setSaveStatus(msg.optionsNotionDataSourceRequired);
+        return;
+      }
+
+      try {
+        normalizedNotionDataSource = normalizeNotionPageIdInput(trimmedNotionDataSource);
+      } catch {
+        setSaveStatus(msg.optionsNotionInvalidDataSource);
+        return;
+      }
+    }
+
+    const granted = await requestNotionHostPermission();
+    if (!granted) {
+      setSaveStatus(msg.optionsNotionPermissionDenied);
+      return;
+    }
+  }
 
   if (nextAiOrganization.enabled) {
     if (!providerPreset.apiKeyOptional && !trimmedApiKey) {
@@ -688,13 +851,21 @@ form?.addEventListener("submit", async (event) => {
 
   const nextOptions: ExtensionOptions = {
     ...currentOptions,
+    saveTarget: nextSaveTarget,
     filenamePattern: filenamePattern.value.trim() || DEFAULT_OPTIONS.filenamePattern,
     savePathPattern: savePathPattern.value.trim(),
     includeImages: includeImages.checked,
+    notion: {
+      token: trimmedNotionToken,
+      parentType: nextNotionParentType,
+      parentPageId: normalizedNotionParentPage,
+      dataSourceId: normalizedNotionDataSource
+    },
     aiOrganization: nextAiOrganization
   };
 
   await setOptions(nextOptions);
+  renderSaveTargetState();
   setSaveStatus(nextAiOrganization.enabled ? msg.optionsAiSaved : msg.optionsSaved);
 });
 

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Threads to Obsidian",
-  "description": "Save Threads posts directly to your Obsidian vault as Markdown. Falls back to ZIP download when direct save is unavailable.",
+  "description": "Save Threads posts to Obsidian or Notion. Falls back to ZIP download when direct folder save is unavailable.",
   "version": "0.1.0",
   "icons": {
     "16": "assets/icon-16.png",
@@ -10,6 +10,7 @@
     "128": "assets/icon-128.png"
   },
   "permissions": [
+    "permissions",
     "storage",
     "downloads",
     "tabs",

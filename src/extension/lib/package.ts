@@ -1,8 +1,8 @@
 import JSZip from "jszip";
 import { organizePostWithAi } from "./llm";
-import type { AiOrganizationSettings, ExtractedPost, PackagedResult } from "./types";
+import type { AiOrganizationResult, AiOrganizationSettings, ExtractedPost, PackagedResult } from "./types";
 import { t } from "./i18n";
-import { renderMarkdown } from "./markdown";
+import { renderMarkdown, renderNotionMarkdown, type MarkdownMediaRefs } from "./markdown";
 import { buildArchiveBaseName, buildPathPatternParts, buildZipFilename } from "./utils";
 
 export interface ArchiveAssetFile {
@@ -16,6 +16,13 @@ export interface ArchiveBundle {
   assetFiles: ArchiveAssetFile[];
   warning: string | null;
   noteWarning: string | null;
+}
+
+export interface NotionBundle {
+  title: string;
+  markdownContent: string;
+  aiResult: AiOrganizationResult | null;
+  warning: string | null;
 }
 
 function prefixAssetBasePath(orderPrefix: string, basename: string): string {
@@ -224,6 +231,44 @@ export async function buildArchiveBundle(
     ],
     warning,
     noteWarning
+  };
+}
+
+function buildNotionMediaRefs(post: ExtractedPost, includeImages: boolean): MarkdownMediaRefs {
+  return {
+    postImages: includeImages ? [...post.imageUrls] : [],
+    postVideo:
+      post.sourceType === "video"
+        ? {
+            file: post.videoUrl,
+            thumbnail: includeImages ? post.thumbnailUrl : null
+          }
+        : null,
+    replyImages: post.authorReplies.map((reply) => (includeImages ? [...reply.imageUrls] : [])),
+    replyVideos: post.authorReplies.map((reply) =>
+      reply.sourceType === "video"
+        ? {
+            file: reply.videoUrl,
+            thumbnail: includeImages ? reply.thumbnailUrl : null
+          }
+        : null
+    )
+  };
+}
+
+export async function buildNotionBundle(
+  post: ExtractedPost,
+  includeImages: boolean,
+  aiOrganization?: AiOrganizationSettings
+): Promise<NotionBundle> {
+  const ai = aiOrganization ? await organizePostWithAi(post, aiOrganization) : { result: null, warning: null };
+  const markdownContent = await renderNotionMarkdown(post, buildNotionMediaRefs(post, includeImages), ai.warning, ai.result);
+
+  return {
+    title: post.title,
+    markdownContent,
+    aiResult: ai.result,
+    warning: ai.warning
   };
 }
 

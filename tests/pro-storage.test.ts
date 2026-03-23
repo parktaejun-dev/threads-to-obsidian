@@ -245,6 +245,8 @@ test("options migration should fill missing savePathPattern with default", async
 
     const options = await storageMod.getOptions();
     assert.equal(options.savePathPattern, configMod.DEFAULT_OPTIONS.savePathPattern);
+    assert.equal(options.notion.parentType, configMod.DEFAULT_OPTIONS.notion.parentType);
+    assert.equal(options.notion.dataSourceId, configMod.DEFAULT_OPTIONS.notion.dataSourceId);
     assert.equal(options.aiOrganization.provider, configMod.DEFAULT_OPTIONS.aiOrganization.provider);
     assert.equal(options.aiOrganization.baseUrl, configMod.DEFAULT_OPTIONS.aiOrganization.baseUrl);
   } finally {

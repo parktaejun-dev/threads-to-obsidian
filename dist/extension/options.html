@@ -38,7 +38,7 @@
         <p id="ad-slot-copy"></p>
       </section>
 
-      <section class="subsection">
+      <section id="folder-section" class="subsection">
         <h2 id="folder-section-title"></h2>
         <p id="folder-status" class="section-copy"></p>
         <div class="folder-meta">
@@ -54,6 +54,57 @@
 
       <section class="subsection">
         <h2 id="basic-section-title"></h2>
+
+        <label class="field">
+          <span class="field-head">
+            <span id="save-target-label"></span>
+          </span>
+          <select id="save-target" name="saveTarget">
+            <option value="obsidian"></option>
+            <option value="notion"></option>
+          </select>
+          <small id="save-target-hint"></small>
+        </label>
+
+        <div id="notion-section" class="hidden">
+          <h3 id="notion-section-title"></h3>
+          <p id="notion-section-subtitle" class="section-copy"></p>
+
+          <label class="field">
+            <span class="field-head">
+              <span id="notion-parent-type-label"></span>
+            </span>
+            <select id="notion-parent-type" name="notionParentType">
+              <option value="page"></option>
+              <option value="data_source"></option>
+            </select>
+            <small id="notion-parent-type-hint"></small>
+          </label>
+
+          <label class="field">
+            <span class="field-head">
+              <span id="notion-token-label"></span>
+            </span>
+            <input id="notion-token" name="notionToken" type="password" autocomplete="off" spellcheck="false" />
+            <small id="notion-token-hint"></small>
+          </label>
+
+          <label class="field">
+            <span class="field-head">
+              <span id="notion-parent-page-label"></span>
+            </span>
+            <input id="notion-parent-page" name="notionParentPage" type="text" autocomplete="off" spellcheck="false" />
+            <small id="notion-parent-page-hint"></small>
+          </label>
+
+          <label id="notion-data-source-field" class="field hidden">
+            <span class="field-head">
+              <span id="notion-data-source-label"></span>
+            </span>
+            <input id="notion-data-source" name="notionDataSource" type="text" autocomplete="off" spellcheck="false" />
+            <small id="notion-data-source-hint"></small>
+          </label>
+        </div>
 
         <label class="checkbox">
           <input id="include-images" name="includeImages" type="checkbox" />

@@ -2,8 +2,9 @@ import { queryDirectoryPermission, requestDirectoryPermission, supportsFileSyste
 import { getObsidianDirectoryHandle } from "./lib/fs-handle-store";
 import { type Locale, type Messages, getLocale, setLocale, t } from "./lib/i18n";
 import { resolveImageDownloadPolicy } from "./lib/media-permissions";
+import { isNotionConfigured } from "./lib/notion";
 import { findDuplicateSave, findRecentSaveByUrl, getEffectiveOptions, upsertRecentSave } from "./lib/storage";
-import type { ExtractedPost, PopupState, RecentSave, SaveStatus } from "./lib/types";
+import type { ExtractedPost, PopupState, RecentSave, SaveStatus, SaveTarget } from "./lib/types";
 import { cleanTextLines, normalizeThreadsUrl } from "./lib/utils";
 
 const statusLabel = document.querySelector<HTMLDivElement>("#status-label");
@@ -20,6 +21,8 @@ let latestStatus: SaveStatus | null = null;
 let cachedDirectoryHandle: FileSystemDirectoryHandle | null = null;
 let cachedDirectReady = false;
 let cachedPermissionState: PermissionState | "unsupported" = "prompt";
+let cachedSaveTarget: SaveTarget = "obsidian";
+let cachedNotionReady = false;
 let activeRecentSaves: RecentSave[] = [];
 const expandedSaveIds = new Set<string>();
 let msg: Messages;
@@ -31,6 +34,14 @@ function getIdleStatus(supported: boolean): SaveStatus {
     return {
       kind: "unsupported",
       message: msg.statusUnsupported
+    };
+  }
+
+  if (cachedSaveTarget === "notion") {
+    return {
+      kind: "idle",
+      message: cachedNotionReady ? msg.statusReady : msg.statusNotionSetupRequired,
+      canRetry: false
     };
   }
 
@@ -225,13 +236,26 @@ function renderRecentSaves(items: RecentSave[]): void {
       setStatus(state.status);
       renderRecentSaves(state.recentSaves);
       if (saveButton) {
-        saveButton.disabled = !state.supported;
+        saveButton.disabled = !state.supported || (cachedSaveTarget === "notion" && !cachedNotionReady);
       }
     });
   }
 }
 
-async function refreshDirectSaveState(): Promise<void> {
+async function refreshSaveTargetState(): Promise<void> {
+  const options = await getEffectiveOptions();
+  cachedSaveTarget = options.saveTarget;
+
+  if (cachedSaveTarget === "notion") {
+    cachedDirectoryHandle = null;
+    cachedDirectReady = false;
+    cachedPermissionState = "unsupported";
+    cachedNotionReady = isNotionConfigured(options.notion);
+    setSubtitle(cachedNotionReady ? msg.popupSubtitleNotion : msg.popupSubtitleNotionSetup);
+    return;
+  }
+
+  cachedNotionReady = false;
   if (!supportsFileSystemAccess()) {
     cachedDirectoryHandle = null;
     cachedDirectReady = false;
@@ -260,12 +284,12 @@ async function refreshDirectSaveState(): Promise<void> {
 
 async function refreshPopupState(useIdleStatus = false, overrideStatus?: SaveStatus): Promise<PopupState> {
   const state = (await chrome.runtime.sendMessage({ type: "get-popup-state" })) as PopupState;
-  await refreshDirectSaveState();
+  await refreshSaveTargetState();
   const renderedRecentSaves = await repairVisibleRecentSaves(state);
   setStatus(overrideStatus ?? (useIdleStatus ? getIdleStatus(state.supported) : state.status));
   renderRecentSaves(renderedRecentSaves);
   if (saveButton) {
-    saveButton.disabled = !state.supported;
+    saveButton.disabled = !state.supported || (cachedSaveTarget === "notion" && !cachedNotionReady);
   }
 
   return {
@@ -348,10 +372,11 @@ function mergeZipFallbackStatus(status: SaveStatus, reason: string | null): Save
 }
 
 async function recordDirectSave(post: ExtractedPost, archiveName: string, savedRelativePath: string, warning: string | null): Promise<RecentSave> {
-  const duplicate = await findDuplicateSave(post.canonicalUrl, post.contentHash);
+  const duplicate = await findDuplicateSave(post.canonicalUrl, post.contentHash, "obsidian");
   const recent: RecentSave = duplicate
     ? {
       ...duplicate,
+      saveTarget: "obsidian",
       canonicalUrl: post.canonicalUrl,
       shortcode: post.shortcode,
       author: post.author,
@@ -362,11 +387,14 @@ async function recordDirectSave(post: ExtractedPost, archiveName: string, savedR
       status: "complete",
       savedVia: "direct",
       savedRelativePath,
+      remotePageId: null,
+      remotePageUrl: null,
       warning,
       post
     }
     : {
       id: crypto.randomUUID(),
+      saveTarget: "obsidian",
       canonicalUrl: post.canonicalUrl,
       shortcode: post.shortcode,
       author: post.author,
@@ -377,6 +405,8 @@ async function recordDirectSave(post: ExtractedPost, archiveName: string, savedR
       status: "complete",
       savedVia: "direct",
       savedRelativePath,
+      remotePageId: null,
+      remotePageUrl: null,
       warning,
       post
     };
@@ -402,7 +432,7 @@ async function tryDirectSaveCurrent(): Promise<{ status: SaveStatus } | { fallba
   const options = await getEffectiveOptions();
   const post = await extractCurrentPost();
 
-  const existingSave = await findRecentSaveByUrl(post.canonicalUrl);
+  const existingSave = await findRecentSaveByUrl(post.canonicalUrl, "obsidian");
   if (existingSave) {
     return {
       status: {
@@ -459,6 +489,16 @@ async function saveCurrent(): Promise<void> {
   setStatus({ kind: "saving", message: msg.statusSaving });
 
   try {
+    const options = await getEffectiveOptions();
+    if (options.saveTarget === "notion") {
+      const status = (await chrome.runtime.sendMessage({
+        type: "save-current-post",
+        allowDuplicate: false
+      })) as SaveStatus;
+      await refreshPopupState(false, status);
+      return;
+    }
+
     const directResult = await tryDirectSaveCurrent();
     if (directResult && "status" in directResult) {
       await refreshPopupState(false, directResult.status);
@@ -487,6 +527,15 @@ async function saveCurrent(): Promise<void> {
 
 async function resaveRecent(item: RecentSave): Promise<void> {
   setStatus({ kind: "saving", message: msg.statusResaving });
+
+  if (item.saveTarget === "notion") {
+    const status = (await chrome.runtime.sendMessage({
+      type: "redownload-save",
+      saveId: item.id
+    })) as SaveStatus;
+    await refreshPopupState(false, status);
+    return;
+  }
 
   if (item.savedVia === "zip") {
     const imageOverride = await resolveZipImageOverride(item.post);
@@ -537,10 +586,13 @@ async function resaveRecent(item: RecentSave): Promise<void> {
     );
     const updatedSave: RecentSave = {
       ...item,
+      saveTarget: "obsidian",
       downloadedAt: new Date().toISOString(),
       archiveName: result.archiveName,
       savedVia: "direct",
       savedRelativePath: result.savedRelativePath,
+      remotePageId: null,
+      remotePageUrl: null,
       warning: result.warning,
       status: "complete"
     };
@@ -606,11 +658,11 @@ openOptionsButton?.addEventListener("click", async () => {
 clearRecentsButton?.addEventListener("click", async () => {
   const state = (await chrome.runtime.sendMessage({ type: "clear-recent-saves" })) as PopupState;
   expandedSaveIds.clear();
-  await refreshDirectSaveState();
+  await refreshSaveTargetState();
   setStatus(state.status);
   renderRecentSaves(state.recentSaves);
   if (saveButton) {
-    saveButton.disabled = !state.supported;
+    saveButton.disabled = !state.supported || (cachedSaveTarget === "notion" && !cachedNotionReady);
   }
 });
 

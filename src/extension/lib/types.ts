@@ -5,10 +5,12 @@ export interface ExtractorConfig {
 }
 
 export interface ExtensionOptions {
+  saveTarget: SaveTarget;
   filenamePattern: string;
   savePathPattern: string;
   includeImages: boolean;
   obsidianFolderLabel: string | null;
+  notion: NotionSettings;
   aiOrganization: AiOrganizationSettings;
 }
 
@@ -31,6 +33,16 @@ export interface AiOrganizationResult {
   summary: string | null;
   tags: string[];
   frontmatter: Record<string, FrontmatterValue>;
+}
+
+export type SaveTarget = "obsidian" | "notion";
+export type NotionParentType = "page" | "data_source";
+
+export interface NotionSettings {
+  token: string;
+  parentType: NotionParentType;
+  parentPageId: string;
+  dataSourceId: string;
 }
 
 export type PlanTier = "free" | "pro";
@@ -99,10 +111,11 @@ export interface PackagedResult {
   warning: string | null;
 }
 
-export type SavedVia = "direct" | "zip";
+export type SavedVia = "direct" | "zip" | "notion";
 
 export interface RecentSave {
   id: string;
+  saveTarget: SaveTarget;
   canonicalUrl: string;
   shortcode: string;
   author: string;
@@ -113,6 +126,8 @@ export interface RecentSave {
   status: "complete" | "error";
   savedVia: SavedVia;
   savedRelativePath: string | null;
+  remotePageId: string | null;
+  remotePageUrl: string | null;
   warning: string | null;
   post: ExtractedPost;
 }

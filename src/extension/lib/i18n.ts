@@ -18,6 +18,8 @@ export interface Messages {
     popupSubtitlePermissionCheck: string;
     popupSubtitleNoFolder: string;
     popupSubtitleUnsupported: string;
+    popupSubtitleNotion: string;
+    popupSubtitleNotionSetup: string;
     popupRecentSaves: string;
     popupClearAll: string;
     popupEmpty: string;
@@ -34,12 +36,15 @@ export interface Messages {
     statusSaving: string;
     statusSavedDirect: string;
     statusSavedZip: string;
+    statusSavedNotion: string;
     statusDuplicate: string;
     statusDuplicateWarning: string;
     statusAlreadySaved: string;
+    statusNotionSetupRequired: string;
     statusError: string;
     statusResaving: string;
     statusResaved: string;
+    statusResavedNotion: string;
     statusRecentNotFound: string;
     statusDeletedRecent: string;
     statusClearedRecents: string;
@@ -80,6 +85,28 @@ export interface Messages {
     optionsFolderPathLabel: string;
     optionsFolderPathHint: string;
     optionsFolderPathUnavailable: string;
+    optionsSaveTarget: string;
+    optionsSaveTargetHint: string;
+    optionsSaveTargetObsidian: string;
+    optionsSaveTargetNotion: string;
+    optionsNotionSection: string;
+    optionsNotionSubtitle: string;
+    optionsNotionParentType: string;
+    optionsNotionParentTypeHint: string;
+    optionsNotionParentTypePage: string;
+    optionsNotionParentTypeDataSource: string;
+    optionsNotionToken: string;
+    optionsNotionTokenHint: string;
+    optionsNotionParentPage: string;
+    optionsNotionParentPageHint: string;
+    optionsNotionDataSource: string;
+    optionsNotionDataSourceHint: string;
+    optionsNotionTokenRequired: string;
+    optionsNotionParentPageRequired: string;
+    optionsNotionInvalidPage: string;
+    optionsNotionDataSourceRequired: string;
+    optionsNotionInvalidDataSource: string;
+    optionsNotionPermissionDenied: string;
     optionsBasicSection: string;
     optionsBasicSubtitle: string;
     optionsCompareSection: string;
@@ -187,6 +214,14 @@ export interface Messages {
     errBrowserUnsupported: string;
     errFolderNameFailed: string;
     errInvalidPath: string;
+    errNotionTokenMissing: string;
+    errNotionPermissionMissing: string;
+    errNotionUnauthorized: string;
+    errNotionForbidden: string;
+    errNotionParentNotFound: string;
+    errNotionRateLimited: string;
+    errNotionValidation: string;
+    errNotionRequestFailed: string;
     // fallback
     fallbackNoFolder: string;
     fallbackPermissionDenied: string;
@@ -212,6 +247,8 @@ const ko: Messages = {
     popupSubtitlePermissionCheck: "연결된 폴더가 있지만 권한을 다시 확인할 수 있습니다.",
     popupSubtitleNoFolder: "연결된 폴더가 있으면 바로 저장하고, 없으면 파일로 다운로드합니다.",
     popupSubtitleUnsupported: "이 브라우저에서는 파일로 다운로드합니다.",
+    popupSubtitleNotion: "설정한 Notion 대상에 새 페이지로 저장합니다.",
+    popupSubtitleNotionSetup: "Notion 저장을 쓰려면 설정에서 토큰과 저장 대상을 먼저 입력하세요.",
     popupRecentSaves: "최근 저장",
     popupClearAll: "전체 삭제",
     popupEmpty: "아직 저장한 글이 없습니다.",
@@ -227,12 +264,15 @@ const ko: Messages = {
     statusSaving: "저장하는 중…",
     statusSavedDirect: "Obsidian 폴더에 바로 저장했습니다.",
     statusSavedZip: "저장 완료. 파일 다운로드를 시작했습니다.",
+    statusSavedNotion: "Notion에 저장했습니다.",
     statusDuplicate: "이미 저장한 글이지만 최신 내용으로 덮어써 저장했습니다.",
     statusDuplicateWarning: "이미 저장한 글이지만 최신 내용으로 덮어써 저장했습니다: ",
     statusAlreadySaved: "이미 저장된 글입니다. 다시 저장하려면 최근 저장에서 '다시 저장'을 눌러주세요.",
+    statusNotionSetupRequired: "Notion 저장을 사용하려면 설정에서 토큰과 저장 대상을 먼저 입력하세요.",
     statusError: "알 수 없는 오류가 발생했습니다.",
     statusResaving: "파일을 다시 만드는 중…",
     statusResaved: "다운로드를 다시 시작했습니다.",
+    statusResavedNotion: "Notion에 새 페이지로 다시 저장했습니다.",
     statusRecentNotFound: "최근 저장 기록을 찾지 못했습니다.",
     statusDeletedRecent: "최근 저장에서 삭제했습니다.",
     statusClearedRecents: "최근 저장을 모두 삭제했습니다.",
@@ -241,7 +281,7 @@ const ko: Messages = {
     statusRedownloadError: "다시 다운로드하는 중 오류가 발생했습니다.",
     statusRetry: "다시 시도",
     statusResaveButton: "다시 저장",
-    optionsTitle: "Threads 글을 Obsidian에 저장하고 규칙과 AI로 정리하세요.",
+    optionsTitle: "Threads 글을 Obsidian 또는 Notion에 저장하고 규칙과 AI로 정리하세요.",
     optionsSubtitle: "무료 저장, 필요할 때만 Pro.",
     optionsPlanSpotlightFreeTitle: "Free",
     optionsPlanSpotlightFreeCopy: "기본 저장 기능을 바로 사용할 수 있습니다.",
@@ -272,6 +312,28 @@ const ko: Messages = {
     optionsFolderPathLabel: "현재 저장 위치",
     optionsFolderPathHint: "절대경로는 읽을 수 없어 연결된 폴더 기준으로만 표시합니다.",
     optionsFolderPathUnavailable: "폴더 연결 후 표시",
+    optionsSaveTarget: "저장 대상",
+    optionsSaveTargetHint: "PC에서는 Obsidian 또는 Notion 중 하나를 기본 저장 대상으로 선택합니다.",
+    optionsSaveTargetObsidian: "Obsidian",
+    optionsSaveTargetNotion: "Notion",
+    optionsNotionSection: "Notion 연결",
+    optionsNotionSubtitle: "Notion은 API로 새 페이지를 만듭니다. parent page 저장과 data source 저장을 모두 지원합니다.",
+    optionsNotionParentType: "저장 방식",
+    optionsNotionParentTypeHint: "Page 아래 새 페이지를 만들거나, data source에 새 row/page를 만들 수 있습니다.",
+    optionsNotionParentTypePage: "Parent page",
+    optionsNotionParentTypeDataSource: "Data source",
+    optionsNotionToken: "Integration token",
+    optionsNotionTokenHint: "Notion internal integration 토큰을 넣습니다. 이 값은 현재 브라우저 프로필에만 저장됩니다.",
+    optionsNotionParentPage: "Parent page ID 또는 URL",
+    optionsNotionParentPageHint: "Notion 페이지 URL 전체를 붙여넣어도 되고, page ID만 넣어도 됩니다.",
+    optionsNotionDataSource: "Data source ID 또는 URL",
+    optionsNotionDataSourceHint: "Notion data source URL 전체 또는 data source ID를 넣습니다. 저장 시 제목/태그/날짜 같은 속성을 자동 매핑합니다.",
+    optionsNotionTokenRequired: "Notion 저장을 쓰려면 integration token이 필요합니다.",
+    optionsNotionParentPageRequired: "Notion 저장을 쓰려면 parent page ID 또는 URL이 필요합니다.",
+    optionsNotionInvalidPage: "Notion parent page ID 또는 URL 형식이 올바르지 않습니다.",
+    optionsNotionDataSourceRequired: "Notion data source 저장을 쓰려면 data source ID 또는 URL이 필요합니다.",
+    optionsNotionInvalidDataSource: "Notion data source ID 또는 URL 형식이 올바르지 않습니다.",
+    optionsNotionPermissionDenied: "Notion API 접근 권한을 허용하지 않아 저장하지 않았습니다.",
     optionsBasicSection: "기본 저장",
     optionsBasicSubtitle: "",
     optionsCompareSection: "Free vs Pro",
@@ -376,6 +438,14 @@ const ko: Messages = {
     errBrowserUnsupported: "이 브라우저에서는 Obsidian 폴더에 바로 저장할 수 없습니다.",
     errFolderNameFailed: "저장할 폴더 이름을 결정하지 못했습니다.",
     errInvalidPath: "잘못된 파일 경로입니다.",
+    errNotionTokenMissing: "Notion integration token이 없습니다.",
+    errNotionPermissionMissing: "Notion API 권한이 없습니다. 설정에서 다시 저장해 주세요.",
+    errNotionUnauthorized: "Notion 토큰이 유효하지 않거나 만료되었습니다.",
+    errNotionForbidden: "선택한 Notion 대상에 접근 권한이 없습니다. page 또는 data source를 integration에 연결했는지 확인해 주세요.",
+    errNotionParentNotFound: "선택한 Notion page 또는 data source를 찾지 못했습니다. ID와 연결 상태를 확인해 주세요.",
+    errNotionRateLimited: "Notion 요청이 너무 많습니다. {seconds}초 후 다시 시도해 주세요.",
+    errNotionValidation: "Notion 요청 형식이 올바르지 않습니다.",
+    errNotionRequestFailed: "Notion 저장 요청에 실패했습니다.",
     fallbackNoFolder: "연결된 폴더가 없어",
     fallbackPermissionDenied: "폴더 권한이 없어",
     fallbackDirectFailed: "폴더에 저장하지 못해",
@@ -399,6 +469,8 @@ const en: Messages = {
     popupSubtitlePermissionCheck: "Folder connected, but permission may need re-confirmation.",
     popupSubtitleNoFolder: "Saves directly when a folder is connected, otherwise downloads a file.",
     popupSubtitleUnsupported: "This browser only supports file downloads.",
+    popupSubtitleNotion: "Saving to your configured Notion destination.",
+    popupSubtitleNotionSetup: "To use Notion saving, enter your token and destination in settings first.",
     popupRecentSaves: "Recent Saves",
     popupClearAll: "Clear All",
     popupEmpty: "No saved posts yet.",
@@ -414,12 +486,15 @@ const en: Messages = {
     statusSaving: "Saving…",
     statusSavedDirect: "Saved directly to your Obsidian folder.",
     statusSavedZip: "Saved. Download started.",
+    statusSavedNotion: "Saved to Notion.",
     statusDuplicate: "Already saved — updated with the latest content.",
     statusDuplicateWarning: "Already saved, updated: ",
     statusAlreadySaved: "This post is already saved. Use 'Re-save' from recent saves to save again.",
+    statusNotionSetupRequired: "To use Notion saving, enter your token and destination in settings first.",
     statusError: "An unknown error occurred.",
     statusResaving: "Preparing your file…",
     statusResaved: "Download started.",
+    statusResavedNotion: "Saved to Notion as a new page.",
     statusRecentNotFound: "Could not find the recent save record.",
     statusDeletedRecent: "Deleted from recent saves.",
     statusClearedRecents: "All recent saves cleared.",
@@ -428,7 +503,7 @@ const en: Messages = {
     statusRedownloadError: "Error during re-download.",
     statusRetry: "Retry",
     statusResaveButton: "Re-save",
-    optionsTitle: "Save Threads posts to Obsidian, with auto-organize.",
+    optionsTitle: "Save Threads posts to Obsidian or Notion, with auto-organize.",
     optionsSubtitle: "Free saving, Pro only when needed.",
     optionsPlanSpotlightFreeTitle: "Free",
     optionsPlanSpotlightFreeCopy: "Basic saving is ready to use.",
@@ -459,6 +534,28 @@ const en: Messages = {
     optionsFolderPathLabel: "Current Save Location",
     optionsFolderPathHint: "The browser cannot expose the OS absolute path, so this stays relative to the connected folder.",
     optionsFolderPathUnavailable: "Shown after you connect a folder",
+    optionsSaveTarget: "Save target",
+    optionsSaveTargetHint: "On PC, choose either Obsidian or Notion as the default destination.",
+    optionsSaveTargetObsidian: "Obsidian",
+    optionsSaveTargetNotion: "Notion",
+    optionsNotionSection: "Notion Connection",
+    optionsNotionSubtitle: "Notion creates new pages through the API. Both parent-page saving and data-source saving are supported.",
+    optionsNotionParentType: "Save mode",
+    optionsNotionParentTypeHint: "Create a new page under a page, or create a new entry/page inside a data source.",
+    optionsNotionParentTypePage: "Parent page",
+    optionsNotionParentTypeDataSource: "Data source",
+    optionsNotionToken: "Integration token",
+    optionsNotionTokenHint: "Paste your Notion internal integration token. It is stored only in this browser profile.",
+    optionsNotionParentPage: "Parent page ID or URL",
+    optionsNotionParentPageHint: "You can paste a full Notion page URL or just the page ID.",
+    optionsNotionDataSource: "Data source ID or URL",
+    optionsNotionDataSourceHint: "Paste a full Notion data source URL or just its ID. Title, tags, dates, and similar properties are mapped automatically when possible.",
+    optionsNotionTokenRequired: "A Notion integration token is required to use Notion saving.",
+    optionsNotionParentPageRequired: "A Notion parent page ID or URL is required to use Notion saving.",
+    optionsNotionInvalidPage: "The Notion parent page ID or URL format is not valid.",
+    optionsNotionDataSourceRequired: "A Notion data source ID or URL is required to use data source saving.",
+    optionsNotionInvalidDataSource: "The Notion data source ID or URL format is not valid.",
+    optionsNotionPermissionDenied: "Permission to access the Notion API was denied, so settings were not saved.",
     optionsBasicSection: "Basic Saving",
     optionsBasicSubtitle: "",
     optionsCompareSection: "Free vs Pro",
@@ -563,6 +660,14 @@ const en: Messages = {
     errBrowserUnsupported: "This browser cannot save directly to an Obsidian folder.",
     errFolderNameFailed: "Could not determine a folder name for saving.",
     errInvalidPath: "Invalid file path.",
+    errNotionTokenMissing: "No Notion integration token is configured.",
+    errNotionPermissionMissing: "Permission for the Notion API is missing. Re-save settings first.",
+    errNotionUnauthorized: "The Notion token is invalid or expired.",
+    errNotionForbidden: "This integration cannot access the selected Notion destination. Make sure the page or data source is shared with the integration.",
+    errNotionParentNotFound: "The selected Notion page or data source could not be found. Check the ID and connection.",
+    errNotionRateLimited: "Too many Notion requests. Try again in {seconds} seconds.",
+    errNotionValidation: "The Notion request is not valid.",
+    errNotionRequestFailed: "The Notion save request failed.",
     fallbackNoFolder: "No folder connected,",
     fallbackPermissionDenied: "No folder permission,",
     fallbackDirectFailed: "Could not save to folder,",

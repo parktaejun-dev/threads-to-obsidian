@@ -126,39 +126,13 @@ async function renderReplySection(post: ExtractedPost, mediaRefs: MarkdownMediaR
   return section;
 }
 
-export async function renderMarkdown(
+async function buildMarkdownBody(
   post: ExtractedPost,
   mediaRefs: MarkdownMediaRefs,
   warning: string | null,
-  aiResult: AiOrganizationResult | null = null
-): Promise<string> {
+  aiResult: AiOrganizationResult | null
+): Promise<string[]> {
   const msg = await t();
-  const hasImages = post.imageUrls.length > 0 || post.authorReplies.some((reply) => reply.imageUrls.length > 0);
-  const hasExternalUrl = Boolean(post.externalUrl || post.authorReplies.some((reply) => reply.externalUrl));
-  const tags = Array.from(new Set(["threads", ...(aiResult?.tags ?? [])]));
-  const frontmatter = [
-    "---",
-    `title: ${formatYamlStringValue(post.title)}`,
-    `author: ${formatYamlStringValue(post.author)}`,
-    ...renderFrontmatterField("tags", tags),
-    ...(aiResult?.summary ? renderFrontmatterField("summary", aiResult.summary) : []),
-    `canonical_url: ${formatYamlStringValue(post.canonicalUrl)}`,
-    `shortcode: ${formatYamlStringValue(post.shortcode)}`,
-    `published_at: ${formatYamlDateValue(post.publishedAt)}`,
-    `captured_at: ${formatYamlDateValue(post.capturedAt)}`,
-    `source_type: ${formatYamlStringValue(post.sourceType)}`,
-    ...(post.sourceType === "video" && post.thumbnailUrl ? renderFrontmatterField("thumbnail_url", post.thumbnailUrl) : []),
-    ...(post.sourceType === "video" && post.videoUrl ? renderFrontmatterField("video_url", post.videoUrl) : []),
-    `has_images: ${hasImages}`,
-    `has_external_url: ${hasExternalUrl}`,
-    `quoted_post_url: ${formatYamlStringValue(post.quotedPostUrl)}`,
-    `replied_to_url: ${formatYamlStringValue(post.repliedToUrl)}`,
-    `author_reply_count: ${post.authorReplies.length}`,
-    ...Object.entries(aiResult?.frontmatter ?? {}).flatMap(([key, value]) => renderFrontmatterField(key, value)),
-    "---",
-    ""
-  ];
-
   const body: string[] = [`# ${post.title}`, "", `${msg.mdSource}: ${post.canonicalUrl}`, `${msg.mdAuthor}: @${post.author}`];
 
   if (post.publishedAt) {
@@ -191,6 +165,52 @@ export async function renderMarkdown(
   }
 
   body.push(...(await renderReplySection(post, mediaRefs)));
+  return body;
+}
+
+export async function renderMarkdown(
+  post: ExtractedPost,
+  mediaRefs: MarkdownMediaRefs,
+  warning: string | null,
+  aiResult: AiOrganizationResult | null = null
+): Promise<string> {
+  const msg = await t();
+  const hasImages = post.imageUrls.length > 0 || post.authorReplies.some((reply) => reply.imageUrls.length > 0);
+  const hasExternalUrl = Boolean(post.externalUrl || post.authorReplies.some((reply) => reply.externalUrl));
+  const tags = Array.from(new Set(["threads", ...(aiResult?.tags ?? [])]));
+  const frontmatter = [
+    "---",
+    `title: ${formatYamlStringValue(post.title)}`,
+    `author: ${formatYamlStringValue(post.author)}`,
+    ...renderFrontmatterField("tags", tags),
+    ...(aiResult?.summary ? renderFrontmatterField("summary", aiResult.summary) : []),
+    `canonical_url: ${formatYamlStringValue(post.canonicalUrl)}`,
+    `shortcode: ${formatYamlStringValue(post.shortcode)}`,
+    `published_at: ${formatYamlDateValue(post.publishedAt)}`,
+    `captured_at: ${formatYamlDateValue(post.capturedAt)}`,
+    `source_type: ${formatYamlStringValue(post.sourceType)}`,
+    ...(post.sourceType === "video" && post.thumbnailUrl ? renderFrontmatterField("thumbnail_url", post.thumbnailUrl) : []),
+    ...(post.sourceType === "video" && post.videoUrl ? renderFrontmatterField("video_url", post.videoUrl) : []),
+    `has_images: ${hasImages}`,
+    `has_external_url: ${hasExternalUrl}`,
+    `quoted_post_url: ${formatYamlStringValue(post.quotedPostUrl)}`,
+    `replied_to_url: ${formatYamlStringValue(post.repliedToUrl)}`,
+    `author_reply_count: ${post.authorReplies.length}`,
+    ...Object.entries(aiResult?.frontmatter ?? {}).flatMap(([key, value]) => renderFrontmatterField(key, value)),
+    "---",
+    ""
+  ];
+  const body = await buildMarkdownBody(post, mediaRefs, warning, aiResult);
 
   return [...frontmatter, ...body].join("\n").trimEnd() + "\n";
+}
+
+export async function renderNotionMarkdown(
+  post: ExtractedPost,
+  mediaRefs: MarkdownMediaRefs,
+  warning: string | null,
+  aiResult: AiOrganizationResult | null = null
+): Promise<string> {
+  const body = await buildMarkdownBody(post, mediaRefs, warning, aiResult);
+  return body.join("\n").trimEnd() + "\n";
 }

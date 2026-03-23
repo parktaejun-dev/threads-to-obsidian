@@ -85,10 +85,17 @@ export const DEFAULT_AI_ORGANIZATION_SETTINGS: AiOrganizationSettings = {
 };
 
 export const DEFAULT_OPTIONS: ExtensionOptions = {
+  saveTarget: "obsidian",
   filenamePattern: "{author}_{first_sentence_20}",
   savePathPattern: "",
   includeImages: true,
   obsidianFolderLabel: null,
+  notion: {
+    token: "",
+    parentType: "page",
+    parentPageId: "",
+    dataSourceId: ""
+  },
   aiOrganization: DEFAULT_AI_ORGANIZATION_SETTINGS
 };
 
