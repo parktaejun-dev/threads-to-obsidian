@@ -6,7 +6,7 @@
 
 ## Single Purpose Description
 
-> Save individual Threads posts as Obsidian-ready Markdown files, either directly to a local folder or as a ZIP download.
+> Save individual Threads posts to personal knowledge tools such as Obsidian or Notion, either as local Markdown archives or as Notion pages.
 
 ---
 
@@ -14,13 +14,15 @@
 
 | Permission | Justification |
 |---|---|
-| `storage` | Stores user preferences (filename pattern, include images toggle) and recent save history (up to 10 entries) in `chrome.storage.local`. |
-| `downloads` | Used to trigger a ZIP file download when direct save to the user's Obsidian vault is not available. |
-| `tabs` | Checks the active tab's URL to determine if it is a supported Threads permalink page before enabling the save action. |
+| `storage` | Stores user preferences, recent save history, and Pro activation status in `chrome.storage.local`. |
+| `downloads` | Triggers ZIP downloads when direct local save is unavailable. |
+| `tabs` | Checks the active tab's URL to determine whether it is a supported Threads permalink page. |
 | `scripting` | Re-injects the content script into the active Threads tab if the page loaded before the extension was installed or enabled. |
-| `permissions` | Requests optional host access only when the user enables image downloads from Meta CDNs or configures a custom AI endpoint for BYO LLM organization. |
+| `permissions` | Requests optional host access only when the user enables image downloads, Notion saving, or a custom AI endpoint. |
 | Host permission: `threads.com`, `threads.net` | Required for the content script to run on Threads post pages and extract post content from the DOM. |
-| Optional host permission: `cdninstagram.com`, `fbcdn.net` | Used only when the user has "Save images" enabled. Fetches public image binaries from Meta's CDNs for local storage. Granted only when the user initiates a save with images. |
+| Host permission: `threads-obsidian.dahanda.dev` | Required for Pro license activation, status checks, and seat release against the developer-controlled licensing service. No saved post content is sent there. |
+| Optional host permission: `cdninstagram.com`, `fbcdn.net` | Used only when the user has image saving enabled. Fetches public image binaries from Meta's CDNs for local storage. |
+| Optional host permission: `api.notion.com` | Used only when the user enables Notion saving. Sends the explicitly saved post content to the user's own Notion workspace. |
 | Optional host permission: custom AI endpoint (`https://*/*`, `http://*/*` requested per-origin) | Used only when the user enables AI organization and saves settings for a specific OpenAI-compatible endpoint. Allows the extension to call the user-selected LLM API directly from the browser with the user's own key. |
 
 ---
@@ -31,21 +33,21 @@
 
 Use wording that matches the implementation exactly:
 
-> The extension processes saved Threads content locally on the user's device. It does not send saved post content, settings, or analytics to the developer or to any developer-controlled server. When the user enables image saving, Chrome makes direct requests to Meta CDNs to download public image files to the user's device. When the user enables AI organization, the extension sends the saved post content directly to the user-selected LLM endpoint using the user's own API key or local endpoint configuration.
+> The extension primarily processes saved Threads content locally on the user's device. When the user chooses Notion saving, the extension sends the explicitly saved post content directly to the user's Notion workspace. When the user enables AI organization, the extension sends the explicitly saved post content directly to the user-selected LLM endpoint using the user's own API key or local endpoint configuration. When the user activates or validates a Pro key, the extension sends the Pro token and device activation metadata to the developer-controlled licensing endpoint. The extension does not send analytics or browsing telemetry to the developer.
 
 ### Specific data use disclosures
 
 | Category | Collected? | Details |
 |---|---|---|
-| Personally identifiable information | No | — |
+| Personally identifiable information | No, unless embedded by the user in an external service | The extension itself does not require name, email, or account registration to save posts. If a user pastes a Notion token, AI API key, or Pro key, that value is handled only for the selected feature. |
 | Health information | No | — |
 | Financial and payment information | No | — |
-| Authentication information | User-configured only | If the user enables AI organization, their own API key may be stored locally in `chrome.storage.local` and sent only to the user-selected LLM endpoint. It is not sent to the developer. |
+| Authentication information | User-configured only | Notion integration tokens, AI API keys, and Pro license keys may be stored locally in `chrome.storage.local`. Notion tokens are sent only to Notion. AI keys are sent only to the user-selected AI endpoint. Pro keys are sent only to the licensing endpoint for activation and status checks. |
 | Personal communications | No | — |
 | Location | No | — |
-| Web history / browsing activity | Limited local handling only | The extension checks the active tab URL to confirm a supported Threads permalink and stores the permalink URL of posts the user explicitly saves in local recent-save history. This data stays on device. |
-| User activity | No | — |
-| Website content | Yes | Post text, author name, permalink URL, reply content, visible external links, and image URLs from the Threads page the user explicitly saves. Stored only on the user's device or written to the local folder/ZIP the user chose. If the user enables AI organization, the same saved content is also sent directly to the user-selected LLM endpoint. |
+| Web history / browsing activity | Limited local handling only | The extension checks the active tab URL to confirm a supported Threads permalink and stores the permalink URL of posts the user explicitly saves in local recent-save history. |
+| User activity | Limited feature operations only | The extension records local recent-save history and Pro activation status to support user-triggered saves and license management. |
+| Website content | Yes | Post text, author name, permalink URL, reply content, visible external links, and image URLs from the Threads page the user explicitly saves. Stored locally, written to the user's local files, or sent directly to the user's Notion workspace and optional AI endpoint when those features are enabled. |
 
 ### Remote code
 
@@ -68,29 +70,30 @@ Use the public GitHub URL:
 
 ## Store Listing — Short Description (132 chars)
 
-> Save Threads posts to your Obsidian vault as Markdown. Direct save to local folders or ZIP download fallback.
+> Save Threads posts to Obsidian or Notion from Chrome. Direct folder save, Notion page save, and ZIP fallback in one extension.
 
 ## Store Listing — Detailed Description
 
-> **Threads to Obsidian** saves individual Threads posts as clean, Obsidian-ready Markdown files — directly into your vault folder.
+> **Threads Saver** saves individual Threads posts as clean notes for Obsidian or Notion on desktop Chrome.
 >
 > **How it works:**
-> 1. Connect your Obsidian vault folder in the extension options (one-time setup).
-> 2. Open any Threads post permalink in Chrome.
-> 3. Click the extension icon and hit Save.
-> 4. The post is saved as `archive-name/archive-name.md` with optional images next to the note as sibling files.
-> 5. If direct save isn't available, a ZIP file is downloaded instead.
+> 1. Open any public Threads post permalink in Chrome.
+> 2. Choose your default save target in the extension settings.
+> 3. For Obsidian, connect a local vault folder once. For Notion, paste an internal integration token and choose a parent page or data source.
+> 4. Click the extension icon and save the current post.
+> 5. The post is written either to your local archive, to a ZIP download, or to your Notion workspace.
 >
 > **Features:**
-> - Frontmatter with tags, author, dates, and shortcode for Dataview queries
-> - Optional Pro AI organization using the user's own LLM key for summaries, tags, and extra frontmatter
+> - Obsidian direct save with optional local image downloads
+> - ZIP fallback when direct local save is unavailable
+> - Notion save to either a parent page or a data source
+> - Automatic mapping of common Notion fields such as title, source URL, author, dates, tags, and reply count when supported
+> - Optional Pro AI organization using the user's own LLM key for summaries, tags, and extra metadata
 > - Author's self-thread replies preserved together
-> - Images saved locally with alt text for accessibility
-> - External links restored to full URLs when visible
-> - Customizable filename patterns
-> - Keyboard shortcut support (Alt+Shift+S)
+> - Customizable filename and save-path patterns
+> - Keyboard shortcut support (`Alt+Shift+S`)
 > - Recent save history in the popup
 >
-> **Privacy-first:** Saved content is processed locally on your device. No analytics, no tracking, and no developer-controlled servers. If you enable image saving, Chrome downloads the public image files directly from Meta's CDNs to your device. See our privacy policy for details.
+> **Privacy-first:** The extension works locally by default. Saved post content is sent out only when you explicitly use Notion saving or AI organization. Pro activation requests send only licensing metadata, not saved post content. See the privacy policy for details.
 >
 > **Requirements:** Desktop Chrome/Chromium. Only public Threads permalink pages are supported.

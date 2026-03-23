@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
-  "name": "Threads to Obsidian",
-  "description": "Save Threads posts to Obsidian or Notion. Falls back to ZIP download when direct folder save is unavailable.",
+  "name": "Threads Saver",
+  "description": "Save Threads posts to Obsidian or Notion, with ZIP fallback and optional AI organization.",
   "version": "0.1.0",
   "icons": {
     "16": "assets/icon-16.png",
@@ -24,6 +24,7 @@
   "optional_host_permissions": [
     "https://*.cdninstagram.com/*",
     "https://*.fbcdn.net/*",
+    "https://api.notion.com/*",
     "https://*/*",
     "http://*/*"
   ],
