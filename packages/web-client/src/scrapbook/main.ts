@@ -1,5 +1,14 @@
 import { SUPPORTED_LOCALES, getLocaleLabel } from "@threads/shared/locale";
-import { applyTranslations, getLocale, scrapbookMessages, setLocale, type ScrapbookMsg, type WebLocale } from "../lib/web-i18n";
+import {
+  applyBotHandlePlaceholder,
+  applyTranslations,
+  getLocale,
+  scrapbookMessages,
+  setLocale,
+  type ScrapbookMsg,
+  type WebLocale
+} from "../lib/web-i18n";
+import { DEFAULT_BOT_HANDLE, normalizeBotHandleValue } from "../lib/web-copy-constants";
 
 interface BotPublicConfig {
   botHandle: string;
@@ -200,8 +209,6 @@ interface ScrapbookPlusState {
 }
 
 type WorkspaceTab = "inbox" | "watchlists" | "searches" | "insights";
-const LEGACY_BOT_HANDLE = "parktaejun";
-const DEFAULT_BOT_HANDLE = "your-bot";
 
 let latestConfig: BotPublicConfig | null = null;
 let latestState: BotSessionState | null = null;
@@ -595,7 +602,7 @@ function localizeSearchStatus(status: ScrapbookSearchResultView["status"]): stri
 }
 
 function normalizeBotHandle(value: string | null | undefined): string {
-  return `${value ?? ""}`.trim().replace(/^@+/, "");
+  return normalizeBotHandleValue(value);
 }
 
 function normalizeScrapbookHandle(value: string | null | undefined): string | null {
@@ -651,29 +658,6 @@ function syncScrapbookHistory(): void {
   }
 
   history.replaceState({}, "", `${targetPath}${currentUrl.search}${currentUrl.hash}`);
-}
-
-function replaceLegacyBotHandle(value: string, handle = getCurrentBotHandle()): string {
-  const normalized = normalizeBotHandle(handle) || DEFAULT_BOT_HANDLE;
-  return value.replaceAll(`@${LEGACY_BOT_HANDLE}`, `@${normalized}`);
-}
-
-function applyBotHandleToCopy<T>(value: T): T {
-  if (typeof value === "string") {
-    return replaceLegacyBotHandle(value) as T;
-  }
-
-  if (Array.isArray(value)) {
-    return value.map((entry) => applyBotHandleToCopy(entry)) as T;
-  }
-
-  if (value && typeof value === "object") {
-    return Object.fromEntries(
-      Object.entries(value).map(([key, entry]) => [key, applyBotHandleToCopy(entry)])
-    ) as T;
-  }
-
-  return value;
 }
 
 function getCurrentBotHandle(): string {
@@ -748,7 +732,7 @@ function syncLocaleSelect(): void {
 
 function applyLocale(locale: WebLocale): void {
   currentLocale = locale;
-  msg = applyBotHandleToCopy(scrapbookMessages[currentLocale]);
+  msg = applyBotHandlePlaceholder(scrapbookMessages[currentLocale], latestConfig?.botHandle, DEFAULT_BOT_HANDLE);
   setLocale(locale);
   syncLocaleSelect();
   applyStaticTranslations();
@@ -1709,6 +1693,22 @@ function setActiveTab(tab: WorkspaceTab): void {
   }
 }
 
+function renderFeatureGateState(
+  emptyEl: HTMLElement,
+  listEl: HTMLElement | null,
+  title: string,
+  copy: string,
+  formEl?: HTMLElement | null
+): void {
+  listEl?.classList.add("hidden");
+  if (listEl) {
+    listEl.innerHTML = "";
+  }
+  formEl?.classList.add("hidden");
+  emptyEl.classList.remove("hidden");
+  emptyEl.innerHTML = `<strong>${escapeHtml(title)}</strong><span>${escapeHtml(copy)}</span>`;
+}
+
 function renderTrackedPostCard(item: ScrapbookTrackedPostView, archiveEndpoint: string): string {
   return `
     <article class="feature-item">
@@ -1741,21 +1741,42 @@ function renderWatchlists(workspace: ScrapbookPlusState | null): void {
   }
 
   if (!workspace || !workspace.authenticated) {
-    watchlistsList.innerHTML = "";
-    watchlistsList.classList.add("hidden");
-    watchlistsEmpty.classList.remove("hidden");
-    watchlistsEmpty.innerHTML = `<strong>${escapeHtml(t("scrapbookWatchlistsLoginTitle"))}</strong><span>${escapeHtml(t("scrapbookWatchlistsLoginCopy"))}</span>`;
+    renderFeatureGateState(
+      watchlistsEmpty,
+      watchlistsList,
+      t("scrapbookWatchlistsLoginTitle"),
+      t("scrapbookWatchlistsLoginCopy"),
+      watchlistForm
+    );
+    return;
+  }
+
+  if (workspace.plan.tier !== "plus") {
+    renderFeatureGateState(
+      watchlistsEmpty,
+      watchlistsList,
+      uiText("Plus가 필요합니다.", "Plus required."),
+      uiText(
+        "watchlists는 Plus에서 열립니다. Plus 키를 연결하면 공개 계정 모니터링을 사용할 수 있습니다.",
+        "Watchlists unlock on Plus. Activate Plus to monitor public Threads accounts."
+      ),
+      watchlistForm
+    );
     return;
   }
 
   if (workspace.scopes.needsReconnect) {
-    watchlistsList.innerHTML = "";
-    watchlistsList.classList.add("hidden");
-    watchlistsEmpty.classList.remove("hidden");
-    watchlistsEmpty.innerHTML = `<strong>${escapeHtml(t("scrapbookWatchlistsReconnectTitle"))}</strong><span>${escapeHtml(t("scrapbookWatchlistsReconnectCopy"))}</span>`;
+    renderFeatureGateState(
+      watchlistsEmpty,
+      watchlistsList,
+      t("scrapbookWatchlistsReconnectTitle"),
+      t("scrapbookWatchlistsReconnectCopy"),
+      watchlistForm
+    );
     return;
   }
 
+  watchlistForm?.classList.remove("hidden");
   if (workspace.watchlists.length === 0) {
     watchlistsList.innerHTML = "";
     watchlistsList.classList.add("hidden");
@@ -1816,21 +1837,28 @@ function renderSearches(workspace: ScrapbookPlusState | null): void {
   }
 
   if (!workspace || !workspace.authenticated) {
-    searchesList.innerHTML = "";
-    searchesList.classList.add("hidden");
-    searchesEmpty.classList.remove("hidden");
-    searchesEmpty.innerHTML = `<strong>${escapeHtml(t("scrapbookSearchesLoginTitle"))}</strong><span>${escapeHtml(t("scrapbookSearchesLoginCopy"))}</span>`;
+    renderFeatureGateState(
+      searchesEmpty,
+      searchesList,
+      t("scrapbookSearchesLoginTitle"),
+      t("scrapbookSearchesLoginCopy"),
+      searchForm
+    );
     return;
   }
 
   if (workspace.scopes.needsReconnect) {
-    searchesList.innerHTML = "";
-    searchesList.classList.add("hidden");
-    searchesEmpty.classList.remove("hidden");
-    searchesEmpty.innerHTML = `<strong>${escapeHtml(t("scrapbookSearchesReconnectTitle"))}</strong><span>${escapeHtml(t("scrapbookSearchesReconnectCopy"))}</span>`;
+    renderFeatureGateState(
+      searchesEmpty,
+      searchesList,
+      t("scrapbookSearchesReconnectTitle"),
+      t("scrapbookSearchesReconnectCopy"),
+      searchForm
+    );
     return;
   }
 
+  searchForm?.classList.remove("hidden");
   if (workspace.searches.length === 0) {
     searchesList.innerHTML = "";
     searchesList.classList.add("hidden");
@@ -1926,7 +1954,12 @@ function renderInsights(workspace: ScrapbookPlusState | null): void {
       : t("scrapbookInsightsNotLoadedYet");
   }
 
-  if (!workspace || !workspace.authenticated || workspace.scopes.needsReconnect) {
+  const insightsLocked = !workspace || !workspace.authenticated || workspace.plan.tier !== "plus" || workspace.scopes.needsReconnect;
+  if (insightsRefresh) {
+    insightsRefresh.disabled = insightsLocked;
+  }
+
+  if (!workspace || !workspace.authenticated || workspace.plan.tier !== "plus" || workspace.scopes.needsReconnect) {
     setMetricValue(metricFollowers, metricFollowersDelta, { value: null, delta: null });
     setMetricValue(metricProfileViews, metricProfileViewsDelta, { value: null, delta: null });
     setMetricValue(metricViews, metricViewsDelta, { value: null, delta: null });
@@ -1942,7 +1975,14 @@ function renderInsights(workspace: ScrapbookPlusState | null): void {
       insightsEmpty.innerHTML =
         !workspace || !workspace.authenticated
           ? `<strong>${escapeHtml(t("scrapbookInsightsLoginTitle"))}</strong><span>${escapeHtml(t("scrapbookInsightsLoginCopy"))}</span>`
-          : `<strong>${escapeHtml(t("scrapbookInsightsReconnectTitle"))}</strong><span>${escapeHtml(t("scrapbookInsightsReconnectCopy"))}</span>`;
+          : workspace.plan.tier !== "plus"
+            ? `<strong>${escapeHtml(uiText("Plus가 필요합니다.", "Plus required."))}</strong><span>${escapeHtml(
+                uiText(
+                  "insights는 Plus에서 열립니다. Plus 키를 연결하면 계정 성과 추적을 사용할 수 있습니다.",
+                  "Insights unlock on Plus. Activate Plus to track your Threads account performance."
+                )
+              )}</span>`
+            : `<strong>${escapeHtml(t("scrapbookInsightsReconnectTitle"))}</strong><span>${escapeHtml(t("scrapbookInsightsReconnectCopy"))}</span>`;
     }
     return;
   }

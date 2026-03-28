@@ -27,12 +27,12 @@
   >
     <div class="page">
       <header class="topbar">
-        <a class="brand-link" href="/" aria-label="SS Threads home">
+        <a class="brand-link" href="/" aria-label="ss-threads home">
           <span class="brand-icon" aria-hidden="true">
             <img src="/assets/icons/icon-32.png" alt="" />
           </span>
           <span class="brand-copy">
-            <strong class="brand-name" id="brand-name">SS Threads</strong>
+            <strong class="brand-name" id="brand-name"><span class="brand-accent">ss</span>-threads</strong>
             <span class="brand-mark">__SITE_HOST__</span>
           </span>
         </a>
@@ -56,13 +56,16 @@
       <main>
         <section class="hero">
           <div class="hero-copy">
-            <p class="eyebrow" data-i18n="heroEyebrow">Save · Store</p>
-            <h1 id="headline">For PC, the Chrome extension. For mobile, a mention bot.</h1>
+            <p id="hero-eyebrow" class="eyebrow" data-i18n="heroEyebrow">Save&Store</p>
+            <h1 id="headline">
+              <span class="headline-row">Extension on PC. @Mentions on mobile.</span>
+              <span class="headline-row">Save&Sync, ss-threads</span>
+            </h1>
             <p id="subheadline" class="lead"></p>
 
             <div class="hero-actions">
-              <a id="hero-mobile-cta" class="primary-cta" href="/scrapbook" data-i18n="productBCta">멘션 bot 열기</a>
-              <a id="hero-desktop-cta" class="secondary-cta" href="https://github.com/parktaejun-dev/threads-to-obsidian/releases/latest/download/ss-threads-extension.zip" data-i18n="productACta">크롬 익스텐션</a>
+              <a id="hero-mobile-cta" class="primary-cta" href="/scrapbook" data-i18n="productBCta">멘션 scrapbook</a>
+              <a id="hero-desktop-cta" class="secondary-cta" href="" data-i18n="productACta">extension 설치</a>
             </div>
           </div>
         </section>
@@ -71,7 +74,7 @@
           <article id="mobile-flow" class="flow-row">
             <div class="flow-copy">
               <p id="product-b-tag" class="product-tag" data-i18n="productBTag">Mobile</p>
-              <h3 id="product-b-title" data-i18n="productBTitle">모바일 · 멘션 봇</h3>
+              <h3 id="product-b-title" data-i18n="productBTitle"><span class="brand-accent">ss</span>-threads</h3>
               <p id="product-b-desc" class="flow-desc" data-i18n="productBDesc"></p>
             </div>
           </article>
@@ -79,7 +82,7 @@
           <article id="desktop-flow" class="flow-row">
             <div class="flow-copy">
               <p id="product-a-tag" class="product-tag" data-i18n="productATag">PC</p>
-              <h3 id="product-a-title" data-i18n="productATitle">PC · 크롬 익스텐션</h3>
+              <h3 id="product-a-title" data-i18n="productATitle">Save&Sync</h3>
               <p id="product-a-desc" class="flow-desc" data-i18n="productADesc"></p>
             </div>
           </article>
@@ -89,7 +92,13 @@
 
       <footer class="site-footer">
         <span class="footer-domain">__SITE_HOST__</span>
-        <a href="https://github.com/parktaejun-dev/threads-to-obsidian" target="_blank" rel="noreferrer">GitHub</a>
+        <a
+          id="footer-extension-link"
+          href=""
+          target="_blank"
+          rel="noreferrer"
+          data-i18n="productACta"
+        >extension 설치</a>
       </footer>
     </div>
 

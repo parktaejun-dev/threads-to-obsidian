@@ -244,6 +244,52 @@ test("trusted browser extension origins can call extension-backed JSON endpoints
   }
 });
 
+test("public order creation is rate limited per IP", async () => {
+  const previousAdminToken = process.env.THREADS_WEB_ADMIN_TOKEN;
+  const previousDbFile = process.env.THREADS_WEB_DB_FILE;
+  const tempDir = await mkdtemp(path.join(tmpdir(), "threads-server-hardening-"));
+  const dbFile = path.join(tempDir, "web-admin-data.json");
+
+  process.env.THREADS_WEB_ADMIN_TOKEN = "threads-admin-secret";
+  process.env.THREADS_WEB_DB_FILE = dbFile;
+
+  const { server, origin } = await startTestServer();
+
+  try {
+    let finalResponse: Response | null = null;
+    for (let index = 0; index < 11; index += 1) {
+      finalResponse = await fetch(`${origin}/api/public/orders`, {
+        method: "POST",
+        headers: {
+          origin,
+          "content-type": "application/json"
+        },
+        body: JSON.stringify({
+          buyerName: `Buyer ${index}`,
+          buyerEmail: `buyer-${index}@example.com`,
+          paymentMethodId: "pm-stableorder"
+        })
+      });
+    }
+
+    assert.ok(finalResponse);
+    assert.equal(finalResponse.status, 429);
+    assert.deepEqual(await finalResponse.json(), { error: "Too many requests. Try again soon." });
+  } finally {
+    await stopTestServer(server);
+    if (typeof previousAdminToken === "string") {
+      process.env.THREADS_WEB_ADMIN_TOKEN = previousAdminToken;
+    } else {
+      delete process.env.THREADS_WEB_ADMIN_TOKEN;
+    }
+    if (typeof previousDbFile === "string") {
+      process.env.THREADS_WEB_DB_FILE = previousDbFile;
+    } else {
+      delete process.env.THREADS_WEB_DB_FILE;
+    }
+  }
+});
+
 test("admin routes can be restricted by IP allowlist", async () => {
   const previousAdminToken = process.env.THREADS_WEB_ADMIN_TOKEN;
   const previousDbFile = process.env.THREADS_WEB_DB_FILE;
@@ -422,6 +468,42 @@ test("admin session login issues an HttpOnly cookie that can access admin APIs",
     assert.match(clearedCookie, /threads_admin_session=/);
     assert.match(clearedCookie, /HttpOnly/i);
     assert.match(clearedCookie, /SameSite=Strict/i);
+  } finally {
+    await stopTestServer(server);
+    if (typeof previousAdminToken === "string") {
+      process.env.THREADS_WEB_ADMIN_TOKEN = previousAdminToken;
+    } else {
+      delete process.env.THREADS_WEB_ADMIN_TOKEN;
+    }
+    if (typeof previousDbFile === "string") {
+      process.env.THREADS_WEB_DB_FILE = previousDbFile;
+    } else {
+      delete process.env.THREADS_WEB_DB_FILE;
+    }
+  }
+});
+
+test("landing and checkout pages send public security headers", async () => {
+  const previousAdminToken = process.env.THREADS_WEB_ADMIN_TOKEN;
+  const previousDbFile = process.env.THREADS_WEB_DB_FILE;
+  const tempDir = await mkdtemp(path.join(tmpdir(), "threads-server-hardening-"));
+  const dbFile = path.join(tempDir, "web-admin-data.json");
+
+  process.env.THREADS_WEB_ADMIN_TOKEN = "threads-admin-secret";
+  process.env.THREADS_WEB_DB_FILE = dbFile;
+
+  const { server, origin } = await startTestServer();
+
+  try {
+    for (const pathname of ["/landing", "/checkout"]) {
+      const response = await fetch(`${origin}${pathname}`);
+      assert.equal(response.status, 200);
+      assert.equal(response.headers.get("x-frame-options"), "DENY");
+      assert.equal(response.headers.get("x-content-type-options"), "nosniff");
+      assert.equal(response.headers.get("referrer-policy"), "strict-origin-when-cross-origin");
+      assert.match(response.headers.get("content-security-policy") ?? "", /frame-ancestors 'none'/);
+      assert.match(response.headers.get("content-security-policy") ?? "", /style-src 'self' https:\/\/cdn\.jsdelivr\.net/);
+    }
   } finally {
     await stopTestServer(server);
     if (typeof previousAdminToken === "string") {

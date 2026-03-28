@@ -10,18 +10,21 @@ import {
   landingMessageLocales,
   landingStorefrontLocales
 } from "./web-i18n-locales";
+import {
+  BOT_HANDLE_PLACEHOLDER,
+  EXTENSION_RELEASE_DOWNLOAD_URL,
+  EXTENSION_UNPACKED_FOLDER,
+  normalizeBotHandleValue
+} from "./web-copy-constants";
 
 export type WebLocale = SupportedLocale;
 type SecondaryWebLocale = Exclude<WebLocale, "ko" | "en">;
 
 const LS_KEY = "web-locale";
 const COOKIE_KEY = "threads-web-locale";
-export const EXTENSION_RELEASE_ASSET_NAME = "ss-threads-extension.zip";
-export const EXTENSION_RELEASE_DOWNLOAD_URL = `https://github.com/parktaejun-dev/threads-to-obsidian/releases/latest/download/${EXTENSION_RELEASE_ASSET_NAME}`;
-const EXTENSION_UNPACKED_FOLDER = "ss-threads-extension";
-const LEGACY_EXTENSION_REPO_URL = "https://github.com/parktaejun-dev/threads-to-obsidian";
-const LEGACY_EXTENSION_SOURCE_ZIP_URL = `${LEGACY_EXTENSION_REPO_URL}/archive/refs/heads/main.zip`;
 const LEGACY_PLAN_PATTERN = /\bPro\b/g;
+
+export { EXTENSION_RELEASE_ASSET_NAME, EXTENSION_RELEASE_DOWNLOAD_URL } from "./web-copy-constants";
 
 function readLocaleCookie(): WebLocale | null {
   if (typeof document === "undefined") {
@@ -148,21 +151,28 @@ export function bindLangToggle(onSwitch: (locale: WebLocale) => void): void {
   }
 }
 
-export function applyExtensionInstallCopy<T>(value: T): T {
+export function applyBotHandlePlaceholder<T>(
+  value: T,
+  botHandle: string | null | undefined,
+  fallbackBotHandle: string
+): T {
+  const normalizedBotHandle = normalizeBotHandleValue(botHandle, fallbackBotHandle);
+  const replacement = `@${normalizedBotHandle}`;
+
   if (typeof value === "string") {
-    return value
-      .replaceAll(LEGACY_EXTENSION_SOURCE_ZIP_URL, EXTENSION_RELEASE_DOWNLOAD_URL)
-      .replaceAll(LEGACY_EXTENSION_REPO_URL, EXTENSION_RELEASE_DOWNLOAD_URL)
-      .replaceAll("dist/extension", EXTENSION_UNPACKED_FOLDER) as T;
+    return value.replaceAll(BOT_HANDLE_PLACEHOLDER, replacement) as T;
   }
 
   if (Array.isArray(value)) {
-    return value.map((entry) => applyExtensionInstallCopy(entry)) as T;
+    return value.map((entry) => applyBotHandlePlaceholder(entry, normalizedBotHandle, fallbackBotHandle)) as T;
   }
 
   if (value && typeof value === "object") {
     return Object.fromEntries(
-      Object.entries(value).map(([key, entry]) => [key, applyExtensionInstallCopy(entry)])
+      Object.entries(value).map(([key, entry]) => [
+        key,
+        applyBotHandlePlaceholder(entry, normalizedBotHandle, fallbackBotHandle)
+      ])
     ) as T;
   }
 
@@ -171,7 +181,9 @@ export function applyExtensionInstallCopy<T>(value: T): T {
 
 function applyPlanBrandingToString(value: string): string {
   return value
-    .replaceAll("SS Threads Pro", "SS Threads Plus")
+    .replaceAll("SS Threads Pro", "ss-threads Plus")
+    .replaceAll("SS Threads Plus", "ss-threads Plus")
+    .replaceAll("SS Threads", "ss-threads")
     .replace(LEGACY_PLAN_PATTERN, "Plus");
 }
 
@@ -199,15 +211,15 @@ function normalizeLegacyLandingMessage(message: LandingMsg): LandingMsg {
     heroRailLabel2: "Plus",
     heroRailText2: "1,000 saves + 50 folders",
     priceNote: "yearly default",
-    priceSummary: "Free 100/5 -> Plus 1000/50",
-    pricePointProDesc: "Raise scrapbook save and folder limits.",
+    priceSummary: "Free 100/5 + searches -> Plus 1000/50 + watchlists/insights",
+    pricePointProDesc: "Raise scrapbook limits and unlock watchlists and insights.",
     flowStep2: "Upgrade to Plus when needed",
     flowStep3: "Use the same Plus key in scrapbook and the extension",
     shotSmallCapTitle: "Plus higher limits",
-    shotSmallCapDesc: "Raise scrapbook limits to 1,000 saves and 50 folders, and use the same key in the extension.",
-    compProDesc: "1,000 saves, 50 folders, same key in the extension",
+    shotSmallCapDesc: "Raise scrapbook limits to 1,000 saves and 50 folders, unlock watchlists and insights, and use the same key in the extension.",
+    compProDesc: "1,000 saves, 50 folders, watchlists/insights, same key in the extension",
     step2Title: "Upgrade when needed",
-    step2Desc: "Free includes 100 saved posts and 5 folders. Plus raises it to 1,000 and 50.",
+    step2Desc: "Free includes 100 saved posts, 5 folders, and searches. Plus raises limits to 1,000 and 50, and unlocks watchlists and insights.",
     step3Title: "Use the same key",
     step3Desc: "Paste the same Plus key into scrapbook and extension settings.",
     commerceH2: "Buy Plus",
@@ -215,18 +227,21 @@ function normalizeLegacyLandingMessage(message: LandingMsg): LandingMsg {
     formRemark: "The Plus key is emailed after payment confirmation.",
     compareH2: "Free vs Plus",
     bundleTag: "Plus",
-    bundleTitle: "SS Threads Plus",
-    bundleDesc: "Free 100/5 -> Plus 1000/50",
+    bundleTitle: "ss-threads Plus",
+    bundleDesc: "Free 100/5 + searches -> Plus 1000/50 + watchlists/insights",
     bundleCta: "Buy Plus",
-    orderFinal: "Your SS Threads Plus key will be emailed after payment confirmation."
+    cloudTag: "Threads Tools",
+    cloudTitle: "Searches + Watchlists + Insights",
+    cloudDesc: "Searches stay on Free. Watchlists and insights unlock on Plus.",
+    orderFinal: "Your ss-threads Plus key will be emailed after payment confirmation."
   };
 }
 
 function normalizeLegacyStorefrontCopy(copy: LandingStorefrontCopy): LandingStorefrontCopy {
   return {
     ...applyPlanBrandingCopy(copy),
-    priceLabel: "SS Threads Plus",
-    includedUpdates: "US$2.99 monthly · US$19.99 yearly · Free 100/5 -> Plus 1000/50"
+    priceLabel: "ss-threads Plus",
+    includedUpdates: "US$2.99 monthly · US$19.99 yearly · Free 100/5 + searches -> Plus 1000/50 + watchlists/insights"
   };
 }
 
@@ -386,7 +401,7 @@ const obsidianLandingMessages: { ko: LandingMsg; en: LandingMsg } = {
   ko: {
     topbarCta: "설치 안내",
     siteLabel: "안내 주소",
-    heroEyebrow: "Save · Store",
+    heroEyebrow: "Save&Store",
     heroGuideCta: "scrapbook 열기",
     heroPurchaseCta: "Plus 구매",
     heroRailLabel1: "Free",
@@ -396,7 +411,7 @@ const obsidianLandingMessages: { ko: LandingMsg; en: LandingMsg } = {
     priceNote: "연간 기본",
     priceSummary: "Free 100/5로 시작하고, 한도에 닿으면 Plus로 넓히세요.",
     pricePointFreeDesc: "핵심 저장은 바로 사용 가능.",
-    pricePointProDesc: "저장 한도와 폴더 한도를 넓힙니다.",
+    pricePointProDesc: "저장 한도와 폴더 한도를 넓히고 watchlists와 insights를 엽니다.",
     primaryCta: "Plus 구매",
     secondaryCta: "scrapbook 열기",
     flowStep1: "Free로 먼저 저장해보기",
@@ -408,7 +423,7 @@ const obsidianLandingMessages: { ko: LandingMsg; en: LandingMsg } = {
     guideInstallCta: "설치 안내 보기",
     guideUpgradeCta: "Plus 구매 요청",
     card1Title: "Chrome에 로드",
-    card1Desc: "압축을 풀고 Chrome에서 dist/extension 폴더를 언팩드 확장으로 로드합니다.",
+    card1Desc: `압축을 풀고 Chrome에서 ${EXTENSION_UNPACKED_FOLDER} 폴더를 언팩드 확장으로 로드합니다.`,
     card2Title: "Vault 연결",
     card2Desc: "옵션에서 Obsidian 폴더를 연결하면 마크다운과 미디어를 바로 저장합니다.",
     card3Title: "Threads에서 저장",
@@ -418,13 +433,13 @@ const obsidianLandingMessages: { ko: LandingMsg; en: LandingMsg } = {
     shotLargeCapTitle: "Free 저장 흐름",
     shotLargeCapDesc: "핵심 저장 경험은 빠르고 단순하게 유지됩니다.",
     shotSmallCapTitle: "Plus 확장 한도",
-    shotSmallCapDesc: "저장글 1,000개와 폴더 50개까지 넓히고, 같은 키를 extension에도 연결할 수 있습니다.",
+    shotSmallCapDesc: "저장글 1,000개와 폴더 50개까지 넓히고, watchlists와 insights를 열며, 같은 키를 extension에도 연결할 수 있습니다.",
     compFreeDesc: "핵심 저장이 이미 완성된 기본 흐름",
-    compProDesc: "저장글 1,000개, 폴더 50개, 동일 키 extension 연결",
+    compProDesc: "저장글 1,000개, 폴더 50개, watchlists·insights, 동일 키 extension 연결",
     step1Title: "Free로 저장 체험",
     step1Desc: "글·이미지·답글 저장이 바로 됩니다.",
     step2Title: "한도에 닿으면 Plus로 확장",
-    step2Desc: "Free는 저장글 100개, 폴더 5개까지. Plus는 1,000개와 50개까지 확장됩니다.",
+    step2Desc: "Free는 저장글 100개, 폴더 5개, searches까지. Plus는 1,000개와 50개까지 확장되고 watchlists와 insights가 열립니다.",
     step3Title: "같은 키를 두 곳에 연결",
     step3Desc: "scrapbook과 extension에 같은 Plus 키를 붙여넣으면 됩니다.",
     commerceH2: "Plus 구매",
@@ -458,29 +473,29 @@ const obsidianLandingMessages: { ko: LandingMsg; en: LandingMsg } = {
     productsTitle: "",
     productsCopy: "",
     productATag: "PC",
-    productATitle: "PC · 크롬 익스텐션",
-    productADesc: "PC에서 보고 있는 Threads를 바로 저장합니다.",
-    productACta: "크롬 익스텐션",
+    productATitle: "Save&Sync",
+    productADesc: "PC에서는 extension으로 바로 저장합니다.",
+    productACta: "extension 설치",
     productBTag: "Mobile",
-    productBTitle: "모바일 · 멘션 봇",
-    productBDesc: "모바일에서는 봇에게 멘션해서 inbox로 모읍니다.",
+    productBTitle: "ss-threads",
+    productBDesc: "Mobile에서는 @ss-threads로 멘션해서 inbox로 받습니다.",
     productBCta: "멘션 scrapbook",
     pricingEyebrow: "Pricing",
     pricingTitle: "결제는 단순하게.",
     pricingCopy: "",
     bundleTag: "Plus",
-    bundleTitle: "SS Threads Plus",
-    bundleDesc: "Free 100/5에서 시작하고, Plus에서 1,000/50으로 확장합니다.",
+    bundleTitle: "ss-threads Plus",
+    bundleDesc: "Free 100/5와 searches로 시작하고, Plus에서 1,000/50과 watchlists·insights로 확장합니다.",
     bundleCta: "Plus 구매",
-    cloudTag: "Cloud Add-on",
-    cloudTitle: "Watchlists + Searches + Insights",
-    cloudDesc: "지속 동기화가 필요한 기능은 별도 add-on.",
+    cloudTag: "Threads 기능",
+    cloudTitle: "Searches + Watchlists + Insights",
+    cloudDesc: "searches는 Free에 포함되고, watchlists와 insights는 Plus에서 열립니다.",
     cloudCta: "scrapbook 열기",
     botEyebrow: "Mention bot",
     botTitle: "댓글 멘션으로 scrapbook에 저장",
     botCopy: "댓글에 @를 붙이면 저장. 이후 Markdown으로 내보내기.",
-    botStep1Title: "댓글에 @parktaejun 추가",
-    botStep1Desc: "저장하고 싶은 Threads 글에 댓글을 달고 @parktaejun만 붙이면 저장 트리거가 생성됩니다.",
+    botStep1Title: "댓글에 @{botHandle} 추가",
+    botStep1Desc: "저장하고 싶은 Threads 글에 댓글을 달고 @{botHandle}만 붙이면 저장 트리거가 생성됩니다.",
     botStep2Title: "계정 기준으로 내 scrapbook에 라우팅",
     botStep2Desc: "로그인 시 연결한 Threads 계정을 기준으로 작성자를 매칭해 사용자별 private scrapbook에만 저장합니다.",
     botStep3Title: "Markdown으로 꺼내 사용",
@@ -490,13 +505,13 @@ const obsidianLandingMessages: { ko: LandingMsg; en: LandingMsg } = {
     orderSuccess1: "{email}로 요청이 접수됐습니다.",
     orderNextStep: "다음 단계: {instructions}",
     orderPayLink: "결제 링크: {url}",
-    orderFinal: "결제 확인 후 SS Threads Plus 키를 이메일로 보내드립니다.",
+    orderFinal: "결제 확인 후 ss-threads Plus 키를 이메일로 보내드립니다.",
     footerPurchaseLink: "",
   },
   en: {
     topbarCta: "Install guide",
     siteLabel: "Guide URL",
-    heroEyebrow: "Save · Store",
+    heroEyebrow: "Save&Store",
     heroGuideCta: "Open scrapbook",
     heroPurchaseCta: "Buy Plus",
     heroRailLabel1: "Free",
@@ -506,7 +521,7 @@ const obsidianLandingMessages: { ko: LandingMsg; en: LandingMsg } = {
     priceNote: "yearly default",
     priceSummary: "Start on Free 100/5, then move to Plus when you hit the limit.",
     pricePointFreeDesc: "Core saving works right away.",
-    pricePointProDesc: "Raise your scrapbook save and folder limits.",
+    pricePointProDesc: "Raise your scrapbook save and folder limits, and unlock watchlists and insights.",
     primaryCta: "Buy Plus",
     secondaryCta: "Open scrapbook",
     flowStep1: "Try Free first",
@@ -518,7 +533,7 @@ const obsidianLandingMessages: { ko: LandingMsg; en: LandingMsg } = {
     guideInstallCta: "Open install guide",
     guideUpgradeCta: "Request Plus",
     card1Title: "Load in Chrome",
-    card1Desc: "Unzip the project and load the dist/extension folder as an unpacked Chrome extension.",
+    card1Desc: `Unzip the project and load the ${EXTENSION_UNPACKED_FOLDER} folder as an unpacked Chrome extension.`,
     card2Title: "Connect your vault",
     card2Desc: "Connect your Obsidian folder in options so markdown and media save directly.",
     card3Title: "Save from Threads",
@@ -528,13 +543,13 @@ const obsidianLandingMessages: { ko: LandingMsg; en: LandingMsg } = {
     shotLargeCapTitle: "Free save flow",
     shotLargeCapDesc: "The core saving experience stays fast and simple.",
     shotSmallCapTitle: "Plus higher limits",
-    shotSmallCapDesc: "Raise scrapbook limits to 1,000 saves and 50 folders, using the same key across scrapbook and extension.",
+    shotSmallCapDesc: "Raise scrapbook limits to 1,000 saves and 50 folders, unlock watchlists and insights, and use the same key across scrapbook and extension.",
     compFreeDesc: "The core save flow that already works well",
-    compProDesc: "An upgrade that raises scrapbook limits and keeps the same key usable in the extension",
+    compProDesc: "1,000 saves, 50 folders, watchlists/insights, same key in the extension",
     step1Title: "Try Free first",
     step1Desc: "Posts, images, and reply chains save immediately.",
     step2Title: "Upgrade when needed",
-    step2Desc: "Free includes 100 saved posts and 5 folders. Plus raises it to 1,000 and 50.",
+    step2Desc: "Free includes 100 saved posts, 5 folders, and searches. Plus raises it to 1,000 and 50, and unlocks watchlists and insights.",
     step3Title: "Paste the same key",
     step3Desc: "Use the same Plus key in scrapbook and in extension settings.",
     commerceH2: "Buy Plus",
@@ -568,29 +583,29 @@ const obsidianLandingMessages: { ko: LandingMsg; en: LandingMsg } = {
     productsTitle: "",
     productsCopy: "",
     productATag: "PC",
-    productATitle: "PC · Chrome extension",
-    productADesc: "Save the Threads post you are viewing on desktop.",
-    productACta: "Chrome extension",
+    productATitle: "Save&Sync",
+    productADesc: "Save directly with the extension on PC.",
+    productACta: "Install extension",
     productBTag: "Mobile",
-    productBTitle: "Mobile · Mention bot",
-    productBDesc: "Mention the bot on mobile and let it land in your inbox.",
+    productBTitle: "ss-threads",
+    productBDesc: "Mention @ss-threads on mobile and let it land in your inbox.",
     productBCta: "Mention scrapbook",
     pricingEyebrow: "Pricing",
     pricingTitle: "Simple billing.",
     pricingCopy: "",
     bundleTag: "Plus",
-    bundleTitle: "SS Threads Plus",
-    bundleDesc: "Start on Free 100/5, then raise it to 1,000 saves and 50 folders with Plus.",
+    bundleTitle: "ss-threads Plus",
+    bundleDesc: "Start on Free 100/5 with searches, then raise it to 1,000 saves, 50 folders, and watchlists/insights with Plus.",
     bundleCta: "Buy Plus",
-    cloudTag: "Cloud Add-on",
-    cloudTitle: "Watchlists + Searches + Insights",
-    cloudDesc: "Always-on sync features as a separate add-on.",
+    cloudTag: "Threads Tools",
+    cloudTitle: "Searches + Watchlists + Insights",
+    cloudDesc: "Searches stay available on Free. Watchlists and insights unlock on Plus.",
     cloudCta: "Open scrapbook",
     botEyebrow: "Mention bot",
     botTitle: "Save to scrapbook with one reply",
     botCopy: "Reply with @ to save. Export as Markdown later.",
-    botStep1Title: "Add @parktaejun in a reply",
-    botStep1Desc: "Reply to the Threads post you want to save and include only @parktaejun to create the save trigger.",
+    botStep1Title: "Add @{botHandle} in a reply",
+    botStep1Desc: "Reply to the Threads post you want to save and include only @{botHandle} to create the save trigger.",
     botStep2Title: "Route it to your scrapbook by identity",
     botStep2Desc: "The system matches the reply author against the Threads account linked at sign-in and stores the item only in that user's private scrapbook.",
     botStep3Title: "Export as Markdown later",
@@ -600,12 +615,12 @@ const obsidianLandingMessages: { ko: LandingMsg; en: LandingMsg } = {
     orderSuccess1: "Your request has been received at {email}.",
     orderNextStep: "Next step: {instructions}",
     orderPayLink: "Payment link: {url}",
-    orderFinal: "Your SS Threads Plus key will be emailed after payment confirmation.",
+    orderFinal: "Your ss-threads Plus key will be emailed after payment confirmation.",
     footerPurchaseLink: "",
   },
 };
 
-export const landingMessages: Record<WebLocale, Record<LandingVariant, LandingMsg>> = {
+export const landingMessages = applyPlanBrandingCopy({
   ko: {
     obsidian: obsidianLandingMessages.ko,
     bot: {
@@ -616,12 +631,12 @@ export const landingMessages: Record<WebLocale, Record<LandingVariant, LandingMs
       heroPurchaseCta: "확장 Plus 구매",
       primaryCta: "확장 Plus 구매",
       storyEyebrow: "Chrome Extension",
-      storyH2: "SS Threads 확장도 함께 제공합니다.",
+      storyH2: "ss-threads 확장도 함께 제공합니다.",
       storyP: "댓글 멘션 저장은 bot이 맡고, 브라우저에서 보고 있는 Threads 글을 즉시 Obsidian으로 보내는 흐름은 extension이 맡습니다.",
       card3Title: "Threads에서 바로 저장",
       card3Desc: "브라우저에서 보고 있는 글을 즉시 저장합니다. mention bot와 별도로 쓰거나 함께 쓸 수 있습니다.",
-      commerceH2: "SS Threads Plus 구매",
-      commerceLead: "이 아래 폼은 SS Threads Plus 구매용입니다. 같은 키를 scrapbook과 extension 양쪽에 연결할 수 있습니다.",
+      commerceH2: "ss-threads Plus 구매",
+      commerceLead: "이 아래 폼은 ss-threads Plus 구매용입니다. 같은 키를 scrapbook과 extension 양쪽에 연결할 수 있습니다.",
       faqH2: "Bot / Extension FAQ",
       compareH2: "Chrome Extension Free vs Plus",
       screenH2: "Chrome extension preview",
@@ -630,10 +645,10 @@ export const landingMessages: Record<WebLocale, Record<LandingVariant, LandingMs
       productsCopy: "공개 댓글 기반 scrapbook bot과, 보고 있는 글을 바로 저장하는 Chrome extension을 함께 안내합니다.",
       productATag: "Mention bot",
       productATitle: "Threads Mention Scrapbook",
-      productADesc: "댓글에 @parktaejun만 붙이면 내 private scrapbook으로 저장되고, 나중에 Markdown으로 꺼내 쓸 수 있습니다.",
+      productADesc: "댓글에 @{botHandle}만 붙이면 내 private scrapbook으로 저장되고, 나중에 Markdown으로 꺼내 쓸 수 있습니다.",
       productACta: "scrapbook 열기",
       productBTag: "Chrome extension",
-      productBTitle: "SS Threads",
+      productBTitle: "ss-threads",
       productBDesc: "브라우저에서 보고 있는 Threads 글을 바로 Obsidian으로 저장합니다. 같은 Plus 키를 extension에도 연결할 수 있습니다.",
       productBCta: "확장 안내 보기",
       botEyebrow: "How it works",
@@ -641,8 +656,8 @@ export const landingMessages: Record<WebLocale, Record<LandingVariant, LandingMs
       botCopy: "Threads 로그인으로 내 계정을 연결한 뒤, 공개 댓글 멘션을 저장 트리거로 씁니다. 저장된 데이터는 사용자별 scrapbook에만 보입니다.",
       botStep1Title: "Threads 계정 연결",
       botStep1Desc: "scrapbook 페이지에서 Threads로 로그인하고, 저장 요청을 받을 계정을 연결합니다.",
-      botStep2Title: "@parktaejun 댓글로 저장 요청",
-      botStep2Desc: "Threads 게시물 댓글에 @parktaejun만 붙이면 멘션 수집기가 연결된 계정 기준으로 scrapbook에 반영합니다.",
+      botStep2Title: "@{botHandle} 댓글로 저장 요청",
+      botStep2Desc: "Threads 게시물 댓글에 @{botHandle}만 붙이면 멘션 수집기가 연결된 계정 기준으로 scrapbook에 반영합니다.",
       botStep3Title: "웹에서 확인하고 Markdown export",
       botStep3Desc: "저장 반영은 60초 이내를 목표로 하고, Markdown export나 plain text copy로 Obsidian, Notion, 메모 앱으로 옮깁니다."
     }
@@ -657,12 +672,12 @@ export const landingMessages: Record<WebLocale, Record<LandingVariant, LandingMs
       heroPurchaseCta: "Buy extension Plus",
       primaryCta: "Buy extension Plus",
       storyEyebrow: "Chrome Extension",
-      storyH2: "SS Threads is also available here.",
+      storyH2: "ss-threads is also available here.",
       storyP: "The bot handles mention-based scrapbook saves, while the extension sends the post you are actively viewing straight into Obsidian.",
       card3Title: "Save directly from Threads",
       card3Desc: "Save the post you are viewing in the browser immediately. You can use it separately from the mention bot or alongside it.",
-      commerceH2: "Buy SS Threads Plus",
-      commerceLead: "The form below is for SS Threads Plus. The same key can be used in both scrapbook and the extension.",
+      commerceH2: "Buy ss-threads Plus",
+      commerceLead: "The form below is for ss-threads Plus. The same key can be used in both scrapbook and the extension.",
       faqH2: "Bot / Extension FAQ",
       compareH2: "Chrome Extension Free vs Plus",
       screenH2: "Chrome extension preview",
@@ -671,10 +686,10 @@ export const landingMessages: Record<WebLocale, Record<LandingVariant, LandingMs
       productsCopy: "This page introduces both the public-reply scrapbook bot and the Chrome extension that saves the post you are viewing right now.",
       productATag: "Mention bot",
       productATitle: "Threads Mention Scrapbook",
-      productADesc: "Add @parktaejun in a reply and the item lands in your private scrapbook, ready to export as Markdown later.",
+      productADesc: "Add @{botHandle} in a reply and the item lands in your private scrapbook, ready to export as Markdown later.",
       productACta: "Open scrapbook",
       productBTag: "Chrome extension",
-      productBTitle: "SS Threads",
+      productBTitle: "ss-threads",
       productBDesc: "Save the Threads post you are viewing straight into Obsidian. The same Plus key can also be used in the extension.",
       productBCta: "See extension guide",
       botEyebrow: "How it works",
@@ -682,15 +697,200 @@ export const landingMessages: Record<WebLocale, Record<LandingVariant, LandingMs
       botCopy: "Users connect their Threads account through Threads OAuth, then use a public reply mention as the save trigger. Saved data stays separated per scrapbook account.",
       botStep1Title: "Connect your Threads account",
       botStep1Desc: "Open the scrapbook page, continue with Threads, and connect the account that should receive saved mentions.",
-      botStep2Title: "Save with an @parktaejun reply",
-      botStep2Desc: "Once a reply mentions @parktaejun, the mention ingester matches the reply author account and stores it idempotently.",
+      botStep2Title: "Save with an @{botHandle} reply",
+      botStep2Desc: "Once a reply mentions @{botHandle}, the mention ingester matches the reply author account and stores it idempotently.",
       botStep3Title: "Review on the web and export",
       botStep3Desc: "The target is to reflect saves within 60 seconds, then let users export as Markdown or plain text for Obsidian, Notion, or note apps."
     }
   }
-} as Record<WebLocale, Record<LandingVariant, LandingMsg>>;
+}) as Record<WebLocale, Record<LandingVariant, LandingMsg>>;
 
 Object.assign(landingMessages, secondaryLandingMessages);
+
+Object.assign(landingMessages.ja.obsidian, {
+  heroRailLabel1: "Free",
+  heroRailLabel2: "Plus",
+  heroRailText2: "保存 1,000件 + フォルダ 50個",
+  priceNote: "年額が標準",
+  priceSummary: "Free 100/5 + searches から始め、必要になったら Plus で 1000/50 と watchlists/insights に広げます。",
+  pricePointProDesc: "scrapbook の上限を広げ、watchlists と insights を使えるようにします。",
+  flowStep2: "必要になったら Plus にアップグレード",
+  flowStep3: "同じ Plus キーを scrapbook と extension の両方で使う",
+  shotSmallCapTitle: "Plus の上限拡張",
+  shotSmallCapDesc: "scrapbook の上限を保存 1,000 件、フォルダ 50 個まで広げ、watchlists と insights を使えるようにし、同じキーを extension でも使えます。",
+  compProDesc: "保存 1,000 件、フォルダ 50 個、watchlists/insights、extension でも同じキー",
+  step2Title: "必要になったらアップグレード",
+  step2Desc: "Free では保存 100 件、フォルダ 5 個、searches を使えます。Plus では 1,000 件と 50 個に広がり、watchlists と insights が使えます。",
+  step3Title: "同じキーを使う",
+  step3Desc: "同じ Plus キーを scrapbook と extension の設定に貼り付けます。",
+  commerceH2: "Plus を購入",
+  commerceLead: "年額 US$19.99、月額 US$2.99。支払い確認後に Plus キーをメールで送ります。",
+  formRemark: "支払い確認後に Plus キーをメールで送ります。",
+  phNote: "請求書、通貨、チーム利用の相談など",
+  bundleTag: "Plus",
+  bundleTitle: "ss-threads Plus",
+  bundleDesc: "Free 100/5 + searches から始め、Plus で 1000/50 + watchlists/insights に広げます。",
+  bundleCta: "Plus を購入",
+  cloudTag: "Threads ツール",
+  cloudTitle: "Searches + Watchlists + Insights",
+  cloudDesc: "searches は Free で使えます。watchlists と insights は Plus で開放されます。",
+  orderFinal: "支払い確認後に ss-threads Plus キーをメールで送ります。",
+  productATag: "PC",
+  productATitle: "Save&Sync",
+  productADesc: "PC では extension で直接保存します。",
+  productACta: "extension をインストール",
+  productBTag: "Mobile",
+  productBTitle: "ss-threads",
+  productBDesc: "Mobile では mention で集め、あとで inbox で受け取ります。"
+});
+
+Object.assign(landingMessages["pt-BR"].obsidian, {
+  heroRailLabel1: "Free",
+  heroRailLabel2: "Plus",
+  heroRailText2: "1.000 salvamentos + 50 pastas",
+  priceNote: "anual por padrão",
+  priceSummary: "Comece com Free 100/5 + searches e amplie para Plus 1000/50 + watchlists/insights quando precisar.",
+  pricePointProDesc: "Aumente os limites do scrapbook e desbloqueie watchlists e insights.",
+  flowStep2: "Faça upgrade para Plus quando precisar",
+  flowStep3: "Use a mesma chave Plus no scrapbook e na extensão",
+  shotSmallCapTitle: "Plus com limites maiores",
+  shotSmallCapDesc: "Aumente o scrapbook para 1.000 salvamentos e 50 pastas, desbloqueie watchlists e insights e use a mesma chave na extensão.",
+  compProDesc: "1.000 salvamentos, 50 pastas, watchlists/insights e a mesma chave na extensão",
+  step2Title: "Faça upgrade quando precisar",
+  step2Desc: "Free inclui 100 posts salvos, 5 pastas e searches. Plus aumenta para 1.000 e 50 e desbloqueia watchlists e insights.",
+  step3Title: "Use a mesma chave",
+  step3Desc: "Cole a mesma chave Plus no scrapbook e nas configurações da extensão.",
+  commerceH2: "Comprar Plus",
+  commerceLead: "US$19.99 por ano ou US$2.99 por mês. A chave Plus é enviada por email após a confirmação do pagamento.",
+  formRemark: "A chave Plus é enviada por email após a confirmação do pagamento.",
+  phNote: "Fatura, moeda, pedido para equipe, etc.",
+  bundleTag: "Plus",
+  bundleTitle: "ss-threads Plus",
+  bundleDesc: "Comece com Free 100/5 + searches e amplie para Plus 1000/50 + watchlists/insights.",
+  bundleCta: "Comprar Plus",
+  cloudTag: "Ferramentas do Threads",
+  cloudTitle: "Searches + Watchlists + Insights",
+  cloudDesc: "Searches permanecem no Free. Watchlists e insights são liberados no Plus.",
+  orderFinal: "A chave ss-threads Plus será enviada por email após a confirmação do pagamento.",
+  productATag: "PC",
+  productATitle: "Save&Sync",
+  productADesc: "No PC, salve diretamente com a extensão.",
+  productACta: "Instalar extension",
+  productBTag: "Mobile",
+  productBTitle: "ss-threads",
+  productBDesc: "No celular, reúna por mention e receba depois na inbox."
+});
+
+Object.assign(landingMessages.es.obsidian, {
+  heroRailLabel1: "Free",
+  heroRailLabel2: "Plus",
+  heroRailText2: "1.000 guardados + 50 carpetas",
+  priceNote: "anual por defecto",
+  priceSummary: "Empieza con Free 100/5 + searches y pasa a Plus 1000/50 + watchlists/insights cuando lo necesites.",
+  pricePointProDesc: "Amplía los límites del scrapbook y desbloquea watchlists e insights.",
+  flowStep2: "Haz upgrade a Plus cuando lo necesites",
+  flowStep3: "Usa la misma clave Plus en scrapbook y en la extensión",
+  shotSmallCapTitle: "Plus con límites ampliados",
+  shotSmallCapDesc: "Amplía el scrapbook a 1.000 guardados y 50 carpetas, desbloquea watchlists e insights y usa la misma clave en la extensión.",
+  compProDesc: "1.000 guardados, 50 carpetas, watchlists/insights y la misma clave en la extensión",
+  step2Title: "Haz upgrade cuando lo necesites",
+  step2Desc: "Free incluye 100 publicaciones guardadas, 5 carpetas y searches. Plus lo amplía a 1.000 y 50, y desbloquea watchlists e insights.",
+  step3Title: "Usa la misma clave",
+  step3Desc: "Pega la misma clave Plus en scrapbook y en la configuración de la extensión.",
+  commerceH2: "Comprar Plus",
+  commerceLead: "US$19.99 al año o US$2.99 al mes. La clave Plus se envía por correo después de confirmar el pago.",
+  formRemark: "La clave Plus se envía por correo después de confirmar el pago.",
+  phNote: "Factura, moneda, solicitudes para equipos, etc.",
+  bundleTag: "Plus",
+  bundleTitle: "ss-threads Plus",
+  bundleDesc: "Empieza con Free 100/5 + searches y amplíalo con Plus 1000/50 + watchlists/insights.",
+  bundleCta: "Comprar Plus",
+  cloudTag: "Herramientas de Threads",
+  cloudTitle: "Searches + Watchlists + Insights",
+  cloudDesc: "Searches se mantiene en Free. Watchlists e insights se desbloquean en Plus.",
+  orderFinal: "La clave ss-threads Plus se enviará por correo después de confirmar el pago.",
+  productATag: "PC",
+  productATitle: "Save&Sync",
+  productADesc: "En PC, guarda directamente con la extensión.",
+  productACta: "Instalar extension",
+  productBTag: "Mobile",
+  productBTitle: "ss-threads",
+  productBDesc: "En móvil, reúne por mention y recíbelo después en la inbox."
+});
+
+Object.assign(landingMessages["zh-TW"].obsidian, {
+  heroRailLabel1: "Free",
+  heroRailLabel2: "Plus",
+  heroRailText2: "1,000 篇保存 + 50 個資料夾",
+  priceNote: "預設為年繳",
+  priceSummary: "從 Free 100/5 + searches 開始，需要時再升級到 Plus 1000/50 + watchlists/insights。",
+  pricePointProDesc: "提高 scrapbook 上限，並解鎖 watchlists 與 insights。",
+  flowStep2: "需要時再升級到 Plus",
+  flowStep3: "同一組 Plus 金鑰可同時用在 scrapbook 和 extension",
+  shotSmallCapTitle: "Plus 更高上限",
+  shotSmallCapDesc: "把 scrapbook 擴充到 1,000 篇保存與 50 個資料夾，解鎖 watchlists 與 insights，並在 extension 也用同一組金鑰。",
+  compProDesc: "1,000 篇保存、50 個資料夾、watchlists/insights、extension 共用同一組金鑰",
+  step2Title: "需要時再升級",
+  step2Desc: "Free 包含 100 篇保存、5 個資料夾與 searches。Plus 會提升到 1,000 與 50，並解鎖 watchlists 與 insights。",
+  step3Title: "使用同一組金鑰",
+  step3Desc: "把同一組 Plus 金鑰貼到 scrapbook 與 extension 設定中。",
+  commerceH2: "購買 Plus",
+  commerceLead: "年繳 US$19.99 或月繳 US$2.99。付款確認後會透過電子郵件寄出 Plus 金鑰。",
+  formRemark: "付款確認後會透過電子郵件寄出 Plus 金鑰。",
+  phNote: "發票、幣別、團隊使用需求等",
+  bundleTag: "Plus",
+  bundleTitle: "ss-threads Plus",
+  bundleDesc: "從 Free 100/5 + searches 開始，再用 Plus 擴充到 1000/50 + watchlists/insights。",
+  bundleCta: "購買 Plus",
+  cloudTag: "Threads 工具",
+  cloudTitle: "Searches + Watchlists + Insights",
+  cloudDesc: "searches 在 Free 就能使用；watchlists 與 insights 於 Plus 解鎖。",
+  orderFinal: "付款確認後，ss-threads Plus 金鑰會寄到你的電子郵件。",
+  productATag: "PC",
+  productATitle: "Save&Sync",
+  productADesc: "在 PC 上可直接用 extension 儲存。",
+  productACta: "安裝 extension",
+  productBTag: "Mobile",
+  productBTitle: "ss-threads",
+  productBDesc: "在 Mobile 上用 mention 收集，之後在 inbox 接收。"
+});
+
+Object.assign(landingMessages.vi.obsidian, {
+  heroRailLabel1: "Free",
+  heroRailLabel2: "Plus",
+  heroRailText2: "1.000 mục lưu + 50 thư mục",
+  priceNote: "mặc định theo năm",
+  priceSummary: "Bắt đầu với Free 100/5 + searches rồi nâng lên Plus 1000/50 + watchlists/insights khi cần.",
+  pricePointProDesc: "Mở rộng giới hạn của scrapbook và mở khóa watchlists cùng insights.",
+  flowStep2: "Nâng cấp lên Plus khi cần",
+  flowStep3: "Dùng cùng một khóa Plus cho scrapbook và extension",
+  shotSmallCapTitle: "Plus với giới hạn cao hơn",
+  shotSmallCapDesc: "Nâng scrapbook lên 1.000 mục lưu và 50 thư mục, mở khóa watchlists và insights, đồng thời dùng cùng một khóa trong extension.",
+  compProDesc: "1.000 mục lưu, 50 thư mục, watchlists/insights và cùng một khóa trong extension",
+  step2Title: "Nâng cấp khi cần",
+  step2Desc: "Free gồm 100 bài đã lưu, 5 thư mục và searches. Plus nâng lên 1.000 và 50, đồng thời mở khóa watchlists và insights.",
+  step3Title: "Dùng cùng một khóa",
+  step3Desc: "Dán cùng một khóa Plus vào scrapbook và phần cài đặt extension.",
+  commerceH2: "Mua Plus",
+  commerceLead: "US$19.99 mỗi năm hoặc US$2.99 mỗi tháng. Khóa Plus sẽ được gửi qua email sau khi thanh toán được xác nhận.",
+  formRemark: "Khóa Plus sẽ được gửi qua email sau khi thanh toán được xác nhận.",
+  phNote: "Hóa đơn, loại tiền, nhu cầu cho nhóm, v.v.",
+  bundleTag: "Plus",
+  bundleTitle: "ss-threads Plus",
+  bundleDesc: "Bắt đầu với Free 100/5 + searches, rồi mở rộng lên Plus 1000/50 + watchlists/insights.",
+  bundleCta: "Mua Plus",
+  cloudTag: "Công cụ Threads",
+  cloudTitle: "Searches + Watchlists + Insights",
+  cloudDesc: "searches vẫn có trong Free. Watchlists và insights mở khóa trên Plus.",
+  orderFinal: "Khóa ss-threads Plus sẽ được gửi qua email sau khi thanh toán được xác nhận.",
+  productATag: "PC",
+  productATitle: "Save&Sync",
+  productADesc: "Trên PC, lưu trực tiếp bằng extension.",
+  productACta: "Cài extension",
+  productBTag: "Mobile",
+  productBTitle: "ss-threads",
+  productBDesc: "Trên Mobile, gom bằng mention và nhận lại trong inbox."
+});
 
 export interface LandingLinkSet {
   topbarSecondaryHref: string;
@@ -719,15 +919,16 @@ export interface LandingStorefrontCopy {
 
 const obsidianLandingStorefrontCopy: { ko: LandingStorefrontCopy; en: LandingStorefrontCopy } = {
   ko: {
-    productName: "SS Threads",
-    headline: "<span class=\"headline-row\">PC는 Chrome extension.</span><span class=\"headline-row\">Mobile은 mention bot.</span>",
-    subheadline: "SS는 Save · Store. PC에서는 바로 저장하고, 모바일에서는 멘션으로 모읍니다.",
-    priceLabel: "SS Threads Plus",
-    includedUpdates: "월 US$2.99 · 연 US$19.99 · Free 100/5 -> Plus 1000/50",
+    productName: "ss-threads",
+    headline:
+      "<span class=\"headline-row\">PC에서는 extension. 모바일에서는 @mention.</span><span class=\"headline-row\">Save&Sync, ss-threads</span>",
+    subheadline: "PC에서는 extension으로 바로 저장하고, 모바일에서는 @mention으로 모읍니다.",
+    priceLabel: "ss-threads Plus",
+    includedUpdates: "월 US$2.99 · 연 US$19.99 · Free 100/5 + searches -> Plus 1000/50 + watchlists/insights",
     heroNotes: [
       "Chrome extension: 현재 보고 있는 글 저장",
-      "scrapbook: 멘션, watchlist, search 결과 정리",
-      "Cloud add-on: Discovery, Search, Insights"
+      "scrapbook Free: 멘션 inbox + searches + Markdown / ZIP export",
+      "scrapbook Plus: watchlists · insights"
     ],
     links: {
       topbarSecondaryHref: "/scrapbook",
@@ -735,24 +936,24 @@ const obsidianLandingStorefrontCopy: { ko: LandingStorefrontCopy; en: LandingSto
       heroSecondaryHref: "/scrapbook",
       heroPrimaryHref: "/checkout",
       priceCardHref: "/checkout",
-      productAHref: "https://github.com/parktaejun-dev/threads-to-obsidian",
+      productAHref: EXTENSION_RELEASE_DOWNLOAD_URL,
       productBHref: "/scrapbook"
     },
     faqs: [
       {
         id: "faq-1",
         question: "저장하려면 Plus가 필요한가요?",
-        answer: "아니요. Free에서도 저장, 이미지 포함, 연속 답글, 중복 건너뜀이 가능합니다. 대신 저장글은 100개, 폴더는 5개까지입니다."
+        answer: "아니요. Free에서도 저장, 이미지 포함, 연속 답글, 중복 건너뜀이 가능합니다. 저장글 100개, 폴더 5개, searches까지 Free에서 사용할 수 있고, watchlists와 insights는 Plus에서 열립니다."
       },
       {
         id: "faq-2",
         question: "누가 Plus를 쓰면 좋나요?",
-        answer: "scrapbook 저장글이 100개를 넘거나, 폴더를 5개 이상 쓰고 싶은 사용자에게 맞습니다. 같은 키를 extension에도 연결할 수 있습니다."
+        answer: "scrapbook 저장글이 100개를 넘거나, 폴더를 5개 이상 쓰고 싶은 사용자, 그리고 watchlists와 insights가 필요한 사용자에게 맞습니다. 같은 키를 extension에도 연결할 수 있습니다."
       },
       {
         id: "faq-3",
         question: "Plus에서는 뭐가 달라지나요?",
-        answer: "scrapbook 저장글 1,000개, 폴더 50개까지 확장되고, 동일한 키를 extension에도 연결할 수 있습니다."
+        answer: "scrapbook 저장글 1,000개, 폴더 50개까지 확장되고, watchlists와 insights가 열리며, 동일한 키를 extension에도 연결할 수 있습니다."
       },
       {
         id: "faq-4",
@@ -767,15 +968,16 @@ const obsidianLandingStorefrontCopy: { ko: LandingStorefrontCopy; en: LandingSto
     ]
   },
   en: {
-    productName: "SS Threads",
-    headline: "<span class=\"headline-row\">For PC, the Chrome extension.</span><span class=\"headline-row\">For mobile, a mention bot.</span>",
-    subheadline: "SS means Save · Store. Save directly on desktop, or collect later by mention on mobile.",
-    priceLabel: "SS Threads Plus",
-    includedUpdates: "US$2.99 monthly · US$19.99 yearly · Free 100/5 -> Plus 1000/50",
+    productName: "ss-threads",
+    headline:
+      "<span class=\"headline-row\">Extension on PC. @Mentions on mobile.</span><span class=\"headline-row\">Save&Sync, ss-threads</span>",
+    subheadline: "Save directly with the extension on PC, then collect through @mentions on mobile.",
+    priceLabel: "ss-threads Plus",
+    includedUpdates: "US$2.99 monthly · US$19.99 yearly · Free 100/5 + searches -> Plus 1000/50 + watchlists/insights",
     heroNotes: [
       "Chrome extension: save the post you are reading now",
-      "scrapbook: organize mentions, watchlists, and searches",
-      "Cloud add-on: Discovery, Search, Insights"
+      "scrapbook Free: mention inbox + searches + Markdown / ZIP export",
+      "scrapbook Plus: watchlists and insights"
     ],
     links: {
       topbarSecondaryHref: "/scrapbook",
@@ -783,24 +985,24 @@ const obsidianLandingStorefrontCopy: { ko: LandingStorefrontCopy; en: LandingSto
       heroSecondaryHref: "/scrapbook",
       heroPrimaryHref: "/checkout",
       priceCardHref: "/checkout",
-      productAHref: "https://github.com/parktaejun-dev/threads-to-obsidian",
+      productAHref: EXTENSION_RELEASE_DOWNLOAD_URL,
       productBHref: "/scrapbook"
     },
     faqs: [
       {
         id: "faq-1",
         question: "Do I need Plus to save posts?",
-        answer: "No. Free already supports saving, image capture, author reply chains, and duplicate skipping. Free is limited to 100 saved posts and 5 folders."
+        answer: "No. Free already supports saving, image capture, author reply chains, duplicate skipping, and searches. Free is limited to 100 saved posts and 5 folders, while watchlists and insights unlock on Plus."
       },
       {
         id: "faq-2",
         question: "Who should buy Plus?",
-        answer: "It fits users who will go beyond 100 saved posts or need more than 5 folders in scrapbook. The same key can also be used in the extension."
+        answer: "It fits users who will go beyond 100 saved posts, need more than 5 folders in scrapbook, or want watchlists and insights. The same key can also be used in the extension."
       },
       {
         id: "faq-3",
         question: "What changes on Plus?",
-        answer: "Plus raises scrapbook limits to 1,000 saved posts and 50 folders, and the same key can be used in the extension."
+        answer: "Plus raises scrapbook limits to 1,000 saved posts and 50 folders, unlocks watchlists and insights, and the same key can be used in the extension."
       },
       {
         id: "faq-4",
@@ -816,15 +1018,15 @@ const obsidianLandingStorefrontCopy: { ko: LandingStorefrontCopy; en: LandingSto
   }
 };
 
-export const landingStorefrontCopy: Record<WebLocale, Record<LandingVariant, LandingStorefrontCopy>> = {
+export const landingStorefrontCopy = applyPlanBrandingCopy({
   ko: {
     obsidian: obsidianLandingStorefrontCopy.ko,
     bot: {
       productName: "Threads Mention Scrapbook",
-      headline: "Threads 댓글에 @parktaejun만 붙이면 저장됩니다.",
+      headline: "Threads 댓글에 @{botHandle}만 붙이면 저장됩니다.",
       subheadline: "공개 댓글을 private scrapbook 저장 트리거로 바꾸고, 나중에 Markdown이나 Obsidian, Notion으로 꺼내 쓰는 SaaS입니다.",
-      priceLabel: "SS Threads Plus",
-      includedUpdates: "Free 100/5 · Plus 1000/50 · 같은 키를 extension에도 사용",
+      priceLabel: "ss-threads Plus",
+      includedUpdates: "Free 100/5 + searches · Plus 1000/50 + watchlists/insights · 같은 키를 extension에도 사용",
       heroNotes: [
         "댓글은 공개 트리거입니다. 민감한 메모는 적지 마세요.",
         "Threads 로그인으로 연결된 계정과 댓글 작성 계정을 기준으로 사용자별로 분리 저장합니다.",
@@ -872,10 +1074,10 @@ export const landingStorefrontCopy: Record<WebLocale, Record<LandingVariant, Lan
     obsidian: obsidianLandingStorefrontCopy.en,
     bot: {
       productName: "Threads Mention Scrapbook",
-      headline: "Add @parktaejun in a Threads reply and it gets saved.",
+      headline: "Add @{botHandle} in a Threads reply and it gets saved.",
       subheadline: "Turn a public reply into a save trigger for a private scrapbook, then move the result into Markdown, Obsidian, or Notion later.",
-      priceLabel: "SS Threads Plus",
-      includedUpdates: "Free 100/5 · Plus 1000/50 · use the same key in the extension too",
+      priceLabel: "ss-threads Plus",
+      includedUpdates: "Free 100/5 + searches · Plus 1000/50 + watchlists/insights · use the same key in the extension too",
       heroNotes: [
         "Replies are public triggers, so do not write sensitive notes there.",
         "The system matches the reply author against the Threads account linked through OAuth and stores items per user.",
@@ -919,9 +1121,234 @@ export const landingStorefrontCopy: Record<WebLocale, Record<LandingVariant, Lan
       ]
     }
   }
-} as Record<WebLocale, Record<LandingVariant, LandingStorefrontCopy>>;
+}) as Record<WebLocale, Record<LandingVariant, LandingStorefrontCopy>>;
 
 Object.assign(landingStorefrontCopy, secondaryLandingStorefrontCopy);
+
+Object.assign(landingStorefrontCopy.ja.obsidian, {
+  productName: "ss-threads",
+  headline:
+    "<span class=\"headline-row\">PC では extension。モバイルでは @mention。</span><span class=\"headline-row\">Save&Sync, ss-threads</span>",
+  subheadline: "PC では extension で直接保存し、モバイルでは @mention で集めます。",
+  priceLabel: "ss-threads Plus",
+  includedUpdates: "月額 US$2.99 · 年額 US$19.99 · Free 100/5 + searches -> Plus 1000/50 + watchlists/insights",
+  heroNotes: [
+    "Chrome extension: 今見ている投稿を保存",
+    "scrapbook Free: mention inbox + searches + Markdown / ZIP export",
+    "scrapbook Plus: watchlists と insights"
+  ],
+  links: {
+    ...landingStorefrontCopy.ja.obsidian.links,
+    productAHref: EXTENSION_RELEASE_DOWNLOAD_URL
+  },
+  faqs: [
+    {
+      id: "faq-1",
+      question: "投稿を保存するのに Plus は必要ですか？",
+      answer: "いいえ。Free でも保存、画像保存、著者の返信チェーン、重複スキップ、searches を使えます。Free は保存 100 件、フォルダ 5 個までで、watchlists と insights は Plus で使えます。"
+    },
+    {
+      id: "faq-2",
+      question: "どんな人が Plus を使うべきですか？",
+      answer: "保存件数が 100 件を超える人、フォルダを 5 個以上使いたい人、watchlists や insights が必要な人に向いています。同じキーを extension でも使えます。"
+    },
+    {
+      id: "faq-3",
+      question: "Plus では何が変わりますか？",
+      answer: "scrapbook は保存 1,000 件、フォルダ 50 個まで広がり、watchlists と insights が使えるようになります。同じキーを extension にも使えます。"
+    },
+    {
+      id: "faq-4",
+      question: "Plus キーはどう届きますか？",
+      answer: "支払い確認後、Plus キーをメールで送ります。"
+    },
+    {
+      id: "faq-5",
+      question: "返金ポリシーはありますか？",
+      answer: "購入から 7 日以内であれば、返金リクエストを受け付けます。"
+    }
+  ]
+});
+
+Object.assign(landingStorefrontCopy["pt-BR"].obsidian, {
+  productName: "ss-threads",
+  headline:
+    "<span class=\"headline-row\">Extension no PC. @Mentions no celular.</span><span class=\"headline-row\">Save&Sync, ss-threads</span>",
+  subheadline: "No PC, salve direto com a extensão. No celular, reúna por @mentions.",
+  priceLabel: "ss-threads Plus",
+  includedUpdates: "US$2.99 por mês · US$19.99 por ano · Free 100/5 + searches -> Plus 1000/50 + watchlists/insights",
+  heroNotes: [
+    "Chrome extension: salve o post que você está vendo agora",
+    "scrapbook Free: mention inbox + searches + Markdown / ZIP export",
+    "scrapbook Plus: watchlists e insights"
+  ],
+  links: {
+    ...landingStorefrontCopy["pt-BR"].obsidian.links,
+    productAHref: EXTENSION_RELEASE_DOWNLOAD_URL
+  },
+  faqs: [
+    {
+      id: "faq-1",
+      question: "Preciso de Plus para salvar posts?",
+      answer: "Não. Free já inclui salvamento, captura de imagens, cadeia de respostas do autor, pular duplicados e searches. Free vai até 100 posts salvos e 5 pastas; watchlists e insights entram no Plus."
+    },
+    {
+      id: "faq-2",
+      question: "Quem deve comprar Plus?",
+      answer: "É indicado para quem vai passar de 100 posts salvos, precisa de mais de 5 pastas no scrapbook ou quer watchlists e insights. A mesma chave também funciona na extensão."
+    },
+    {
+      id: "faq-3",
+      question: "O que muda no Plus?",
+      answer: "O Plus amplia o scrapbook para 1.000 posts salvos e 50 pastas, desbloqueia watchlists e insights e permite usar a mesma chave na extensão."
+    },
+    {
+      id: "faq-4",
+      question: "Como a chave Plus é entregue?",
+      answer: "Depois da confirmação do pagamento, a chave Plus é enviada para o seu email."
+    },
+    {
+      id: "faq-5",
+      question: "Existe política de reembolso?",
+      answer: "Pedidos de reembolso são aceitos em até 7 dias após a compra."
+    }
+  ]
+});
+
+Object.assign(landingStorefrontCopy.es.obsidian, {
+  productName: "ss-threads",
+  headline:
+    "<span class=\"headline-row\">Extension en PC. @Mentions en móvil.</span><span class=\"headline-row\">Save&Sync, ss-threads</span>",
+  subheadline: "En PC, guarda directamente con la extensión. En móvil, reúne por @mentions.",
+  priceLabel: "ss-threads Plus",
+  includedUpdates: "US$2.99 al mes · US$19.99 al año · Free 100/5 + searches -> Plus 1000/50 + watchlists/insights",
+  heroNotes: [
+    "Chrome extension: guarda la publicación que estás viendo ahora",
+    "scrapbook Free: mention inbox + searches + Markdown / ZIP export",
+    "scrapbook Plus: watchlists e insights"
+  ],
+  links: {
+    ...landingStorefrontCopy.es.obsidian.links,
+    productAHref: EXTENSION_RELEASE_DOWNLOAD_URL
+  },
+  faqs: [
+    {
+      id: "faq-1",
+      question: "¿Necesito Plus para guardar publicaciones?",
+      answer: "No. Free ya incluye guardado, captura de imágenes, cadena de respuestas del autor, omisión de duplicados y searches. Free llega hasta 100 publicaciones guardadas y 5 carpetas; watchlists e insights se desbloquean en Plus."
+    },
+    {
+      id: "faq-2",
+      question: "¿Quién debería comprar Plus?",
+      answer: "Está pensado para quienes superarán 100 publicaciones guardadas, necesitan más de 5 carpetas en scrapbook o quieren watchlists e insights. La misma clave también sirve en la extensión."
+    },
+    {
+      id: "faq-3",
+      question: "¿Qué cambia con Plus?",
+      answer: "Plus amplía scrapbook a 1.000 publicaciones guardadas y 50 carpetas, desbloquea watchlists e insights y permite usar la misma clave en la extensión."
+    },
+    {
+      id: "faq-4",
+      question: "¿Cómo se entrega la clave Plus?",
+      answer: "Después de confirmar el pago, la clave Plus se envía por correo electrónico."
+    },
+    {
+      id: "faq-5",
+      question: "¿Hay política de reembolso?",
+      answer: "Se aceptan solicitudes de reembolso dentro de los 7 días posteriores a la compra."
+    }
+  ]
+});
+
+Object.assign(landingStorefrontCopy["zh-TW"].obsidian, {
+  productName: "ss-threads",
+  headline:
+    "<span class=\"headline-row\">PC 用 extension。手機用 @mention。</span><span class=\"headline-row\">Save&Sync, ss-threads</span>",
+  subheadline: "在 PC 上用 extension 直接儲存，在手機上用 @mention 收集。",
+  priceLabel: "ss-threads Plus",
+  includedUpdates: "月繳 US$2.99 · 年繳 US$19.99 · Free 100/5 + searches -> Plus 1000/50 + watchlists/insights",
+  heroNotes: [
+    "Chrome extension: 儲存你正在看的貼文",
+    "scrapbook Free: mention inbox + searches + Markdown / ZIP export",
+    "scrapbook Plus: watchlists 與 insights"
+  ],
+  links: {
+    ...landingStorefrontCopy["zh-TW"].obsidian.links,
+    productAHref: EXTENSION_RELEASE_DOWNLOAD_URL
+  },
+  faqs: [
+    {
+      id: "faq-1",
+      question: "儲存貼文需要 Plus 嗎？",
+      answer: "不需要。Free 已支援儲存、圖片擷取、作者回覆串、跳過重複與 searches。Free 可用 100 篇保存與 5 個資料夾；watchlists 與 insights 會在 Plus 解鎖。"
+    },
+    {
+      id: "faq-2",
+      question: "誰適合購買 Plus？",
+      answer: "適合保存量會超過 100 篇、需要超過 5 個資料夾，或需要 watchlists 與 insights 的使用者。同一組金鑰也能用在 extension。"
+    },
+    {
+      id: "faq-3",
+      question: "Plus 會帶來哪些變化？",
+      answer: "Plus 會把 scrapbook 擴充到 1,000 篇保存與 50 個資料夾，解鎖 watchlists 與 insights，並可在 extension 共用同一組金鑰。"
+    },
+    {
+      id: "faq-4",
+      question: "Plus 金鑰會怎麼交付？",
+      answer: "付款確認後，Plus 金鑰會透過電子郵件寄送。"
+    },
+    {
+      id: "faq-5",
+      question: "有退款政策嗎？",
+      answer: "購買後 7 天內可提出退款申請。"
+    }
+  ]
+});
+
+Object.assign(landingStorefrontCopy.vi.obsidian, {
+  productName: "ss-threads",
+  headline:
+    "<span class=\"headline-row\">Extension trên PC. @Mentions trên di động.</span><span class=\"headline-row\">Save&Sync, ss-threads</span>",
+  subheadline: "Trên PC, lưu trực tiếp bằng extension. Trên di động, gom bằng @mentions.",
+  priceLabel: "ss-threads Plus",
+  includedUpdates: "US$2.99 mỗi tháng · US$19.99 mỗi năm · Free 100/5 + searches -> Plus 1000/50 + watchlists/insights",
+  heroNotes: [
+    "Chrome extension: lưu bài viết bạn đang xem ngay lúc này",
+    "scrapbook Free: mention inbox + searches + Markdown / ZIP export",
+    "scrapbook Plus: watchlists và insights"
+  ],
+  links: {
+    ...landingStorefrontCopy.vi.obsidian.links,
+    productAHref: EXTENSION_RELEASE_DOWNLOAD_URL
+  },
+  faqs: [
+    {
+      id: "faq-1",
+      question: "Tôi có cần Plus để lưu bài viết không?",
+      answer: "Không. Free đã hỗ trợ lưu, chụp ảnh, chuỗi phản hồi của tác giả, bỏ qua trùng lặp và searches. Free giới hạn ở 100 bài đã lưu và 5 thư mục; watchlists và insights mở khóa trong Plus."
+    },
+    {
+      id: "faq-2",
+      question: "Ai nên mua Plus?",
+      answer: "Phù hợp với người sẽ vượt quá 100 bài đã lưu, cần hơn 5 thư mục trong scrapbook hoặc muốn dùng watchlists và insights. Cùng một khóa cũng dùng được trong extension."
+    },
+    {
+      id: "faq-3",
+      question: "Plus thay đổi điều gì?",
+      answer: "Plus nâng scrapbook lên 1.000 bài đã lưu và 50 thư mục, mở khóa watchlists và insights, đồng thời cho phép dùng cùng một khóa trong extension."
+    },
+    {
+      id: "faq-4",
+      question: "Khóa Plus được gửi như thế nào?",
+      answer: "Sau khi thanh toán được xác nhận, khóa Plus sẽ được gửi qua email."
+    },
+    {
+      id: "faq-5",
+      question: "Có chính sách hoàn tiền không?",
+      answer: "Yêu cầu hoàn tiền được chấp nhận trong vòng 7 ngày sau khi mua."
+    }
+  ]
+});
 
 // ─── Admin messages ───────────────────────────────────────────────────────────
 
@@ -1162,7 +1589,7 @@ export type AdminMsg = {
   issueExpiryInvalid?: string;
 };
 
-export const adminMessages: Record<WebLocale, AdminMsg> = {
+export const adminMessages = applyPlanBrandingCopy({
   ko: {
     adminH1: "운영 패널",
     adminLead: "결제, 키 발급, 전달을 관리합니다.",
@@ -1635,7 +2062,7 @@ export const adminMessages: Record<WebLocale, AdminMsg> = {
     issueExpiryClear: "Clear expiry",
     issueExpiryInvalid: "Expiry must be a valid YYYY-MM-DD date.",
   }
-} as Record<WebLocale, AdminMsg>;
+}) as Record<WebLocale, AdminMsg>;
 
 Object.assign(adminMessages, secondaryAdminMessages);
 
@@ -1731,7 +2158,7 @@ export const scrapbookMessages = {
     scrapbookSearchQuery: "검색어",
     scrapbookSearchQueryPh: "openai codex",
     scrapbookSearchAuthor: "작성자 필터",
-    scrapbookSearchAuthorPh: "@parktaejun",
+    scrapbookSearchAuthorPh: "@{botHandle}",
     scrapbookSearchExcludeHandles: "제외 핸들",
     scrapbookSearchExcludeHandlesPh: "@spam1, @spam2",
     scrapbookSearchType: "검색 방식",
@@ -1943,7 +2370,7 @@ export const scrapbookMessages = {
     scrapbookSearchQuery: "Query",
     scrapbookSearchQueryPh: "openai codex",
     scrapbookSearchAuthor: "Author filter",
-    scrapbookSearchAuthorPh: "@parktaejun",
+    scrapbookSearchAuthorPh: "@{botHandle}",
     scrapbookSearchExcludeHandles: "Exclude handles",
     scrapbookSearchExcludeHandlesPh: "@spam1, @spam2",
     scrapbookSearchType: "Search mode",
@@ -2156,7 +2583,7 @@ export const scrapbookMessages = {
     scrapbookSearchQuery: "検索語",
     scrapbookSearchQueryPh: "openai codex",
     scrapbookSearchAuthor: "投稿者フィルター",
-    scrapbookSearchAuthorPh: "@parktaejun",
+    scrapbookSearchAuthorPh: "@{botHandle}",
     scrapbookSearchExcludeHandles: "除外ハンドル",
     scrapbookSearchExcludeHandlesPh: "@spam1, @spam2",
     scrapbookSearchType: "検索モード",
@@ -2369,7 +2796,7 @@ export const scrapbookMessages = {
     scrapbookSearchQuery: "Consulta",
     scrapbookSearchQueryPh: "openai codex",
     scrapbookSearchAuthor: "Filtro de autor",
-    scrapbookSearchAuthorPh: "@parktaejun",
+    scrapbookSearchAuthorPh: "@{botHandle}",
     scrapbookSearchExcludeHandles: "Handles excluídos",
     scrapbookSearchExcludeHandlesPh: "@spam1, @spam2",
     scrapbookSearchType: "Modo de busca",
@@ -2582,7 +3009,7 @@ export const scrapbookMessages = {
     scrapbookSearchQuery: "Consulta",
     scrapbookSearchQueryPh: "openai codex",
     scrapbookSearchAuthor: "Filtro de autor",
-    scrapbookSearchAuthorPh: "@parktaejun",
+    scrapbookSearchAuthorPh: "@{botHandle}",
     scrapbookSearchExcludeHandles: "Handles excluidos",
     scrapbookSearchExcludeHandlesPh: "@spam1, @spam2",
     scrapbookSearchType: "Modo de búsqueda",
@@ -2795,7 +3222,7 @@ export const scrapbookMessages = {
     scrapbookSearchQuery: "搜尋詞",
     scrapbookSearchQueryPh: "openai codex",
     scrapbookSearchAuthor: "作者篩選",
-    scrapbookSearchAuthorPh: "@parktaejun",
+    scrapbookSearchAuthorPh: "@{botHandle}",
     scrapbookSearchExcludeHandles: "排除 handles",
     scrapbookSearchExcludeHandlesPh: "@spam1, @spam2",
     scrapbookSearchType: "搜尋模式",
@@ -3008,7 +3435,7 @@ export const scrapbookMessages = {
     scrapbookSearchQuery: "Từ khóa",
     scrapbookSearchQueryPh: "openai codex",
     scrapbookSearchAuthor: "Bộ lọc tác giả",
-    scrapbookSearchAuthorPh: "@parktaejun",
+    scrapbookSearchAuthorPh: "@{botHandle}",
     scrapbookSearchExcludeHandles: "Handle loại trừ",
     scrapbookSearchExcludeHandlesPh: "@spam1, @spam2",
     scrapbookSearchType: "Chế độ tìm kiếm",

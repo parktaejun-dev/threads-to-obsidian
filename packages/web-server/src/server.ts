@@ -1,5 +1,6 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
+import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -145,6 +146,11 @@ const DEFAULT_SERVER_REQUEST_TIMEOUT_MS = 30_000;
 const DEFAULT_SERVER_HEADERS_TIMEOUT_MS = 35_000;
 const DEFAULT_SERVER_KEEP_ALIVE_TIMEOUT_MS = 5_000;
 const DEFAULT_GRACEFUL_SHUTDOWN_TIMEOUT_MS = 15_000;
+const PUBLIC_MARKETING_PAGE_CONTENT_SECURITY_POLICY =
+  "default-src 'self'; script-src 'self'; style-src 'self' https://cdn.jsdelivr.net; font-src 'self' data: https://cdn.jsdelivr.net; img-src 'self' data: https:; connect-src 'self' https://cdn.jsdelivr.net; base-uri 'none'; object-src 'none'; frame-ancestors 'none'; form-action 'self'";
+const ADMIN_PAGE_CONTENT_SECURITY_POLICY =
+  "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: https:; connect-src 'self'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'; form-action 'self'";
+let ignoredForwardedForWarningLogged = false;
 
 interface ServerConfig {
   adminToken: string;
@@ -161,6 +167,16 @@ type RuntimeConfigPatch = {
     databasePostgresUrl?: "clear" | "keep" | "replace";
     smtpPass?: "clear" | "keep" | "replace";
   };
+};
+
+type RateLimitBucket = {
+  count: number;
+  resetAt: number;
+};
+
+type RateLimitState = {
+  buckets: Map<string, RateLimitBucket>;
+  gcTimer: NodeJS.Timeout | null;
 };
 
 class RequestError extends Error {
@@ -1918,6 +1934,17 @@ function readTrustedProxyAllowlist(): Set<string> {
   );
 }
 
+function warnIgnoredForwardedForHeader(peerIp: string): void {
+  if (ignoredForwardedForWarningLogged) {
+    return;
+  }
+
+  ignoredForwardedForWarningLogged = true;
+  console.warn(
+    `[threads-web] Ignoring X-Forwarded-For from untrusted peer ${peerIp || "unknown"}. Configure THREADS_WEB_TRUST_PROXY_ALLOWLIST when running behind a reverse proxy.`
+  );
+}
+
 function readPeerIp(request: IncomingMessage): string {
   return normalizeIpAddress(request.socket.remoteAddress) || "unknown";
 }
@@ -1925,6 +1952,9 @@ function readPeerIp(request: IncomingMessage): string {
 function readClientIp(request: IncomingMessage): string {
   const peerIp = readPeerIp(request);
   if (!readTrustedProxyAllowlist().has(peerIp)) {
+    if (readForwardedValue(request.headers, "x-forwarded-for")) {
+      warnIgnoredForwardedForHeader(peerIp);
+    }
     return peerIp;
   }
 
@@ -1993,61 +2023,67 @@ type RateLimitRule = {
   windowMs: number;
 };
 
-const rateLimitBuckets = new Map<string, { count: number; resetAt: number }>();
+function createRateLimitState(): RateLimitState {
+  return {
+    buckets: new Map(),
+    gcTimer: null
+  };
+}
 
-function cleanupRateLimitBuckets(now = Date.now()): void {
-  for (const [key, bucket] of rateLimitBuckets.entries()) {
+function cleanupRateLimitBuckets(state: RateLimitState, now = Date.now()): void {
+  for (const [key, bucket] of state.buckets.entries()) {
     if (bucket.resetAt <= now) {
-      rateLimitBuckets.delete(key);
+      state.buckets.delete(key);
     }
   }
 }
 
-function enforceRateLimitBucketCap(now = Date.now()): void {
-  cleanupRateLimitBuckets(now);
+function enforceRateLimitBucketCap(state: RateLimitState, now = Date.now()): void {
+  cleanupRateLimitBuckets(state, now);
   const maxBuckets = getRateLimitBucketLimit();
-  if (rateLimitBuckets.size < maxBuckets) {
+  if (state.buckets.size < maxBuckets) {
     return;
   }
 
-  const overflowCount = rateLimitBuckets.size - maxBuckets + 1;
-  const entriesByExpiry = [...rateLimitBuckets.entries()].sort((left, right) => left[1].resetAt - right[1].resetAt);
+  const overflowCount = state.buckets.size - maxBuckets + 1;
+  const entriesByExpiry = [...state.buckets.entries()].sort((left, right) => left[1].resetAt - right[1].resetAt);
   for (let index = 0; index < overflowCount; index += 1) {
     const entry = entriesByExpiry[index];
     if (!entry) {
       break;
     }
-    rateLimitBuckets.delete(entry[0]);
+    state.buckets.delete(entry[0]);
   }
 }
 
-let rateLimitBucketGcTimer: NodeJS.Timeout | null = null;
-
-function ensureRateLimitBucketGcTimer(): void {
-  if (rateLimitBucketGcTimer) {
+function ensureRateLimitBucketGcTimer(state: RateLimitState): void {
+  if (state.gcTimer) {
     return;
   }
 
-  rateLimitBucketGcTimer = setInterval(() => {
-    cleanupRateLimitBuckets();
+  state.gcTimer = setInterval(() => {
+    cleanupRateLimitBuckets(state);
   }, RATE_LIMIT_BUCKET_GC_INTERVAL_MS);
-  rateLimitBucketGcTimer.unref?.();
+  state.gcTimer.unref?.();
 }
 
-function stopRateLimitBucketGcTimer(): void {
-  if (rateLimitBucketGcTimer) {
-    clearInterval(rateLimitBucketGcTimer);
-    rateLimitBucketGcTimer = null;
+function stopRateLimitBucketGcTimer(state: RateLimitState): void {
+  if (state.gcTimer) {
+    clearInterval(state.gcTimer);
+    state.gcTimer = null;
   }
+  state.buckets.clear();
 }
-
-ensureRateLimitBucketGcTimer();
 
 function getRateLimitRule(pathname: string, method: string): RateLimitRule | null {
   const normalizedMethod = method.toUpperCase();
 
   if (pathname.startsWith("/api/admin/")) {
     return { name: "admin-api", windowMs: 10 * 60_000, maxRequests: 240, keyScope: "auth" };
+  }
+
+  if (pathname === "/api/public/orders" && normalizedMethod === "POST") {
+    return { name: "public-order-create", windowMs: 10 * 60_000, maxRequests: 10, keyScope: "ip" };
   }
 
   if (pathname === "/api/extension/cloud/save" && normalizedMethod === "POST") {
@@ -2102,7 +2138,7 @@ function buildRateLimitKey(request: IncomingMessage, rule: RateLimitRule): strin
   return `${rule.name}:ip:${readClientIp(request)}`;
 }
 
-function assertRateLimit(request: IncomingMessage, pathname: string, method: string): void {
+function assertRateLimit(state: RateLimitState, request: IncomingMessage, pathname: string, method: string): void {
   const rule = getRateLimitRule(pathname, method);
   if (!rule) {
     return;
@@ -2110,10 +2146,10 @@ function assertRateLimit(request: IncomingMessage, pathname: string, method: str
 
   const now = Date.now();
   const key = buildRateLimitKey(request, rule);
-  const existing = rateLimitBuckets.get(key);
+  const existing = state.buckets.get(key);
   if (!existing || existing.resetAt <= now) {
-    enforceRateLimitBucketCap(now);
-    rateLimitBuckets.set(key, {
+    enforceRateLimitBucketCap(state, now);
+    state.buckets.set(key, {
       count: 1,
       resetAt: now + rule.windowMs
     });
@@ -2125,7 +2161,7 @@ function assertRateLimit(request: IncomingMessage, pathname: string, method: str
   }
 
   existing.count += 1;
-  rateLimitBuckets.set(key, existing);
+  state.buckets.set(key, existing);
 }
 
 function shouldRedirectLegacyPublicPage(request: IncomingMessage, requestUrl: URL): URL | null {
@@ -2162,7 +2198,7 @@ function resolveLandingMeta(_siteHost: string): { title: string; description: st
   const botHandle = getBotPublicConfig().botHandle;
   const publicHost = resolvePreferredPublicOrigin().replace(/^https?:\/\//, "");
   return {
-    title: "SS Threads",
+    title: "ss-threads",
     description: `Threads 저장용 Chrome extension과 @${botHandle} mention scrapbook을 ${publicHost}에서 함께 제공합니다.`
   };
 }
@@ -2661,13 +2697,44 @@ function resolveStaticPath(candidate: string): string | null {
     return null;
   }
 
-  const absolutePath = path.resolve(__dirname, normalized);
-  const basePath = path.resolve(__dirname);
-  if (!absolutePath.startsWith(`${basePath}${path.sep}`) && absolutePath !== basePath) {
-    return null;
+  for (const basePath of [path.resolve(__dirname), path.resolve(__dirname, "../../../dist/web")]) {
+    const absolutePath = path.resolve(basePath, normalized);
+    if (!absolutePath.startsWith(`${basePath}${path.sep}`) && absolutePath !== basePath) {
+      continue;
+    }
+
+    if (existsSync(absolutePath)) {
+      return absolutePath;
+    }
   }
 
-  return absolutePath;
+  return null;
+}
+
+function buildStaticAssetHeaders(contentType: string): Record<string, string> {
+  return {
+    "content-type": contentType,
+    "x-content-type-options": "nosniff"
+  };
+}
+
+function buildPublicMarketingPageHeaders(contentType: string): Record<string, string> {
+  return {
+    ...buildStaticAssetHeaders(contentType),
+    "content-security-policy": PUBLIC_MARKETING_PAGE_CONTENT_SECURITY_POLICY,
+    "referrer-policy": "strict-origin-when-cross-origin",
+    "x-frame-options": "DENY"
+  };
+}
+
+function buildAdminPageHeaders(contentType: string): Record<string, string> {
+  return {
+    ...buildStaticAssetHeaders(contentType),
+    "cache-control": "no-store",
+    "content-security-policy": ADMIN_PAGE_CONTENT_SECURITY_POLICY,
+    "referrer-policy": "no-referrer",
+    "x-frame-options": "DENY"
+  };
 }
 
 async function serveStatic(request: IncomingMessage, response: ServerResponse, pathname: string): Promise<boolean> {
@@ -2692,9 +2759,7 @@ async function serveStatic(request: IncomingMessage, response: ServerResponse, p
           .replaceAll("__SITE_HOST__", escapeHtml(siteHost))
           .replaceAll("__INITIAL_LOCALE__", escapeHtml(initialLocale));
 
-        response.writeHead(200, {
-          "content-type": MIME_TYPES[extension] ?? "application/octet-stream"
-        });
+        response.writeHead(200, buildPublicMarketingPageHeaders(MIME_TYPES[extension] ?? "application/octet-stream"));
         response.end(contents);
         return true;
       }
@@ -2710,32 +2775,20 @@ async function serveStatic(request: IncomingMessage, response: ServerResponse, p
           .replaceAll("__SITE_URL__", escapeHtml(siteUrl))
           .replaceAll("__SITE_HOST__", escapeHtml(siteHost));
 
-        response.writeHead(200, {
-          "content-type": MIME_TYPES[extension] ?? "application/octet-stream"
-        });
+        response.writeHead(200, buildPublicMarketingPageHeaders(MIME_TYPES[extension] ?? "application/octet-stream"));
         response.end(contents);
         return true;
       }
 
       if (relativePath === "admin/index.html") {
         const contents = await readFile(absolutePath);
-        response.writeHead(200, {
-          "cache-control": "no-store",
-          "content-security-policy":
-            "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: https:; connect-src 'self'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'; form-action 'self'",
-          "content-type": MIME_TYPES[extension] ?? "application/octet-stream",
-          "referrer-policy": "no-referrer",
-          "x-content-type-options": "nosniff",
-          "x-frame-options": "DENY"
-        });
+        response.writeHead(200, buildAdminPageHeaders(MIME_TYPES[extension] ?? "application/octet-stream"));
         response.end(contents);
         return true;
       }
 
       const contents = await readFile(absolutePath);
-      response.writeHead(200, {
-        "content-type": MIME_TYPES[extension] ?? "application/octet-stream"
-      });
+      response.writeHead(200, buildStaticAssetHeaders(MIME_TYPES[extension] ?? "application/octet-stream"));
       response.end(contents);
       return true;
     } catch {
@@ -4966,7 +5019,8 @@ async function handleRequest(
   request: IncomingMessage,
   response: ServerResponse,
   config: ServerConfig,
-  collector: BotMentionCollector
+  collector: BotMentionCollector,
+  rateLimitState: RateLimitState
 ): Promise<void> {
   let requestUrl: URL;
   try {
@@ -4995,7 +5049,7 @@ async function handleRequest(
     if (pathname.startsWith("/api/admin/") || pathname === "/admin" || pathname === "/admin/" || pathname.startsWith("/admin/")) {
       assertAdminOriginAllowed(request, requestUrl);
     }
-    assertRateLimit(request, pathname, method);
+    assertRateLimit(rateLimitState, request, pathname, method);
     if (pathname.startsWith("/api/admin/")) {
       assertAdminIpAllowed(request);
     }
@@ -5114,7 +5168,8 @@ function createWebRuntime(port?: number): {
     runTransaction: withDatabaseTransaction,
     loadDatabase
   });
-  ensureRateLimitBucketGcTimer();
+  const rateLimitState = createRateLimitState();
+  ensureRateLimitBucketGcTimer(rateLimitState);
   configureMonitoringService({
     getCollectorStatus: () => collector.getStatus()
   });
@@ -5139,7 +5194,7 @@ function createWebRuntime(port?: number): {
       }
 
       try {
-        await handleRequest(request, response, config, collector);
+        await handleRequest(request, response, config, collector, rateLimitState);
       } finally {
         const completedAt = new Date().toISOString();
         const durationMs = Math.max(0, Date.now() - startedAtMs);
@@ -5168,7 +5223,7 @@ function createWebRuntime(port?: number): {
     shutdown: async () => {
       collector.stop();
       stopMonitoringService();
-      stopRateLimitBucketGcTimer();
+      stopRateLimitBucketGcTimer(rateLimitState);
       await closeDatabaseConnections();
     }
   };
@@ -5188,7 +5243,7 @@ export function startWebServer(port?: number): import("node:http").Server {
   server.keepAliveTimeout = getServerKeepAliveTimeoutMs();
 
   server.listen(config.port, () => {
-    console.log(`SS Threads Plus web app running at http://127.0.0.1:${config.port}`);
+    console.log(`ss-threads Plus web app running at http://127.0.0.1:${config.port}`);
   });
 
   collector.start();

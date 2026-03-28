@@ -8,7 +8,7 @@
 
 ## 결론 요약
 
-이전에 작성된 보고서는 잘못된 라인 번호와 코드를 읽지 않은 주장이 다수 포함되어 있었다. 직접 확인한 결과, **이 코드베이스는 상당히 잘 만들어진 프로덕션급 서버**로, 대부분의 보안 핵심 항목이 이미 올바르게 구현되어 있다. 실제 문제는 3개 중간 등급 이슈와 2개 낮은 등급 이슈로 제한된다.
+이전에 작성된 보고서는 잘못된 라인 번호와 코드를 읽지 않은 주장이 다수 포함되어 있었다. 직접 확인한 결과, **이 코드베이스는 상당히 잘 만들어진 프로덕션급 서버**로, 대부분의 보안 핵심 항목이 이미 올바르게 구현되어 있다. 실제 이슈는 **2 medium / 1 low**에 그친다.
 
 ---
 
@@ -34,17 +34,17 @@
 
 ### 🟡 MEDIUM-1 — `POST /api/public/orders` Rate Limit 없음
 
-**위치:** `getRateLimitRule()` (`server.ts:2031-2064`) — `/api/public/orders` 경로 누락
+**위치:** `getRateLimitRule()` (`server.ts:2046`) — `/api/public/orders` 경로 규칙 없음
 
 **상황:**
-- 이 엔드포인트는 Origin 검사(`getMutationOriginPolicy`)는 받지만 rate limit 규칙이 없음
-- 인증 없이 호출 가능
+- 전역 `assertRateLimit()`는 호출되지만, 이 경로에 매칭되는 규칙이 없어 실질적으로 제한 없이 통과
+- 인증 없이 호출 가능 (`server.ts:3035`)
 - 호출 시 DB에 `pending` 상태 주문 레코드 생성
 
 **실제 위험 수준:**
 - 결제 웹훅 없이는 라이선스가 발급되지 않으므로 금전적 피해 없음
-- 단기간 대량 호출 시 DB 레코드 과부하, 관리자 대시보드 오염 가능
-- paymentMethod의 `enabled` 검사로 유효하지 않은 결제 수단 차단됨
+- 단기간 대량 호출 시 DB 레코드 누적, 관리자 대시보드 오염 가능
+- `paymentMethod.enabled` 검사로 비활성 결제 수단 차단됨
 
 **권고:** IP 기반 rate limit 추가 (예: 10분간 10회)
 
@@ -52,77 +52,28 @@
 
 ### 🟡 MEDIUM-2 — 공개 페이지 보안 헤더 미적용
 
-**위치:** `serveStaticFile()` (`server.ts:2680, 2698, 2720-2724`)
+**위치:** `serveStaticFile()` (`server.ts:2695, 2713, 2722`)
 
 **상황:**
 - `/admin/index.html`: CSP + X-Frame-Options + X-Content-Type-Options + Referrer-Policy 모두 적용됨 ✅
-- `landing/index.html`, `checkout/index.html`, `scrapbook/index.html`, 기타 정적 파일: `content-type` 헤더만 존재
+- `landing/index.html`, `checkout/index.html`, 기타 정적 파일: `content-type` 헤더만 존재
 
 **누락된 헤더:**
 - `X-Frame-Options: DENY` 또는 `frame-ancestors 'none'` — checkout 페이지 클릭재킹 방어
 - `X-Content-Type-Options: nosniff` — MIME 스니핑 방어
-- `Strict-Transport-Security` — 코드베이스 전체에 HSTS 헤더 없음
 
-**HSTS 관련:** 리버스 프록시(Nginx/Caddy)에서 설정하거나 서버 코드에 추가 가능. 현재 어느 쪽에도 없음.
+**HSTS 관련:** 앱 코드보다 TLS 종료 프록시(Nginx/Caddy)에서 거는 성격이 크므로 배포 설정 항목으로 분류.
 
 **참고:** Landing/checkout 페이지 HTML 템플릿 주입 시 `escapeHtml()` 일관 적용 확인 — SSR XSS는 방어됨
 
 ---
 
-### 🟡 MEDIUM-3 — 구조적 요청 로그 없음
+### 🟢 LOW-1 — 리버스 프록시 미설정 시 Rate Limit IP 판별 오동작
 
-**위치:** `logUnexpectedError()` (`server.ts:2854-2856`)
-
-```typescript
-function logUnexpectedError(context: string, error: unknown): void {
-  console.error(`[threads-web] ${context}:`, error);
-}
-```
+**위치:** `readClientIp()` (`server.ts:1908, 1925`), `.env.example:10`
 
 **상황:**
-- 예외 발생 시 `console.error`만 존재
-- HTTP 요청별 access log 없음 (method, path, status, latency)
-- 관리자 액션 감사 로그 없음
-- 웹훅 처리 성공/실패 로그 있음 (`appendWebhookHistory` → DB 기록) — 웹훅은 예외
-
-**실제 영향:** 프로덕션 장애 시 원인 추적이 어려움. PM2 logs 또는 CloudWatch 등 외부 집계를 쓰더라도 요청 수준 정보가 없으면 디버깅에 한계
-
----
-
-### 🟢 LOW-1 — 웹훅 이벤트 전역 dedupe 저장소 없음
-
-**위치:** `processWebhookForOrder()` (`server.ts:3770`)
-
-**상황:**
-```typescript
-// 현재: 주문에 eventId를 저장하고 같은 조합 재진입 차단
-if (hints.eventId && order.paymentProviderEventId === hints.eventId && order.status === "key_issued") {
-  return { reason: "already_processed", ... };
-}
-```
-
-주문 레코드 자체에 `paymentProviderEventId`를 기록해 같은 주문-이벤트 조합의 재처리를 막는 방어는 있음.
-
-**실제 한계:** 동일 eventId가 다른 주문과 매칭될 경우(극히 드문 엣지케이스) 방어 안 됨. 이벤트 전용 ledger가 있으면 provider + eventId 단위로 완전한 멱등성 보장 가능.
-
----
-
-### 🟢 LOW-2 — 리버스 프록시 미설정 시 Rate Limit IP 판별 오동작
-
-**위치:** `readClientIp()` (`server.ts:1910-1922`)
-
-**상황:**
-```typescript
-function readClientIp(request: IncomingMessage): string {
-  const peerIp = readPeerIp(request);
-  if (!readTrustedProxyAllowlist().has(peerIp)) {
-    return peerIp;  // proxy allowlist 없으면 X-Forwarded-For 무시 (안전)
-  }
-  return normalizeIpAddress(readForwardedValue(...));
-}
-```
-
-`THREADS_WEB_TRUST_PROXY_ALLOWLIST` 미설정 시 X-Forwarded-For를 무시하고 소켓 IP 사용 — IP 스푸핑은 방어되나, Nginx 뒤에 배포할 경우 모든 요청이 `127.0.0.1`로 집계되어 rate limit이 의도대로 동작하지 않음.
+`THREADS_WEB_TRUST_PROXY_ALLOWLIST` 미설정 시 `X-Forwarded-For`를 무시하고 소켓 IP 사용 — IP 스푸핑은 방어되나, Nginx 뒤에 배포하면 모든 요청이 `127.0.0.1`로 집계되어 rate limit이 의도대로 동작하지 않음.
 
 `.env.example`에 문서화되어 있으나 배포 체크리스트에 명시 필요.
 
@@ -151,9 +102,9 @@ function readClientIp(request: IncomingMessage): string {
 | Admin 페이지 강한 CSP + X-Frame-Options | `server.ts:2705-2717` | ✅ |
 | 요청 본문 크기 제한 (기본 1MB) | `server.ts:118` | ✅ |
 | 내부 모니터링 서비스 (자동 체크, incident 기록) | `monitoring-service.ts:300` | ✅ |
-| 웹훅 처리 이력 DB 기록 | `server.ts:2889-2909` | ✅ |
-| 주문 레벨 웹훅 재처리 차단 | `server.ts:2947-2953, 3770-3793` | ✅ |
-| `X-Forwarded-For` 신뢰 프록시 허용목록 방어 | `server.ts:1892-1922` | ✅ |
+| 구조적 request 로그 (`appendRequestLog` + `emitStructuredRequestLog`) — stdout은 `THREADS_WEB_STRUCTURED_REQUEST_LOGS=1`로 활성화 | `request-observability.ts:14, 35, 86`, `server.ts:5128` | ✅ |
+| 웹훅 이벤트 `provider + eventId` dedupe ledger (`isProcessedWebhookDuplicate`) | `webhook-ledger.ts:11, 19, 89`, `server.ts:3996` | ✅ |
+| `X-Forwarded-For` 신뢰 프록시 허용목록 방어 | `server.ts:1908, 1925` | ✅ |
 
 ---
 
@@ -177,8 +128,8 @@ function readClientIp(request: IncomingMessage): string {
 
 보안 강화 (권고)
 [ ] POST /api/public/orders에 IP rate limit 추가 (MEDIUM-1)
-[ ] checkout/landing 페이지 X-Frame-Options: DENY 추가 (MEDIUM-2)
-[ ] 요청 access log 추가 또는 외부 APM 연동 (MEDIUM-3)
+[ ] checkout/landing 페이지 X-Frame-Options: DENY, X-Content-Type-Options: nosniff 추가 (MEDIUM-2)
+[ ] THREADS_WEB_STRUCTURED_REQUEST_LOGS=1 설정 시 stdout JSON 로그 활성화 확인
 
 운영
 [ ] /ready 엔드포인트로 DB 연결 확인
@@ -193,4 +144,4 @@ function readClientIp(request: IncomingMessage): string {
 
 **배포 가능: 즉시 가능 (리버스 프록시 + 필수 환경변수 설정 후)**
 
-코드베이스 자체의 보안, 안정성, 서버 가용성은 상업 서비스 수준에 도달해 있다. 확인된 세 개의 중간 등급 이슈는 서비스 중단이나 금전 피해를 유발하지 않으며, 운영 시작 후 단계적으로 보강 가능하다.
+코드베이스 자체의 보안, 안정성, 서버 가용성은 상업 서비스 수준에 도달해 있다. P0 blocker 없음. 남은 실제 이슈는 `order 생성 rate limit`(MEDIUM-1)과 `public page 보안 헤더`(MEDIUM-2) 두 개가 핵심이며, 리버스 프록시 IP 설정(LOW-1)은 배포 시 체크리스트 항목이다. 모두 서비스 중단이나 금전 피해와 무관하며 운영 시작 후 보강 가능하다.

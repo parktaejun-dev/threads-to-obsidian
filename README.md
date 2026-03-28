@@ -10,14 +10,14 @@
 
 ### 소개
 
-Threads 글을 PC Chrome에서 Obsidian 또는 Notion으로 저장하는 Chrome 확장 프로그램이며, `@parktaejun` 멘션으로 모으는 web scrapbook 백엔드도 함께 포함합니다. 공개 웹 진입점은 `https://ss-threads.dahanda.dev` 단일 도메인으로 통합합니다.
+Threads 글을 PC Chrome에서 Obsidian 또는 Notion으로 저장하는 Chrome 확장 프로그램이며, 설정된 scrapbook bot handle 멘션으로 모으는 web scrapbook 백엔드도 함께 포함합니다. 공개 웹 진입점은 `https://ss-threads.dahanda.dev` 단일 도메인으로 통합합니다.
 
 ### 주요 기능
 
 - **Obsidian 직접 저장** — 연결된 폴더에 마크다운 + 이미지를 바로 기록
 - **Notion 저장** — Free는 parent page에 저장하고, 고급 Notion 저장은 동일한 Plus 키로 확장 가능
 - **ZIP 다운로드 폴백** — 폴더 연결 없이도 ZIP 파일로 저장 가능
-- **Mention scrapbook** — `@parktaejun` 멘션을 서버가 받아 사용자별 private scrapbook에 적재
+- **Mention scrapbook** — 설정된 scrapbook bot handle 멘션을 서버가 받아 사용자별 private scrapbook에 적재
 - **Threads OAuth 로그인** — Threads 계정 로그인으로 scrapbook 계정을 연결
 - **Free 한도** — scrapbook 저장글 100개, 폴더 5개
 - **Plus 한도** — scrapbook 저장글 1,000개, 폴더 50개
@@ -96,6 +96,13 @@ cp .env.example .env  # 운영용 변수 입력 후 서버 실행에 사용
 
 상세 배포 구조와 운영 토폴로지는 `docs/deployment-architecture.md`를 본다.
 
+현재 운영 서버 기준:
+
+- SSH alias: `openclaw-oracle`
+- 배포 경로: `/home/ubuntu/projects/threads`
+- PM2 앱 이름: `threads-obsidian`
+- public origin: `https://ss-threads.dahanda.dev`
+
 환경변수 예시:
 
 ```bash
@@ -113,7 +120,7 @@ cp .env.example .env
 - `THREADS_WEB_PORT` (선택: 기본값 `4173`)
 - `THREADS_WEB_MAX_BODY_BYTES` (선택: 기본값 `1_000_000`, 최대 `2_000_000`)
 - `THREADS_WEB_PUBLIC_ORIGIN` (선택: 예시 `https://ss-threads.dahanda.dev`, 랜딩 canonical/공개 URL 고정)
-- `THREADS_BOT_HANDLE` (scrapbook 봇 handle, 예: `parktaejun`)
+- `THREADS_BOT_HANDLE` (scrapbook 봇 handle, 예: `ss_threads_bot`)
 - `THREADS_BOT_APP_ID` (scrapbook Threads OAuth 사용 시 필수)
 - `THREADS_BOT_APP_SECRET` (scrapbook Threads OAuth 사용 시 필수)
 - `THREADS_BOT_GRAPH_API_VERSION` (선택: Threads Graph API 버전 prefix)
@@ -154,6 +161,41 @@ npm run build
 pm2 start ecosystem.config.cjs
 pm2 save
 ```
+
+현재 운영 서버 재배포 예시:
+
+```bash
+# 1) 로컬 변경분을 운영 서버에 동기화
+rsync -az --delete \
+  --exclude '.git' \
+  --exclude 'node_modules' \
+  --exclude 'dist' \
+  --exclude 'output' \
+  --exclude '.env' \
+  --exclude '.claude' \
+  --exclude '.playwright-cli' \
+  --exclude 'tsconfig.tests.tsbuildinfo' \
+  ./ openclaw-oracle:/home/ubuntu/projects/threads/
+
+# 2) 서버에서 build + PM2 restart
+ssh openclaw-oracle '
+  cd /home/ubuntu/projects/threads &&
+  npm run build &&
+  pm2 restart threads-obsidian --update-env &&
+  pm2 save
+'
+
+# 3) 배포 후 헬스 체크
+curl -fsS https://ss-threads.dahanda.dev/health
+curl -fsS https://ss-threads.dahanda.dev/ready
+curl -fsS https://ss-threads.dahanda.dev/api/public/storefront | jq '.settings'
+```
+
+중요:
+
+- 현재 운영 백엔드는 `postgres`다.
+- storefront 설정은 DB에 영구 저장되므로, 가격/플랜/FAQ 문구를 바꿨을 때 코드 기본값만 배포해서는 운영 화면이 바뀌지 않을 수 있다.
+- 이런 변경이 있으면 `/api/admin/storefront-settings` 또는 admin 화면에서 persisted storefront 설정도 같이 갱신해야 한다.
 
 ### Supabase 멀티유저 전환
 
@@ -210,7 +252,7 @@ Mention scrapbook 흐름:
 
 1. `/scrapbook` 에서 `Threads로 로그인` 버튼으로 계정을 연결
 2. Threads OAuth 승인 후 내 계정 세션이 scrapbook에 생성
-3. Threads에서 저장할 글에 `@parktaejun` 멘션 댓글 작성
+3. Threads에서 저장할 글에 `@<THREADS_BOT_HANDLE>` 멘션 댓글 작성
 4. 백그라운드 mention collector가 Threads API에서 새 멘션을 읽어 사용자 기준 scrapbook에 반영
 5. 웹에서 Markdown 복사 또는 `.md` 다운로드
 
@@ -318,7 +360,7 @@ A Chrome extension that saves Threads posts to Obsidian or Notion from desktop C
 - **Direct Obsidian Save** — Write Markdown + images directly to a connected vault folder
 - **Notion Save** — Free saves under a parent page, and advanced Notion save can be unlocked with the same Plus key
 - **ZIP Download Fallback** — Save as ZIP when no folder is connected
-- **Mention Scrapbook** — Collect posts into a per-user private scrapbook through `@parktaejun` mentions
+- **Mention Scrapbook** — Collect posts into a per-user private scrapbook through the configured scrapbook bot handle mention
 - **Threads OAuth Sign-in** — Link a Threads account to the scrapbook experience
 - **Free limits** — 100 saved scrapbook posts and 5 folders
 - **Plus limits** — 1,000 saved scrapbook posts and 50 folders
@@ -406,6 +448,7 @@ Required `.env` values:
 - `THREADS_WEB_PORT` (optional, default: `4173`)
 - `THREADS_WEB_MAX_BODY_BYTES` (optional, default: `1_000_000`, max `2_000_000`)
 - `THREADS_WEB_PUBLIC_ORIGIN` (optional, example: `https://ss-threads.dahanda.dev`, pins the public landing origin/canonical URL)
+- `THREADS_WEB_TRUST_PROXY_ALLOWLIST` (recommended when the app is behind Nginx, Caddy, or a load balancer so admin IP allowlists and IP-based rate limits use the real client IP)
 - `THREADS_NOTION_CLIENT_ID` (required for Notion OAuth)
 - `THREADS_NOTION_CLIENT_SECRET` (required for Notion OAuth)
 - `THREADS_NOTION_ENCRYPTION_SECRET` (recommended dedicated secret for encrypting Notion OAuth tokens)
