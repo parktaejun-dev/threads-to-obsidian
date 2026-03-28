@@ -1,6 +1,6 @@
 import type { LicenseActivationState } from "./types";
 
-export const PRIMARY_BACKEND_ORIGIN = "https://threads-archive.dahanda.dev";
+export const PRIMARY_BACKEND_ORIGIN = "https://ss-threads.dahanda.dev";
 export const BACKEND_ORIGINS = [PRIMARY_BACKEND_ORIGIN];
 export const PRO_ACTIVATION_ORIGIN = PRIMARY_BACKEND_ORIGIN;
 const PRO_ACTIVATION_PATH = "/api/public/licenses";

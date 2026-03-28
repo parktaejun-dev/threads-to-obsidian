@@ -35,7 +35,7 @@ The extension makes the following network requests only when you use a related f
 - **Threads pages** (`threads.com`, `threads.net`): The content script reads the already-loaded page DOM from the tab you chose to save. The extension does not upload extracted post content back to Threads or to the developer.
 - **Image CDNs** (`cdninstagram.com`, `fbcdn.net`): When "Save images" is enabled for local archives, the browser requests public image or video files from Meta's CDNs so they can be written into the local archive.
 - **Optional AI endpoint** (user-selected OpenAI-compatible endpoint): When AI organization is enabled, the extension sends the post text and visible metadata of the content you explicitly save directly to the endpoint you configured. This is used to generate optional summaries, tags, and extra frontmatter.
-- **Developer backend** (`threads-archive.dahanda.dev`): When you activate, validate, or release a Pro key, or when you use Notion OAuth saving, the extension sends the Pro token, a generated device ID, and a device label such as `Chrome on macOS` to the developer-controlled backend. For Notion saves, the extension also sends the explicitly saved Threads post content and any locally generated AI summary/tag output so the backend can create a page in your connected Notion workspace. The backend stores the user's Notion OAuth tokens server-side so the browser does not need to store them locally.
+- **Developer backend** (`ss-threads.dahanda.dev`): When you activate, validate, or release a Pro key, or when you use Notion OAuth saving, the extension sends the Pro token, a generated device ID, and a device label such as `Chrome on macOS` to the developer-controlled backend. For Notion saves, the extension also sends the explicitly saved Threads post content and any locally generated AI summary/tag output so the backend can create a page in your connected Notion workspace. The backend stores the user's Notion OAuth tokens server-side so the browser does not need to store them locally.
 
 The extension contains no analytics, telemetry, advertising, or tracking code.
 
@@ -48,7 +48,7 @@ The extension contains no analytics, telemetry, advertising, or tracking code.
 | `tabs` | Check the active tab URL so the extension only runs on supported Threads permalink pages |
 | `scripting` | Re-inject the content script if the page loaded before the extension |
 | Host: `threads.com`, `threads.net` | Run the content script on Threads post pages |
-| Host: `threads-archive.dahanda.dev` | Reach the Pro activation API and Notion save backend |
+| Host: `ss-threads.dahanda.dev` | Reach the Pro activation API and Notion save backend |
 | Optional host: `cdninstagram.com`, `fbcdn.net` | Fetch post media for local saving when you approve the optional permission |
 | Optional host: user-selected AI endpoint | Call the OpenAI-compatible LLM endpoint you configure when AI organization is enabled |
 

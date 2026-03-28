@@ -12,6 +12,13 @@ import {
   type WebLocale
 } from "../lib/web-i18n";
 
+interface BotPublicConfig {
+  botHandle: string;
+}
+
+const LEGACY_BOT_HANDLE = "parktaejun";
+const DEFAULT_BOT_HANDLE = "your-bot";
+
 const headline = document.querySelector<HTMLElement>("#headline");
 const subheadline = document.querySelector<HTMLElement>("#subheadline");
 const priceValue = document.querySelector<HTMLElement>("#price-value");
@@ -32,11 +39,38 @@ const landingVariant = getLandingVariant(siteHost);
 let storefront: PublicStorefrontResponse | null = null;
 let msg: LandingMsg = landingMessages.ko[landingVariant];
 let currentLocale: WebLocale = getLocale(initialLocaleHint ?? "en");
+let currentBotHandle = DEFAULT_BOT_HANDLE;
 
 function buildTranslationDict(copy: LandingMsg): Record<string, string> {
   return Object.fromEntries(
     Object.entries(copy).filter(([, value]) => typeof value === "string")
   ) as Record<string, string>;
+}
+
+function normalizeBotHandle(value: string | null | undefined): string {
+  return `${value ?? ""}`.trim().replace(/^@+/, "") || DEFAULT_BOT_HANDLE;
+}
+
+function replaceLegacyBotHandle(value: string): string {
+  return value.replaceAll(`@${LEGACY_BOT_HANDLE}`, `@${currentBotHandle}`);
+}
+
+function applyBotHandleToCopy<T>(value: T): T {
+  if (typeof value === "string") {
+    return replaceLegacyBotHandle(value) as T;
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((entry) => applyBotHandleToCopy(entry)) as T;
+  }
+
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, entry]) => [key, applyBotHandleToCopy(entry)])
+    ) as T;
+  }
+
+  return value;
 }
 
 function setHref(element: HTMLAnchorElement | null, href: string): void {
@@ -47,13 +81,13 @@ function setHref(element: HTMLAnchorElement | null, href: string): void {
 }
 
 function renderLocalizedStorefront(locale: WebLocale): void {
-  const copy = landingStorefrontCopy[locale][landingVariant];
+  const copy = applyBotHandleToCopy(landingStorefrontCopy[locale][landingVariant]);
 
   if (brandName) {
     brandName.textContent = copy.productName;
   }
   if (headline) {
-    headline.textContent = copy.headline;
+    headline.innerHTML = copy.headline;
   }
   if (subheadline) {
     subheadline.textContent = copy.subheadline;
@@ -96,9 +130,20 @@ async function loadStorefront(): Promise<void> {
   renderLocalizedStorefront(currentLocale);
 }
 
+async function loadBotConfig(): Promise<void> {
+  const response = await fetch("/api/public/bot/config");
+  if (!response.ok) {
+    throw new Error("Could not load bot config.");
+  }
+
+  const config = (await response.json()) as BotPublicConfig;
+  currentBotHandle = normalizeBotHandle(config.botHandle);
+  applyLocale(currentLocale);
+}
+
 function applyLocale(locale: WebLocale): void {
   currentLocale = locale;
-  msg = landingMessages[locale][landingVariant];
+  msg = applyBotHandleToCopy(landingMessages[locale][landingVariant]);
   document.documentElement.lang = locale;
   applyTranslations(buildTranslationDict(msg));
   applyLangToggle(locale);
@@ -113,9 +158,8 @@ void (async () => {
     applyLocale(next);
   });
 
-  try {
-    await loadStorefront();
-  } catch {
-    // Storefront data is optional for landing display.
-  }
+  await Promise.allSettled([
+    loadBotConfig(),
+    loadStorefront()
+  ]);
 })();

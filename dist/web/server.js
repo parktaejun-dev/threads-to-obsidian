@@ -10184,7 +10184,9 @@ function buildDefaultDatabase(now = (/* @__PURE__ */ new Date()).toISOString()) 
     trackedPosts: [],
     insightsSnapshots: [],
     savedViews: [],
-    history: []
+    history: [],
+    monitorRuns: [],
+    monitorIncidents: []
   };
 }
 
@@ -10196,12 +10198,13 @@ var DEFAULT_RUNTIME_CONFIG_FILE = path.resolve(process.cwd(), "output", "web-run
 var DEFAULT_DB_FILE = path.resolve(process.cwd(), "output", "web-admin-data.json");
 var DEFAULT_POSTGRES_TABLE = "threads_web_store";
 var DEFAULT_POSTGRES_STORE_KEY = "default";
-var DEFAULT_PUBLIC_ORIGIN = "https://threads-archive.dahanda.dev";
+var DEFAULT_PUBLIC_ORIGIN = "https://ss-threads.dahanda.dev";
 var DEFAULT_SMTP_PORT = 587;
 var DEFAULT_COLLECTOR_INTERVAL_MS = 6e4;
 var DEFAULT_COLLECTOR_FETCH_LIMIT = 25;
 var DEFAULT_COLLECTOR_MAX_PAGES = 5;
 var MAX_COLLECTOR_FETCH_LIMIT = 100;
+var BOT_HANDLE_PATTERN = /^[a-z0-9._]+$/;
 function trimEnv(name) {
   return process.env[name]?.trim() ?? "";
 }
@@ -10226,6 +10229,13 @@ function normalizeOrigin(raw, fallback) {
   } catch {
     return fallback;
   }
+}
+function normalizeBotHandle(raw) {
+  const normalized = `${raw ?? ""}`.trim().replace(/^@+/, "").toLowerCase();
+  if (!normalized || !BOT_HANDLE_PATTERN.test(normalized)) {
+    return "";
+  }
+  return normalized;
 }
 function getRuntimeConfigFilePath() {
   return trimEnv("THREADS_WEB_RUNTIME_CONFIG_FILE") || DEFAULT_RUNTIME_CONFIG_FILE;
@@ -10318,8 +10328,10 @@ function normalizeSmtpConfig(parsed, fallback) {
   };
 }
 function normalizeCollectorConfig(parsed, fallback) {
+  const fallbackBotHandle = normalizeBotHandle(fallback.botHandle ?? "");
+  const nextBotHandle = normalizeBotHandle(parsed?.botHandle ?? fallbackBotHandle);
   return {
-    botHandle: `${parsed?.botHandle ?? fallback.botHandle ?? ""}`.trim(),
+    botHandle: nextBotHandle || fallbackBotHandle,
     accessTokenOverride: `${parsed?.accessTokenOverride ?? fallback.accessTokenOverride ?? ""}`.trim(),
     graphApiVersion: `${parsed?.graphApiVersion ?? fallback.graphApiVersion ?? ""}`.trim(),
     intervalMs: parsePositiveInteger(parsed?.intervalMs, fallback.intervalMs, 5e3, 864e5),
@@ -10540,6 +10552,8 @@ function normalizeDatabasePayload(raw) {
     status: candidate?.status === "completed" ? "completed" : candidate?.status === "expired" ? "expired" : candidate?.status === "failed" ? "failed" : "pending"
   }));
   const settings = normalizeStorefrontSettings(parsed.settings, fallback.settings);
+  const monitorRuns = Array.isArray(parsed.monitorRuns) ? parsed.monitorRuns : [];
+  const monitorIncidents = Array.isArray(parsed.monitorIncidents) ? parsed.monitorIncidents : [];
   return {
     settings,
     paymentMethods: Array.isArray(parsed.paymentMethods) ? parsed.paymentMethods : fallback.paymentMethods,
@@ -10562,7 +10576,9 @@ function normalizeDatabasePayload(raw) {
     trackedPosts: Array.isArray(parsed.trackedPosts) ? parsed.trackedPosts : [],
     insightsSnapshots: Array.isArray(parsed.insightsSnapshots) ? parsed.insightsSnapshots : [],
     savedViews: Array.isArray(parsed.savedViews) ? parsed.savedViews : [],
-    history: Array.isArray(parsed.history) ? parsed.history : []
+    history: Array.isArray(parsed.history) ? parsed.history : [],
+    monitorRuns,
+    monitorIncidents
   };
 }
 async function getPostgresPool(connectionString) {
@@ -17984,6 +18000,281 @@ function createBotMentionCollector(deps) {
   };
 }
 
+// src/server/monitoring-service.ts
+var AUTO_RUN_INTERVAL_MS = 10 * 6e4;
+var MAX_MONITOR_RUNS = 30;
+var MAX_MONITOR_INCIDENTS = 100;
+var collectorStatusReader = null;
+var autoRunTimer = null;
+function byNewest(left, right) {
+  const leftValue = left.lastSeenAt ?? left.createdAt ?? "";
+  const rightValue = right.lastSeenAt ?? right.createdAt ?? "";
+  return rightValue.localeCompare(leftValue);
+}
+function readCollectorStatus() {
+  try {
+    return collectorStatusReader?.() ?? null;
+  } catch {
+    return null;
+  }
+}
+function rankStatus(status) {
+  switch (status) {
+    case "critical":
+      return 3;
+    case "degraded":
+      return 2;
+    case "healthy":
+      return 1;
+    default:
+      return 0;
+  }
+}
+function maxStatus(left, right) {
+  return rankStatus(left) >= rankStatus(right) ? left : right;
+}
+function statusToSeverity(status) {
+  if (status === "critical") {
+    return "critical";
+  }
+  if (status === "degraded") {
+    return "warning";
+  }
+  return "info";
+}
+function isIssueStatus(status) {
+  return status === "critical" || status === "degraded";
+}
+function buildCheck(id, channel, label, status, summary, checkedAt) {
+  return {
+    id,
+    channel,
+    label,
+    status,
+    severity: statusToSeverity(status),
+    summary,
+    checkedAt
+  };
+}
+function formatAgeSummary(timestamp) {
+  if (!timestamp) {
+    return "No successful sync recorded yet.";
+  }
+  const ageMs = Date.now() - new Date(timestamp).getTime();
+  const ageMinutes = Math.max(1, Math.round(ageMs / 6e4));
+  if (ageMinutes < 60) {
+    return `Last successful sync ${ageMinutes} minute${ageMinutes === 1 ? "" : "s"} ago.`;
+  }
+  const ageHours = Math.max(1, Math.round(ageMinutes / 60));
+  return `Last successful sync ${ageHours} hour${ageHours === 1 ? "" : "s"} ago.`;
+}
+function evaluateChecks(data, collectorStatus) {
+  const checkedAt = (/* @__PURE__ */ new Date()).toISOString();
+  const runtimeConfig = getRuntimeConfigSnapshot();
+  const checks = [];
+  const enabledPaymentMethods = data.paymentMethods.filter((method) => method.enabled).length;
+  checks.push(
+    buildCheck(
+      "public-storefront",
+      "public_api",
+      "Public storefront",
+      enabledPaymentMethods > 0 ? "healthy" : "critical",
+      enabledPaymentMethods > 0 ? `${enabledPaymentMethods} payment method${enabledPaymentMethods === 1 ? " is" : "s are"} available publicly.` : "No payment methods are enabled for the public storefront.",
+      checkedAt
+    )
+  );
+  checks.push(
+    buildCheck(
+      "admin-dashboard",
+      "admin_api",
+      "Admin dashboard data",
+      "healthy",
+      `Dashboard data loaded with ${data.orders.length} order${data.orders.length === 1 ? "" : "s"} and ${data.licenses.length} license${data.licenses.length === 1 ? "" : "s"}.`,
+      checkedAt
+    )
+  );
+  const configuredBotHandle = runtimeConfig.collector.botHandle.trim();
+  const collectorBotHandle = collectorStatus?.botHandle?.trim() ?? "";
+  let botAccountStatus = "healthy";
+  let botAccountSummary = configuredBotHandle ? `Public bot handle is @${configuredBotHandle}.` : "Collector bot handle is not configured.";
+  if (!configuredBotHandle) {
+    botAccountStatus = "critical";
+  } else if (collectorBotHandle && collectorBotHandle !== configuredBotHandle) {
+    botAccountStatus = "degraded";
+    botAccountSummary = `Runtime config uses @${configuredBotHandle}, but collector status reports @${collectorBotHandle}.`;
+  }
+  checks.push(buildCheck("bot-account-config", "bot_account", "Bot account", botAccountStatus, botAccountSummary, checkedAt));
+  let collectorHealthStatus = "unknown";
+  let collectorHealthSummary = "Collector status is unavailable.";
+  if (collectorStatus) {
+    const staleThresholdMs = Math.max(collectorStatus.pollIntervalMs * 3, 30 * 6e4);
+    collectorHealthStatus = "healthy";
+    collectorHealthSummary = formatAgeSummary(collectorStatus.lastSucceededAt);
+    if (!collectorStatus.enabled) {
+      collectorHealthStatus = "degraded";
+      collectorHealthSummary = collectorStatus.lastError ? `Collector is disabled: ${collectorStatus.lastError}.` : "Collector is disabled or missing credentials.";
+    } else if (collectorStatus.lastError && !collectorStatus.lastSucceededAt) {
+      collectorHealthStatus = "critical";
+      collectorHealthSummary = `Collector has not succeeded yet: ${collectorStatus.lastError}.`;
+    } else if (collectorStatus.lastError) {
+      collectorHealthStatus = "degraded";
+      collectorHealthSummary = `Collector reported an error: ${collectorStatus.lastError}.`;
+    } else if (!collectorStatus.lastSucceededAt) {
+      collectorHealthStatus = "degraded";
+      collectorHealthSummary = "Collector is enabled but has not completed a successful sync yet.";
+    } else if (Date.now() - new Date(collectorStatus.lastSucceededAt).getTime() > staleThresholdMs) {
+      collectorHealthStatus = "degraded";
+      collectorHealthSummary = `${formatAgeSummary(collectorStatus.lastSucceededAt)} Collector freshness exceeded the expected window.`;
+    }
+  }
+  checks.push(
+    buildCheck(
+      "collector-health",
+      "collector",
+      "Mention collector",
+      collectorHealthStatus,
+      collectorHealthSummary,
+      checkedAt
+    )
+  );
+  return checks;
+}
+function buildRun(checks) {
+  const createdAt = (/* @__PURE__ */ new Date()).toISOString();
+  const overallStatus = checks.reduce((current, check) => maxStatus(current, check.status), "unknown");
+  const failingChecks = checks.filter((check) => isIssueStatus(check.status));
+  const summary = failingChecks.length > 0 ? failingChecks.map((check) => check.summary).join(" | ") : "All internal monitoring checks passed.";
+  return {
+    id: crypto.randomUUID(),
+    source: "internal",
+    overallStatus,
+    createdAt,
+    summary,
+    checks
+  };
+}
+function syncIncidentsForRun(data, run) {
+  const now = run.createdAt;
+  const activeKeys = /* @__PURE__ */ new Set();
+  for (const check of run.checks) {
+    if (!isIssueStatus(check.status)) {
+      continue;
+    }
+    activeKeys.add(check.id);
+    const existing = data.monitorIncidents.find((incident) => incident.dedupeKey === check.id);
+    if (!existing) {
+      data.monitorIncidents.push({
+        id: crypto.randomUUID(),
+        dedupeKey: check.id,
+        channel: check.channel,
+        severity: check.severity,
+        status: "new",
+        summary: check.summary,
+        firstSeenAt: now,
+        lastSeenAt: now,
+        lastRunId: run.id,
+        mutedUntil: null,
+        note: null
+      });
+      continue;
+    }
+    const wasMuted = existing.status === "muted" && existing.mutedUntil && new Date(existing.mutedUntil).getTime() > Date.now();
+    const reopen = existing.status === "resolved" || existing.status === "muted" && !wasMuted;
+    existing.channel = check.channel;
+    existing.severity = check.severity;
+    existing.summary = check.summary;
+    existing.lastSeenAt = now;
+    existing.lastRunId = run.id;
+    if (reopen) {
+      existing.status = "new";
+      existing.firstSeenAt = now;
+      existing.mutedUntil = null;
+    }
+  }
+  for (const incident of data.monitorIncidents) {
+    if (!activeKeys.has(incident.dedupeKey) && incident.status !== "resolved") {
+      incident.status = "resolved";
+      incident.lastSeenAt = now;
+      incident.mutedUntil = null;
+    }
+  }
+  data.monitorIncidents = [...data.monitorIncidents].sort(byNewest).slice(0, MAX_MONITOR_INCIDENTS);
+}
+function buildOverviewFromData(data, checks = evaluateChecks(data, readCollectorStatus())) {
+  const overallStatus = checks.reduce((current, check) => maxStatus(current, check.status), "unknown");
+  const recentRuns = [...data.monitorRuns].sort(byNewest).slice(0, 5);
+  const lastRun = recentRuns[0] ?? null;
+  const lastHealthyRun = [...data.monitorRuns].sort(byNewest).find((run) => run.overallStatus === "healthy") ?? null;
+  const openIncidents = data.monitorIncidents.filter((incident) => incident.status !== "resolved");
+  const channels = checks.map((check) => ({
+    id: check.channel,
+    label: check.label,
+    status: check.status,
+    summary: check.summary,
+    checkedAt: check.checkedAt
+  }));
+  const currentBotHandle = getRuntimeConfigSnapshot().collector.botHandle || readCollectorStatus()?.botHandle || "";
+  return {
+    overallStatus,
+    openIncidents: openIncidents.length,
+    criticalIncidents: openIncidents.filter((incident) => incident.severity === "critical").length,
+    lastRunAt: lastRun?.createdAt ?? null,
+    lastHealthyRunAt: lastHealthyRun?.createdAt ?? null,
+    fallbackRatio: 0,
+    policyReviewPending: 0,
+    currentBotHandle,
+    channels,
+    recentRuns
+  };
+}
+function configureMonitoringService(options) {
+  collectorStatusReader = options.getCollectorStatus;
+  if (autoRunTimer) {
+    return;
+  }
+  autoRunTimer = setInterval(() => {
+    void runMonitoringNow().catch(() => void 0);
+  }, AUTO_RUN_INTERVAL_MS);
+  autoRunTimer.unref?.();
+}
+async function getMonitoringOverview() {
+  const data = await loadDatabase();
+  return buildOverviewFromData(data);
+}
+async function listMonitoringIncidents() {
+  const data = await loadDatabase();
+  return [...data.monitorIncidents].sort(byNewest);
+}
+async function runMonitoringNow() {
+  return withDatabaseTransaction(async (data) => {
+    const checks = evaluateChecks(data, readCollectorStatus());
+    const run = buildRun(checks);
+    data.monitorRuns = [run, ...data.monitorRuns].sort(byNewest).slice(0, MAX_MONITOR_RUNS);
+    syncIncidentsForRun(data, run);
+    return buildOverviewFromData(data, checks);
+  });
+}
+async function updateIncidentStatus(id, status) {
+  return withDatabaseTransaction(async (data) => {
+    const incident = data.monitorIncidents.find((candidate) => candidate.id === id);
+    if (!incident) {
+      throw new Error("Monitoring incident was not found.");
+    }
+    incident.status = status;
+    incident.lastSeenAt = (/* @__PURE__ */ new Date()).toISOString();
+    if (status === "resolved") {
+      incident.mutedUntil = null;
+    }
+    return { ...incident };
+  });
+}
+async function acknowledgeMonitoringIncident(id) {
+  return updateIncidentStatus(id, "acknowledged");
+}
+async function resolveMonitoringIncident(id) {
+  return updateIncidentStatus(id, "resolved");
+}
+
 // src/server.ts
 var __dirname = path3.dirname(fileURLToPath(import.meta.url));
 var DEFAULT_PORT = 4173;
@@ -18030,7 +18321,7 @@ var PROVIDER_ACTION_URL_PATTERNS = {
   stripe: /stripe\.com/i,
   paypal: /paypal\.com/i
 };
-var DEFAULT_PUBLIC_ORIGIN2 = "https://threads-archive.dahanda.dev";
+var DEFAULT_PUBLIC_ORIGIN2 = "https://ss-threads.dahanda.dev";
 var LEGACY_PUBLIC_HOSTS = /* @__PURE__ */ new Set(["threads-obsidian.dahanda.dev"]);
 var LEGACY_PUBLIC_PAGE_PATHS = /* @__PURE__ */ new Set(["/", "/landing", "/landing/", "/scrapbook", "/scrapbook/", "/checkout", "/checkout/"]);
 function trimEnv2(name) {
@@ -21109,6 +21400,36 @@ async function handleAdminRoutes(request, response, pathname, config, collector)
     });
     return;
   }
+  if (pathname === "/api/admin/monitoring/overview") {
+    if (method !== "GET") {
+      methodNotAllowed(response);
+      return;
+    }
+    json(response, 200, await getMonitoringOverview());
+    return;
+  }
+  if (pathname === "/api/admin/monitoring/incidents") {
+    if (method !== "GET") {
+      methodNotAllowed(response);
+      return;
+    }
+    json(response, 200, await listMonitoringIncidents());
+    return;
+  }
+  if (pathname === "/api/admin/monitoring/run-now" && method === "POST") {
+    json(response, 200, await runMonitoringNow());
+    return;
+  }
+  const acknowledgeMonitoringMatch = pathname.match(/^\/api\/admin\/monitoring\/incidents\/([^/]+)\/ack$/);
+  if (acknowledgeMonitoringMatch && method === "POST") {
+    json(response, 200, await acknowledgeMonitoringIncident(acknowledgeMonitoringMatch[1]));
+    return;
+  }
+  const resolveMonitoringMatch = pathname.match(/^\/api\/admin\/monitoring\/incidents\/([^/]+)\/resolve$/);
+  if (resolveMonitoringMatch && method === "POST") {
+    json(response, 200, await resolveMonitoringIncident(resolveMonitoringMatch[1]));
+    return;
+  }
   if (pathname === "/api/admin/payment-methods" && method === "POST") {
     const body = await parseJsonBody(request, config.maxBodyBytes);
     const paymentMethod = mapPaymentMethodInput(body);
@@ -21473,6 +21794,9 @@ function createWebRuntime(port) {
   const config = resolveConfig(port);
   const collector = createBotMentionCollector({
     runTransaction: withDatabaseTransaction
+  });
+  configureMonitoringService({
+    getCollectorStatus: () => collector.getStatus()
   });
   return {
     config,

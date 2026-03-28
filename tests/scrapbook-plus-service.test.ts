@@ -166,7 +166,7 @@ test("watchlists, searches, and insights populate scrapbook plus state", async (
 
   try {
     const data = buildDefaultDatabase("2026-03-25T00:00:00.000Z");
-    const oauthStart = startBotOauth(data, "https://threads-archive.dahanda.dev");
+    const oauthStart = startBotOauth(data, "https://ss-threads.dahanda.dev");
     const rawState = new URL(oauthStart.authorizeUrl).searchParams.get("state");
     assert.ok(rawState);
 
@@ -174,7 +174,7 @@ test("watchlists, searches, and insights populate scrapbook plus state", async (
       data,
       rawState as string,
       "oauth-code-1",
-      "https://threads-archive.dahanda.dev"
+      "https://ss-threads.dahanda.dev"
     );
 
     await createWatchlist(data, session.sessionToken, {

@@ -149,6 +149,88 @@ test("admin runtime config can switch file databases and migrate existing data",
   }
 });
 
+test("admin runtime config normalizes collector bot handle and exposes it publicly", async () => {
+  const previousAdminToken = process.env.THREADS_WEB_ADMIN_TOKEN;
+  const previousDbFile = process.env.THREADS_WEB_DB_FILE;
+  const previousRuntimeConfigFile = process.env.THREADS_WEB_RUNTIME_CONFIG_FILE;
+  const previousAdminAllowlist = process.env.THREADS_WEB_ADMIN_ALLOWLIST;
+  const previousTrustedProxyAllowlist = process.env.THREADS_WEB_TRUST_PROXY_ALLOWLIST;
+  const tempDir = await mkdtemp(path.join(tmpdir(), "threads-admin-runtime-"));
+  const dbFile = path.join(tempDir, "db.json");
+  const runtimeConfigFile = path.join(tempDir, "runtime-config.json");
+
+  process.env.THREADS_WEB_ADMIN_TOKEN = "threads-admin-secret";
+  process.env.THREADS_WEB_DB_FILE = dbFile;
+  process.env.THREADS_WEB_RUNTIME_CONFIG_FILE = runtimeConfigFile;
+  process.env.THREADS_WEB_ADMIN_ALLOWLIST = "10.0.0.1";
+  process.env.THREADS_WEB_TRUST_PROXY_ALLOWLIST = "127.0.0.1";
+  replaceRuntimeConfigForTests(null);
+
+  const { server, origin } = await startTestServer();
+
+  try {
+    const updateRuntime = await fetch(`${origin}/api/admin/runtime-config`, {
+      method: "PUT",
+      headers: {
+        authorization: "Bearer threads-admin-secret",
+        origin,
+        "x-forwarded-for": "10.0.0.1",
+        "content-type": "application/json"
+      },
+      body: JSON.stringify({
+        collector: {
+          botHandle: "@TempBot"
+        }
+      })
+    });
+    assert.equal(updateRuntime.status, 200);
+    const runtimePayload = await updateRuntime.json() as {
+      config?: { collector?: { botHandle?: string } };
+      collectorStatus?: { botHandle?: string };
+    };
+    assert.equal(runtimePayload.config?.collector?.botHandle, "tempbot");
+    assert.equal(runtimePayload.collectorStatus?.botHandle, "tempbot");
+
+    const publicConfigResponse = await fetch(`${origin}/api/public/bot/config`);
+    assert.equal(publicConfigResponse.status, 200);
+    const publicConfig = await publicConfigResponse.json() as { botHandle?: string };
+    assert.equal(publicConfig.botHandle, "tempbot");
+
+    const storedConfig = JSON.parse(await readFile(runtimeConfigFile, "utf8")) as {
+      collector?: { botHandle?: string };
+    };
+    assert.equal(storedConfig.collector?.botHandle, "tempbot");
+  } finally {
+    await stopTestServer(server);
+    if (typeof previousAdminToken === "string") {
+      process.env.THREADS_WEB_ADMIN_TOKEN = previousAdminToken;
+    } else {
+      delete process.env.THREADS_WEB_ADMIN_TOKEN;
+    }
+    if (typeof previousDbFile === "string") {
+      process.env.THREADS_WEB_DB_FILE = previousDbFile;
+    } else {
+      delete process.env.THREADS_WEB_DB_FILE;
+    }
+    if (typeof previousRuntimeConfigFile === "string") {
+      process.env.THREADS_WEB_RUNTIME_CONFIG_FILE = previousRuntimeConfigFile;
+    } else {
+      delete process.env.THREADS_WEB_RUNTIME_CONFIG_FILE;
+    }
+    if (typeof previousAdminAllowlist === "string") {
+      process.env.THREADS_WEB_ADMIN_ALLOWLIST = previousAdminAllowlist;
+    } else {
+      delete process.env.THREADS_WEB_ADMIN_ALLOWLIST;
+    }
+    if (typeof previousTrustedProxyAllowlist === "string") {
+      process.env.THREADS_WEB_TRUST_PROXY_ALLOWLIST = previousTrustedProxyAllowlist;
+    } else {
+      delete process.env.THREADS_WEB_TRUST_PROXY_ALLOWLIST;
+    }
+    replaceRuntimeConfigForTests(null);
+  }
+});
+
 test("admin can update storefront settings", async () => {
   const previousAdminToken = process.env.THREADS_WEB_ADMIN_TOKEN;
   const previousDbFile = process.env.THREADS_WEB_DB_FILE;

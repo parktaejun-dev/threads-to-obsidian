@@ -1116,8 +1116,8 @@ export const landingStorefrontLocales = {
   "ja": {
     "obsidian": {
       "productName": "Threads Saver",
-      "headline": "Threads を保存します。",
-      "subheadline": "拡張機能で保存できるようになりました。スクラップブックは後で収集します。",
+      "headline": "PCは extension。モバイルは mention。",
+      "subheadline": "今見ている投稿は Chrome extension で保存し、モバイルでは mention scrapbook で集めます。",
       "priceLabel": "Threads Saver Pro",
       "includedUpdates": "29 ドルの 1 回限り · 拡張 Pro + scrapbook コア · 7 日間の返金",
       "heroNotes": [
@@ -1214,8 +1214,8 @@ export const landingStorefrontLocales = {
   "pt-BR": {
     "obsidian": {
       "productName": "Threads Saver",
-      "headline": "Salve seu Threads.",
-      "subheadline": "A extensão salva agora. O álbum de recortes é coletado mais tarde.",
+      "headline": "PC é extension. Celular é mention.",
+      "subheadline": "Salve a postagem que você está vendo no PC com a Chrome extension e reúna-a no celular com o mention scrapbook.",
       "priceLabel": "Threads Saver Pro",
       "includedUpdates": "US$ 29 únicos · extensão Pro + núcleo scrapbook · reembolso em 7 dias",
       "heroNotes": [
@@ -1312,8 +1312,8 @@ export const landingStorefrontLocales = {
   "es": {
     "obsidian": {
       "productName": "Threads Saver",
-      "headline": "Guarde su Threads.",
-      "subheadline": "La extensión se guarda ahora. El álbum de recortes se recopila más tarde.",
+      "headline": "PC es extension. Móvil es mention.",
+      "subheadline": "Guarda la publicación que estás viendo con la Chrome extension y recopílala en el móvil con el mention scrapbook.",
       "priceLabel": "Threads Saver Pro",
       "includedUpdates": "$29 por única vez · extensión Pro + núcleo scrapbook · reembolso de 7 días",
       "heroNotes": [
@@ -1410,8 +1410,8 @@ export const landingStorefrontLocales = {
   "zh-TW": {
     "obsidian": {
       "productName": "ZZ術語0ZZ",
-      "headline": "儲存您的 Threads。",
-      "subheadline": "擴展程式現在保存。剪貼簿稍後收集。",
+      "headline": "電腦用 extension。手機用 mention。",
+      "subheadline": "現在觀看的貼文用 Chrome extension 儲存，手機上則用 mention scrapbook 收集。",
       "priceLabel": "Threads Saver Pro",
       "includedUpdates": "一次性 29 美元 · 擴充 Pro + scrapbook 核心 · 7 天退款",
       "heroNotes": [
@@ -1508,8 +1508,8 @@ export const landingStorefrontLocales = {
   "vi": {
     "obsidian": {
       "productName": "Threads Saver",
-      "headline": "Lưu Threads của bạn.",
-      "subheadline": "Tiện ích mở rộng sẽ lưu ngay bây giờ. Sổ lưu niệm thu thập sau.",
+      "headline": "PC dùng extension. Mobile dùng mention.",
+      "subheadline": "Lưu bài viết bạn đang xem bằng Chrome extension và thu thập nó trên thiết bị di động bằng mention scrapbook.",
       "priceLabel": "Threads Saver Pro",
       "includedUpdates": "$29 một lần · tiện ích mở rộng Pro + lõi scrapbook · Hoàn tiền trong 7 ngày",
       "heroNotes": [

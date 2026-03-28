@@ -110,6 +110,12 @@ export function applyLangToggle(locale: WebLocale): void {
   for (const select of document.querySelectorAll<HTMLSelectElement>("[data-web-lang-select]")) {
     select.value = locale;
   }
+
+  for (const button of document.querySelectorAll<HTMLButtonElement>("[data-web-locale]")) {
+    const isActive = button.dataset.webLocale === locale;
+    button.classList.toggle("web-lang-btn-active", isActive);
+    button.setAttribute("aria-pressed", isActive ? "true" : "false");
+  }
 }
 
 export function bindLangToggle(onSwitch: (locale: WebLocale) => void): void {
@@ -117,6 +123,18 @@ export function bindLangToggle(onSwitch: (locale: WebLocale) => void): void {
     select.addEventListener("change", () => {
       const next = readWebLocale(select.value);
       if (!next) return;
+      setLocale(next);
+      onSwitch(next);
+    });
+  }
+
+  for (const button of document.querySelectorAll<HTMLButtonElement>("[data-web-locale]")) {
+    button.addEventListener("click", () => {
+      const next = readWebLocale(button.dataset.webLocale);
+      if (!next) {
+        return;
+      }
+
       setLocale(next);
       onSwitch(next);
     });
@@ -321,7 +339,7 @@ const obsidianLandingMessages: { ko: LandingMsg; en: LandingMsg } = {
     productATag: "Chrome extension",
     productATitle: "Threads to Obsidian",
     productADesc: "PC에서 보고 있는 Threads 글을 바로 저장.",
-    productACta: "GitHub에서 설치",
+    productACta: "ZIP 다운로드",
     productBTag: "Mention bot",
     productBTitle: "Mention Scrapbook",
     productBDesc: "모바일에서는 댓글 멘션으로 모아서 나중에 꺼내기.",
@@ -431,7 +449,7 @@ const obsidianLandingMessages: { ko: LandingMsg; en: LandingMsg } = {
     productATag: "Chrome extension",
     productATitle: "Threads to Obsidian",
     productADesc: "Save the Threads post you are viewing on desktop.",
-    productACta: "Install from GitHub",
+    productACta: "Download ZIP",
     productBTag: "Mention bot",
     productBTitle: "Mention Scrapbook",
     productBDesc: "Use mention replies on mobile, then export later.",
@@ -580,7 +598,7 @@ export interface LandingStorefrontCopy {
 const obsidianLandingStorefrontCopy: { ko: LandingStorefrontCopy; en: LandingStorefrontCopy } = {
   ko: {
     productName: "Threads Saver",
-    headline: "PC는 extension. 모바일은 mention.",
+    headline: "PC는 extension.<br/>모바일은 mention.",
     subheadline: "지금 보는 글은 Chrome extension으로 저장하고, 모바일에서는 mention scrapbook으로 모읍니다.",
     priceLabel: "Threads Saver Pro",
     includedUpdates: "29달러 1회 결제 · Extension Pro + Scrapbook core · 7일 환불",
@@ -628,8 +646,8 @@ const obsidianLandingStorefrontCopy: { ko: LandingStorefrontCopy; en: LandingSto
   },
   en: {
     productName: "Threads Saver",
-    headline: "Desktop saves now. Mobile collects later.",
-    subheadline: "Use the Chrome extension on PC, then use mention scrapbook on mobile when you want to collect posts later.",
+    headline: "Desktop extension. Mobile mention.",
+    subheadline: "Save the current post using the Chrome extension, or collect it later via mention scrapbook on mobile.",
     priceLabel: "Threads Saver Pro",
     includedUpdates: "$29 one-time · extension Pro + scrapbook core · 7-day refund",
     heroNotes: [
@@ -787,9 +805,14 @@ export const landingStorefrontCopy: Record<WebLocale, Record<LandingVariant, Lan
 export type AdminMsg = {
   adminH1: string;
   adminLead: string;
+  authBannerEyebrow?: string;
+  authBannerTitle?: string;
+  authBannerCopy?: string;
+  authOverlayLabel?: string;
   tokenLabel: string;
   tokenApply: string;
   tokenLogout?: string;
+  tokenPlaceholder?: string;
   tokenStatusDefault: string;
   statPending: string;
   statPaid: string;
@@ -880,7 +903,10 @@ export type AdminMsg = {
   revenueSent: string;
   revenueByMethod: string;
   revenueByMonth: string;
+  revenueEmptyTitle?: string;
+  revenueEmptyCopy?: string;
   colOrders: string;
+  colMonth?: string;
   colPaid: string;
   colIssued: string;
   mailerOn: string;
@@ -894,43 +920,65 @@ export type AdminMsg = {
   collectorLastSuccessLabel?: string;
   collectorLastErrorLabel?: string;
   collectorHandleLabel?: string;
+  collectorHandlePlaceholder?: string;
   collectorGraphLabel?: string;
+  collectorGraphPlaceholder?: string;
   collectorTokenLabel?: string;
+  collectorTokenPlaceholder?: string;
   collectorIntervalLabel?: string;
   collectorFetchLabel?: string;
   collectorPagesLabel?: string;
+  collectorPublicHandleLabel?: string;
+  collectorProfileLink?: string;
+  collectorHandleCopy?: string;
   collectorSaveBtn?: string;
   collectorStateRunning?: string;
   collectorStateReady?: string;
   collectorStateDisabled?: string;
+  collectorSaving?: string;
   collectorSaved?: string;
+  collectorSyncing?: string;
   collectorSynced?: string;
   runtimeTitle?: string;
   runtimeCopy?: string;
   publicOriginLabel?: string;
+  publicOriginPlaceholder?: string;
   databaseTitle?: string;
   databaseBackendLabel?: string;
   databaseBackendFile?: string;
   databaseBackendPostgres?: string;
   databaseFilePathLabel?: string;
+  databaseFilePathPlaceholder?: string;
   databaseUrlLabel?: string;
+  databaseUrlPlaceholder?: string;
   databaseTableLabel?: string;
+  databaseTablePlaceholder?: string;
   databaseStoreKeyLabel?: string;
+  databaseStoreKeyPlaceholder?: string;
   databaseActiveLabel?: string;
   databaseClearUrlLabel?: string;
+  databaseUrlConfiguredPlaceholder?: string;
+  databaseTesting?: string;
   databaseTestBtn?: string;
+  runtimeSaving?: string;
   runtimeSaveBtn?: string;
   runtimeSaved?: string;
   runtimeMigrated?: string;
   runtimeRestartRequired?: string;
   smtpTitle?: string;
   smtpHostLabel?: string;
+  smtpHostPlaceholder?: string;
   smtpPortLabel?: string;
   smtpUserLabel?: string;
+  smtpUserPlaceholder?: string;
   smtpPassLabel?: string;
+  smtpPassPlaceholder?: string;
   smtpFromLabel?: string;
+  smtpFromPlaceholder?: string;
   smtpSecureLabel?: string;
   smtpClearPassLabel?: string;
+  smtpPassConfiguredPlaceholder?: string;
+  smtpTesting?: string;
   smtpTestBtn?: string;
   storefrontTitle?: string;
   storefrontCopy?: string;
@@ -942,25 +990,59 @@ export type AdminMsg = {
   storefrontPriceValueLabel?: string;
   storefrontUpdatesLabel?: string;
   storefrontHeroNotesLabel?: string;
+  storefrontHeroNotesPlaceholder?: string;
   storefrontFaqsLabel?: string;
+  storefrontFaqsPlaceholder?: string;
+  storefrontSaving?: string;
   storefrontSaveBtn?: string;
   storefrontSaved?: string;
   methodEditBtn?: string;
   methodSaveBtn?: string;
   methodCancelBtn?: string;
+  methodNamePlaceholder?: string;
+  methodSummaryPlaceholder?: string;
+  methodInstructionsPlaceholder?: string;
+  methodActionLabelPlaceholder?: string;
+  methodActionUrlPlaceholder?: string;
+  methodSaving?: string;
   methodEditing?: string;
   methodSaved?: string;
   methodCreated?: string;
   methodEditCancelled?: string;
+  methodsEmptyTitle?: string;
+  methodsEmptyCopy?: string;
+  ordersEmptyTitle?: string;
+  ordersEmptyCopy?: string;
+  orderMarkingPaid?: string;
+  orderMarkedPaid?: string;
+  keyIssuing?: string;
+  keyReissuing?: string;
+  emailSending?: string;
+  licensesEmptyTitle?: string;
+  licensesEmptyCopy?: string;
+  licenseRevoking?: string;
+  licenseRevoked?: string;
+  historyEmptyTitle?: string;
+  historyEmptyCopy?: string;
+  emailPreviewLoading?: string;
+  issueExpiryLabel?: string;
+  issueExpiryHint?: string;
+  issueExpiryClear?: string;
+  issueExpiryInvalid?: string;
 };
 
 export const adminMessages: Record<WebLocale, AdminMsg> = {
   ko: {
     adminH1: "결제, 발급, 전달 관리",
     adminLead: "결제 수단 관리, 구매 요청 검토, Pro 키 발급, 수동 이메일 전달을 위한 관리자 패널입니다.",
+    authBannerEyebrow: "운영 권한",
+    authBannerTitle: "먼저 로그인해야 실시간 운영 항목을 수정할 수 있습니다.",
+    authBannerCopy: "매출, 수집기 동기화, 런타임 설정, 결제 수단, 키 발급은 관리자 토큰 검증 전까지 잠금 상태로 유지됩니다.",
+    authOverlayLabel: "관리자 토큰으로 로그인하면 이 섹션을 사용할 수 있습니다.",
     tokenLabel: "관리자 토큰",
     tokenApply: "로그인",
     tokenLogout: "로그아웃",
+    tokenPlaceholder: "관리자 접근 토큰",
     tokenStatusDefault: "/api/admin/* 접근을 위해 로그인이 필요합니다",
     statPending: "미결 주문",
     statPaid: "결제 확인, 키 대기",
@@ -1051,7 +1133,10 @@ export const adminMessages: Record<WebLocale, AdminMsg> = {
     revenueSent: "발송 완료",
     revenueByMethod: "결제수단별",
     revenueByMonth: "월별 주문",
+    revenueEmptyTitle: "아직 집계된 매출이 없습니다.",
+    revenueEmptyCopy: "결제 완료 건이 생기면 이 표에 자동으로 반영됩니다.",
     colOrders: "주문수",
+    colMonth: "월",
     colPaid: "결제",
     colIssued: "발급",
     mailerOn: "이메일 자동 발송: 켜짐",
@@ -1064,44 +1149,66 @@ export const adminMessages: Record<WebLocale, AdminMsg> = {
     collectorStateLabel: "상태",
     collectorLastSuccessLabel: "마지막 성공",
     collectorLastErrorLabel: "최근 오류",
-    collectorHandleLabel: "봇 핸들",
+    collectorHandleLabel: "Threads 봇 핸들",
+    collectorHandlePlaceholder: "threadsbot",
     collectorGraphLabel: "Graph API 버전",
+    collectorGraphPlaceholder: "v1.0",
     collectorTokenLabel: "액세스 토큰 오버라이드",
+    collectorTokenPlaceholder: "선택 사항: 장기 액세스 토큰",
     collectorIntervalLabel: "폴링 간격 (ms)",
     collectorFetchLabel: "가져올 개수",
     collectorPagesLabel: "최대 페이지",
+    collectorPublicHandleLabel: "공개 봇 계정",
+    collectorProfileLink: "프로필 열기",
+    collectorHandleCopy: "여기서 변경한 핸들은 공개 scrapbook 안내 문구와 수집기 조회 대상에 함께 반영됩니다.",
     collectorSaveBtn: "수집기 설정 저장",
     collectorStateRunning: "실행 중",
     collectorStateReady: "준비됨",
     collectorStateDisabled: "비활성",
+    collectorSaving: "수집기 설정 저장 중...",
     collectorSaved: "수집기 설정이 저장되었습니다.",
+    collectorSyncing: "멘션을 즉시 동기화하는 중...",
     collectorSynced: "수집기 수동 동기화가 완료되었습니다.",
     runtimeTitle: "런타임 설정",
     runtimeCopy: "서버 파일을 직접 수정하지 않고 public origin, 데이터베이스, SMTP를 변경합니다.",
     publicOriginLabel: "Public origin",
+    publicOriginPlaceholder: "https://ss-threads.dahanda.dev",
     databaseTitle: "데이터베이스",
     databaseBackendLabel: "백엔드",
     databaseBackendFile: "파일",
     databaseBackendPostgres: "Postgres",
     databaseFilePathLabel: "파일 경로",
+    databaseFilePathPlaceholder: "/var/app/output/web-admin-data.json",
     databaseUrlLabel: "Postgres URL",
+    databaseUrlPlaceholder: "postgres://user:pass@host:5432/db",
     databaseTableLabel: "테이블 이름",
+    databaseTablePlaceholder: "threads_web_store",
     databaseStoreKeyLabel: "Store key",
+    databaseStoreKeyPlaceholder: "default",
     databaseActiveLabel: "현재 활성 데이터베이스",
     databaseClearUrlLabel: "저장된 Postgres URL을 저장 시 제거",
+    databaseUrlConfiguredPlaceholder: "이미 저장되어 있습니다. 교체할 새 URL만 입력하세요.",
+    databaseTesting: "DB 연결을 테스트하는 중...",
     databaseTestBtn: "DB 연결 테스트",
+    runtimeSaving: "런타임 설정 저장 중...",
     runtimeSaveBtn: "런타임 설정 저장",
     runtimeSaved: "런타임 설정이 저장되었습니다.",
     runtimeMigrated: "런타임 설정이 저장되었고 데이터가 새 데이터베이스로 이전되었습니다.",
     runtimeRestartRequired: "데이터베이스 설정이 저장되었습니다. 새 백엔드를 쓰기 전에 서버를 재시작하세요.",
     smtpTitle: "SMTP",
     smtpHostLabel: "호스트",
+    smtpHostPlaceholder: "smtp.resend.com",
     smtpPortLabel: "포트",
     smtpUserLabel: "사용자",
+    smtpUserPlaceholder: "apikey",
     smtpPassLabel: "비밀번호",
+    smtpPassPlaceholder: "secret",
     smtpFromLabel: "보내는 주소",
+    smtpFromPlaceholder: "hello@example.com",
     smtpSecureLabel: "TLS / secure 전송 사용",
     smtpClearPassLabel: "저장된 SMTP 비밀번호를 저장 시 제거",
+    smtpPassConfiguredPlaceholder: "이미 저장되어 있습니다. 교체할 새 비밀번호만 입력하세요.",
+    smtpTesting: "SMTP 연결을 테스트하는 중...",
     smtpTestBtn: "SMTP 테스트",
     storefrontTitle: "스토어프론트 설정",
     storefrontCopy: "구매자에게 보이는 랜딩 페이지 문구를 관리합니다.",
@@ -1113,23 +1220,57 @@ export const adminMessages: Record<WebLocale, AdminMsg> = {
     storefrontPriceValueLabel: "가격 값",
     storefrontUpdatesLabel: "포함 업데이트",
     storefrontHeroNotesLabel: "Hero 노트",
+    storefrontHeroNotesPlaceholder: "한 줄에 하나씩 입력",
     storefrontFaqsLabel: "FAQ",
+    storefrontFaqsPlaceholder: "질문 :: 답변",
+    storefrontSaving: "스토어프론트 설정 저장 중...",
     storefrontSaveBtn: "스토어프론트 저장",
     storefrontSaved: "스토어프론트 설정이 저장되었습니다.",
     methodEditBtn: "수정",
     methodSaveBtn: "결제 수단 저장",
     methodCancelBtn: "수정 취소",
+    methodNamePlaceholder: "계좌이체",
+    methodSummaryPlaceholder: "수동 확인이 필요한 국내 결제 방식",
+    methodInstructionsPlaceholder: "구매자가 결제를 완료하거나 확인해야 하는 절차를 적어주세요.",
+    methodActionLabelPlaceholder: "구매 요청 보내기",
+    methodActionUrlPlaceholder: "https://...",
+    methodSaving: "결제 수단 저장 중...",
     methodEditing: "결제 수단 수정 중입니다.",
     methodSaved: "결제 수단이 업데이트되었습니다.",
     methodCreated: "결제 수단이 생성되었습니다.",
     methodEditCancelled: "수정이 취소되었습니다.",
+    methodsEmptyTitle: "등록된 결제 수단이 없습니다.",
+    methodsEmptyCopy: "첫 결제 수단을 추가하면 구매 페이지에 바로 노출됩니다.",
+    ordersEmptyTitle: "들어온 구매 요청이 없습니다.",
+    ordersEmptyCopy: "새 구매 요청이 들어오면 이 표에 표시됩니다.",
+    orderMarkingPaid: "결제 완료로 표시하는 중...",
+    orderMarkedPaid: "{email} 주문을 결제 완료로 표시했습니다.",
+    keyIssuing: "키를 발급하는 중...",
+    keyReissuing: "키를 재발급하는 중...",
+    emailSending: "이메일을 발송하는 중...",
+    licensesEmptyTitle: "발급된 키가 없습니다.",
+    licensesEmptyCopy: "키를 발급하면 이 표에 기록됩니다.",
+    licenseRevoking: "키를 폐기하는 중...",
+    licenseRevoked: "{email} 키를 폐기했습니다.",
+    historyEmptyTitle: "표시할 기록이 없습니다.",
+    historyEmptyCopy: "결제, 키, 웹훅 이벤트가 발생하면 여기에 누적됩니다.",
+    emailPreviewLoading: "이메일 초안을 준비하는 중...",
+    issueExpiryLabel: "다음 발급 키 만료일",
+    issueExpiryHint: "Issue key 또는 Reissue를 누를 때 적용됩니다. 비워두면 만료일 없는 키를 발급합니다.",
+    issueExpiryClear: "만료일 지우기",
+    issueExpiryInvalid: "만료일은 YYYY-MM-DD 형식의 유효한 날짜여야 합니다.",
   },
   en: {
     adminH1: "Payments, issuance, and delivery",
     adminLead: "Manage accepted payment methods, review purchase requests, issue signed Pro keys, and keep an auditable history for manual email delivery.",
+    authBannerEyebrow: "Admin access",
+    authBannerTitle: "Sign in first to unlock live operations.",
+    authBannerCopy: "Revenue, collector sync, runtime settings, payment methods, and key issuance stay locked until the admin token is verified.",
+    authOverlayLabel: "Sign in with the admin token to unlock this section.",
     tokenLabel: "Admin token",
     tokenApply: "Sign in",
     tokenLogout: "Sign out",
+    tokenPlaceholder: "Admin access token",
     tokenStatusDefault: "Sign in required for /api/admin/*",
     statPending: "Pending orders",
     statPaid: "Paid, awaiting key",
@@ -1220,7 +1361,10 @@ export const adminMessages: Record<WebLocale, AdminMsg> = {
     revenueSent: "Delivered",
     revenueByMethod: "By payment method",
     revenueByMonth: "Monthly orders",
+    revenueEmptyTitle: "No revenue has been recorded yet.",
+    revenueEmptyCopy: "Completed payments will show up here automatically.",
     colOrders: "Orders",
+    colMonth: "Month",
     colPaid: "Paid",
     colIssued: "Issued",
     mailerOn: "Auto email delivery: ON",
@@ -1233,44 +1377,66 @@ export const adminMessages: Record<WebLocale, AdminMsg> = {
     collectorStateLabel: "State",
     collectorLastSuccessLabel: "Last success",
     collectorLastErrorLabel: "Last error",
-    collectorHandleLabel: "Bot handle",
+    collectorHandleLabel: "Threads bot handle",
+    collectorHandlePlaceholder: "threadsbot",
     collectorGraphLabel: "Graph API version",
+    collectorGraphPlaceholder: "v1.0",
     collectorTokenLabel: "Access token override",
+    collectorTokenPlaceholder: "Optional long-lived access token",
     collectorIntervalLabel: "Poll interval (ms)",
     collectorFetchLabel: "Fetch limit",
     collectorPagesLabel: "Max pages",
+    collectorPublicHandleLabel: "Public bot account",
+    collectorProfileLink: "Open profile",
+    collectorHandleCopy: "Changing this updates both the public scrapbook mention target and the collector lookup handle.",
     collectorSaveBtn: "Save collector settings",
     collectorStateRunning: "Running",
     collectorStateReady: "Ready",
     collectorStateDisabled: "Disabled",
+    collectorSaving: "Saving collector settings...",
     collectorSaved: "Collector settings saved.",
+    collectorSyncing: "Syncing mentions now...",
     collectorSynced: "Collector sync completed.",
     runtimeTitle: "Runtime settings",
     runtimeCopy: "Change public origin, database, and SMTP without editing the server manually.",
     publicOriginLabel: "Public origin",
+    publicOriginPlaceholder: "https://ss-threads.dahanda.dev",
     databaseTitle: "Database",
     databaseBackendLabel: "Backend",
     databaseBackendFile: "File",
     databaseBackendPostgres: "Postgres",
     databaseFilePathLabel: "File path",
+    databaseFilePathPlaceholder: "/var/app/output/web-admin-data.json",
     databaseUrlLabel: "Postgres URL",
+    databaseUrlPlaceholder: "postgres://user:pass@host:5432/db",
     databaseTableLabel: "Table name",
+    databaseTablePlaceholder: "threads_web_store",
     databaseStoreKeyLabel: "Store key",
+    databaseStoreKeyPlaceholder: "default",
     databaseActiveLabel: "Active database",
     databaseClearUrlLabel: "Clear saved Postgres URL on save",
+    databaseUrlConfiguredPlaceholder: "Already configured. Enter a new URL only if you want to replace it.",
+    databaseTesting: "Testing database connection...",
     databaseTestBtn: "Test database",
+    runtimeSaving: "Saving runtime settings...",
     runtimeSaveBtn: "Save runtime settings",
     runtimeSaved: "Runtime settings saved.",
     runtimeMigrated: "Runtime settings saved and data migrated to the new database.",
     runtimeRestartRequired: "Database settings were saved. Restart the server before using the new backend.",
     smtpTitle: "SMTP",
     smtpHostLabel: "Host",
+    smtpHostPlaceholder: "smtp.resend.com",
     smtpPortLabel: "Port",
     smtpUserLabel: "User",
+    smtpUserPlaceholder: "apikey",
     smtpPassLabel: "Password",
+    smtpPassPlaceholder: "secret",
     smtpFromLabel: "From",
+    smtpFromPlaceholder: "hello@example.com",
     smtpSecureLabel: "Use TLS / secure transport",
     smtpClearPassLabel: "Clear saved SMTP password on save",
+    smtpPassConfiguredPlaceholder: "Already configured. Enter a new password only if you want to replace it.",
+    smtpTesting: "Testing SMTP connection...",
     smtpTestBtn: "Test SMTP",
     storefrontTitle: "Storefront settings",
     storefrontCopy: "Manage the landing page copy shown to buyers.",
@@ -1282,16 +1448,45 @@ export const adminMessages: Record<WebLocale, AdminMsg> = {
     storefrontPriceValueLabel: "Price value",
     storefrontUpdatesLabel: "Included updates",
     storefrontHeroNotesLabel: "Hero notes",
+    storefrontHeroNotesPlaceholder: "One note per line",
     storefrontFaqsLabel: "FAQs",
+    storefrontFaqsPlaceholder: "Question :: Answer",
+    storefrontSaving: "Saving storefront settings...",
     storefrontSaveBtn: "Save storefront settings",
     storefrontSaved: "Storefront settings saved.",
     methodEditBtn: "Edit",
     methodSaveBtn: "Save method",
     methodCancelBtn: "Cancel edit",
+    methodNamePlaceholder: "Bank transfer",
+    methodSummaryPlaceholder: "Manual confirmation for local sales",
+    methodInstructionsPlaceholder: "Explain how the buyer should complete or confirm payment.",
+    methodActionLabelPlaceholder: "Request purchase",
+    methodActionUrlPlaceholder: "https://...",
+    methodSaving: "Saving payment method...",
     methodEditing: "Editing payment method.",
     methodSaved: "Payment method updated.",
     methodCreated: "Payment method created.",
     methodEditCancelled: "Edit cancelled.",
+    methodsEmptyTitle: "No payment methods yet.",
+    methodsEmptyCopy: "Add the first payment method to publish checkout choices.",
+    ordersEmptyTitle: "No purchase requests yet.",
+    ordersEmptyCopy: "New purchase requests will appear here.",
+    orderMarkingPaid: "Marking the order as paid...",
+    orderMarkedPaid: "Marked the order for {email} as paid.",
+    keyIssuing: "Issuing a key...",
+    keyReissuing: "Reissuing a key...",
+    emailSending: "Sending email...",
+    licensesEmptyTitle: "No issued keys yet.",
+    licensesEmptyCopy: "Issued keys will appear here.",
+    licenseRevoking: "Revoking the key...",
+    licenseRevoked: "Revoked the key for {email}.",
+    historyEmptyTitle: "No records to show.",
+    historyEmptyCopy: "Payment, key, and webhook events will accumulate here.",
+    emailPreviewLoading: "Preparing email preview...",
+    issueExpiryLabel: "Expiry date for the next issued key",
+    issueExpiryHint: "Applied when you use Issue key or Reissue. Leave it empty for a key without expiry.",
+    issueExpiryClear: "Clear expiry",
+    issueExpiryInvalid: "Expiry must be a valid YYYY-MM-DD date.",
   },
   ...adminMessageLocales
 };

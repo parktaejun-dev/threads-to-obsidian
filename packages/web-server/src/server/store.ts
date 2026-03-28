@@ -3,6 +3,8 @@ import path from "node:path";
 import { Pool, type Pool as PgPool, type PoolClient } from "pg";
 
 import {
+  type AdminMonitoringIncidentRecord,
+  type AdminMonitoringRunRecord,
   buildDefaultDatabase,
   type AdminHistoryEvent,
   type BotArchiveRecord,
@@ -215,6 +217,10 @@ function normalizeDatabasePayload(raw: unknown): WebDatabase {
     status: candidate?.status === "completed" ? "completed" : candidate?.status === "expired" ? "expired" : candidate?.status === "failed" ? "failed" : "pending"
   }));
   const settings = normalizeStorefrontSettings(parsed.settings, fallback.settings);
+  const monitorRuns = Array.isArray(parsed.monitorRuns) ? parsed.monitorRuns as AdminMonitoringRunRecord[] : [];
+  const monitorIncidents = Array.isArray(parsed.monitorIncidents)
+    ? parsed.monitorIncidents as AdminMonitoringIncidentRecord[]
+    : [];
 
   return {
     settings,
@@ -238,7 +244,9 @@ function normalizeDatabasePayload(raw: unknown): WebDatabase {
     trackedPosts: Array.isArray(parsed.trackedPosts) ? parsed.trackedPosts : [],
     insightsSnapshots: Array.isArray(parsed.insightsSnapshots) ? parsed.insightsSnapshots : [],
     savedViews: Array.isArray(parsed.savedViews) ? parsed.savedViews : [],
-    history: Array.isArray(parsed.history) ? parsed.history : []
+    history: Array.isArray(parsed.history) ? parsed.history : [],
+    monitorRuns,
+    monitorIncidents
   };
 }
 

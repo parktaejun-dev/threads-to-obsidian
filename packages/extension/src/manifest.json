@@ -18,7 +18,7 @@
   "host_permissions": [
     "https://www.threads.com/*",
     "https://www.threads.net/*",
-    "https://threads-archive.dahanda.dev/*"
+    "https://ss-threads.dahanda.dev/*"
   ],
   "optional_host_permissions": [
     "https://*.cdninstagram.com/*",

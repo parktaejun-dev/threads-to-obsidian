@@ -1159,8 +1159,8 @@ var landingStorefrontLocales = {
   "ja": {
     "obsidian": {
       "productName": "Threads Saver",
-      "headline": "Threads \u3092\u4FDD\u5B58\u3057\u307E\u3059\u3002",
-      "subheadline": "\u62E1\u5F35\u6A5F\u80FD\u3067\u4FDD\u5B58\u3067\u304D\u308B\u3088\u3046\u306B\u306A\u308A\u307E\u3057\u305F\u3002\u30B9\u30AF\u30E9\u30C3\u30D7\u30D6\u30C3\u30AF\u306F\u5F8C\u3067\u53CE\u96C6\u3057\u307E\u3059\u3002",
+      "headline": "PC\u306F extension\u3002\u30E2\u30D0\u30A4\u30EB\u306F mention\u3002",
+      "subheadline": "\u4ECA\u898B\u3066\u3044\u308B\u6295\u7A3F\u306F Chrome extension \u3067\u4FDD\u5B58\u3057\u3001\u30E2\u30D0\u30A4\u30EB\u3067\u306F mention scrapbook \u3067\u96C6\u3081\u307E\u3059\u3002",
       "priceLabel": "Threads Saver Pro",
       "includedUpdates": "29 \u30C9\u30EB\u306E 1 \u56DE\u9650\u308A \xB7 \u62E1\u5F35 Pro + scrapbook \u30B3\u30A2 \xB7 7 \u65E5\u9593\u306E\u8FD4\u91D1",
       "heroNotes": [
@@ -1257,8 +1257,8 @@ var landingStorefrontLocales = {
   "pt-BR": {
     "obsidian": {
       "productName": "Threads Saver",
-      "headline": "Salve seu Threads.",
-      "subheadline": "A extens\xE3o salva agora. O \xE1lbum de recortes \xE9 coletado mais tarde.",
+      "headline": "PC \xE9 extension. Celular \xE9 mention.",
+      "subheadline": "Salve a postagem que voc\xEA est\xE1 vendo no PC com a Chrome extension e re\xFAna-a no celular com o mention scrapbook.",
       "priceLabel": "Threads Saver Pro",
       "includedUpdates": "US$ 29 \xFAnicos \xB7 extens\xE3o Pro + n\xFAcleo scrapbook \xB7 reembolso em 7 dias",
       "heroNotes": [
@@ -1355,8 +1355,8 @@ var landingStorefrontLocales = {
   "es": {
     "obsidian": {
       "productName": "Threads Saver",
-      "headline": "Guarde su Threads.",
-      "subheadline": "La extensi\xF3n se guarda ahora. El \xE1lbum de recortes se recopila m\xE1s tarde.",
+      "headline": "PC es extension. M\xF3vil es mention.",
+      "subheadline": "Guarda la publicaci\xF3n que est\xE1s viendo con la Chrome extension y recop\xEDlala en el m\xF3vil con el mention scrapbook.",
       "priceLabel": "Threads Saver Pro",
       "includedUpdates": "$29 por \xFAnica vez \xB7 extensi\xF3n Pro + n\xFAcleo scrapbook \xB7 reembolso de 7 d\xEDas",
       "heroNotes": [
@@ -1453,8 +1453,8 @@ var landingStorefrontLocales = {
   "zh-TW": {
     "obsidian": {
       "productName": "ZZ\u8853\u8A9E0ZZ",
-      "headline": "\u5132\u5B58\u60A8\u7684 Threads\u3002",
-      "subheadline": "\u64F4\u5C55\u7A0B\u5F0F\u73FE\u5728\u4FDD\u5B58\u3002\u526A\u8CBC\u7C3F\u7A0D\u5F8C\u6536\u96C6\u3002",
+      "headline": "\u96FB\u8166\u7528 extension\u3002\u624B\u6A5F\u7528 mention\u3002",
+      "subheadline": "\u73FE\u5728\u89C0\u770B\u7684\u8CBC\u6587\u7528 Chrome extension \u5132\u5B58\uFF0C\u624B\u6A5F\u4E0A\u5247\u7528 mention scrapbook \u6536\u96C6\u3002",
       "priceLabel": "Threads Saver Pro",
       "includedUpdates": "\u4E00\u6B21\u6027 29 \u7F8E\u5143 \xB7 \u64F4\u5145 Pro + scrapbook \u6838\u5FC3 \xB7 7 \u5929\u9000\u6B3E",
       "heroNotes": [
@@ -1551,8 +1551,8 @@ var landingStorefrontLocales = {
   "vi": {
     "obsidian": {
       "productName": "Threads Saver",
-      "headline": "L\u01B0u Threads c\u1EE7a b\u1EA1n.",
-      "subheadline": "Ti\u1EC7n \xEDch m\u1EDF r\u1ED9ng s\u1EBD l\u01B0u ngay b\xE2y gi\u1EDD. S\u1ED5 l\u01B0u ni\u1EC7m thu th\u1EADp sau.",
+      "headline": "PC d\xF9ng extension. Mobile d\xF9ng mention.",
+      "subheadline": "L\u01B0u b\xE0i vi\u1EBFt b\u1EA1n \u0111ang xem b\u1EB1ng Chrome extension v\xE0 thu th\u1EADp n\xF3 tr\xEAn thi\u1EBFt b\u1ECB di \u0111\u1ED9ng b\u1EB1ng mention scrapbook.",
       "priceLabel": "Threads Saver Pro",
       "includedUpdates": "$29 m\u1ED9t l\u1EA7n \xB7 ti\u1EC7n \xEDch m\u1EDF r\u1ED9ng Pro + l\xF5i scrapbook \xB7 Ho\xE0n ti\u1EC1n trong 7 ng\xE0y",
       "heroNotes": [
@@ -2249,12 +2249,27 @@ function applyLangToggle(locale) {
   for (const select of document.querySelectorAll("[data-web-lang-select]")) {
     select.value = locale;
   }
+  for (const button of document.querySelectorAll("[data-web-locale]")) {
+    const isActive = button.dataset.webLocale === locale;
+    button.classList.toggle("web-lang-btn-active", isActive);
+    button.setAttribute("aria-pressed", isActive ? "true" : "false");
+  }
 }
 function bindLangToggle(onSwitch) {
   for (const select of document.querySelectorAll("[data-web-lang-select]")) {
     select.addEventListener("change", () => {
       const next = readWebLocale(select.value);
       if (!next) return;
+      setLocale(next);
+      onSwitch(next);
+    });
+  }
+  for (const button of document.querySelectorAll("[data-web-locale]")) {
+    button.addEventListener("click", () => {
+      const next = readWebLocale(button.dataset.webLocale);
+      if (!next) {
+        return;
+      }
       setLocale(next);
       onSwitch(next);
     });
@@ -2338,7 +2353,7 @@ var obsidianLandingMessages = {
     productATag: "Chrome extension",
     productATitle: "Threads to Obsidian",
     productADesc: "PC\uC5D0\uC11C \uBCF4\uACE0 \uC788\uB294 Threads \uAE00\uC744 \uBC14\uB85C \uC800\uC7A5.",
-    productACta: "GitHub\uC5D0\uC11C \uC124\uCE58",
+    productACta: "ZIP \uB2E4\uC6B4\uB85C\uB4DC",
     productBTag: "Mention bot",
     productBTitle: "Mention Scrapbook",
     productBDesc: "\uBAA8\uBC14\uC77C\uC5D0\uC11C\uB294 \uB313\uAE00 \uBA58\uC158\uC73C\uB85C \uBAA8\uC544\uC11C \uB098\uC911\uC5D0 \uAEBC\uB0B4\uAE30.",
@@ -2448,7 +2463,7 @@ var obsidianLandingMessages = {
     productATag: "Chrome extension",
     productATitle: "Threads to Obsidian",
     productADesc: "Save the Threads post you are viewing on desktop.",
-    productACta: "Install from GitHub",
+    productACta: "Download ZIP",
     productBTag: "Mention bot",
     productBTitle: "Mention Scrapbook",
     productBDesc: "Use mention replies on mobile, then export later.",
@@ -2570,7 +2585,7 @@ var landingMessages = {
 var obsidianLandingStorefrontCopy = {
   ko: {
     productName: "Threads Saver",
-    headline: "PC\uB294 extension. \uBAA8\uBC14\uC77C\uC740 mention.",
+    headline: "PC\uB294 extension.<br/>\uBAA8\uBC14\uC77C\uC740 mention.",
     subheadline: "\uC9C0\uAE08 \uBCF4\uB294 \uAE00\uC740 Chrome extension\uC73C\uB85C \uC800\uC7A5\uD558\uACE0, \uBAA8\uBC14\uC77C\uC5D0\uC11C\uB294 mention scrapbook\uC73C\uB85C \uBAA8\uC74D\uB2C8\uB2E4.",
     priceLabel: "Threads Saver Pro",
     includedUpdates: "29\uB2EC\uB7EC 1\uD68C \uACB0\uC81C \xB7 Extension Pro + Scrapbook core \xB7 7\uC77C \uD658\uBD88",
@@ -2618,8 +2633,8 @@ var obsidianLandingStorefrontCopy = {
   },
   en: {
     productName: "Threads Saver",
-    headline: "Desktop saves now. Mobile collects later.",
-    subheadline: "Use the Chrome extension on PC, then use mention scrapbook on mobile when you want to collect posts later.",
+    headline: "Desktop extension. Mobile mention.",
+    subheadline: "Save the current post using the Chrome extension, or collect it later via mention scrapbook on mobile.",
     priceLabel: "Threads Saver Pro",
     includedUpdates: "$29 one-time \xB7 extension Pro + scrapbook core \xB7 7-day refund",
     heroNotes: [
@@ -2774,9 +2789,14 @@ var adminMessages = {
   ko: {
     adminH1: "\uACB0\uC81C, \uBC1C\uAE09, \uC804\uB2EC \uAD00\uB9AC",
     adminLead: "\uACB0\uC81C \uC218\uB2E8 \uAD00\uB9AC, \uAD6C\uB9E4 \uC694\uCCAD \uAC80\uD1A0, Pro \uD0A4 \uBC1C\uAE09, \uC218\uB3D9 \uC774\uBA54\uC77C \uC804\uB2EC\uC744 \uC704\uD55C \uAD00\uB9AC\uC790 \uD328\uB110\uC785\uB2C8\uB2E4.",
+    authBannerEyebrow: "\uC6B4\uC601 \uAD8C\uD55C",
+    authBannerTitle: "\uBA3C\uC800 \uB85C\uADF8\uC778\uD574\uC57C \uC2E4\uC2DC\uAC04 \uC6B4\uC601 \uD56D\uBAA9\uC744 \uC218\uC815\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.",
+    authBannerCopy: "\uB9E4\uCD9C, \uC218\uC9D1\uAE30 \uB3D9\uAE30\uD654, \uB7F0\uD0C0\uC784 \uC124\uC815, \uACB0\uC81C \uC218\uB2E8, \uD0A4 \uBC1C\uAE09\uC740 \uAD00\uB9AC\uC790 \uD1A0\uD070 \uAC80\uC99D \uC804\uAE4C\uC9C0 \uC7A0\uAE08 \uC0C1\uD0DC\uB85C \uC720\uC9C0\uB429\uB2C8\uB2E4.",
+    authOverlayLabel: "\uAD00\uB9AC\uC790 \uD1A0\uD070\uC73C\uB85C \uB85C\uADF8\uC778\uD558\uBA74 \uC774 \uC139\uC158\uC744 \uC0AC\uC6A9\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.",
     tokenLabel: "\uAD00\uB9AC\uC790 \uD1A0\uD070",
     tokenApply: "\uB85C\uADF8\uC778",
     tokenLogout: "\uB85C\uADF8\uC544\uC6C3",
+    tokenPlaceholder: "\uAD00\uB9AC\uC790 \uC811\uADFC \uD1A0\uD070",
     tokenStatusDefault: "/api/admin/* \uC811\uADFC\uC744 \uC704\uD574 \uB85C\uADF8\uC778\uC774 \uD544\uC694\uD569\uB2C8\uB2E4",
     statPending: "\uBBF8\uACB0 \uC8FC\uBB38",
     statPaid: "\uACB0\uC81C \uD655\uC778, \uD0A4 \uB300\uAE30",
@@ -2867,7 +2887,10 @@ var adminMessages = {
     revenueSent: "\uBC1C\uC1A1 \uC644\uB8CC",
     revenueByMethod: "\uACB0\uC81C\uC218\uB2E8\uBCC4",
     revenueByMonth: "\uC6D4\uBCC4 \uC8FC\uBB38",
+    revenueEmptyTitle: "\uC544\uC9C1 \uC9D1\uACC4\uB41C \uB9E4\uCD9C\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.",
+    revenueEmptyCopy: "\uACB0\uC81C \uC644\uB8CC \uAC74\uC774 \uC0DD\uAE30\uBA74 \uC774 \uD45C\uC5D0 \uC790\uB3D9\uC73C\uB85C \uBC18\uC601\uB429\uB2C8\uB2E4.",
     colOrders: "\uC8FC\uBB38\uC218",
+    colMonth: "\uC6D4",
     colPaid: "\uACB0\uC81C",
     colIssued: "\uBC1C\uAE09",
     mailerOn: "\uC774\uBA54\uC77C \uC790\uB3D9 \uBC1C\uC1A1: \uCF1C\uC9D0",
@@ -2880,44 +2903,66 @@ var adminMessages = {
     collectorStateLabel: "\uC0C1\uD0DC",
     collectorLastSuccessLabel: "\uB9C8\uC9C0\uB9C9 \uC131\uACF5",
     collectorLastErrorLabel: "\uCD5C\uADFC \uC624\uB958",
-    collectorHandleLabel: "\uBD07 \uD578\uB4E4",
+    collectorHandleLabel: "Threads \uBD07 \uD578\uB4E4",
+    collectorHandlePlaceholder: "threadsbot",
     collectorGraphLabel: "Graph API \uBC84\uC804",
+    collectorGraphPlaceholder: "v1.0",
     collectorTokenLabel: "\uC561\uC138\uC2A4 \uD1A0\uD070 \uC624\uBC84\uB77C\uC774\uB4DC",
+    collectorTokenPlaceholder: "\uC120\uD0DD \uC0AC\uD56D: \uC7A5\uAE30 \uC561\uC138\uC2A4 \uD1A0\uD070",
     collectorIntervalLabel: "\uD3F4\uB9C1 \uAC04\uACA9 (ms)",
     collectorFetchLabel: "\uAC00\uC838\uC62C \uAC1C\uC218",
     collectorPagesLabel: "\uCD5C\uB300 \uD398\uC774\uC9C0",
+    collectorPublicHandleLabel: "\uACF5\uAC1C \uBD07 \uACC4\uC815",
+    collectorProfileLink: "\uD504\uB85C\uD544 \uC5F4\uAE30",
+    collectorHandleCopy: "\uC5EC\uAE30\uC11C \uBCC0\uACBD\uD55C \uD578\uB4E4\uC740 \uACF5\uAC1C scrapbook \uC548\uB0B4 \uBB38\uAD6C\uC640 \uC218\uC9D1\uAE30 \uC870\uD68C \uB300\uC0C1\uC5D0 \uD568\uAED8 \uBC18\uC601\uB429\uB2C8\uB2E4.",
     collectorSaveBtn: "\uC218\uC9D1\uAE30 \uC124\uC815 \uC800\uC7A5",
     collectorStateRunning: "\uC2E4\uD589 \uC911",
     collectorStateReady: "\uC900\uBE44\uB428",
     collectorStateDisabled: "\uBE44\uD65C\uC131",
+    collectorSaving: "\uC218\uC9D1\uAE30 \uC124\uC815 \uC800\uC7A5 \uC911...",
     collectorSaved: "\uC218\uC9D1\uAE30 \uC124\uC815\uC774 \uC800\uC7A5\uB418\uC5C8\uC2B5\uB2C8\uB2E4.",
+    collectorSyncing: "\uBA58\uC158\uC744 \uC989\uC2DC \uB3D9\uAE30\uD654\uD558\uB294 \uC911...",
     collectorSynced: "\uC218\uC9D1\uAE30 \uC218\uB3D9 \uB3D9\uAE30\uD654\uAC00 \uC644\uB8CC\uB418\uC5C8\uC2B5\uB2C8\uB2E4.",
     runtimeTitle: "\uB7F0\uD0C0\uC784 \uC124\uC815",
     runtimeCopy: "\uC11C\uBC84 \uD30C\uC77C\uC744 \uC9C1\uC811 \uC218\uC815\uD558\uC9C0 \uC54A\uACE0 public origin, \uB370\uC774\uD130\uBCA0\uC774\uC2A4, SMTP\uB97C \uBCC0\uACBD\uD569\uB2C8\uB2E4.",
     publicOriginLabel: "Public origin",
+    publicOriginPlaceholder: "https://ss-threads.dahanda.dev",
     databaseTitle: "\uB370\uC774\uD130\uBCA0\uC774\uC2A4",
     databaseBackendLabel: "\uBC31\uC5D4\uB4DC",
     databaseBackendFile: "\uD30C\uC77C",
     databaseBackendPostgres: "Postgres",
     databaseFilePathLabel: "\uD30C\uC77C \uACBD\uB85C",
+    databaseFilePathPlaceholder: "/var/app/output/web-admin-data.json",
     databaseUrlLabel: "Postgres URL",
+    databaseUrlPlaceholder: "postgres://user:pass@host:5432/db",
     databaseTableLabel: "\uD14C\uC774\uBE14 \uC774\uB984",
+    databaseTablePlaceholder: "threads_web_store",
     databaseStoreKeyLabel: "Store key",
+    databaseStoreKeyPlaceholder: "default",
     databaseActiveLabel: "\uD604\uC7AC \uD65C\uC131 \uB370\uC774\uD130\uBCA0\uC774\uC2A4",
     databaseClearUrlLabel: "\uC800\uC7A5\uB41C Postgres URL\uC744 \uC800\uC7A5 \uC2DC \uC81C\uAC70",
+    databaseUrlConfiguredPlaceholder: "\uC774\uBBF8 \uC800\uC7A5\uB418\uC5B4 \uC788\uC2B5\uB2C8\uB2E4. \uAD50\uCCB4\uD560 \uC0C8 URL\uB9CC \uC785\uB825\uD558\uC138\uC694.",
+    databaseTesting: "DB \uC5F0\uACB0\uC744 \uD14C\uC2A4\uD2B8\uD558\uB294 \uC911...",
     databaseTestBtn: "DB \uC5F0\uACB0 \uD14C\uC2A4\uD2B8",
+    runtimeSaving: "\uB7F0\uD0C0\uC784 \uC124\uC815 \uC800\uC7A5 \uC911...",
     runtimeSaveBtn: "\uB7F0\uD0C0\uC784 \uC124\uC815 \uC800\uC7A5",
     runtimeSaved: "\uB7F0\uD0C0\uC784 \uC124\uC815\uC774 \uC800\uC7A5\uB418\uC5C8\uC2B5\uB2C8\uB2E4.",
     runtimeMigrated: "\uB7F0\uD0C0\uC784 \uC124\uC815\uC774 \uC800\uC7A5\uB418\uC5C8\uACE0 \uB370\uC774\uD130\uAC00 \uC0C8 \uB370\uC774\uD130\uBCA0\uC774\uC2A4\uB85C \uC774\uC804\uB418\uC5C8\uC2B5\uB2C8\uB2E4.",
     runtimeRestartRequired: "\uB370\uC774\uD130\uBCA0\uC774\uC2A4 \uC124\uC815\uC774 \uC800\uC7A5\uB418\uC5C8\uC2B5\uB2C8\uB2E4. \uC0C8 \uBC31\uC5D4\uB4DC\uB97C \uC4F0\uAE30 \uC804\uC5D0 \uC11C\uBC84\uB97C \uC7AC\uC2DC\uC791\uD558\uC138\uC694.",
     smtpTitle: "SMTP",
     smtpHostLabel: "\uD638\uC2A4\uD2B8",
+    smtpHostPlaceholder: "smtp.resend.com",
     smtpPortLabel: "\uD3EC\uD2B8",
     smtpUserLabel: "\uC0AC\uC6A9\uC790",
+    smtpUserPlaceholder: "apikey",
     smtpPassLabel: "\uBE44\uBC00\uBC88\uD638",
+    smtpPassPlaceholder: "secret",
     smtpFromLabel: "\uBCF4\uB0B4\uB294 \uC8FC\uC18C",
+    smtpFromPlaceholder: "hello@example.com",
     smtpSecureLabel: "TLS / secure \uC804\uC1A1 \uC0AC\uC6A9",
     smtpClearPassLabel: "\uC800\uC7A5\uB41C SMTP \uBE44\uBC00\uBC88\uD638\uB97C \uC800\uC7A5 \uC2DC \uC81C\uAC70",
+    smtpPassConfiguredPlaceholder: "\uC774\uBBF8 \uC800\uC7A5\uB418\uC5B4 \uC788\uC2B5\uB2C8\uB2E4. \uAD50\uCCB4\uD560 \uC0C8 \uBE44\uBC00\uBC88\uD638\uB9CC \uC785\uB825\uD558\uC138\uC694.",
+    smtpTesting: "SMTP \uC5F0\uACB0\uC744 \uD14C\uC2A4\uD2B8\uD558\uB294 \uC911...",
     smtpTestBtn: "SMTP \uD14C\uC2A4\uD2B8",
     storefrontTitle: "\uC2A4\uD1A0\uC5B4\uD504\uB860\uD2B8 \uC124\uC815",
     storefrontCopy: "\uAD6C\uB9E4\uC790\uC5D0\uAC8C \uBCF4\uC774\uB294 \uB79C\uB529 \uD398\uC774\uC9C0 \uBB38\uAD6C\uB97C \uAD00\uB9AC\uD569\uB2C8\uB2E4.",
@@ -2929,23 +2974,57 @@ var adminMessages = {
     storefrontPriceValueLabel: "\uAC00\uACA9 \uAC12",
     storefrontUpdatesLabel: "\uD3EC\uD568 \uC5C5\uB370\uC774\uD2B8",
     storefrontHeroNotesLabel: "Hero \uB178\uD2B8",
+    storefrontHeroNotesPlaceholder: "\uD55C \uC904\uC5D0 \uD558\uB098\uC529 \uC785\uB825",
     storefrontFaqsLabel: "FAQ",
+    storefrontFaqsPlaceholder: "\uC9C8\uBB38 :: \uB2F5\uBCC0",
+    storefrontSaving: "\uC2A4\uD1A0\uC5B4\uD504\uB860\uD2B8 \uC124\uC815 \uC800\uC7A5 \uC911...",
     storefrontSaveBtn: "\uC2A4\uD1A0\uC5B4\uD504\uB860\uD2B8 \uC800\uC7A5",
     storefrontSaved: "\uC2A4\uD1A0\uC5B4\uD504\uB860\uD2B8 \uC124\uC815\uC774 \uC800\uC7A5\uB418\uC5C8\uC2B5\uB2C8\uB2E4.",
     methodEditBtn: "\uC218\uC815",
     methodSaveBtn: "\uACB0\uC81C \uC218\uB2E8 \uC800\uC7A5",
     methodCancelBtn: "\uC218\uC815 \uCDE8\uC18C",
+    methodNamePlaceholder: "\uACC4\uC88C\uC774\uCCB4",
+    methodSummaryPlaceholder: "\uC218\uB3D9 \uD655\uC778\uC774 \uD544\uC694\uD55C \uAD6D\uB0B4 \uACB0\uC81C \uBC29\uC2DD",
+    methodInstructionsPlaceholder: "\uAD6C\uB9E4\uC790\uAC00 \uACB0\uC81C\uB97C \uC644\uB8CC\uD558\uAC70\uB098 \uD655\uC778\uD574\uC57C \uD558\uB294 \uC808\uCC28\uB97C \uC801\uC5B4\uC8FC\uC138\uC694.",
+    methodActionLabelPlaceholder: "\uAD6C\uB9E4 \uC694\uCCAD \uBCF4\uB0B4\uAE30",
+    methodActionUrlPlaceholder: "https://...",
+    methodSaving: "\uACB0\uC81C \uC218\uB2E8 \uC800\uC7A5 \uC911...",
     methodEditing: "\uACB0\uC81C \uC218\uB2E8 \uC218\uC815 \uC911\uC785\uB2C8\uB2E4.",
     methodSaved: "\uACB0\uC81C \uC218\uB2E8\uC774 \uC5C5\uB370\uC774\uD2B8\uB418\uC5C8\uC2B5\uB2C8\uB2E4.",
     methodCreated: "\uACB0\uC81C \uC218\uB2E8\uC774 \uC0DD\uC131\uB418\uC5C8\uC2B5\uB2C8\uB2E4.",
-    methodEditCancelled: "\uC218\uC815\uC774 \uCDE8\uC18C\uB418\uC5C8\uC2B5\uB2C8\uB2E4."
+    methodEditCancelled: "\uC218\uC815\uC774 \uCDE8\uC18C\uB418\uC5C8\uC2B5\uB2C8\uB2E4.",
+    methodsEmptyTitle: "\uB4F1\uB85D\uB41C \uACB0\uC81C \uC218\uB2E8\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.",
+    methodsEmptyCopy: "\uCCAB \uACB0\uC81C \uC218\uB2E8\uC744 \uCD94\uAC00\uD558\uBA74 \uAD6C\uB9E4 \uD398\uC774\uC9C0\uC5D0 \uBC14\uB85C \uB178\uCD9C\uB429\uB2C8\uB2E4.",
+    ordersEmptyTitle: "\uB4E4\uC5B4\uC628 \uAD6C\uB9E4 \uC694\uCCAD\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.",
+    ordersEmptyCopy: "\uC0C8 \uAD6C\uB9E4 \uC694\uCCAD\uC774 \uB4E4\uC5B4\uC624\uBA74 \uC774 \uD45C\uC5D0 \uD45C\uC2DC\uB429\uB2C8\uB2E4.",
+    orderMarkingPaid: "\uACB0\uC81C \uC644\uB8CC\uB85C \uD45C\uC2DC\uD558\uB294 \uC911...",
+    orderMarkedPaid: "{email} \uC8FC\uBB38\uC744 \uACB0\uC81C \uC644\uB8CC\uB85C \uD45C\uC2DC\uD588\uC2B5\uB2C8\uB2E4.",
+    keyIssuing: "\uD0A4\uB97C \uBC1C\uAE09\uD558\uB294 \uC911...",
+    keyReissuing: "\uD0A4\uB97C \uC7AC\uBC1C\uAE09\uD558\uB294 \uC911...",
+    emailSending: "\uC774\uBA54\uC77C\uC744 \uBC1C\uC1A1\uD558\uB294 \uC911...",
+    licensesEmptyTitle: "\uBC1C\uAE09\uB41C \uD0A4\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4.",
+    licensesEmptyCopy: "\uD0A4\uB97C \uBC1C\uAE09\uD558\uBA74 \uC774 \uD45C\uC5D0 \uAE30\uB85D\uB429\uB2C8\uB2E4.",
+    licenseRevoking: "\uD0A4\uB97C \uD3D0\uAE30\uD558\uB294 \uC911...",
+    licenseRevoked: "{email} \uD0A4\uB97C \uD3D0\uAE30\uD588\uC2B5\uB2C8\uB2E4.",
+    historyEmptyTitle: "\uD45C\uC2DC\uD560 \uAE30\uB85D\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.",
+    historyEmptyCopy: "\uACB0\uC81C, \uD0A4, \uC6F9\uD6C5 \uC774\uBCA4\uD2B8\uAC00 \uBC1C\uC0DD\uD558\uBA74 \uC5EC\uAE30\uC5D0 \uB204\uC801\uB429\uB2C8\uB2E4.",
+    emailPreviewLoading: "\uC774\uBA54\uC77C \uCD08\uC548\uC744 \uC900\uBE44\uD558\uB294 \uC911...",
+    issueExpiryLabel: "\uB2E4\uC74C \uBC1C\uAE09 \uD0A4 \uB9CC\uB8CC\uC77C",
+    issueExpiryHint: "Issue key \uB610\uB294 Reissue\uB97C \uB204\uB97C \uB54C \uC801\uC6A9\uB429\uB2C8\uB2E4. \uBE44\uC6CC\uB450\uBA74 \uB9CC\uB8CC\uC77C \uC5C6\uB294 \uD0A4\uB97C \uBC1C\uAE09\uD569\uB2C8\uB2E4.",
+    issueExpiryClear: "\uB9CC\uB8CC\uC77C \uC9C0\uC6B0\uAE30",
+    issueExpiryInvalid: "\uB9CC\uB8CC\uC77C\uC740 YYYY-MM-DD \uD615\uC2DD\uC758 \uC720\uD6A8\uD55C \uB0A0\uC9DC\uC5EC\uC57C \uD569\uB2C8\uB2E4."
   },
   en: {
     adminH1: "Payments, issuance, and delivery",
     adminLead: "Manage accepted payment methods, review purchase requests, issue signed Pro keys, and keep an auditable history for manual email delivery.",
+    authBannerEyebrow: "Admin access",
+    authBannerTitle: "Sign in first to unlock live operations.",
+    authBannerCopy: "Revenue, collector sync, runtime settings, payment methods, and key issuance stay locked until the admin token is verified.",
+    authOverlayLabel: "Sign in with the admin token to unlock this section.",
     tokenLabel: "Admin token",
     tokenApply: "Sign in",
     tokenLogout: "Sign out",
+    tokenPlaceholder: "Admin access token",
     tokenStatusDefault: "Sign in required for /api/admin/*",
     statPending: "Pending orders",
     statPaid: "Paid, awaiting key",
@@ -3036,7 +3115,10 @@ var adminMessages = {
     revenueSent: "Delivered",
     revenueByMethod: "By payment method",
     revenueByMonth: "Monthly orders",
+    revenueEmptyTitle: "No revenue has been recorded yet.",
+    revenueEmptyCopy: "Completed payments will show up here automatically.",
     colOrders: "Orders",
+    colMonth: "Month",
     colPaid: "Paid",
     colIssued: "Issued",
     mailerOn: "Auto email delivery: ON",
@@ -3049,44 +3131,66 @@ var adminMessages = {
     collectorStateLabel: "State",
     collectorLastSuccessLabel: "Last success",
     collectorLastErrorLabel: "Last error",
-    collectorHandleLabel: "Bot handle",
+    collectorHandleLabel: "Threads bot handle",
+    collectorHandlePlaceholder: "threadsbot",
     collectorGraphLabel: "Graph API version",
+    collectorGraphPlaceholder: "v1.0",
     collectorTokenLabel: "Access token override",
+    collectorTokenPlaceholder: "Optional long-lived access token",
     collectorIntervalLabel: "Poll interval (ms)",
     collectorFetchLabel: "Fetch limit",
     collectorPagesLabel: "Max pages",
+    collectorPublicHandleLabel: "Public bot account",
+    collectorProfileLink: "Open profile",
+    collectorHandleCopy: "Changing this updates both the public scrapbook mention target and the collector lookup handle.",
     collectorSaveBtn: "Save collector settings",
     collectorStateRunning: "Running",
     collectorStateReady: "Ready",
     collectorStateDisabled: "Disabled",
+    collectorSaving: "Saving collector settings...",
     collectorSaved: "Collector settings saved.",
+    collectorSyncing: "Syncing mentions now...",
     collectorSynced: "Collector sync completed.",
     runtimeTitle: "Runtime settings",
     runtimeCopy: "Change public origin, database, and SMTP without editing the server manually.",
     publicOriginLabel: "Public origin",
+    publicOriginPlaceholder: "https://ss-threads.dahanda.dev",
     databaseTitle: "Database",
     databaseBackendLabel: "Backend",
     databaseBackendFile: "File",
     databaseBackendPostgres: "Postgres",
     databaseFilePathLabel: "File path",
+    databaseFilePathPlaceholder: "/var/app/output/web-admin-data.json",
     databaseUrlLabel: "Postgres URL",
+    databaseUrlPlaceholder: "postgres://user:pass@host:5432/db",
     databaseTableLabel: "Table name",
+    databaseTablePlaceholder: "threads_web_store",
     databaseStoreKeyLabel: "Store key",
+    databaseStoreKeyPlaceholder: "default",
     databaseActiveLabel: "Active database",
     databaseClearUrlLabel: "Clear saved Postgres URL on save",
+    databaseUrlConfiguredPlaceholder: "Already configured. Enter a new URL only if you want to replace it.",
+    databaseTesting: "Testing database connection...",
     databaseTestBtn: "Test database",
+    runtimeSaving: "Saving runtime settings...",
     runtimeSaveBtn: "Save runtime settings",
     runtimeSaved: "Runtime settings saved.",
     runtimeMigrated: "Runtime settings saved and data migrated to the new database.",
     runtimeRestartRequired: "Database settings were saved. Restart the server before using the new backend.",
     smtpTitle: "SMTP",
     smtpHostLabel: "Host",
+    smtpHostPlaceholder: "smtp.resend.com",
     smtpPortLabel: "Port",
     smtpUserLabel: "User",
+    smtpUserPlaceholder: "apikey",
     smtpPassLabel: "Password",
+    smtpPassPlaceholder: "secret",
     smtpFromLabel: "From",
+    smtpFromPlaceholder: "hello@example.com",
     smtpSecureLabel: "Use TLS / secure transport",
     smtpClearPassLabel: "Clear saved SMTP password on save",
+    smtpPassConfiguredPlaceholder: "Already configured. Enter a new password only if you want to replace it.",
+    smtpTesting: "Testing SMTP connection...",
     smtpTestBtn: "Test SMTP",
     storefrontTitle: "Storefront settings",
     storefrontCopy: "Manage the landing page copy shown to buyers.",
@@ -3098,16 +3202,45 @@ var adminMessages = {
     storefrontPriceValueLabel: "Price value",
     storefrontUpdatesLabel: "Included updates",
     storefrontHeroNotesLabel: "Hero notes",
+    storefrontHeroNotesPlaceholder: "One note per line",
     storefrontFaqsLabel: "FAQs",
+    storefrontFaqsPlaceholder: "Question :: Answer",
+    storefrontSaving: "Saving storefront settings...",
     storefrontSaveBtn: "Save storefront settings",
     storefrontSaved: "Storefront settings saved.",
     methodEditBtn: "Edit",
     methodSaveBtn: "Save method",
     methodCancelBtn: "Cancel edit",
+    methodNamePlaceholder: "Bank transfer",
+    methodSummaryPlaceholder: "Manual confirmation for local sales",
+    methodInstructionsPlaceholder: "Explain how the buyer should complete or confirm payment.",
+    methodActionLabelPlaceholder: "Request purchase",
+    methodActionUrlPlaceholder: "https://...",
+    methodSaving: "Saving payment method...",
     methodEditing: "Editing payment method.",
     methodSaved: "Payment method updated.",
     methodCreated: "Payment method created.",
-    methodEditCancelled: "Edit cancelled."
+    methodEditCancelled: "Edit cancelled.",
+    methodsEmptyTitle: "No payment methods yet.",
+    methodsEmptyCopy: "Add the first payment method to publish checkout choices.",
+    ordersEmptyTitle: "No purchase requests yet.",
+    ordersEmptyCopy: "New purchase requests will appear here.",
+    orderMarkingPaid: "Marking the order as paid...",
+    orderMarkedPaid: "Marked the order for {email} as paid.",
+    keyIssuing: "Issuing a key...",
+    keyReissuing: "Reissuing a key...",
+    emailSending: "Sending email...",
+    licensesEmptyTitle: "No issued keys yet.",
+    licensesEmptyCopy: "Issued keys will appear here.",
+    licenseRevoking: "Revoking the key...",
+    licenseRevoked: "Revoked the key for {email}.",
+    historyEmptyTitle: "No records to show.",
+    historyEmptyCopy: "Payment, key, and webhook events will accumulate here.",
+    emailPreviewLoading: "Preparing email preview...",
+    issueExpiryLabel: "Expiry date for the next issued key",
+    issueExpiryHint: "Applied when you use Issue key or Reissue. Leave it empty for a key without expiry.",
+    issueExpiryClear: "Clear expiry",
+    issueExpiryInvalid: "Expiry must be a valid YYYY-MM-DD date."
   },
   ...adminMessageLocales
 };
@@ -3120,10 +3253,14 @@ var licenseList = document.getElementById("license-history");
 var emailPreview = document.getElementById("email-preview");
 var emailStatus = document.getElementById("email-status");
 var copyEmailButton = document.getElementById("copy-email");
+var issueExpiryInput = document.getElementById("license-expiry-date");
+var issueExpiryClearButton = document.getElementById("license-expiry-clear");
 var tokenInput = document.getElementById("admin-token");
 var tokenStatus = document.getElementById("token-status");
 var applyTokenButton = document.getElementById("token-apply");
 var logoutButton = document.getElementById("token-logout");
+var authBanner = document.getElementById("admin-auth-banner");
+var authBannerStatus = document.getElementById("admin-auth-banner-status");
 var reloadButton = document.getElementById("reload-all");
 var methodForm = document.getElementById("method-form");
 var historyKindFilter = document.getElementById("history-filter-kind");
@@ -3138,6 +3275,8 @@ var collectorStatusText = document.getElementById("collector-status");
 var collectorState = document.getElementById("collector-state");
 var collectorLastSuccess = document.getElementById("collector-last-success");
 var collectorLastError = document.getElementById("collector-last-error");
+var collectorHandlePreview = document.getElementById("collector-handle-preview");
+var collectorHandleLink = document.getElementById("collector-handle-link");
 var runtimeForm = document.getElementById("runtime-form");
 var runtimeStatus = document.getElementById("runtime-status");
 var runtimeActiveDatabase = document.getElementById("runtime-active-database");
@@ -3146,6 +3285,9 @@ var smtpTestButton = document.getElementById("smtp-test");
 var smtpStatus = document.getElementById("smtp-status");
 var storefrontForm = document.getElementById("storefront-form");
 var storefrontStatus = document.getElementById("storefront-status");
+var ordersStatus = document.getElementById("orders-status");
+var licensesStatus = document.getElementById("licenses-status");
+var protectedSections = [...document.querySelectorAll("[data-admin-auth-required]")];
 var stats = {
   pending: document.getElementById("stat-pending"),
   paid: document.getElementById("stat-paid"),
@@ -3178,8 +3320,137 @@ var collector = null;
 var currentEmailDraft = "";
 var adminAuthenticated = false;
 var msg = adminMessages.en;
+var statusElements = [
+  tokenStatus,
+  authBannerStatus,
+  methodStatus,
+  collectorStatusText,
+  runtimeStatus,
+  smtpStatus,
+  storefrontStatus,
+  ordersStatus,
+  licensesStatus,
+  emailStatus
+].filter((value) => Boolean(value));
 function escapeHtml(value) {
   return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#39;");
+}
+function normalizeBotHandle(value) {
+  return value.trim().replace(/^@+/, "").toLowerCase();
+}
+function setStatus(element, text, state = "neutral") {
+  if (!element) {
+    return;
+  }
+  element.textContent = text;
+  if (state === "neutral") {
+    delete element.dataset.state;
+    return;
+  }
+  element.dataset.state = state;
+}
+function setBusy(target, busy) {
+  if (!target) {
+    return;
+  }
+  if (target instanceof HTMLButtonElement || target instanceof HTMLInputElement || target instanceof HTMLSelectElement || target instanceof HTMLTextAreaElement) {
+    target.disabled = busy;
+    return;
+  }
+  for (const control of target.querySelectorAll("input, button, select, textarea")) {
+    if (control === tokenInput || control === applyTokenButton || control === logoutButton) {
+      continue;
+    }
+    control.disabled = busy;
+  }
+}
+function formatBotHandlePreview(handle) {
+  const normalized = normalizeBotHandle(handle ?? "");
+  return normalized ? `@${normalized}` : "@your-bot";
+}
+function updateCollectorHandlePreview(handle) {
+  const normalized = normalizeBotHandle(handle ?? "");
+  if (collectorHandlePreview) {
+    collectorHandlePreview.textContent = formatBotHandlePreview(normalized);
+  }
+  if (collectorHandleLink) {
+    const hasHandle = Boolean(normalized);
+    collectorHandleLink.hidden = !hasHandle;
+    collectorHandleLink.href = hasHandle ? `https://www.threads.com/@${normalized}` : "#";
+  }
+}
+function tableEmptyMarkup(title, copy, colspan) {
+  return `
+    <tr class="table-empty-row">
+      <td colspan="${colspan}" class="table-empty-cell">
+        <div class="table-empty">
+          <strong>${escapeHtml(title)}</strong>
+          <span>${escapeHtml(copy)}</span>
+        </div>
+      </td>
+    </tr>
+  `;
+}
+function getLockedEmptyCopy() {
+  return msg.authOverlayLabel ?? "Sign in to unlock this section.";
+}
+function parseExpiryIsoFromInput() {
+  const raw = issueExpiryInput?.value.trim() ?? "";
+  if (!raw) {
+    return { ok: true, iso: null };
+  }
+  const match = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) {
+    return { ok: false };
+  }
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const parsed = new Date(Date.UTC(year, month - 1, day));
+  if (Number.isNaN(parsed.getTime()) || parsed.getUTCFullYear() !== year || parsed.getUTCMonth() !== month - 1 || parsed.getUTCDate() !== day) {
+    return { ok: false };
+  }
+  return { ok: true, iso: parsed.toISOString() };
+}
+async function runWithFeedback(work, options = {}) {
+  const statusEl = options.statusEl ?? null;
+  const busyTargets = options.busyTargets ?? [];
+  const previousDisabled = busyTargets.map(
+    (target) => target instanceof HTMLButtonElement || target instanceof HTMLInputElement || target instanceof HTMLSelectElement || target instanceof HTMLTextAreaElement ? target.disabled : null
+  );
+  for (const target of busyTargets) {
+    setBusy(target, true);
+  }
+  if (options.pendingText) {
+    setStatus(statusEl, options.pendingText, "warning");
+  }
+  try {
+    return await work();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : options.errorFallback ?? msg.dashboardError;
+    setStatus(statusEl, message, "error");
+    if (statusEl !== tokenStatus && !adminAuthenticated && tokenStatus) {
+      setStatus(tokenStatus, message, "error");
+    }
+    return null;
+  } finally {
+    busyTargets.forEach((target, index) => {
+      if (!target) {
+        return;
+      }
+      const restore = previousDisabled[index];
+      if (restore === null || typeof restore === "undefined") {
+        setBusy(target, false);
+        return;
+      }
+      if (target instanceof HTMLButtonElement || target instanceof HTMLInputElement || target instanceof HTMLSelectElement || target instanceof HTMLTextAreaElement) {
+        target.disabled = restore;
+      } else {
+        setBusy(target, false);
+      }
+    });
+    updateAdminSessionUi();
+  }
 }
 async function requestJson(url, init) {
   const headers = new Headers(init?.headers ?? {});
@@ -3195,6 +3466,8 @@ async function requestJson(url, init) {
   if (!response.ok) {
     if (response.status === 401) {
       adminAuthenticated = false;
+      clearAdminState();
+      renderAll();
       updateAdminSessionUi();
     }
     throw new Error(payload.error || msg.requestFailed);
@@ -3255,7 +3528,53 @@ function formatActiveDatabaseSummary(database) {
   }
   return `File \xB7 ${database.filePath || "\u2014"}`;
 }
+function resetProtectedForms() {
+  if (collectorForm) {
+    collectorForm.reset();
+  }
+  if (runtimeForm) {
+    runtimeForm.reset();
+  }
+  if (storefrontForm) {
+    storefrontForm.reset();
+  }
+  resetMethodForm();
+  if (emailPreview) {
+    emailPreview.value = "";
+  }
+  if (issueExpiryInput) {
+    issueExpiryInput.value = "";
+  }
+  updateCollectorHandlePreview("");
+  if (runtimeActiveDatabase) {
+    runtimeActiveDatabase.textContent = `${msg.databaseActiveLabel ?? "Active database"}: \u2014`;
+  }
+}
+function clearAdminState() {
+  dashboard = null;
+  runtimeConfig = null;
+  runtimeSecretState = null;
+  activeRuntimeDatabase = null;
+  collector = null;
+  currentEmailDraft = "";
+  resetProtectedForms();
+}
 function updateAdminSessionUi() {
+  document.body.classList.toggle("admin-authenticated", adminAuthenticated);
+  authBanner?.toggleAttribute("hidden", adminAuthenticated);
+  const lockLabel = msg.authOverlayLabel ?? "Sign in to unlock this section.";
+  for (const section of protectedSections) {
+    section.classList.toggle("is-locked", !adminAuthenticated);
+    section.dataset.lockLabel = lockLabel;
+    section.setAttribute("aria-hidden", adminAuthenticated ? "false" : "true");
+    for (const control of section.querySelectorAll("input, button, select, textarea")) {
+      if (control === issueExpiryInput || control === issueExpiryClearButton) {
+        control.disabled = !adminAuthenticated;
+        continue;
+      }
+      control.disabled = !adminAuthenticated;
+    }
+  }
   if (tokenInput) {
     tokenInput.disabled = adminAuthenticated;
     if (adminAuthenticated) {
@@ -3268,8 +3587,11 @@ function updateAdminSessionUi() {
   if (logoutButton) {
     logoutButton.hidden = !adminAuthenticated;
   }
-  if (tokenStatus && !adminAuthenticated && !tokenStatus.textContent?.trim()) {
-    tokenStatus.textContent = msg.tokenStatusDefault;
+  if (!adminAuthenticated) {
+    setStatus(tokenStatus, msg.tokenStatusDefault, "warning");
+    if (authBannerStatus) {
+      setStatus(authBannerStatus, msg.authBannerCopy ?? "Sign in before changing live settings or issuing keys.");
+    }
   }
 }
 function setMethodFormMode(editing) {
@@ -3453,12 +3775,12 @@ function populateRuntimeForm(config) {
   applySecretPlaceholder(
     "postgresUrl",
     runtimeSecretState?.databasePostgresUrlConfigured === true,
-    "Configured. Enter a new URL to replace it."
+    msg.databaseUrlConfiguredPlaceholder ?? "Configured. Enter a new URL to replace it."
   );
   applySecretPlaceholder(
     "smtpPass",
     runtimeSecretState?.smtpPassConfigured === true,
-    "Configured. Enter a new password to replace it."
+    msg.smtpPassConfiguredPlaceholder ?? "Configured. Enter a new password to replace it."
   );
   if (runtimeActiveDatabase) {
     runtimeActiveDatabase.textContent = `${msg.databaseActiveLabel ?? "Active database"}: ${formatActiveDatabaseSummary(
@@ -3473,7 +3795,7 @@ function parseCollectorForm() {
   const formData = new FormData(collectorForm);
   return {
     collector: {
-      botHandle: formData.get("botHandle")?.toString() ?? "",
+      botHandle: normalizeBotHandle(formData.get("botHandle")?.toString() ?? ""),
       accessTokenOverride: formData.get("accessTokenOverride")?.toString() ?? "",
       graphApiVersion: formData.get("graphApiVersion")?.toString() ?? "",
       intervalMs: Number(formData.get("intervalMs")?.toString() ?? "0"),
@@ -3492,88 +3814,120 @@ function populateCollectorForm(config) {
       field.value = value;
     }
   };
-  setValue("botHandle", config.collector.botHandle);
+  setValue("botHandle", normalizeBotHandle(config.collector.botHandle));
   setValue("accessTokenOverride", config.collector.accessTokenOverride);
   setValue("graphApiVersion", config.collector.graphApiVersion);
   setValue("intervalMs", String(config.collector.intervalMs));
   setValue("fetchLimit", String(config.collector.fetchLimit));
   setValue("maxPages", String(config.collector.maxPages));
+  updateCollectorHandlePreview(config.collector.botHandle);
 }
 function renderCollector() {
   const status = collector ?? dashboard?.collectorStatus ?? null;
-  if (!status) {
-    return;
-  }
+  const handleField = collectorForm?.elements.namedItem("botHandle");
+  const fallbackHandle = handleField instanceof HTMLInputElement ? handleField.value : "";
+  updateCollectorHandlePreview(status?.botHandle ?? runtimeConfig?.collector.botHandle ?? fallbackHandle);
   if (collectorState) {
-    collectorState.textContent = status.running ? msg.collectorStateRunning ?? "Running" : status.enabled ? msg.collectorStateReady ?? "Ready" : msg.collectorStateDisabled ?? "Disabled";
+    collectorState.textContent = !status ? "\u2014" : status.running ? msg.collectorStateRunning ?? "Running" : status.enabled ? msg.collectorStateReady ?? "Ready" : msg.collectorStateDisabled ?? "Disabled";
   }
   if (collectorLastSuccess) {
-    collectorLastSuccess.textContent = formatDateTime(status.lastSucceededAt);
+    collectorLastSuccess.textContent = status ? formatDateTime(status.lastSucceededAt) : "\u2014";
   }
   if (collectorLastError) {
-    collectorLastError.textContent = status.lastError || "\u2014";
+    collectorLastError.textContent = status?.lastError || "\u2014";
+  }
+  if (collectorSyncButton) {
+    collectorSyncButton.disabled = !adminAuthenticated || !Boolean(normalizeBotHandle(status?.botHandle ?? fallbackHandle));
   }
 }
 function renderStats() {
-  if (!dashboard) {
-    return;
-  }
-  if (stats.pending) stats.pending.textContent = String(dashboard.summary.pendingOrders);
-  if (stats.paid) stats.paid.textContent = String(dashboard.summary.paidOrders);
-  if (stats.issued) stats.issued.textContent = String(dashboard.summary.issuedKeys);
-  if (stats.methods) stats.methods.textContent = String(dashboard.summary.activePaymentMethods);
-  if (stats.webhookProcessed) stats.webhookProcessed.textContent = String(dashboard.summary.webhookProcessed);
-  if (stats.webhookIgnored) stats.webhookIgnored.textContent = String(dashboard.summary.webhookIgnored);
-  if (stats.webhookRejected) stats.webhookRejected.textContent = String(dashboard.summary.webhookRejected);
-  if (stats.webhookDuplicates) stats.webhookDuplicates.textContent = String(dashboard.summary.webhookDuplicates);
-  if (stats.deliveryReady) stats.deliveryReady.textContent = String(dashboard.summary.deliveryReadyToSend ?? 0);
-  if (stats.deliverySent) stats.deliverySent.textContent = String(dashboard.summary.deliverySent ?? 0);
+  const summary = dashboard?.summary;
+  if (stats.pending) stats.pending.textContent = summary ? String(summary.pendingOrders) : "\u2014";
+  if (stats.paid) stats.paid.textContent = summary ? String(summary.paidOrders) : "\u2014";
+  if (stats.issued) stats.issued.textContent = summary ? String(summary.issuedKeys) : "\u2014";
+  if (stats.methods) stats.methods.textContent = summary ? String(summary.activePaymentMethods) : "\u2014";
+  if (stats.webhookProcessed) stats.webhookProcessed.textContent = summary ? String(summary.webhookProcessed) : "\u2014";
+  if (stats.webhookIgnored) stats.webhookIgnored.textContent = summary ? String(summary.webhookIgnored) : "\u2014";
+  if (stats.webhookRejected) stats.webhookRejected.textContent = summary ? String(summary.webhookRejected) : "\u2014";
+  if (stats.webhookDuplicates) stats.webhookDuplicates.textContent = summary ? String(summary.webhookDuplicates) : "\u2014";
+  if (stats.deliveryReady) stats.deliveryReady.textContent = summary ? String(summary.deliveryReadyToSend ?? 0) : "\u2014";
+  if (stats.deliverySent) stats.deliverySent.textContent = summary ? String(summary.deliverySent ?? 0) : "\u2014";
 }
 function renderRevenue() {
-  if (!dashboard) return;
-  const rep = dashboard.revenueReport;
-  if (!rep) return;
-  if (revenue.estimate) revenue.estimate.textContent = `$${rep.estimatedRevenueUsd.toFixed(2)}`;
-  if (revenue.totalOrders) revenue.totalOrders.textContent = String(rep.totalOrders);
-  if (revenue.paid) revenue.paid.textContent = String(rep.paidOrders);
-  if (revenue.issued) revenue.issued.textContent = String(rep.issuedKeys);
-  if (revenue.revoked) revenue.revoked.textContent = String(rep.revokedKeys);
-  if (revenue.readyToSend) revenue.readyToSend.textContent = String(rep.deliveryReadyToSend);
-  if (revenue.sent) revenue.sent.textContent = String(rep.deliverySent);
+  const rep = dashboard?.revenueReport;
+  if (revenue.estimate) revenue.estimate.textContent = rep ? `$${rep.estimatedRevenueUsd.toFixed(2)}` : "\u2014";
+  if (revenue.totalOrders) revenue.totalOrders.textContent = rep ? String(rep.totalOrders) : "\u2014";
+  if (revenue.paid) revenue.paid.textContent = rep ? String(rep.paidOrders) : "\u2014";
+  if (revenue.issued) revenue.issued.textContent = rep ? String(rep.issuedKeys) : "\u2014";
+  if (revenue.revoked) revenue.revoked.textContent = rep ? String(rep.revokedKeys) : "\u2014";
+  if (revenue.readyToSend) revenue.readyToSend.textContent = rep ? String(rep.deliveryReadyToSend) : "\u2014";
+  if (revenue.sent) revenue.sent.textContent = rep ? String(rep.deliverySent) : "\u2014";
   if (mailerStatus) {
-    mailerStatus.textContent = dashboard.mailerConfigured ? msg.mailerOn : msg.mailerOff;
+    mailerStatus.textContent = dashboard ? dashboard.mailerConfigured ? msg.mailerOn : msg.mailerOff : "\u2014";
   }
   if (revenue.byMethod) {
-    revenue.byMethod.innerHTML = rep.byPaymentMethod.length === 0 ? `<tr><td colspan="3" class="table-subtle">\u2014</td></tr>` : rep.byPaymentMethod.map((row) => `
+    revenue.byMethod.innerHTML = !rep ? tableEmptyMarkup(
+      msg.revenueEmptyTitle ?? "Revenue is locked",
+      adminAuthenticated ? msg.revenueEmptyCopy ?? "Completed payments will show up here." : getLockedEmptyCopy(),
+      3
+    ) : rep.byPaymentMethod.length === 0 ? tableEmptyMarkup(
+      msg.revenueEmptyTitle ?? "No payment method revenue yet",
+      msg.revenueEmptyCopy ?? "Completed payments will show up here.",
+      3
+    ) : rep.byPaymentMethod.map((row) => `
           <tr>
-            <td>${escapeHtml(row.methodName)}</td>
-            <td>${row.orders}</td>
-            <td>${row.paid}</td>
+            <td data-label="${escapeHtml(msg.colName)}">${escapeHtml(row.methodName)}</td>
+            <td data-label="${escapeHtml(msg.colOrders)}">${row.orders}</td>
+            <td data-label="${escapeHtml(msg.colPaid)}">${row.paid}</td>
           </tr>
         `).join("");
   }
   if (revenue.byMonth) {
-    revenue.byMonth.innerHTML = rep.byMonth.length === 0 ? `<tr><td colspan="3" class="table-subtle">\u2014</td></tr>` : rep.byMonth.map((row) => `
+    revenue.byMonth.innerHTML = !rep ? tableEmptyMarkup(
+      msg.revenueEmptyTitle ?? "Revenue is locked",
+      adminAuthenticated ? msg.revenueEmptyCopy ?? "Completed payments will show up here." : getLockedEmptyCopy(),
+      3
+    ) : rep.byMonth.length === 0 ? tableEmptyMarkup(
+      msg.revenueEmptyTitle ?? "No monthly revenue yet",
+      msg.revenueEmptyCopy ?? "Completed payments will show up here.",
+      3
+    ) : rep.byMonth.map((row) => `
           <tr>
-            <td>${escapeHtml(row.month)}</td>
-            <td>${row.orders}</td>
-            <td>${row.issued}</td>
+            <td data-label="${escapeHtml(msg.colMonth ?? "Month")}">${escapeHtml(row.month)}</td>
+            <td data-label="${escapeHtml(msg.colOrders)}">${row.orders}</td>
+            <td data-label="${escapeHtml(msg.colIssued)}">${row.issued}</td>
           </tr>
         `).join("");
   }
 }
 function renderPaymentMethods() {
-  if (!dashboard || !methodList) {
+  if (!methodList) {
+    return;
+  }
+  if (!dashboard) {
+    methodList.innerHTML = tableEmptyMarkup(
+      msg.methodsEmptyTitle ?? "Payment methods are locked",
+      adminAuthenticated ? msg.methodsEmptyCopy ?? "Add the first payment method to publish checkout choices." : getLockedEmptyCopy(),
+      5
+    );
+    return;
+  }
+  if (dashboard.paymentMethods.length === 0) {
+    methodList.innerHTML = tableEmptyMarkup(
+      msg.methodsEmptyTitle ?? "No payment methods yet",
+      msg.methodsEmptyCopy ?? "Add the first payment method to publish checkout choices.",
+      5
+    );
     return;
   }
   methodList.innerHTML = dashboard.paymentMethods.map(
     (method) => `
         <tr>
-          <td>${escapeHtml(method.name)}</td>
-          <td>${escapeHtml(method.summary)}</td>
-          <td>${escapeHtml(method.actionLabel || "Continue")}</td>
-          <td>${statusPill(method.enabled ? msg.pillEnabled : msg.pillDisabled, method.enabled ? "success" : "neutral")}</td>
-          <td class="action-cell">
+          <td data-label="${escapeHtml(msg.colName)}">${escapeHtml(method.name)}</td>
+          <td data-label="${escapeHtml(msg.colSummary)}">${escapeHtml(method.summary)}</td>
+          <td data-label="${escapeHtml(msg.colAction)}">${escapeHtml(method.actionLabel || "Continue")}</td>
+          <td data-label="${escapeHtml(msg.colEnabled)}">${statusPill(method.enabled ? msg.pillEnabled : msg.pillDisabled, method.enabled ? "success" : "neutral")}</td>
+          <td data-label="${escapeHtml(msg.colActions)}" class="action-cell">
             <button class="ghost small" data-edit-method="${method.id}" type="button">
               ${msg.methodEditBtn ?? "Edit"}
             </button>
@@ -3586,7 +3940,23 @@ function renderPaymentMethods() {
   ).join("");
 }
 function renderOrders() {
-  if (!dashboard || !ordersList) {
+  if (!ordersList) {
+    return;
+  }
+  if (!dashboard) {
+    ordersList.innerHTML = tableEmptyMarkup(
+      msg.ordersEmptyTitle ?? "Purchase requests are locked",
+      adminAuthenticated ? msg.ordersEmptyCopy ?? "New purchase requests will appear here." : getLockedEmptyCopy(),
+      5
+    );
+    return;
+  }
+  if (dashboard.orders.length === 0) {
+    ordersList.innerHTML = tableEmptyMarkup(
+      msg.ordersEmptyTitle ?? "No purchase requests yet",
+      msg.ordersEmptyCopy ?? "New purchase requests will appear here.",
+      5
+    );
     return;
   }
   ordersList.innerHTML = dashboard.orders.map((order) => {
@@ -3607,33 +3977,49 @@ function renderOrders() {
     }
     return `
         <tr>
-          <td>
+          <td data-label="${escapeHtml(msg.colBuyer)}">
             <strong>${escapeHtml(order.buyerName)}</strong><br />
             <span class="table-subtle">${escapeHtml(order.buyerEmail)}</span>
           </td>
-          <td>${escapeHtml(paymentMethodName(order.paymentMethodId))}</td>
-          <td>${statusPill(order.status.replaceAll("_", " "), variant)}</td>
-          <td>${new Date(order.createdAt).toLocaleString()}</td>
-          <td class="action-cell">${actions.join("") || `<span class="table-subtle">${msg.noActions}</span>`}</td>
+          <td data-label="${escapeHtml(msg.colMethod)}">${escapeHtml(paymentMethodName(order.paymentMethodId))}</td>
+          <td data-label="${escapeHtml(msg.colStatus)}">${statusPill(order.status.replaceAll("_", " "), variant)}</td>
+          <td data-label="${escapeHtml(msg.colCreated)}">${new Date(order.createdAt).toLocaleString()}</td>
+          <td data-label="${escapeHtml(msg.colActions)}" class="action-cell">${actions.join("") || `<span class="table-subtle">${msg.noActions}</span>`}</td>
         </tr>
       `;
   }).join("");
 }
 function renderLicenses() {
-  if (!dashboard || !licenseList) {
+  if (!licenseList) {
+    return;
+  }
+  if (!dashboard) {
+    licenseList.innerHTML = tableEmptyMarkup(
+      msg.licensesEmptyTitle ?? "Issued keys are locked",
+      adminAuthenticated ? msg.licensesEmptyCopy ?? "Issued keys will appear here." : getLockedEmptyCopy(),
+      5
+    );
+    return;
+  }
+  if (dashboard.licenses.length === 0) {
+    licenseList.innerHTML = tableEmptyMarkup(
+      msg.licensesEmptyTitle ?? "No issued keys yet",
+      msg.licensesEmptyCopy ?? "Issued keys will appear here.",
+      5
+    );
     return;
   }
   licenseList.innerHTML = dashboard.licenses.map(
     (license) => `
         <tr>
-          <td>
+          <td data-label="${escapeHtml(msg.colHolder)}">
             <strong>${escapeHtml(license.holderName)}</strong><br />
             <span class="table-subtle">${escapeHtml(license.holderEmail)}</span>
           </td>
-          <td>${new Date(license.issuedAt).toLocaleString()}</td>
-          <td><code>${escapeHtml(license.tokenPreview)}</code></td>
-          <td>${statusPill(license.status, license.status === "active" ? "success" : "warning")}</td>
-          <td class="action-cell">
+          <td data-label="${escapeHtml(msg.colIssuedAt)}">${new Date(license.issuedAt).toLocaleString()}</td>
+          <td data-label="${escapeHtml(msg.colPreview)}"><code>${escapeHtml(license.tokenPreview)}</code></td>
+          <td data-label="${escapeHtml(msg.colStatus)}">${statusPill(license.status, license.status === "active" ? "success" : "warning")}</td>
+          <td data-label="${escapeHtml(msg.colActions)}" class="action-cell">
             ${license.status === "active" ? `<button class="ghost small" data-revoke-license="${license.id}" type="button">${msg.btnRevoke}</button>` : ""}
           </td>
         </tr>
@@ -3641,27 +4027,35 @@ function renderLicenses() {
   ).join("");
 }
 function renderHistory() {
-  if (!dashboard || !historyList) {
+  if (!historyList) {
+    return;
+  }
+  if (!dashboard) {
+    historyList.innerHTML = tableEmptyMarkup(
+      msg.historyEmptyTitle ?? "History is locked",
+      adminAuthenticated ? msg.historyEmptyCopy ?? "Key, payment, and webhook events will appear here." : getLockedEmptyCopy(),
+      6
+    );
     return;
   }
   const events = dashboard.history.filter(matchesWebhookFilter);
   if (events.length === 0) {
-    historyList.innerHTML = `
-      <tr>
-        <td colspan="6" class="table-subtle">${msg.noHistoryMatch}</td>
-      </tr>
-    `;
+    historyList.innerHTML = tableEmptyMarkup(
+      msg.historyEmptyTitle ?? "No matching events",
+      msg.noHistoryMatch,
+      6
+    );
     return;
   }
   historyList.innerHTML = events.map(
     (event) => `
         <tr>
-          <td>${new Date(event.createdAt).toLocaleString()}</td>
-          <td>${statusPill(event.kind, historyKindVariant(event.kind))}</td>
-          <td>${escapeHtml(event.webhookProvider ?? "\u2014")}</td>
-          <td>${escapeHtml(event.webhookEventId ?? "\u2014")}</td>
-          <td>${escapeHtml(event.webhookReason ?? "\u2014")}</td>
-          <td>${escapeHtml(event.message)}</td>
+          <td data-label="${escapeHtml(msg.colWhen)}">${new Date(event.createdAt).toLocaleString()}</td>
+          <td data-label="${escapeHtml(msg.colEventKind)}">${statusPill(event.kind, historyKindVariant(event.kind))}</td>
+          <td data-label="${escapeHtml(msg.colProvider)}">${escapeHtml(event.webhookProvider ?? "\u2014")}</td>
+          <td data-label="${escapeHtml(msg.colEventId)}">${escapeHtml(event.webhookEventId ?? "\u2014")}</td>
+          <td data-label="${escapeHtml(msg.colReason)}">${escapeHtml(event.webhookReason ?? "\u2014")}</td>
+          <td data-label="${escapeHtml(msg.colMessage)}">${escapeHtml(event.message)}</td>
         </tr>
       `
   ).join("");
@@ -3686,9 +4080,7 @@ async function refreshDashboard() {
   dashboard = await requestAdmin("/api/admin/dashboard");
   collector = dashboard.collectorStatus ?? collector;
   renderAll();
-  if (tokenStatus) {
-    tokenStatus.textContent = msg.dashboardLoaded;
-  }
+  setStatus(tokenStatus, msg.dashboardLoaded, "success");
 }
 async function refreshAdminData() {
   const [nextDashboard, runtimeResponse] = await Promise.all([
@@ -3701,17 +4093,16 @@ async function refreshAdminData() {
   activeRuntimeDatabase = runtimeResponse.activeDatabase;
   collector = nextDashboard.collectorStatus ?? collector;
   renderAll();
-  if (tokenStatus) {
-    tokenStatus.textContent = msg.dashboardLoaded;
-  }
+  setStatus(tokenStatus, msg.dashboardLoaded, "success");
 }
 async function refreshAdminSession() {
   const session = await requestJson("/api/admin/session");
   adminAuthenticated = session.authenticated === true;
-  updateAdminSessionUi();
-  if (tokenStatus && !adminAuthenticated) {
-    tokenStatus.textContent = msg.tokenStatusDefault;
+  if (!adminAuthenticated) {
+    clearAdminState();
+    renderAll();
   }
+  updateAdminSessionUi();
   return adminAuthenticated;
 }
 async function loginAdminSession() {
@@ -3722,30 +4113,45 @@ async function loginAdminSession() {
     }
     return;
   }
-  if (tokenStatus) {
-    tokenStatus.textContent = msg.tokenSaving;
+  const result = await runWithFeedback(
+    () => requestJson("/api/admin/session/login", {
+      method: "POST",
+      body: JSON.stringify({ token })
+    }),
+    {
+      statusEl: tokenStatus,
+      busyTargets: [applyTokenButton, tokenInput],
+      pendingText: msg.tokenSaving,
+      errorFallback: msg.dashboardError
+    }
+  );
+  if (!result) {
+    return;
   }
-  await requestJson("/api/admin/session/login", {
-    method: "POST",
-    body: JSON.stringify({ token })
-  });
   adminAuthenticated = true;
   updateAdminSessionUi();
-  if (tokenStatus) {
-    tokenStatus.textContent = msg.dashboardLoaded;
-  }
   await refreshAdminData();
 }
 async function logoutAdminSession() {
-  await requestJson("/api/admin/session/logout", {
-    method: "POST",
-    body: JSON.stringify({})
-  });
-  adminAuthenticated = false;
-  updateAdminSessionUi();
-  if (tokenStatus) {
-    tokenStatus.textContent = msg.tokenCleared;
+  const result = await runWithFeedback(
+    () => requestJson("/api/admin/session/logout", {
+      method: "POST",
+      body: JSON.stringify({})
+    }),
+    {
+      statusEl: tokenStatus,
+      busyTargets: [logoutButton],
+      pendingText: msg.tokenCleared
+    }
+  );
+  if (!result) {
+    return;
   }
+  adminAuthenticated = false;
+  clearAdminState();
+  renderAll();
+  updateAdminSessionUi();
+  setStatus(tokenStatus, msg.tokenCleared, "success");
 }
 async function handleMethodSubmit(event) {
   event.preventDefault();
@@ -3763,14 +4169,23 @@ async function handleMethodSubmit(event) {
     enabled: formData.get("enabled") === "on",
     sortOrder: Number(formData.get("sortOrder")?.toString() ?? "0")
   };
-  await requestAdmin(methodId ? `/api/admin/payment-methods/${methodId}` : "/api/admin/payment-methods", {
-    method: methodId ? "PUT" : "POST",
-    body: JSON.stringify(payload)
-  });
-  resetMethodForm();
-  if (methodStatus) {
-    methodStatus.textContent = methodId ? msg.methodSaved ?? "Payment method updated." : msg.methodCreated ?? "Payment method created.";
+  const saved = await runWithFeedback(
+    () => requestAdmin(methodId ? `/api/admin/payment-methods/${methodId}` : "/api/admin/payment-methods", {
+      method: methodId ? "PUT" : "POST",
+      body: JSON.stringify(payload)
+    }),
+    {
+      statusEl: methodStatus,
+      busyTargets: [methodForm],
+      pendingText: msg.methodSaving ?? "Saving payment method...",
+      errorFallback: msg.dashboardError
+    }
+  );
+  if (!saved) {
+    return;
   }
+  resetMethodForm();
+  setStatus(methodStatus, methodId ? msg.methodSaved ?? "Payment method updated." : msg.methodCreated ?? "Payment method created.", "success");
   await refreshDashboard();
 }
 async function togglePaymentMethod(methodId) {
@@ -3781,105 +4196,185 @@ async function togglePaymentMethod(methodId) {
   if (!method) {
     return;
   }
-  await requestAdmin(`/api/admin/payment-methods/${methodId}`, {
-    method: "PUT",
-    body: JSON.stringify({
-      ...method,
-      enabled: !method.enabled
-    })
-  });
+  const updated = await runWithFeedback(
+    () => requestAdmin(`/api/admin/payment-methods/${methodId}`, {
+      method: "PUT",
+      body: JSON.stringify({
+        ...method,
+        enabled: !method.enabled
+      })
+    }),
+    {
+      statusEl: methodStatus,
+      pendingText: msg.methodSaving ?? "Updating payment method...",
+      errorFallback: msg.dashboardError
+    }
+  );
+  if (!updated) {
+    return;
+  }
+  setStatus(methodStatus, msg.methodSaved ?? "Payment method updated.", "success");
   await refreshDashboard();
 }
 async function saveCollectorSettings(event) {
   event.preventDefault();
-  const response = await requestAdmin(
-    "/api/admin/runtime-config",
+  const response = await runWithFeedback(
+    () => requestAdmin(
+      "/api/admin/runtime-config",
+      {
+        method: "PUT",
+        body: JSON.stringify(parseCollectorForm())
+      }
+    ),
     {
-      method: "PUT",
-      body: JSON.stringify(parseCollectorForm())
+      statusEl: collectorStatusText,
+      busyTargets: [collectorForm, collectorSyncButton],
+      pendingText: msg.collectorSaving ?? "Saving collector settings...",
+      errorFallback: msg.dashboardError
     }
   );
+  if (!response) {
+    return;
+  }
   runtimeConfig = response.config;
   runtimeSecretState = response.secretState;
   activeRuntimeDatabase = response.activeDatabase;
   collector = response.collectorStatus ?? collector;
   populateCollectorForm(runtimeConfig);
   renderCollector();
-  if (collectorStatusText) {
-    collectorStatusText.textContent = msg.collectorSaved ?? "Collector settings saved.";
-  }
+  setStatus(collectorStatusText, msg.collectorSaved ?? "Collector settings saved.", "success");
 }
 async function syncCollectorNow() {
-  const result = await requestAdmin("/api/admin/bot-collector/sync", {
-    method: "POST",
-    body: JSON.stringify({})
-  });
+  const result = await runWithFeedback(
+    () => requestAdmin("/api/admin/bot-collector/sync", {
+      method: "POST",
+      body: JSON.stringify({})
+    }),
+    {
+      statusEl: collectorStatusText,
+      busyTargets: [collectorSyncButton, collectorForm],
+      pendingText: msg.collectorSyncing ?? "Syncing mentions now...",
+      errorFallback: msg.dashboardError
+    }
+  );
+  if (!result) {
+    return;
+  }
   collector = result.status;
   renderCollector();
-  if (collectorStatusText) {
-    collectorStatusText.textContent = msg.collectorSynced ?? "Collector sync completed.";
-  }
+  setStatus(collectorStatusText, msg.collectorSynced ?? "Collector sync completed.", "success");
 }
 async function saveRuntimeSettings(event) {
   event.preventDefault();
-  const response = await requestAdmin(
-    "/api/admin/runtime-config",
+  const response = await runWithFeedback(
+    () => requestAdmin(
+      "/api/admin/runtime-config",
+      {
+        method: "PUT",
+        body: JSON.stringify(parseRuntimeConfigFromForm())
+      }
+    ),
     {
-      method: "PUT",
-      body: JSON.stringify(parseRuntimeConfigFromForm())
+      statusEl: runtimeStatus,
+      busyTargets: [runtimeForm, databaseTestButton, smtpTestButton],
+      pendingText: msg.runtimeSaving ?? "Saving runtime settings...",
+      errorFallback: msg.dashboardError
     }
   );
+  if (!response) {
+    return;
+  }
   runtimeConfig = response.config;
   runtimeSecretState = response.secretState;
   activeRuntimeDatabase = response.activeDatabase;
   collector = response.collectorStatus ?? collector;
   populateRuntimeForm(runtimeConfig);
   renderCollector();
-  if (runtimeStatus) {
-    runtimeStatus.textContent = response.databaseRestartRequired ? msg.runtimeRestartRequired ?? "Database settings were saved. Restart the server before using the new backend." : response.migrated ? msg.runtimeMigrated ?? "Runtime settings saved and data migrated to the new database." : msg.runtimeSaved ?? "Runtime settings saved.";
-  }
+  setStatus(
+    runtimeStatus,
+    response.databaseRestartRequired ? msg.runtimeRestartRequired ?? "Database settings were saved. Restart the server before using the new backend." : response.migrated ? msg.runtimeMigrated ?? "Runtime settings saved and data migrated to the new database." : msg.runtimeSaved ?? "Runtime settings saved.",
+    response.databaseRestartRequired ? "warning" : "success"
+  );
   await refreshDashboard();
 }
 async function testRuntimeDatabase() {
-  const result = await requestAdmin("/api/admin/runtime-config/database/test", {
-    method: "POST",
-    body: JSON.stringify({
-      database: parseRuntimeConfigFromForm().database
-    })
-  });
-  if (runtimeStatus) {
-    runtimeStatus.textContent = result.message;
+  const result = await runWithFeedback(
+    () => requestAdmin("/api/admin/runtime-config/database/test", {
+      method: "POST",
+      body: JSON.stringify({
+        database: parseRuntimeConfigFromForm().database
+      })
+    }),
+    {
+      statusEl: runtimeStatus,
+      busyTargets: [databaseTestButton],
+      pendingText: msg.databaseTesting ?? "Testing database connection...",
+      errorFallback: msg.dashboardError
+    }
+  );
+  if (!result) {
+    return;
   }
+  setStatus(runtimeStatus, result.message, "success");
 }
 async function testRuntimeSmtp() {
-  const result = await requestAdmin("/api/admin/runtime-config/smtp/test", {
-    method: "POST",
-    body: JSON.stringify({
-      smtp: parseRuntimeConfigFromForm().smtp
-    })
-  });
-  if (smtpStatus) {
-    smtpStatus.textContent = result.message;
+  const result = await runWithFeedback(
+    () => requestAdmin("/api/admin/runtime-config/smtp/test", {
+      method: "POST",
+      body: JSON.stringify({
+        smtp: parseRuntimeConfigFromForm().smtp
+      })
+    }),
+    {
+      statusEl: smtpStatus,
+      busyTargets: [smtpTestButton],
+      pendingText: msg.smtpTesting ?? "Testing SMTP connection...",
+      errorFallback: msg.dashboardError
+    }
+  );
+  if (!result) {
+    return;
   }
+  setStatus(smtpStatus, result.message, "success");
 }
 async function saveStorefrontSettings(event) {
   event.preventDefault();
-  const settings = await requestAdmin("/api/admin/storefront-settings", {
-    method: "PUT",
-    body: JSON.stringify(parseStorefrontForm())
-  });
+  const settings = await runWithFeedback(
+    () => requestAdmin("/api/admin/storefront-settings", {
+      method: "PUT",
+      body: JSON.stringify(parseStorefrontForm())
+    }),
+    {
+      statusEl: storefrontStatus,
+      busyTargets: [storefrontForm],
+      pendingText: msg.storefrontSaving ?? "Saving storefront settings...",
+      errorFallback: msg.dashboardError
+    }
+  );
+  if (!settings) {
+    return;
+  }
   if (dashboard) {
     dashboard.settings = settings;
   }
   populateStorefrontForm(settings);
-  if (storefrontStatus) {
-    storefrontStatus.textContent = msg.storefrontSaved ?? "Storefront settings saved.";
-  }
+  setStatus(storefrontStatus, msg.storefrontSaved ?? "Storefront settings saved.", "success");
 }
 async function previewEmail(orderId) {
-  const draft = await requestAdmin(`/api/admin/orders/${orderId}/email-preview`, {
-    method: "GET"
-  });
+  const draft = await runWithFeedback(
+    () => requestAdmin(`/api/admin/orders/${orderId}/email-preview`, {
+      method: "GET"
+    }),
+    {
+      statusEl: emailStatus,
+      busyTargets: [copyEmailButton],
+      pendingText: msg.emailPreviewLoading ?? "Preparing email preview...",
+      errorFallback: msg.dashboardError
+    }
+  );
+  if (!draft) {
+    return null;
+  }
   currentEmailDraft = `To: ${draft.to}
 Subject: ${draft.subject}
 
@@ -3887,36 +4382,70 @@ ${draft.body}`;
   if (emailPreview) {
     emailPreview.value = currentEmailDraft;
   }
-  if (emailStatus) {
-    emailStatus.textContent = msg.emailDraftReady.replace("{email}", draft.to);
-  }
+  setStatus(emailStatus, msg.emailDraftReady.replace("{email}", draft.to), "success");
+  return draft;
 }
 async function handleOrderAction(target) {
-  const markPaidId = target.getAttribute("data-mark-paid");
-  const issueLicenseId = target.getAttribute("data-issue-license");
-  const emailPreviewId = target.getAttribute("data-email-preview");
-  const reissueId = target.getAttribute("data-reissue");
-  const sendEmailId = target.getAttribute("data-send-email");
+  const actionButton = target.closest("button");
+  if (!(actionButton instanceof HTMLButtonElement)) {
+    return;
+  }
+  const markPaidId = actionButton.getAttribute("data-mark-paid");
+  const issueLicenseId = actionButton.getAttribute("data-issue-license");
+  const emailPreviewId = actionButton.getAttribute("data-email-preview");
+  const reissueId = actionButton.getAttribute("data-reissue");
+  const sendEmailId = actionButton.getAttribute("data-send-email");
   if (markPaidId) {
-    await requestAdmin(`/api/admin/orders/${markPaidId}/mark-paid`, {
-      method: "POST",
-      body: JSON.stringify({})
-    });
+    const order = await runWithFeedback(
+      () => requestAdmin(`/api/admin/orders/${markPaidId}/mark-paid`, {
+        method: "POST",
+        body: JSON.stringify({})
+      }),
+      {
+        statusEl: ordersStatus,
+        busyTargets: [actionButton],
+        pendingText: msg.orderMarkingPaid ?? "Marking the order as paid...",
+        errorFallback: msg.dashboardError
+      }
+    );
+    if (!order) {
+      return;
+    }
+    setStatus(
+      ordersStatus,
+      (msg.orderMarkedPaid ?? "Marked the order for {email} as paid.").replace("{email}", order.buyerEmail),
+      "success"
+    );
     await refreshDashboard();
     return;
   }
-  if (issueLicenseId) {
-    const expiresAt = window.prompt("Optional expiry date (YYYY-MM-DD). Leave blank for no expiry.", "") || "";
-    const payload = {
-      expiresAt: expiresAt ? (/* @__PURE__ */ new Date(`${expiresAt}T00:00:00.000Z`)).toISOString() : null
-    };
-    const result = await requestAdmin(
-      `/api/admin/orders/${issueLicenseId}/issue-license`,
+  if (issueLicenseId || reissueId) {
+    const expiry = parseExpiryIsoFromInput();
+    if (!expiry.ok) {
+      setStatus(emailStatus, msg.issueExpiryInvalid ?? "Expiry must be a valid YYYY-MM-DD date.", "error");
+      issueExpiryInput?.focus();
+      return;
+    }
+    const orderId = issueLicenseId ?? reissueId;
+    const isReissue = Boolean(reissueId);
+    const result = await runWithFeedback(
+      () => requestAdmin(
+        `/api/admin/orders/${orderId}/${isReissue ? "reissue" : "issue-license"}`,
+        {
+          method: "POST",
+          body: JSON.stringify({ expiresAt: expiry.iso })
+        }
+      ),
       {
-        method: "POST",
-        body: JSON.stringify(payload)
+        statusEl: ordersStatus,
+        busyTargets: [actionButton, copyEmailButton],
+        pendingText: isReissue ? msg.keyReissuing ?? "Reissuing a key..." : msg.keyIssuing ?? "Issuing a key...",
+        errorFallback: msg.dashboardError
       }
     );
+    if (!result) {
+      return;
+    }
     currentEmailDraft = `To: ${result.emailDraft.to}
 Subject: ${result.emailDraft.subject}
 
@@ -3924,61 +4453,80 @@ ${result.emailDraft.body}`;
     if (emailPreview) {
       emailPreview.value = currentEmailDraft;
     }
-    if (emailStatus) {
-      const base = msg.keyIssued.replace("{email}", result.license.holderEmail);
-      emailStatus.textContent = result.autoSent ? `${base} \xB7 ${msg.emailSent.replace("{email}", result.license.holderEmail)}` : base;
-    }
-    await refreshDashboard();
-    return;
-  }
-  if (reissueId) {
-    const expiresAt = window.prompt("Optional expiry date (YYYY-MM-DD). Leave blank for no expiry.", "") || "";
-    const payload = {
-      expiresAt: expiresAt ? (/* @__PURE__ */ new Date(`${expiresAt}T00:00:00.000Z`)).toISOString() : null
-    };
-    const result = await requestAdmin(
-      `/api/admin/orders/${reissueId}/reissue`,
-      {
-        method: "POST",
-        body: JSON.stringify(payload)
-      }
-    );
-    currentEmailDraft = `To: ${result.emailDraft.to}
-Subject: ${result.emailDraft.subject}
-
-${result.emailDraft.body}`;
-    if (emailPreview) {
-      emailPreview.value = currentEmailDraft;
-    }
-    if (emailStatus) {
-      const base = msg.keyReissued.replace("{email}", result.license.holderEmail);
-      emailStatus.textContent = result.autoSent ? `${base} \xB7 ${msg.emailSent.replace("{email}", result.license.holderEmail)}` : base;
+    const issuedMessage = isReissue ? msg.keyReissued.replace("{email}", result.license.holderEmail) : msg.keyIssued.replace("{email}", result.license.holderEmail);
+    const emailMessage = result.autoSent ? msg.emailSent.replace("{email}", result.license.holderEmail) : msg.emailDraftReady.replace("{email}", result.emailDraft.to);
+    setStatus(ordersStatus, issuedMessage, "success");
+    setStatus(licensesStatus, issuedMessage, "success");
+    setStatus(emailStatus, result.autoSent ? `${issuedMessage} \xB7 ${emailMessage}` : emailMessage, "success");
+    if (issueExpiryInput) {
+      issueExpiryInput.value = "";
     }
     await refreshDashboard();
     return;
   }
   if (sendEmailId) {
-    const result = await requestAdmin(
-      `/api/admin/orders/${sendEmailId}/send-email`,
-      { method: "POST", body: JSON.stringify({}) }
+    const result = await runWithFeedback(
+      () => requestAdmin(`/api/admin/orders/${sendEmailId}/send-email`, {
+        method: "POST",
+        body: JSON.stringify({})
+      }),
+      {
+        statusEl: ordersStatus,
+        busyTargets: [actionButton, copyEmailButton],
+        pendingText: msg.emailSending ?? "Sending email...",
+        errorFallback: msg.dashboardError
+      }
     );
-    if (emailStatus) {
-      emailStatus.textContent = msg.emailSent.replace("{email}", result.to);
+    if (!result) {
+      return;
     }
+    const sentMessage = msg.emailSent.replace("{email}", result.to);
+    setStatus(ordersStatus, sentMessage, "success");
+    setStatus(emailStatus, sentMessage, "success");
     await refreshDashboard();
     return;
   }
   if (emailPreviewId) {
-    await previewEmail(emailPreviewId);
+    const draft = await previewEmail(emailPreviewId);
+    if (!draft) {
+      return;
+    }
+    setStatus(
+      ordersStatus,
+      msg.emailDraftReady.replace("{email}", draft.to),
+      "success"
+    );
   }
 }
 async function handleLicenseAction(target) {
-  const revokeId = target.getAttribute("data-revoke-license");
-  if (!revokeId) return;
-  await requestAdmin(`/api/admin/licenses/${revokeId}/revoke`, {
-    method: "POST",
-    body: JSON.stringify({})
-  });
+  const actionButton = target.closest("button");
+  if (!(actionButton instanceof HTMLButtonElement)) {
+    return;
+  }
+  const revokeId = actionButton.getAttribute("data-revoke-license");
+  if (!revokeId) {
+    return;
+  }
+  const license = await runWithFeedback(
+    () => requestAdmin(`/api/admin/licenses/${revokeId}/revoke`, {
+      method: "POST",
+      body: JSON.stringify({})
+    }),
+    {
+      statusEl: licensesStatus,
+      busyTargets: [actionButton],
+      pendingText: msg.licenseRevoking ?? "Revoking the key...",
+      errorFallback: msg.dashboardError
+    }
+  );
+  if (!license) {
+    return;
+  }
+  setStatus(
+    licensesStatus,
+    (msg.licenseRevoked ?? "Revoked the key for {email}.").replace("{email}", license.holderEmail),
+    "success"
+  );
   await refreshDashboard();
 }
 function applyLocale(locale) {
@@ -3986,11 +4534,14 @@ function applyLocale(locale) {
   document.documentElement.lang = locale;
   applyTranslations(msg);
   applyLangToggle(locale);
-  if (dashboard) {
-    renderAll();
-  }
+  renderAll();
+  updateAdminSessionUi();
 }
 function bindEvents() {
+  for (const element of statusElements) {
+    element.setAttribute("aria-live", "polite");
+    element.setAttribute("role", "status");
+  }
   applyTokenButton?.addEventListener("click", () => {
     void loginAdminSession().catch((error) => {
       if (tokenStatus) {
@@ -4000,6 +4551,17 @@ function bindEvents() {
   });
   logoutButton?.addEventListener("click", () => {
     void logoutAdminSession().catch((error) => {
+      if (tokenStatus) {
+        tokenStatus.textContent = error instanceof Error ? error.message : msg.dashboardError;
+      }
+    });
+  });
+  tokenInput?.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter") {
+      return;
+    }
+    event.preventDefault();
+    void loginAdminSession().catch((error) => {
       if (tokenStatus) {
         tokenStatus.textContent = error instanceof Error ? error.message : msg.dashboardError;
       }
@@ -4040,8 +4602,26 @@ function bindEvents() {
     }
   });
   collectorForm?.addEventListener("submit", (event) => {
+    const handleField = collectorForm.elements.namedItem("botHandle");
+    if (handleField instanceof HTMLInputElement) {
+      const normalizedHandle = handleField.value.trim().replace(/^@+/, "").toLowerCase();
+      if (!normalizedHandle || !/^[a-z0-9._]+$/.test(normalizedHandle)) {
+        event.preventDefault();
+        setStatus(collectorStatus, "Enter a valid Threads bot handle.", "error");
+        handleField.focus();
+        return;
+      }
+      handleField.value = normalizedHandle;
+      updateCollectorHandlePreview(normalizedHandle);
+    }
     void saveCollectorSettings(event);
   });
+  const collectorHandleField = collectorForm?.elements.namedItem("botHandle");
+  if (collectorHandleField instanceof HTMLInputElement) {
+    collectorHandleField.addEventListener("input", () => {
+      updateCollectorHandlePreview(collectorHandleField.value);
+    });
+  }
   collectorSyncButton?.addEventListener("click", () => {
     void syncCollectorNow();
   });
@@ -4073,15 +4653,22 @@ function bindEvents() {
   });
   copyEmailButton?.addEventListener("click", async () => {
     if (!currentEmailDraft) {
-      if (emailStatus) {
-        emailStatus.textContent = msg.nothingToCopy;
-      }
+      setStatus(emailStatus, msg.nothingToCopy, "warning");
       return;
     }
-    await navigator.clipboard.writeText(currentEmailDraft);
-    if (emailStatus) {
-      emailStatus.textContent = msg.emailCopied;
+    try {
+      await navigator.clipboard.writeText(currentEmailDraft);
+      setStatus(emailStatus, msg.emailCopied, "success");
+    } catch (error) {
+      setStatus(emailStatus, error instanceof Error ? error.message : msg.dashboardError, "error");
     }
+  });
+  issueExpiryClearButton?.addEventListener("click", () => {
+    if (issueExpiryInput) {
+      issueExpiryInput.value = "";
+      issueExpiryInput.focus();
+    }
+    setStatus(emailStatus, msg.issueExpiryHint ?? "Leave it empty for a key without expiry.");
   });
   historyKindFilter?.addEventListener("change", () => {
     renderHistory();
@@ -4104,6 +4691,7 @@ void (async () => {
   document.documentElement.lang = locale;
   bindEvents();
   resetMethodForm();
+  renderAll();
   updateAdminSessionUi();
   let authenticated = false;
   try {

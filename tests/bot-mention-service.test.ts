@@ -143,7 +143,7 @@ test("mention collector fetches mentions and ingests them idempotently", async (
 
   try {
     const data = buildDefaultDatabase("2026-03-25T00:00:00.000Z");
-    const oauthStart = startBotOauth(data, "https://threads-archive.dahanda.dev");
+    const oauthStart = startBotOauth(data, "https://ss-threads.dahanda.dev");
     const state = new URL(oauthStart.authorizeUrl).searchParams.get("state");
     assert.ok(state);
 
@@ -151,7 +151,7 @@ test("mention collector fetches mentions and ingests them idempotently", async (
       data,
       state as string,
       "oauth-code-1",
-      "https://threads-archive.dahanda.dev"
+      "https://ss-threads.dahanda.dev"
     );
 
     const collector = createBotMentionCollector({
@@ -359,25 +359,25 @@ test("mention collector refreshes existing archives with the original replied po
   try {
     const data = buildDefaultDatabase("2026-03-25T00:00:00.000Z");
 
-    const botOauthStart = startBotOauth(data, "https://threads-archive.dahanda.dev");
+    const botOauthStart = startBotOauth(data, "https://ss-threads.dahanda.dev");
     const botState = new URL(botOauthStart.authorizeUrl).searchParams.get("state");
     assert.ok(botState);
     await completeBotOauth(
       data,
       botState as string,
       "oauth-code-bot",
-      "https://threads-archive.dahanda.dev"
+      "https://ss-threads.dahanda.dev"
     );
 
     process.env.THREADS_BOT_HANDLE = "parktaejun";
-    const userOauthStart = startBotOauth(data, "https://threads-archive.dahanda.dev");
+    const userOauthStart = startBotOauth(data, "https://ss-threads.dahanda.dev");
     const userState = new URL(userOauthStart.authorizeUrl).searchParams.get("state");
     assert.ok(userState);
     await completeBotOauth(
       data,
       userState as string,
       "oauth-code-user",
-      "https://threads-archive.dahanda.dev"
+      "https://ss-threads.dahanda.dev"
     );
     process.env.THREADS_BOT_HANDLE = "ss_savebot";
 

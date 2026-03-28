@@ -183,17 +183,61 @@ interface ScrapbookPlusState {
 }
 
 type WorkspaceTab = "inbox" | "watchlists" | "searches" | "insights";
+const LEGACY_BOT_HANDLE = "parktaejun";
+const DEFAULT_BOT_HANDLE = "your-bot";
 
 let latestConfig: BotPublicConfig | null = null;
 let latestState: BotSessionState | null = null;
 let latestWorkspace: ScrapbookPlusState | null = null;
 let activeTab: WorkspaceTab = "inbox";
+let activeArchiveId: string | null = null;
 const selectedArchiveIds = new Set<string>();
 const expandedMediaArchiveIds = new Set<string>();
-let activeArchiveId: string | null = null;
-let isExportingArchives = false;
-let connectButtonsAvailable = true;
 let connectButtonsBusy = false;
+let connectButtonsAvailable = true;
+let isExportingArchives = false;
+let archiveSearchQuery = "";
+let activeFolderId: string | null = null;
+
+interface FolderEntry {
+  id: string;
+  name: string;
+  createdAt: string;
+}
+
+const FOLDER_STORAGE_KEY = "scrapbook_folders";
+const FOLDER_MAP_STORAGE_KEY = "scrapbook_folder_map";
+
+function loadFolders(): FolderEntry[] {
+  try {
+    const raw = localStorage.getItem(FOLDER_STORAGE_KEY);
+    return raw ? (JSON.parse(raw) as FolderEntry[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveFolders(folders: FolderEntry[]): void {
+  localStorage.setItem(FOLDER_STORAGE_KEY, JSON.stringify(folders));
+}
+
+function loadFolderMap(): Record<string, string> {
+  try {
+    const raw = localStorage.getItem(FOLDER_MAP_STORAGE_KEY);
+    return raw ? (JSON.parse(raw) as Record<string, string>) : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveFolderMap(map: Record<string, string>): void {
+  localStorage.setItem(FOLDER_MAP_STORAGE_KEY, JSON.stringify(map));
+}
+
+function generateFolderId(): string {
+  return `folder_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
 let currentLocale: WebLocale = getLocale("en");
 let msg: ScrapbookMsg = scrapbookMessages[currentLocale];
 
@@ -224,6 +268,11 @@ const archivesToolbarMeta = document.querySelector<HTMLElement>("#archives-toolb
 const archivesSelectAll = document.querySelector<HTMLInputElement>("#archives-select-all");
 const archivesExportSelected = document.querySelector<HTMLButtonElement>("#archives-export-selected");
 const archivesExportAll = document.querySelector<HTMLButtonElement>("#archives-export-all");
+const archivesMoveSelected = document.querySelector<HTMLButtonElement>("#archives-move-selected");
+const archivesDeleteSelected = document.querySelector<HTMLButtonElement>("#archives-delete-selected");
+const archivesFilterBar = document.querySelector<HTMLElement>("#archives-filter-bar");
+const archivesSearchInput = document.querySelector<HTMLInputElement>("#archives-search");
+const archivesFolderStrip = document.querySelector<HTMLElement>("#archives-folder-strip");
 const logoutButton = document.querySelector<HTMLButtonElement>("#logout");
 const workspaceTabs = document.querySelector<HTMLElement>("#workspace-tabs");
 const workspaceTabButtons = document.querySelectorAll<HTMLButtonElement>("[data-tab]");
@@ -371,8 +420,35 @@ function localizeSearchStatus(status: ScrapbookSearchResultView["status"]): stri
   return runtimeLabel().searchStatusNew;
 }
 
+function normalizeBotHandle(value: string | null | undefined): string {
+  return `${value ?? ""}`.trim().replace(/^@+/, "");
+}
+
+function replaceLegacyBotHandle(value: string, handle = getCurrentBotHandle()): string {
+  const normalized = normalizeBotHandle(handle) || DEFAULT_BOT_HANDLE;
+  return value.replaceAll(`@${LEGACY_BOT_HANDLE}`, `@${normalized}`);
+}
+
+function applyBotHandleToCopy<T>(value: T): T {
+  if (typeof value === "string") {
+    return replaceLegacyBotHandle(value) as T;
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((entry) => applyBotHandleToCopy(entry)) as T;
+  }
+
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, entry]) => [key, applyBotHandleToCopy(entry)])
+    ) as T;
+  }
+
+  return value;
+}
+
 function getCurrentBotHandle(): string {
-  return latestConfig?.botHandle ?? "parktaejun";
+  return normalizeBotHandle(latestConfig?.botHandle) || DEFAULT_BOT_HANDLE;
 }
 
 function setLocalizedHtml(selector: string, html: string): void {
@@ -437,7 +513,7 @@ function syncLocaleSelect(): void {
 
 function applyLocale(locale: WebLocale): void {
   currentLocale = locale;
-  msg = scrapbookMessages[currentLocale];
+  msg = applyBotHandleToCopy(scrapbookMessages[currentLocale]);
   setLocale(locale);
   syncLocaleSelect();
   applyStaticTranslations();
@@ -739,6 +815,8 @@ function updateArchivesToolbar(items: BotArchiveView[], isAuthenticated: boolean
     archivesSelectAll.indeterminate = false;
     archivesExportSelected.disabled = true;
     archivesExportAll.disabled = true;
+    if (archivesMoveSelected) archivesMoveSelected.disabled = true;
+    if (archivesDeleteSelected) archivesDeleteSelected.disabled = true;
     archivesToolbarMeta.textContent = "";
     return;
   }
@@ -751,6 +829,301 @@ function updateArchivesToolbar(items: BotArchiveView[], isAuthenticated: boolean
   archivesExportAll.disabled = isExportingArchives || items.length === 0;
   archivesExportSelected.textContent = isExportingArchives ? t("scrapbookExportPreparing") : t("scrapbookExportSelected");
   archivesExportAll.textContent = isExportingArchives ? t("scrapbookExportPreparing") : t("scrapbookExportAll");
+  if (archivesMoveSelected) archivesMoveSelected.disabled = selectedCount === 0;
+  if (archivesDeleteSelected) archivesDeleteSelected.disabled = selectedCount === 0;
+}
+
+function filterArchives(items: BotArchiveView[]): BotArchiveView[] {
+  let filtered = items;
+
+  if (activeFolderId) {
+    const folderMap = loadFolderMap();
+    filtered = filtered.filter((item) => folderMap[item.id] === activeFolderId);
+  }
+
+  if (archiveSearchQuery.trim()) {
+    const query = archiveSearchQuery.trim().toLowerCase();
+    filtered = filtered.filter((item) => {
+      const searchable = [
+        item.targetText,
+        item.targetAuthorHandle ?? "",
+        item.targetAuthorDisplayName ?? "",
+        item.noteText ?? "",
+        ...item.tags,
+        item.mentionAuthorHandle ?? "",
+        item.mentionAuthorDisplayName ?? "",
+        ...item.authorReplies.map((r) => r.text)
+      ].join(" ").toLowerCase();
+      return searchable.includes(query);
+    });
+  }
+
+  return filtered;
+}
+
+function renderFolderStrip(allItems: BotArchiveView[]): void {
+  if (!archivesFolderStrip) return;
+
+  const folders = loadFolders();
+  const folderMap = loadFolderMap();
+
+  const folderCounts: Record<string, number> = {};
+  let unfolderedCount = 0;
+  for (const item of allItems) {
+    const fid = folderMap[item.id];
+    if (fid) {
+      folderCounts[fid] = (folderCounts[fid] || 0) + 1;
+    } else {
+      unfolderedCount++;
+    }
+  }
+
+  const allLabel = currentLocale === "ko" ? "전체" : currentLocale === "ja" ? "すべて" : "All";
+  const newFolderLabel = currentLocale === "ko" ? "+ 새 폴더" : currentLocale === "ja" ? "+ 新規" : "+ New";
+
+  let html = `<button class="folder-pill ${activeFolderId === null ? "is-active" : ""}" type="button" data-folder-id="">
+    ${escapeHtml(allLabel)}
+    <span class="folder-pill-count">${allItems.length}</span>
+  </button>`;
+
+  for (const folder of folders) {
+    const count = folderCounts[folder.id] || 0;
+    const isActive = activeFolderId === folder.id;
+    html += `<button class="folder-pill ${isActive ? "is-active" : ""}" type="button" data-folder-id="${escapeHtml(folder.id)}">
+      ${escapeHtml(folder.name)}
+      <span class="folder-pill-count">${count}</span>
+    </button>`;
+  }
+
+  html += `<button class="folder-pill folder-pill-new" type="button" data-folder-new="1">${escapeHtml(newFolderLabel)}</button>`;
+
+  archivesFolderStrip.innerHTML = html;
+
+  for (const button of archivesFolderStrip.querySelectorAll<HTMLButtonElement>("[data-folder-id]")) {
+    button.addEventListener("click", () => {
+      const fid = button.dataset.folderId || null;
+      activeFolderId = fid || null;
+      if (latestState) {
+        renderArchives(latestState.archives, latestState.authenticated && Boolean(latestState.user));
+      }
+    });
+
+    button.addEventListener("contextmenu", (event) => {
+      const fid = button.dataset.folderId;
+      if (!fid) return;
+      event.preventDefault();
+      showFolderContextMenu(fid, event as MouseEvent);
+    });
+  }
+
+  const newFolderButton = archivesFolderStrip.querySelector<HTMLButtonElement>("[data-folder-new]");
+  newFolderButton?.addEventListener("click", () => void createFolderPrompt());
+}
+
+function createFolderPrompt(): void {
+  const labelPrompt = currentLocale === "ko" ? "폴더 이름을 입력하세요:" : "Enter folder name:";
+  const name = window.prompt(labelPrompt);
+  if (!name?.trim()) return;
+
+  const folders = loadFolders();
+  const newFolder: FolderEntry = {
+    id: generateFolderId(),
+    name: name.trim(),
+    createdAt: new Date().toISOString()
+  };
+  folders.push(newFolder);
+  saveFolders(folders);
+
+  if (latestState) {
+    renderArchives(latestState.archives, latestState.authenticated && Boolean(latestState.user));
+  }
+
+  const label = currentLocale === "ko" ? `폴더 "${newFolder.name}" 생성됨` : `Folder "${newFolder.name}" created`;
+  setStatus(label);
+}
+
+function showFolderContextMenu(folderId: string, event: MouseEvent): void {
+  const existing = document.querySelector(".folder-context-menu");
+  existing?.remove();
+
+  const folders = loadFolders();
+  const folder = folders.find((f) => f.id === folderId);
+  if (!folder) return;
+
+  const renameLabel = currentLocale === "ko" ? "이름 변경" : "Rename";
+  const deleteLabel = currentLocale === "ko" ? "폴더 삭제" : "Delete folder";
+
+  const menu = document.createElement("div");
+  menu.className = "folder-context-menu";
+  menu.style.position = "fixed";
+  menu.style.left = `${event.clientX}px`;
+  menu.style.top = `${event.clientY}px`;
+  menu.innerHTML = `
+    <button class="folder-context-item" data-action="rename">${escapeHtml(renameLabel)}</button>
+    <button class="folder-context-item folder-context-item-danger" data-action="delete">${escapeHtml(deleteLabel)}</button>
+  `;
+  document.body.appendChild(menu);
+
+  const dismiss = () => menu.remove();
+  window.setTimeout(() => document.addEventListener("click", dismiss, { once: true }), 0);
+
+  menu.querySelector<HTMLButtonElement>("[data-action='rename']")?.addEventListener("click", () => {
+    dismiss();
+    const prompt = currentLocale === "ko" ? `새 이름 입력 (현재: ${folder.name}):` : `New name (current: ${folder.name}):`;
+    const newName = window.prompt(prompt, folder.name);
+    if (!newName?.trim()) return;
+    folder.name = newName.trim();
+    saveFolders(folders);
+    if (latestState) {
+      renderArchives(latestState.archives, latestState.authenticated && Boolean(latestState.user));
+    }
+  });
+
+  menu.querySelector<HTMLButtonElement>("[data-action='delete']")?.addEventListener("click", () => {
+    dismiss();
+    const confirmMsg = currentLocale === "ko"
+      ? `폴더 "${folder.name}"를 삭제하시겠습니까? (안의 아이템은 삭제되지 않습니다)`
+      : `Delete folder "${folder.name}"? (Items inside will not be deleted)`;
+    if (!window.confirm(confirmMsg)) return;
+
+    const updatedFolders = folders.filter((f) => f.id !== folderId);
+    saveFolders(updatedFolders);
+
+    const folderMap = loadFolderMap();
+    for (const key of Object.keys(folderMap)) {
+      if (folderMap[key] === folderId) {
+        delete folderMap[key];
+      }
+    }
+    saveFolderMap(folderMap);
+
+    if (activeFolderId === folderId) {
+      activeFolderId = null;
+    }
+
+    if (latestState) {
+      renderArchives(latestState.archives, latestState.authenticated && Boolean(latestState.user));
+    }
+  });
+}
+
+function showMoveToFolderMenu(): void {
+  const existing = document.querySelector(".folder-move-menu");
+  existing?.remove();
+
+  const folders = loadFolders();
+  const removeLabel = currentLocale === "ko" ? "폴더에서 제거" : "Remove from folder";
+  const newLabel = currentLocale === "ko" ? "+ 새 폴더에 이동" : "+ Move to new folder";
+
+  const menu = document.createElement("div");
+  menu.className = "folder-move-menu";
+
+  let html = `<div class="folder-move-menu-title">${escapeHtml(currentLocale === "ko" ? "폴더 선택" : "Choose folder")}</div>`;
+  for (const folder of folders) {
+    html += `<button class="folder-move-item" type="button" data-move-folder="${escapeHtml(folder.id)}">${escapeHtml(folder.name)}</button>`;
+  }
+  html += `<button class="folder-move-item" type="button" data-move-folder="">${escapeHtml(removeLabel)}</button>`;
+  html += `<button class="folder-move-item folder-move-item-new" type="button" data-move-new="1">${escapeHtml(newLabel)}</button>`;
+
+  menu.innerHTML = html;
+
+  const btn = archivesMoveSelected;
+  if (btn) {
+    const rect = btn.getBoundingClientRect();
+    menu.style.position = "fixed";
+    menu.style.left = `${rect.left}px`;
+    menu.style.top = `${rect.bottom + 4}px`;
+  }
+
+  document.body.appendChild(menu);
+
+  const dismiss = () => menu.remove();
+  window.setTimeout(() => document.addEventListener("click", dismiss, { once: true }), 0);
+
+  for (const item of menu.querySelectorAll<HTMLButtonElement>("[data-move-folder]")) {
+    item.addEventListener("click", () => {
+      dismiss();
+      const targetFolderId = item.dataset.moveFolder || "";
+      const folderMap = loadFolderMap();
+      for (const archiveId of selectedArchiveIds) {
+        if (targetFolderId) {
+          folderMap[archiveId] = targetFolderId;
+        } else {
+          delete folderMap[archiveId];
+        }
+      }
+      saveFolderMap(folderMap);
+      selectedArchiveIds.clear();
+      if (latestState) {
+        renderArchives(latestState.archives, latestState.authenticated && Boolean(latestState.user));
+      }
+      const label = currentLocale === "ko" ? "이동 완료" : "Moved";
+      setStatus(label);
+    });
+  }
+
+  menu.querySelector<HTMLButtonElement>("[data-move-new]")?.addEventListener("click", () => {
+    dismiss();
+    const labelPrompt = currentLocale === "ko" ? "새 폴더 이름:" : "New folder name:";
+    const name = window.prompt(labelPrompt);
+    if (!name?.trim()) return;
+
+    const folders2 = loadFolders();
+    const newFolder: FolderEntry = {
+      id: generateFolderId(),
+      name: name.trim(),
+      createdAt: new Date().toISOString()
+    };
+    folders2.push(newFolder);
+    saveFolders(folders2);
+
+    const folderMap = loadFolderMap();
+    for (const archiveId of selectedArchiveIds) {
+      folderMap[archiveId] = newFolder.id;
+    }
+    saveFolderMap(folderMap);
+    selectedArchiveIds.clear();
+
+    if (latestState) {
+      renderArchives(latestState.archives, latestState.authenticated && Boolean(latestState.user));
+    }
+    const label = currentLocale === "ko" ? `"${newFolder.name}" 폴더로 이동됨` : `Moved to "${newFolder.name}"`;
+    setStatus(label);
+  });
+}
+
+async function bulkDeleteSelectedArchives(): Promise<void> {
+  const count = selectedArchiveIds.size;
+  if (count === 0) return;
+
+  const confirmMsg = currentLocale === "ko"
+    ? `선택한 ${count}개 항목을 삭제하시겠습니까?`
+    : `Delete ${count} selected items?`;
+  if (!window.confirm(confirmMsg)) return;
+
+  const ids = [...selectedArchiveIds];
+  for (const id of ids) {
+    try {
+      await requestJson<unknown>(`/api/public/bot/archive/${encodeURIComponent(id)}`, { method: "DELETE" });
+      selectedArchiveIds.delete(id);
+      expandedMediaArchiveIds.delete(id);
+      if (activeArchiveId === id) {
+        activeArchiveId = null;
+      }
+    } catch {
+      // skip failed ones
+    }
+  }
+
+  const folderMap = loadFolderMap();
+  for (const id of ids) {
+    delete folderMap[id];
+  }
+  saveFolderMap(folderMap);
+
+  await refreshEverything();
+  const label = currentLocale === "ko" ? `${ids.length}개 삭제됨` : `${ids.length} deleted`;
+  setStatus(label);
 }
 
 function downloadBlob(blob: Blob, filename: string): void {
@@ -879,6 +1252,7 @@ function renderArchives(items: BotArchiveView[], isAuthenticated: boolean): void
     activeArchiveId = null;
     updateArchivesToolbar([], false);
     renderArchiveDetail(null);
+    archivesFilterBar?.classList.add("hidden");
     return;
   }
 
@@ -891,22 +1265,45 @@ function renderArchives(items: BotArchiveView[], isAuthenticated: boolean): void
     activeArchiveId = null;
     updateArchivesToolbar([], true);
     renderArchiveDetail(null);
+    archivesFilterBar?.classList.add("hidden");
     return;
   }
 
-  syncSelectedArchiveIds(items);
-  if (!items.some((item) => item.id === activeArchiveId)) {
-    activeArchiveId = items[0]?.id ?? null;
+  archivesFilterBar?.classList.remove("hidden");
+  renderFolderStrip(items);
+
+  const filtered = filterArchives(items);
+
+  syncSelectedArchiveIds(filtered);
+  if (!filtered.some((item) => item.id === activeArchiveId)) {
+    activeArchiveId = filtered[0]?.id ?? null;
   }
 
   archivesEmptyEl.classList.add("hidden");
   archivesBoard.classList.remove("hidden");
-  archivesEl.innerHTML = items
+
+  if (filtered.length === 0) {
+    const noResultLabel = currentLocale === "ko" ? "검색 결과가 없습니다" : "No results found";
+    archivesEl.innerHTML = `<tr><td colspan="6" class="archive-no-results">${escapeHtml(noResultLabel)}</td></tr>`;
+    updateArchivesToolbar(filtered, isAuthenticated);
+    renderArchiveDetail(null);
+    return;
+  }
+
+  const folderMap = loadFolderMap();
+  const folders = loadFolders();
+  const folderNameMap: Record<string, string> = {};
+  for (const f of folders) {
+    folderNameMap[f.id] = f.name;
+  }
+
+  archivesEl.innerHTML = filtered
     .map((item) => {
       const isSelected = selectedArchiveIds.has(item.id);
       const isActive = activeArchiveId === item.id;
       const source = buildArchiveSource(item);
       const tagsLabel = buildArchiveTagsLabel(item);
+      const folderName = folderMap[item.id] ? folderNameMap[folderMap[item.id]] || "" : "";
       return `
         <tr class="${isActive ? "is-active" : ""}" data-open="${item.id}">
           <td class="archive-table-select">
@@ -917,6 +1314,7 @@ function renderArchives(items: BotArchiveView[], isAuthenticated: boolean): void
           <td>
             <button class="archive-row-title" type="button" data-open="${item.id}">${escapeHtml(buildArchiveTitle(item))}</button>
           </td>
+          <td class="archive-row-folder">${folderName ? `<span class="archive-folder-badge">${escapeHtml(folderName)}</span>` : ""}</td>
           <td class="archive-row-date">${escapeHtml(formatDate(item.archivedAt))}</td>
           <td class="archive-row-source">${escapeHtml(source)}</td>
           <td class="archive-row-tags">${escapeHtml(tagsLabel)}</td>
@@ -936,7 +1334,7 @@ function renderArchives(items: BotArchiveView[], isAuthenticated: boolean): void
       } else {
         selectedArchiveIds.delete(archiveId);
       }
-      updateArchivesToolbar(items, isAuthenticated);
+      updateArchivesToolbar(filtered, isAuthenticated);
     });
   }
 
@@ -954,8 +1352,8 @@ function renderArchives(items: BotArchiveView[], isAuthenticated: boolean): void
     });
   }
 
-  updateArchivesToolbar(items, isAuthenticated);
-  renderArchiveDetail(items.find((item) => item.id === activeArchiveId) ?? null);
+  updateArchivesToolbar(filtered, isAuthenticated);
+  renderArchiveDetail(filtered.find((item) => item.id === activeArchiveId) ?? null);
 }
 
 function renderUser(user: BotUserView | null): void {
@@ -1361,7 +1759,7 @@ function applySessionState(config: BotPublicConfig, state: BotSessionState): voi
   latestState = state;
   applyStaticTranslations();
   for (const element of document.querySelectorAll<HTMLElement>("[data-bot-handle]")) {
-    element.textContent = `@${config.botHandle}`;
+    element.textContent = `@${normalizeBotHandle(config.botHandle) || DEFAULT_BOT_HANDLE}`;
   }
   for (const element of document.querySelectorAll<HTMLElement>("[data-site-host]")) {
     element.textContent = window.location.host;
@@ -1693,8 +2091,9 @@ archivesSelectAll?.addEventListener("change", () => {
   if (!latestState?.authenticated || !latestState.user) {
     return;
   }
+  const filtered = filterArchives(latestState.archives);
   if (archivesSelectAll.checked) {
-    for (const item of latestState.archives) {
+    for (const item of filtered) {
       selectedArchiveIds.add(item.id);
     }
   } else {
@@ -1715,6 +2114,25 @@ archivesExportAll?.addEventListener("click", async () => {
     return;
   }
   await exportArchivesZip(latestState.archives.map((item) => item.id));
+});
+
+archivesMoveSelected?.addEventListener("click", () => {
+  showMoveToFolderMenu();
+});
+
+archivesDeleteSelected?.addEventListener("click", () => {
+  void bulkDeleteSelectedArchives();
+});
+
+let searchDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+archivesSearchInput?.addEventListener("input", () => {
+  archiveSearchQuery = archivesSearchInput.value;
+  if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
+  searchDebounceTimer = setTimeout(() => {
+    if (latestState) {
+      renderArchives(latestState.archives, latestState.authenticated && Boolean(latestState.user));
+    }
+  }, 200);
 });
 
 syncLocaleSelect();

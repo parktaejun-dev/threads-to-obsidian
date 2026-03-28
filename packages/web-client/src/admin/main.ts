@@ -214,8 +214,21 @@ function parseExpiryIsoFromInput(): { ok: true; iso: string | null } | { ok: fal
     return { ok: true, iso: null };
   }
 
-  const parsed = new Date(`${raw}T00:00:00.000Z`);
-  if (Number.isNaN(parsed.getTime())) {
+  const match = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) {
+    return { ok: false };
+  }
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const parsed = new Date(Date.UTC(year, month - 1, day));
+  if (
+    Number.isNaN(parsed.getTime()) ||
+    parsed.getUTCFullYear() !== year ||
+    parsed.getUTCMonth() !== month - 1 ||
+    parsed.getUTCDate() !== day
+  ) {
     return { ok: false };
   }
 
@@ -678,12 +691,12 @@ function populateRuntimeForm(config: WebRuntimeConfig | null): void {
   applySecretPlaceholder(
     "postgresUrl",
     runtimeSecretState?.databasePostgresUrlConfigured === true,
-    "Configured. Enter a new URL to replace it."
+    msg.databaseUrlConfiguredPlaceholder ?? "Configured. Enter a new URL to replace it."
   );
   applySecretPlaceholder(
     "smtpPass",
     runtimeSecretState?.smtpPassConfigured === true,
-    "Configured. Enter a new password to replace it."
+    msg.smtpPassConfiguredPlaceholder ?? "Configured. Enter a new password to replace it."
   );
   if (runtimeActiveDatabase) {
     runtimeActiveDatabase.textContent = `${msg.databaseActiveLabel ?? "Active database"}: ${formatActiveDatabaseSummary(
@@ -1372,7 +1385,7 @@ async function saveStorefrontSettings(event: SubmitEvent): Promise<void> {
   setStatus(storefrontStatus, msg.storefrontSaved ?? "Storefront settings saved.", "success");
 }
 
-async function previewEmail(orderId: string): Promise<void> {
+async function previewEmail(orderId: string): Promise<EmailDeliveryDraft | null> {
   const draft = await runWithFeedback(
     () =>
       requestAdmin<EmailDeliveryDraft>(`/api/admin/orders/${orderId}/email-preview`, {
@@ -1386,7 +1399,7 @@ async function previewEmail(orderId: string): Promise<void> {
     }
   );
   if (!draft) {
-    return;
+    return null;
   }
 
   currentEmailDraft = `To: ${draft.to}\nSubject: ${draft.subject}\n\n${draft.body}`;
@@ -1394,97 +1407,174 @@ async function previewEmail(orderId: string): Promise<void> {
     emailPreview.value = currentEmailDraft;
   }
   setStatus(emailStatus, msg.emailDraftReady.replace("{email}", draft.to), "success");
+  return draft;
 }
 
 async function handleOrderAction(target: HTMLElement): Promise<void> {
-  const markPaidId = target.getAttribute("data-mark-paid");
-  const issueLicenseId = target.getAttribute("data-issue-license");
-  const emailPreviewId = target.getAttribute("data-email-preview");
-  const reissueId = target.getAttribute("data-reissue");
-  const sendEmailId = target.getAttribute("data-send-email");
+  const actionButton = target.closest("button");
+  if (!(actionButton instanceof HTMLButtonElement)) {
+    return;
+  }
+
+  const markPaidId = actionButton.getAttribute("data-mark-paid");
+  const issueLicenseId = actionButton.getAttribute("data-issue-license");
+  const emailPreviewId = actionButton.getAttribute("data-email-preview");
+  const reissueId = actionButton.getAttribute("data-reissue");
+  const sendEmailId = actionButton.getAttribute("data-send-email");
 
   if (markPaidId) {
-    await requestAdmin<PurchaseOrder>(`/api/admin/orders/${markPaidId}/mark-paid`, {
-      method: "POST",
-      body: JSON.stringify({})
-    });
+    const order = await runWithFeedback(
+      () =>
+        requestAdmin<PurchaseOrder>(`/api/admin/orders/${markPaidId}/mark-paid`, {
+          method: "POST",
+          body: JSON.stringify({})
+        }),
+      {
+        statusEl: ordersStatus,
+        busyTargets: [actionButton],
+        pendingText: msg.orderMarkingPaid ?? "Marking the order as paid...",
+        errorFallback: msg.dashboardError
+      }
+    );
+    if (!order) {
+      return;
+    }
+
+    setStatus(
+      ordersStatus,
+      (msg.orderMarkedPaid ?? "Marked the order for {email} as paid.").replace("{email}", order.buyerEmail),
+      "success"
+    );
     await refreshDashboard();
     return;
   }
 
-  if (issueLicenseId) {
-    const expiresAt = window.prompt("Optional expiry date (YYYY-MM-DD). Leave blank for no expiry.", "") || "";
-    const payload = {
-      expiresAt: expiresAt ? new Date(`${expiresAt}T00:00:00.000Z`).toISOString() : null
-    };
-    const result = await requestAdmin<{ license: LicenseRecord; emailDraft: EmailDeliveryDraft; autoSent?: boolean }>(
-      `/api/admin/orders/${issueLicenseId}/issue-license`,
-      {
-        method: "POST",
-        body: JSON.stringify(payload)
-      }
-    );
-    currentEmailDraft = `To: ${result.emailDraft.to}\nSubject: ${result.emailDraft.subject}\n\n${result.emailDraft.body}`;
-    if (emailPreview) {
-      emailPreview.value = currentEmailDraft;
+  if (issueLicenseId || reissueId) {
+    const expiry = parseExpiryIsoFromInput();
+    if (!expiry.ok) {
+      setStatus(emailStatus, msg.issueExpiryInvalid ?? "Expiry must be a valid YYYY-MM-DD date.", "error");
+      issueExpiryInput?.focus();
+      return;
     }
-    if (emailStatus) {
-      const base = msg.keyIssued.replace("{email}", result.license.holderEmail);
-      emailStatus.textContent = result.autoSent ? `${base} · ${msg.emailSent.replace("{email}", result.license.holderEmail)}` : base;
-    }
-    await refreshDashboard();
-    return;
-  }
 
-  if (reissueId) {
-    const expiresAt = window.prompt("Optional expiry date (YYYY-MM-DD). Leave blank for no expiry.", "") || "";
-    const payload = {
-      expiresAt: expiresAt ? new Date(`${expiresAt}T00:00:00.000Z`).toISOString() : null
-    };
-    const result = await requestAdmin<{ license: LicenseRecord; emailDraft: EmailDeliveryDraft; autoSent?: boolean }>(
-      `/api/admin/orders/${reissueId}/reissue`,
+    const orderId = issueLicenseId ?? reissueId;
+    const isReissue = Boolean(reissueId);
+    const result = await runWithFeedback(
+      () =>
+        requestAdmin<{ license: LicenseRecord; emailDraft: EmailDeliveryDraft; autoSent?: boolean }>(
+          `/api/admin/orders/${orderId}/${isReissue ? "reissue" : "issue-license"}`,
+          {
+            method: "POST",
+            body: JSON.stringify({ expiresAt: expiry.iso })
+          }
+        ),
       {
-        method: "POST",
-        body: JSON.stringify(payload)
+        statusEl: ordersStatus,
+        busyTargets: [actionButton, copyEmailButton],
+        pendingText: isReissue
+          ? msg.keyReissuing ?? "Reissuing a key..."
+          : msg.keyIssuing ?? "Issuing a key...",
+        errorFallback: msg.dashboardError
       }
     );
+    if (!result) {
+      return;
+    }
+
     currentEmailDraft = `To: ${result.emailDraft.to}\nSubject: ${result.emailDraft.subject}\n\n${result.emailDraft.body}`;
     if (emailPreview) {
       emailPreview.value = currentEmailDraft;
     }
-    if (emailStatus) {
-      const base = msg.keyReissued.replace("{email}", result.license.holderEmail);
-      emailStatus.textContent = result.autoSent ? `${base} · ${msg.emailSent.replace("{email}", result.license.holderEmail)}` : base;
+
+    const issuedMessage = isReissue
+      ? msg.keyReissued.replace("{email}", result.license.holderEmail)
+      : msg.keyIssued.replace("{email}", result.license.holderEmail);
+    const emailMessage = result.autoSent
+      ? msg.emailSent.replace("{email}", result.license.holderEmail)
+      : msg.emailDraftReady.replace("{email}", result.emailDraft.to);
+
+    setStatus(ordersStatus, issuedMessage, "success");
+    setStatus(licensesStatus, issuedMessage, "success");
+    setStatus(emailStatus, result.autoSent ? `${issuedMessage} · ${emailMessage}` : emailMessage, "success");
+    if (issueExpiryInput) {
+      issueExpiryInput.value = "";
     }
     await refreshDashboard();
     return;
   }
 
   if (sendEmailId) {
-    const result = await requestAdmin<{ sent: boolean; to: string }>(
-      `/api/admin/orders/${sendEmailId}/send-email`,
-      { method: "POST", body: JSON.stringify({}) }
+    const result = await runWithFeedback(
+      () =>
+        requestAdmin<{ sent: boolean; to: string }>(`/api/admin/orders/${sendEmailId}/send-email`, {
+          method: "POST",
+          body: JSON.stringify({})
+        }),
+      {
+        statusEl: ordersStatus,
+        busyTargets: [actionButton, copyEmailButton],
+        pendingText: msg.emailSending ?? "Sending email...",
+        errorFallback: msg.dashboardError
+      }
     );
-    if (emailStatus) {
-      emailStatus.textContent = msg.emailSent.replace("{email}", result.to);
+    if (!result) {
+      return;
     }
+
+    const sentMessage = msg.emailSent.replace("{email}", result.to);
+    setStatus(ordersStatus, sentMessage, "success");
+    setStatus(emailStatus, sentMessage, "success");
     await refreshDashboard();
     return;
   }
 
   if (emailPreviewId) {
-    await previewEmail(emailPreviewId);
+    const draft = await previewEmail(emailPreviewId);
+    if (!draft) {
+      return;
+    }
+
+    setStatus(
+      ordersStatus,
+      msg.emailDraftReady.replace("{email}", draft.to),
+      "success"
+    );
   }
 }
 
 async function handleLicenseAction(target: HTMLElement): Promise<void> {
-  const revokeId = target.getAttribute("data-revoke-license");
-  if (!revokeId) return;
+  const actionButton = target.closest("button");
+  if (!(actionButton instanceof HTMLButtonElement)) {
+    return;
+  }
 
-  await requestAdmin<LicenseRecord>(`/api/admin/licenses/${revokeId}/revoke`, {
-    method: "POST",
-    body: JSON.stringify({})
-  });
+  const revokeId = actionButton.getAttribute("data-revoke-license");
+  if (!revokeId) {
+    return;
+  }
+
+  const license = await runWithFeedback(
+    () =>
+      requestAdmin<LicenseRecord>(`/api/admin/licenses/${revokeId}/revoke`, {
+        method: "POST",
+        body: JSON.stringify({})
+      }),
+    {
+      statusEl: licensesStatus,
+      busyTargets: [actionButton],
+      pendingText: msg.licenseRevoking ?? "Revoking the key...",
+      errorFallback: msg.dashboardError
+    }
+  );
+  if (!license) {
+    return;
+  }
+
+  setStatus(
+    licensesStatus,
+    (msg.licenseRevoked ?? "Revoked the key for {email}.").replace("{email}", license.holderEmail),
+    "success"
+  );
   await refreshDashboard();
 }
 
@@ -1493,13 +1583,16 @@ function applyLocale(locale: WebLocale): void {
   document.documentElement.lang = locale;
   applyTranslations(msg as unknown as Record<string, string>);
   applyLangToggle(locale);
-  // Re-render dynamic table content that uses msg strings
-  if (dashboard) {
-    renderAll();
-  }
+  renderAll();
+  updateAdminSessionUi();
 }
 
 function bindEvents(): void {
+  for (const element of statusElements) {
+    element.setAttribute("aria-live", "polite");
+    element.setAttribute("role", "status");
+  }
+
   applyTokenButton?.addEventListener("click", () => {
     void loginAdminSession().catch((error) => {
       if (tokenStatus) {
@@ -1510,6 +1603,19 @@ function bindEvents(): void {
 
   logoutButton?.addEventListener("click", () => {
     void logoutAdminSession().catch((error) => {
+      if (tokenStatus) {
+        tokenStatus.textContent = error instanceof Error ? error.message : msg.dashboardError;
+      }
+    });
+  });
+
+  tokenInput?.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter") {
+      return;
+    }
+
+    event.preventDefault();
+    void loginAdminSession().catch((error) => {
       if (tokenStatus) {
         tokenStatus.textContent = error instanceof Error ? error.message : msg.dashboardError;
       }
@@ -1557,8 +1663,29 @@ function bindEvents(): void {
   });
 
   collectorForm?.addEventListener("submit", (event) => {
+    const handleField = collectorForm.elements.namedItem("botHandle");
+    if (handleField instanceof HTMLInputElement) {
+      const normalizedHandle = handleField.value.trim().replace(/^@+/, "").toLowerCase();
+      if (!normalizedHandle || !/^[a-z0-9._]+$/.test(normalizedHandle)) {
+        event.preventDefault();
+        setStatus(collectorStatus, "Enter a valid Threads bot handle.", "error");
+        handleField.focus();
+        return;
+      }
+
+      handleField.value = normalizedHandle;
+      updateCollectorHandlePreview(normalizedHandle);
+    }
+
     void saveCollectorSettings(event);
   });
+
+  const collectorHandleField = collectorForm?.elements.namedItem("botHandle");
+  if (collectorHandleField instanceof HTMLInputElement) {
+    collectorHandleField.addEventListener("input", () => {
+      updateCollectorHandlePreview(collectorHandleField.value);
+    });
+  }
 
   collectorSyncButton?.addEventListener("click", () => {
     void syncCollectorNow();
@@ -1600,16 +1727,24 @@ function bindEvents(): void {
 
   copyEmailButton?.addEventListener("click", async () => {
     if (!currentEmailDraft) {
-      if (emailStatus) {
-        emailStatus.textContent = msg.nothingToCopy;
-      }
+      setStatus(emailStatus, msg.nothingToCopy, "warning");
       return;
     }
 
-    await navigator.clipboard.writeText(currentEmailDraft);
-    if (emailStatus) {
-      emailStatus.textContent = msg.emailCopied;
+    try {
+      await navigator.clipboard.writeText(currentEmailDraft);
+      setStatus(emailStatus, msg.emailCopied, "success");
+    } catch (error) {
+      setStatus(emailStatus, error instanceof Error ? error.message : msg.dashboardError, "error");
     }
+  });
+
+  issueExpiryClearButton?.addEventListener("click", () => {
+    if (issueExpiryInput) {
+      issueExpiryInput.value = "";
+      issueExpiryInput.focus();
+    }
+    setStatus(emailStatus, msg.issueExpiryHint ?? "Leave it empty for a key without expiry.");
   });
 
   historyKindFilter?.addEventListener("change", () => {
@@ -1637,6 +1772,7 @@ void (async () => {
   document.documentElement.lang = locale;
   bindEvents();
   resetMethodForm();
+  renderAll();
   updateAdminSessionUi();
 
   let authenticated = false;

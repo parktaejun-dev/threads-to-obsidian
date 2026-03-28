@@ -10,7 +10,7 @@
 
 ### 소개
 
-Threads 글을 PC Chrome에서 Obsidian 또는 Notion으로 저장하는 Chrome 확장 프로그램이며, `@parktaejun` 멘션으로 모으는 web scrapbook 백엔드도 함께 포함합니다. 공개 웹 진입점은 `https://threads-archive.dahanda.dev` 단일 도메인으로 통합합니다.
+Threads 글을 PC Chrome에서 Obsidian 또는 Notion으로 저장하는 Chrome 확장 프로그램이며, `@parktaejun` 멘션으로 모으는 web scrapbook 백엔드도 함께 포함합니다. 공개 웹 진입점은 `https://ss-threads.dahanda.dev` 단일 도메인으로 통합합니다.
 
 ### 주요 기능
 
@@ -111,7 +111,7 @@ cp .env.example .env
 - `THREADS_WEB_DB_FILE` (선택: 기본값 `output/web-admin-data.json`)
 - `THREADS_WEB_PORT` (선택: 기본값 `4173`)
 - `THREADS_WEB_MAX_BODY_BYTES` (선택: 기본값 `1_000_000`, 최대 `2_000_000`)
-- `THREADS_WEB_PUBLIC_ORIGIN` (선택: 예시 `https://threads-archive.dahanda.dev`, 랜딩 canonical/공개 URL 고정)
+- `THREADS_WEB_PUBLIC_ORIGIN` (선택: 예시 `https://ss-threads.dahanda.dev`, 랜딩 canonical/공개 URL 고정)
 - `THREADS_BOT_HANDLE` (scrapbook 봇 handle, 예: `parktaejun`)
 - `THREADS_BOT_APP_ID` (scrapbook Threads OAuth 사용 시 필수)
 - `THREADS_BOT_APP_SECRET` (scrapbook Threads OAuth 사용 시 필수)
@@ -145,10 +145,10 @@ pm2 save
 
 Notion OAuth 추가 설정:
 
-- Notion public integration redirect URI를 `https://threads-archive.dahanda.dev/api/public/notion/oauth/callback` 로 등록
+- Notion public integration redirect URI를 `https://ss-threads.dahanda.dev/api/public/notion/oauth/callback` 로 등록
 - 운영 서버 `.env`에 `THREADS_NOTION_CLIENT_ID`, `THREADS_NOTION_CLIENT_SECRET` 입력
 - `THREADS_NOTION_ENCRYPTION_SECRET`을 별도 랜덤값으로 설정
-- 운영 `THREADS_WEB_PUBLIC_ORIGIN`과 실제 Notion redirect URI를 모두 `https://threads-archive.dahanda.dev` 로 맞춤
+- 운영 `THREADS_WEB_PUBLIC_ORIGIN`과 실제 Notion redirect URI를 모두 `https://ss-threads.dahanda.dev` 로 맞춤
 
 운영 점검:
 
@@ -259,7 +259,7 @@ THREADS_WEB_ADMIN_TOKEN=... THREADS_TO_OBSIDIAN_PRO_PRIVATE_JWK_FILE=... npm run
 
 ### Introduction
 
-A Chrome extension that saves Threads posts to Obsidian or Notion from desktop Chrome, plus a mention-triggered web scrapbook backend. The public web entry point is consolidated on `https://threads-archive.dahanda.dev`.
+A Chrome extension that saves Threads posts to Obsidian or Notion from desktop Chrome, plus a mention-triggered web scrapbook backend. The public web entry point is consolidated on `https://ss-threads.dahanda.dev`.
 
 ### Features
 
@@ -352,7 +352,7 @@ Required `.env` values:
 - `THREADS_WEB_DB_FILE` (optional, default: `output/web-admin-data.json`)
 - `THREADS_WEB_PORT` (optional, default: `4173`)
 - `THREADS_WEB_MAX_BODY_BYTES` (optional, default: `1_000_000`, max `2_000_000`)
-- `THREADS_WEB_PUBLIC_ORIGIN` (optional, example: `https://threads-archive.dahanda.dev`, pins the public landing origin/canonical URL)
+- `THREADS_WEB_PUBLIC_ORIGIN` (optional, example: `https://ss-threads.dahanda.dev`, pins the public landing origin/canonical URL)
 - `THREADS_NOTION_CLIENT_ID` (required for Notion OAuth)
 - `THREADS_NOTION_CLIENT_SECRET` (required for Notion OAuth)
 - `THREADS_NOTION_ENCRYPTION_SECRET` (recommended dedicated secret for encrypting Notion OAuth tokens)
@@ -376,7 +376,7 @@ pm2 start ecosystem.config.cjs
 pm2 save
 ```
 
-Use `https://threads-archive.dahanda.dev` for both `THREADS_WEB_PUBLIC_ORIGIN` and the registered Notion redirect URI.
+Use `https://ss-threads.dahanda.dev` for both `THREADS_WEB_PUBLIC_ORIGIN` and the registered Notion redirect URI.
 
 Smoke checks:
 

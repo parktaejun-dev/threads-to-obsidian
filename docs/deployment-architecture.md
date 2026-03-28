@@ -67,8 +67,8 @@ flowchart LR
 
 현재 운영 기준으로 보면 다음이 핵심이다.
 
-- public origin: `https://threads-archive.dahanda.dev`
-- admin origin: 가능하면 `https://admin.threads-archive.dahanda.dev`
+- public origin: `https://ss-threads.dahanda.dev`
+- admin origin: 가능하면 `https://admin.ss-threads.dahanda.dev`
 - Node 프로세스: `dist/web/server.js`
 - PM2 앱 이름: `threads-obsidian`
 - reverse proxy: repo 밖에서 관리
@@ -309,7 +309,7 @@ mention collector는 별도 서버나 큐 워커가 아니다.
 
 필수 redirect URI:
 
-- `https://threads-archive.dahanda.dev/api/public/notion/oauth/callback`
+- `https://ss-threads.dahanda.dev/api/public/notion/oauth/callback`
 
 ### SMTP
 

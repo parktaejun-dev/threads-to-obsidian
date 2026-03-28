@@ -13,12 +13,13 @@ const DEFAULT_RUNTIME_CONFIG_FILE = path.resolve(process.cwd(), "output", "web-r
 const DEFAULT_DB_FILE = path.resolve(process.cwd(), "output", "web-admin-data.json");
 const DEFAULT_POSTGRES_TABLE = "threads_web_store";
 const DEFAULT_POSTGRES_STORE_KEY = "default";
-const DEFAULT_PUBLIC_ORIGIN = "https://threads-archive.dahanda.dev";
+const DEFAULT_PUBLIC_ORIGIN = "https://ss-threads.dahanda.dev";
 const DEFAULT_SMTP_PORT = 587;
 const DEFAULT_COLLECTOR_INTERVAL_MS = 60_000;
 const DEFAULT_COLLECTOR_FETCH_LIMIT = 25;
 const DEFAULT_COLLECTOR_MAX_PAGES = 5;
 const MAX_COLLECTOR_FETCH_LIMIT = 100;
+const BOT_HANDLE_PATTERN = /^[a-z0-9._]+$/;
 
 function trimEnv(name: string): string {
   return process.env[name]?.trim() ?? "";
@@ -49,6 +50,15 @@ function normalizeOrigin(raw: string | null | undefined, fallback: string): stri
   } catch {
     return fallback;
   }
+}
+
+function normalizeBotHandle(raw: string | null | undefined): string {
+  const normalized = `${raw ?? ""}`.trim().replace(/^@+/, "").toLowerCase();
+  if (!normalized || !BOT_HANDLE_PATTERN.test(normalized)) {
+    return "";
+  }
+
+  return normalized;
 }
 
 export function getRuntimeConfigFilePath(): string {
@@ -159,8 +169,10 @@ function normalizeCollectorConfig(
   parsed: Partial<RuntimeCollectorConfig> | undefined,
   fallback: RuntimeCollectorConfig
 ): RuntimeCollectorConfig {
+  const fallbackBotHandle = normalizeBotHandle(fallback.botHandle ?? "");
+  const nextBotHandle = normalizeBotHandle(parsed?.botHandle ?? fallbackBotHandle);
   return {
-    botHandle: `${parsed?.botHandle ?? fallback.botHandle ?? ""}`.trim(),
+    botHandle: nextBotHandle || fallbackBotHandle,
     accessTokenOverride: `${parsed?.accessTokenOverride ?? fallback.accessTokenOverride ?? ""}`.trim(),
     graphApiVersion: `${parsed?.graphApiVersion ?? fallback.graphApiVersion ?? ""}`.trim(),
     intervalMs: parsePositiveInteger(parsed?.intervalMs, fallback.intervalMs, 5_000, 86_400_000),

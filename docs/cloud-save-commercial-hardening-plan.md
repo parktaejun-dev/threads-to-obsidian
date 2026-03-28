@@ -1,6 +1,10 @@
 # Cloud Save 상업용 하드닝 계획
 
-기준일: `2026-03-25`
+기준일: `2026-03-28 (Supabase Postgres 마이그레이션 완료)`
+
+## 최근 업데이트 (2026-03-28)
+
+- **운영용 DB 전환 완료**: 단일 JSON 파일 기반 저장소에서 Supabase Postgres(Session Pooler, IPv4)로 마이그레이션을 완료했습니다. 이로써 `Phase 3`의 핵심 목표가 달성되었으며, 파일 손상에 따른 데이터 유실 위험과 다중 프로세스/스케일아웃 제약이 해소되었습니다.
 
 ## 문서 목적
 
@@ -24,8 +28,8 @@
 출시 차단급 이슈:
 
 - `CSRF / 세션 경계`
-- `파일 기반 JSON 저장소`
-- `데이터 파일 손상 시 전체 초기화 가능성`
+- ~~`파일 기반 JSON 저장소`~~ (해결됨: Supabase Postgres 전환 완료)
+- ~~`데이터 파일 손상 시 전체 초기화 가능성`~~ (해결됨)
 - `서버측 임의 URL fetch 가능성`
 
 운영 보강 필요 이슈:
@@ -47,7 +51,7 @@
 
 - `Phase 1` 전부 완료
 - `Phase 2` 핵심 항목 완료
-- `Phase 3` 중 `Postgres 전환` 완료
+- ~~`Phase 3` 중 `Postgres 전환` 완료~~ (완료)
 - 운영 모니터링 및 백업 절차 문서화 완료
 
 ## 핵심 문제 요약
@@ -66,24 +70,15 @@
 - logout
 - cloud save
 
-### 2. 백엔드 저장소가 운영용 DB가 아님
+### ~~2. 백엔드 저장소가 운영용 DB가 아님~~ (해결 완료)
 
-현재 저장소는 단일 JSON 파일을 통째로 읽고, 메모리에서 수정한 뒤, 다시 통째로 쓰는 구조다.
+~~현재 저장소는 단일 JSON 파일을 통째로 읽고, 메모리에서 수정한 뒤, 다시 통째로 쓰는 구조다.~~
+**(26.03.28 업데이트: Supabase Postgres로 전환하여 해결)**
 
-이 방식은 다음에 취약하다.
+### ~~3. 파일 손상 시 fail-safe가 아니라 fail-open~~ (해결 완료)
 
-- 다중 프로세스
-- 다중 인스턴스
-- PM2 cluster
-- 컨테이너 scale-out
-- 높은 write 빈도
-- 파일 손상 / 중간 쓰기 실패
-
-### 3. 파일 손상 시 fail-safe가 아니라 fail-open
-
-DB 파일 parse 실패나 일시적 read 오류가 나면, 현재 로직은 새 기본 DB를 만들어 덮어쓴다.
-
-이는 운영 장애가 곧 데이터 유실로 이어지는 구조다.
+~~DB 파일 parse 실패나 일시적 read 오류가 나면, 현재 로직은 새 기본 DB를 만들어 덮어쓴다.~~
+**(26.03.28 업데이트: Postgres 도입으로 파일 덮어쓰기 위험 제거)**
 
 ### 4. 서버가 사용자 제공 media URL을 그대로 fetch함
 
@@ -126,18 +121,16 @@ URL allowlist가 없으면 SSRF 성격의 내부망 접근 경로가 열린다.
 - extension-only 세션 상태 확인 가능
 - popup UX 개선 가능
 
-### 데이터 저장소
+### 데이터 저장소 (✅ 전환 완료)
 
-권장 방향은 `Postgres` 전환이다.
+권장 방향이었던 `Postgres` 전환이 2026-03-28부로 완료되었다. 현재 Supabase Postgres를 백엔드로 사용 중이다.
 
-이 프로젝트 목표가 `상업용 SaaS`이고 사용자 수가 커질 가능성이 높기 때문에, SQLite는 임시 완충재로는 쓸 수 있어도 최종 운영 구조로는 맞지 않는다.
+권장 구성 (진행 상태):
 
-권장 구성:
-
-- `Postgres`
-- migration 도구: `Drizzle` 또는 `Prisma` 중 하나로 통일
-- 아카이브 본문 / raw payload / 세션 / 라이선스 / monitor 전부 테이블화
-- idempotent upsert 기준은 `user_id + content_hash` 또는 `user_id + canonical_url`
+- ✅ `Postgres` (Supabase 사용 중)
+- ⏳ migration 도구: `Drizzle` 또는 `Prisma` 중 하나로 통일 필요 (현재는 `pg` 드라이버로 원시 쿼리 사용 중)
+- ⏳ 아카이브 본문 / raw payload / 세션 / 라이선스 / monitor 전부 정규화된 테이블화 (현재는 `JSONB` 컬럼 하나에 통째로 저장 중)
+- ⏳ idempotent upsert 기준은 `user_id + content_hash` 또는 `user_id + canonical_url` 적용 필요
 
 ### 미디어 처리
 
@@ -293,13 +286,15 @@ URL allowlist가 없으면 SSRF 성격의 내부망 접근 경로가 열린다.
 
 - 사용자가 저장 직후 cloud archive 상세로 바로 이동 가능
 
-## Phase 3. 운영용 DB 전환
+## Phase 3. 운영용 DB 전환 (✅ 1차 완료)
 
-목표: `단일 JSON 파일 저장소 제거`
+목표: `단일 JSON 파일 저장소 제거` -> **2026-03-28 달성 완료**
 
-### 3-1. Postgres 스키마 설계
+### 3-1. Postgres 스키마 정규화 (진행 예정)
 
-우선 전환 대상:
+*현재 1차 마이그레이션은 기존 구조를 유지한 채 JSONB 컬럼에 데이터를 넣는 방식으로 완료되었습니다. 향후 성능 및 관리 용이성을 위해 테이블 정규화가 필요합니다.*
+
+우선 정규화 전환 대상:
 
 - `bot_users`
 - `bot_sessions`
@@ -322,29 +317,21 @@ URL allowlist가 없으면 SSRF 성격의 내부망 접근 경로가 열린다.
 - `bot_users (threads_user_id)`
 - `search_results (user_id, monitor_id, external_post_id)`
 
-### 3-2. migration 전략
+### 3-2. migration 전략 (✅ 완료)
+
+작업 내역:
+
+- ✅ JSON snapshot -> Postgres one-time import script 작성 (`migrate-web-db-to-postgres.mjs`)
+- ✅ Supabase Postgres 세팅 및 연결 (Session Pooler IPv4 사용)
+- ✅ cutover 완료 및 PM2 재시작
+
+### 3-3. 저장소 추상화 (⏳ 진행 중)
 
 작업:
 
-- JSON snapshot -> Postgres one-time import script 작성
-- import 후 row counts 검증
-- read-only rehearsal
-- cutover window 설정
-- cutover 후 JSON은 backup only
-
-수용 기준:
-
-- import 전후 핵심 row count 일치
-- 표본 데이터 검증 완료
-- rollback 절차 문서화
-
-### 3-3. 저장소 추상화
-
-작업:
-
-- `store.ts` 역할을 repository 계층으로 분리
-- 비즈니스 로직에서 JSON 전용 타입 의존 제거
-- transaction boundary를 DB transaction으로 옮김
+- ✅ `store.ts` 환경 변수에 따른 Backend Switchable 구조 적용 (File vs Postgres)
+- ⏳ 비즈니스 로직에서 JSON 전용 타입 의존 완전 제거
+- ⏳ transaction boundary를 DB transaction으로 옮김
 
 수용 기준:
 
@@ -434,7 +421,7 @@ URL allowlist가 없으면 SSRF 성격의 내부망 접근 경로가 열린다.
 
 다음이 만족되면 `Cloud Save GA`를 검토할 수 있다.
 
-- Postgres 전환 완료
+- ~~Postgres 전환 완료~~ (해결됨)
 - backup / restore 점검 완료
 - rate limit 적용
 - 운영 모니터링 대시보드 준비
@@ -456,7 +443,7 @@ URL allowlist가 없으면 SSRF 성격의 내부망 접근 경로가 열린다.
 정리하면:
 
 1. `cloud save 인증을 web session cookie에서 분리`
-2. `파일 기반 JSON 저장소를 운영 DB로 전환`
+2. ~~`파일 기반 JSON 저장소를 운영 DB로 전환`~~ (완료)
 3. `SSRF / CSRF / 데이터 유실 경로를 먼저 닫기`
 4. `그 다음에 UX와 운영 도구를 보강`
 

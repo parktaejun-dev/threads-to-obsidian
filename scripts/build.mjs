@@ -88,6 +88,7 @@ async function buildWebClient() {
     entryPoints: {
       landing: path.join(webClientRoot, "src", "landing", "main.ts"),
       admin: path.join(webClientRoot, "src", "admin", "main.ts"),
+      "admin-monitoring": path.join(webClientRoot, "src", "admin", "monitoring.ts"),
       scrapbook: path.join(webClientRoot, "src", "scrapbook", "main.ts"),
       checkout: path.join(webClientRoot, "src", "checkout", "main.ts")
     },

@@ -83,7 +83,7 @@ test("bot Threads OAuth sign-in and mention ingest create a scrapbook archive", 
 
   try {
     const data = buildDefaultDatabase("2026-03-25T00:00:00.000Z");
-    const oauthStart = startBotOauth(data, "https://threads-archive.dahanda.dev");
+    const oauthStart = startBotOauth(data, "https://ss-threads.dahanda.dev");
     assert.equal(oauthStart.botHandle, "parktaejun");
     assert.match(oauthStart.authorizeUrl, /^https:\/\/www\.threads\.com\/oauth\/authorize\/\?/);
     assert.equal(new URL(oauthStart.authorizeUrl).hash, "#weblink");
@@ -95,7 +95,7 @@ test("bot Threads OAuth sign-in and mention ingest create a scrapbook archive", 
       data,
       state as string,
       "oauth-code-1",
-      "https://threads-archive.dahanda.dev"
+      "https://ss-threads.dahanda.dev"
     );
 
     assert.equal(fetchCallCount, 3);
@@ -447,11 +447,11 @@ test("cloud save creates a scrapbook archive with deep link and ZIP export", asy
           contentHash: "cloud-hash-1"
         }
       },
-      "https://threads-archive.dahanda.dev"
+      "https://ss-threads.dahanda.dev"
     );
 
     assert.equal(result.created, true);
-    assert.equal(result.archiveUrl, `https://threads-archive.dahanda.dev/scrapbook?archive=${result.archiveId}`);
+    assert.equal(result.archiveUrl, `https://ss-threads.dahanda.dev/scrapbook?archive=${result.archiveId}`);
 
     const sessionState = getBotSessionState(data, "session-token-cloud-1");
     assert.equal(sessionState.archives.length, 1);
@@ -547,7 +547,7 @@ test("extension cloud link issues a scoped token, saves archives, and can be rev
         contentHash: "ext-link-hash-1"
       }
     },
-    "https://threads-archive.dahanda.dev"
+    "https://ss-threads.dahanda.dev"
   );
   assert.equal(saveResult.created, true);
   assert.equal(data.cloudArchives.length, 1);
@@ -588,7 +588,7 @@ test("extension cloud link issues a scoped token, saves archives, and can be rev
             contentHash: "ext-link-hash-2"
           }
         },
-        "https://threads-archive.dahanda.dev"
+        "https://ss-threads.dahanda.dev"
       ),
     /Reconnect the extension/i
   );
@@ -758,7 +758,7 @@ test("bot OAuth login upgrades a legacy scrapbook record that only had a handle"
       status: "active"
     });
 
-    const oauthStart = startBotOauth(data, "https://threads-archive.dahanda.dev");
+    const oauthStart = startBotOauth(data, "https://ss-threads.dahanda.dev");
     const state = new URL(oauthStart.authorizeUrl).searchParams.get("state");
     assert.ok(state);
 
@@ -766,7 +766,7 @@ test("bot OAuth login upgrades a legacy scrapbook record that only had a handle"
       data,
       state as string,
       "oauth-code-legacy",
-      "https://threads-archive.dahanda.dev"
+      "https://ss-threads.dahanda.dev"
     );
 
     assert.equal(session.user.id, "legacy-user");

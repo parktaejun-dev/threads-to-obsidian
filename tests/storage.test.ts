@@ -87,7 +87,7 @@ test("legacy cloud recent saves infer saveTarget from savedVia", async () => {
       status: "complete",
       savedVia: "cloud",
       remotePageId: "archive-1",
-      remotePageUrl: "https://threads-archive.dahanda.dev/scrapbook?archive=archive-1",
+      remotePageUrl: "https://ss-threads.dahanda.dev/scrapbook?archive=archive-1",
       post: basePost
     }
   ]);
@@ -195,7 +195,7 @@ test("recent saves keep separate records for Obsidian, Cloud, and Notion targets
     savedVia: "cloud",
     savedRelativePath: null,
     remotePageId: "cloud-archive-1",
-    remotePageUrl: "https://threads-archive.dahanda.dev/scrapbook?archive=cloud-archive-1"
+    remotePageUrl: "https://ss-threads.dahanda.dev/scrapbook?archive=cloud-archive-1"
   };
 
   await upsertRecentSave(obsidianSave);

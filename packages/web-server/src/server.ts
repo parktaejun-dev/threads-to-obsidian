@@ -90,6 +90,14 @@ import {
   withDatabaseTransaction
 } from "./server/store";
 import {
+  acknowledgeMonitoringIncident,
+  configureMonitoringService,
+  getMonitoringOverview,
+  listMonitoringIncidents,
+  resolveMonitoringIncident,
+  runMonitoringNow
+} from "./server/monitoring-service";
+import {
   activateRuntimeConfig,
   getPersistedRuntimeConfigSnapshot,
   getRuntimeConfigSnapshot,
@@ -186,7 +194,7 @@ const PROVIDER_ACTION_URL_PATTERNS: Record<PaymentProvider, RegExp> = {
   stripe: /stripe\.com/i,
   paypal: /paypal\.com/i
 };
-const DEFAULT_PUBLIC_ORIGIN = "https://threads-archive.dahanda.dev";
+const DEFAULT_PUBLIC_ORIGIN = "https://ss-threads.dahanda.dev";
 const LEGACY_PUBLIC_HOSTS = new Set(["threads-obsidian.dahanda.dev"]);
 const LEGACY_PUBLIC_PAGE_PATHS = new Set(["/", "/landing", "/landing/", "/scrapbook", "/scrapbook/", "/checkout", "/checkout/"]);
 
@@ -4014,6 +4022,43 @@ async function handleAdminRoutes(
     return;
   }
 
+  if (pathname === "/api/admin/monitoring/overview") {
+    if (method !== "GET") {
+      methodNotAllowed(response);
+      return;
+    }
+
+    json(response, 200, await getMonitoringOverview());
+    return;
+  }
+
+  if (pathname === "/api/admin/monitoring/incidents") {
+    if (method !== "GET") {
+      methodNotAllowed(response);
+      return;
+    }
+
+    json(response, 200, await listMonitoringIncidents());
+    return;
+  }
+
+  if (pathname === "/api/admin/monitoring/run-now" && method === "POST") {
+    json(response, 200, await runMonitoringNow());
+    return;
+  }
+
+  const acknowledgeMonitoringMatch = pathname.match(/^\/api\/admin\/monitoring\/incidents\/([^/]+)\/ack$/);
+  if (acknowledgeMonitoringMatch && method === "POST") {
+    json(response, 200, await acknowledgeMonitoringIncident(acknowledgeMonitoringMatch[1]));
+    return;
+  }
+
+  const resolveMonitoringMatch = pathname.match(/^\/api\/admin\/monitoring\/incidents\/([^/]+)\/resolve$/);
+  if (resolveMonitoringMatch && method === "POST") {
+    json(response, 200, await resolveMonitoringIncident(resolveMonitoringMatch[1]));
+    return;
+  }
+
   if (pathname === "/api/admin/payment-methods" && method === "POST") {
     const body = await parseJsonBody<Partial<PaymentMethod>>(request, config.maxBodyBytes);
     const paymentMethod = mapPaymentMethodInput(body);
@@ -4459,6 +4504,9 @@ function createWebRuntime(port?: number): {
   const config = resolveConfig(port);
   const collector = createBotMentionCollector({
     runTransaction: withDatabaseTransaction
+  });
+  configureMonitoringService({
+    getCollectorStatus: () => collector.getStatus()
   });
 
   return {

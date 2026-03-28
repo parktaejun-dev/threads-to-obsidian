@@ -51,7 +51,7 @@ THREADS_WEB_TRUST_PROXY_ALLOWLIST=127.0.0.1,::1
 지원 설정:
 
 ```env
-THREADS_WEB_ADMIN_ORIGIN=https://admin.threads-archive.dahanda.dev
+THREADS_WEB_ADMIN_ORIGIN=https://admin.ss-threads.dahanda.dev
 ```
 
 이 값을 넣으면 `/admin`과 `/api/admin/*`는 해당 origin에서만 서비스된다.
@@ -205,8 +205,8 @@ THREADS_WEB_ADMIN_ORIGIN=https://admin.threads-archive.dahanda.dev
 THREADS_WEB_ADMIN_TOKEN=replace-with-long-random-secret
 THREADS_WEB_ADMIN_ALLOWLIST=10.0.0.5,10.0.0.6
 THREADS_WEB_TRUST_PROXY_ALLOWLIST=127.0.0.1,::1
-THREADS_WEB_ADMIN_ORIGIN=https://admin.threads-archive.dahanda.dev
-THREADS_WEB_PUBLIC_ORIGIN=https://threads-archive.dahanda.dev
+THREADS_WEB_ADMIN_ORIGIN=https://admin.ss-threads.dahanda.dev
+THREADS_WEB_PUBLIC_ORIGIN=https://ss-threads.dahanda.dev
 ```
 
 ## 현재 결론

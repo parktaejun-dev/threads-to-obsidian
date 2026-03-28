@@ -19,7 +19,7 @@
 | `tabs` | Checks the active tab's URL to determine whether it is a supported Threads permalink page. |
 | `scripting` | Re-injects the content script into the active Threads tab if the page loaded before the extension was installed or enabled. |
 | Host permission: `threads.com`, `threads.net` | Required for the content script to run on Threads post pages and extract post content from the DOM. |
-| Host permission: `threads-archive.dahanda.dev` | Required for Pro license activation, status checks, seat release, Notion OAuth connection status, destination lookup, and Notion save requests through the developer-controlled backend. |
+| Host permission: `ss-threads.dahanda.dev` | Required for Pro license activation, status checks, seat release, Notion OAuth connection status, destination lookup, and Notion save requests through the developer-controlled backend. |
 | Optional host permission: `cdninstagram.com`, `fbcdn.net` | Used only when the user has image saving enabled. Fetches public media binaries from Meta's CDNs for local storage. |
 | Optional host permission: custom AI endpoint (`https://*/*`, `http://*/*` requested per-origin) | Used only when the user enables AI organization and saves settings for a specific OpenAI-compatible endpoint. Allows the extension to call the user-selected LLM API directly from the browser with the user's own key. |
 

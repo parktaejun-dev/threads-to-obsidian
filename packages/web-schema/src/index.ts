@@ -441,6 +441,65 @@ export interface RuntimeConfigTestResult {
   message: string;
 }
 
+export type AdminMonitoringStatus = "healthy" | "degraded" | "critical" | "unknown";
+export type AdminMonitoringSeverity = "info" | "warning" | "critical";
+export type AdminMonitoringChannel = "public_api" | "admin_api" | "collector" | "bot_account";
+export type AdminMonitoringIncidentStatus = "new" | "acknowledged" | "resolved" | "muted";
+
+export interface AdminMonitoringRunCheck {
+  id: string;
+  channel: AdminMonitoringChannel;
+  label: string;
+  status: AdminMonitoringStatus;
+  severity: AdminMonitoringSeverity;
+  summary: string;
+  checkedAt: string;
+}
+
+export interface AdminMonitoringRunRecord {
+  id: string;
+  source: "internal";
+  overallStatus: AdminMonitoringStatus;
+  createdAt: string;
+  summary: string;
+  checks: AdminMonitoringRunCheck[];
+}
+
+export interface AdminMonitoringIncidentRecord {
+  id: string;
+  dedupeKey: string;
+  channel: AdminMonitoringChannel;
+  severity: AdminMonitoringSeverity;
+  status: AdminMonitoringIncidentStatus;
+  summary: string;
+  firstSeenAt: string;
+  lastSeenAt: string;
+  lastRunId: string | null;
+  mutedUntil: string | null;
+  note: string | null;
+}
+
+export interface AdminMonitoringChannelState {
+  id: AdminMonitoringChannel;
+  label: string;
+  status: AdminMonitoringStatus;
+  summary: string;
+  checkedAt: string | null;
+}
+
+export interface AdminMonitoringOverviewResponse {
+  overallStatus: AdminMonitoringStatus;
+  openIncidents: number;
+  criticalIncidents: number;
+  lastRunAt: string | null;
+  lastHealthyRunAt: string | null;
+  fallbackRatio: number;
+  policyReviewPending: number;
+  currentBotHandle: string;
+  channels: AdminMonitoringChannelState[];
+  recentRuns: AdminMonitoringRunRecord[];
+}
+
 export interface AdminHistoryEvent {
   id: string;
   kind:
@@ -486,6 +545,8 @@ export interface WebDatabase {
   insightsSnapshots: InsightsSnapshotRecord[];
   savedViews: SavedViewRecord[];
   history: AdminHistoryEvent[];
+  monitorRuns: AdminMonitoringRunRecord[];
+  monitorIncidents: AdminMonitoringIncidentRecord[];
 }
 
 export interface PublicStorefrontResponse {
@@ -651,7 +712,9 @@ export function buildDefaultDatabase(now = new Date().toISOString()): WebDatabas
     trackedPosts: [],
     insightsSnapshots: [],
     savedViews: [],
-    history: []
+    history: [],
+    monitorRuns: [],
+    monitorIncidents: []
   };
 }
 
