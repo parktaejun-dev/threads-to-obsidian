@@ -6120,6 +6120,9 @@ function broadcastStatus(status) {
   currentStatus = status;
   void chrome.runtime.sendMessage({ type: "save-status", status }).catch(() => void 0);
 }
+function broadcastPopupState(state) {
+  void chrome.runtime.sendMessage({ type: "popup-state-refresh", state }).catch(() => void 0);
+}
 async function getActiveTab() {
   const tabs = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
   return tabs[0] ?? null;
@@ -6230,6 +6233,37 @@ async function resolvePopupRecentSaves(saveTarget, cloudConnection) {
   } catch {
     return await getRecentSaves();
   }
+}
+async function buildCachedPopupState() {
+  const [tab, options, recentSaves, cloudConnection] = await Promise.all([
+    getActiveTab(),
+    getOptions(),
+    getRecentSaves(),
+    getStoredCloudConnectionStatus()
+  ]);
+  const supported = Boolean(tab?.url && isSupportedPermalink(tab.url));
+  return {
+    supported,
+    currentUrl: tab?.url ?? null,
+    status: supported ? currentStatus : await createUnsupportedState(tab?.url ?? null),
+    recentSaves,
+    cloudConnection,
+    saveTarget: options.saveTarget
+  };
+}
+async function buildFreshPopupState() {
+  const [tab, options] = await Promise.all([getActiveTab(), getEffectiveOptions()]);
+  const supported = Boolean(tab?.url && isSupportedPermalink(tab.url));
+  const cloudConnection = options.saveTarget === "cloud" ? await fetchCloudConnectionStatus() : await getStoredCloudConnectionStatus();
+  const recentSaves = await resolvePopupRecentSaves(options.saveTarget, cloudConnection);
+  return {
+    supported,
+    currentUrl: tab?.url ?? null,
+    status: supported ? currentStatus : await createUnsupportedState(tab?.url ?? null),
+    recentSaves,
+    cloudConnection,
+    saveTarget: options.saveTarget
+  };
 }
 async function extractPostFromTab(tab) {
   if (!tab.id || !tab.url) {
@@ -6540,19 +6574,8 @@ chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
   void (async () => {
     switch (request.type) {
       case "get-popup-state": {
-        const tab = await getActiveTab();
-        const options = await getEffectiveOptions();
-        const supported = Boolean(tab?.url && isSupportedPermalink(tab.url));
-        const cloudConnection = await fetchCloudConnectionStatus();
-        const recentSaves = await resolvePopupRecentSaves(options.saveTarget, cloudConnection);
-        const response = {
-          supported,
-          currentUrl: tab?.url ?? null,
-          status: supported ? currentStatus : await createUnsupportedState(tab?.url ?? null),
-          recentSaves,
-          cloudConnection
-        };
-        sendResponse(response);
+        sendResponse(await buildCachedPopupState());
+        void buildFreshPopupState().then((state) => broadcastPopupState(state)).catch(() => void 0);
         break;
       }
       case "save-current-post": {
@@ -6614,7 +6637,8 @@ chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
                 canRetry: false
               },
               recentSaves: await resolvePopupRecentSaves(options2.saveTarget, cloudConnection2),
-              cloudConnection: cloudConnection2
+              cloudConnection: cloudConnection2,
+              saveTarget: options2.saveTarget
             };
             broadcastStatus(response2.status);
             sendResponse(response2);
@@ -6636,7 +6660,8 @@ chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
             canRetry: false
           },
           recentSaves,
-          cloudConnection
+          cloudConnection,
+          saveTarget: options.saveTarget
         };
         broadcastStatus(response.status);
         sendResponse(response);
@@ -6657,7 +6682,8 @@ chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
             canRetry: false
           },
           recentSaves: await resolvePopupRecentSaves(options.saveTarget, cloudConnection),
-          cloudConnection
+          cloudConnection,
+          saveTarget: options.saveTarget
         };
         broadcastStatus(response.status);
         sendResponse(response);
@@ -6681,7 +6707,8 @@ chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
             canRetry: false
           },
           recentSaves: await getRecentSaves(),
-          cloudConnection
+          cloudConnection,
+          saveTarget: "cloud"
         };
         broadcastStatus(response.status);
         sendResponse(response);

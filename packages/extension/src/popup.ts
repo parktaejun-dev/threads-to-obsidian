@@ -4,7 +4,7 @@ import { getObsidianDirectoryHandle } from "./lib/fs-handle-store";
 import { type Locale, type Messages, getLocale, setLocale, t } from "./lib/i18n";
 import { resolveImageDownloadPolicy } from "./lib/media-permissions";
 import { isNotionConfigured } from "./lib/notion";
-import { findDuplicateSave, findRecentSaveByUrl, getEffectiveOptions, upsertRecentSave } from "./lib/storage";
+import { findDuplicateSave, findRecentSaveByUrl, getEffectiveOptions, getOptions, upsertRecentSave } from "./lib/storage";
 import type { CloudConnectionStatus, ExtractedPost, PopupState, RecentSave, SaveStatus, SaveTarget } from "./lib/types";
 import { cleanTextLines, normalizeThreadsUrl } from "./lib/utils";
 import { SUPPORTED_LOCALES, getLocaleLabel, isSupportedLocale } from "@threads/shared/locale";
@@ -327,9 +327,8 @@ function renderRecentSaves(items: RecentSave[]): void {
   }
 }
 
-async function refreshSaveTargetState(): Promise<void> {
-  const options = await getEffectiveOptions();
-  cachedSaveTarget = options.saveTarget;
+async function refreshSaveTargetState(saveTargetOverride?: SaveTarget): Promise<void> {
+  cachedSaveTarget = saveTargetOverride ?? (await getOptions()).saveTarget;
   updateModeBadge();
 
   if (cachedSaveTarget === "notion") {
@@ -377,10 +376,13 @@ async function refreshSaveTargetState(): Promise<void> {
   );
 }
 
-async function refreshPopupState(useIdleStatus = false, overrideStatus?: SaveStatus): Promise<PopupState> {
-  const state = (await chrome.runtime.sendMessage({ type: "get-popup-state" })) as PopupState;
+async function applyPopupState(
+  state: PopupState,
+  useIdleStatus = false,
+  overrideStatus?: SaveStatus
+): Promise<PopupState> {
   cachedCloudConnection = state.cloudConnection;
-  await refreshSaveTargetState();
+  await refreshSaveTargetState(state.saveTarget);
   const repairedRecentSaves = await repairVisibleRecentSaves(state);
   const renderedRecentSaves = filterRecentSavesForCurrentTarget(repairedRecentSaves);
   setStatus(overrideStatus ?? (useIdleStatus ? getIdleStatus(state.supported) : state.status));
@@ -409,6 +411,11 @@ async function refreshPopupState(useIdleStatus = false, overrideStatus?: SaveSta
     ...state,
     recentSaves: renderedRecentSaves
   };
+}
+
+async function refreshPopupState(useIdleStatus = false, overrideStatus?: SaveStatus): Promise<PopupState> {
+  const state = (await chrome.runtime.sendMessage({ type: "get-popup-state" })) as PopupState;
+  return await applyPopupState(state, useIdleStatus, overrideStatus);
 }
 
 async function extractCurrentPost(): Promise<ExtractedPost> {
@@ -829,6 +836,12 @@ chrome.runtime.onMessage.addListener((message) => {
     if (cachedSaveTarget === "cloud") {
       void refreshPopupState(true);
     }
+    return;
+  }
+
+  if (message?.type === "popup-state-refresh" && message.state) {
+    const keepCurrentStatus = Boolean(latestStatus && latestStatus.kind !== "idle" && latestStatus.kind !== "unsupported");
+    void applyPopupState(message.state as PopupState, !keepCurrentStatus);
   }
 });
 

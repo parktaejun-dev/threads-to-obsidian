@@ -192,6 +192,7 @@ export interface PopupState {
   status: SaveStatus;
   recentSaves: RecentSave[];
   cloudConnection: CloudConnectionStatus | null;
+  saveTarget: SaveTarget;
 }
 
 export type SaveStatusKind = "idle" | "saving" | "unsupported" | "success" | "duplicate" | "error";

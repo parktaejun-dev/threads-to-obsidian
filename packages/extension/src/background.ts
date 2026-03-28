@@ -22,6 +22,7 @@ import {
   getOptions,
   getPendingCloudLinkRecord,
   getRecentSaves,
+  getStoredCloudConnectionStatus,
   removeRecentSaveById,
   setOptions,
   setPendingCloudLinkRecord,
@@ -106,6 +107,10 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
 function broadcastStatus(status: SaveStatus): void {
   currentStatus = status;
   void chrome.runtime.sendMessage({ type: "save-status", status }).catch(() => undefined);
+}
+
+function broadcastPopupState(state: PopupState): void {
+  void chrome.runtime.sendMessage({ type: "popup-state-refresh", state }).catch(() => undefined);
 }
 
 async function getActiveTab(): Promise<chrome.tabs.Tab | null> {
@@ -240,6 +245,44 @@ async function resolvePopupRecentSaves(saveTarget: SaveTarget, cloudConnection: 
   } catch {
     return await getRecentSaves();
   }
+}
+
+async function buildCachedPopupState(): Promise<PopupState> {
+  const [tab, options, recentSaves, cloudConnection] = await Promise.all([
+    getActiveTab(),
+    getOptions(),
+    getRecentSaves(),
+    getStoredCloudConnectionStatus()
+  ]);
+  const supported = Boolean(tab?.url && isSupportedPermalink(tab.url));
+
+  return {
+    supported,
+    currentUrl: tab?.url ?? null,
+    status: supported ? currentStatus : await createUnsupportedState(tab?.url ?? null),
+    recentSaves,
+    cloudConnection,
+    saveTarget: options.saveTarget
+  };
+}
+
+async function buildFreshPopupState(): Promise<PopupState> {
+  const [tab, options] = await Promise.all([getActiveTab(), getEffectiveOptions()]);
+  const supported = Boolean(tab?.url && isSupportedPermalink(tab.url));
+  const cloudConnection =
+    options.saveTarget === "cloud"
+      ? await fetchCloudConnectionStatus()
+      : await getStoredCloudConnectionStatus();
+  const recentSaves = await resolvePopupRecentSaves(options.saveTarget, cloudConnection);
+
+  return {
+    supported,
+    currentUrl: tab?.url ?? null,
+    status: supported ? currentStatus : await createUnsupportedState(tab?.url ?? null),
+    recentSaves,
+    cloudConnection,
+    saveTarget: options.saveTarget
+  };
 }
 
 async function extractPostFromTab(tab: chrome.tabs.Tab): Promise<RecentSave["post"]> {
@@ -605,19 +648,8 @@ chrome.runtime.onMessage.addListener((request: PopupRequest, _sender, sendRespon
   void (async () => {
     switch (request.type) {
       case "get-popup-state": {
-        const tab = await getActiveTab();
-        const options = await getEffectiveOptions();
-        const supported = Boolean(tab?.url && isSupportedPermalink(tab.url));
-        const cloudConnection = await fetchCloudConnectionStatus();
-        const recentSaves = await resolvePopupRecentSaves(options.saveTarget, cloudConnection);
-        const response: PopupState = {
-          supported,
-          currentUrl: tab?.url ?? null,
-          status: supported ? currentStatus : await createUnsupportedState(tab?.url ?? null),
-          recentSaves,
-          cloudConnection
-        };
-        sendResponse(response);
+        sendResponse(await buildCachedPopupState());
+        void buildFreshPopupState().then((state) => broadcastPopupState(state)).catch(() => undefined);
         break;
       }
       case "save-current-post": {
@@ -682,7 +714,8 @@ chrome.runtime.onMessage.addListener((request: PopupRequest, _sender, sendRespon
                 canRetry: false
               },
               recentSaves: await resolvePopupRecentSaves(options.saveTarget, cloudConnection),
-              cloudConnection
+              cloudConnection,
+              saveTarget: options.saveTarget
             };
             broadcastStatus(response.status);
             sendResponse(response);
@@ -705,7 +738,8 @@ chrome.runtime.onMessage.addListener((request: PopupRequest, _sender, sendRespon
             canRetry: false
           },
           recentSaves,
-          cloudConnection
+          cloudConnection,
+          saveTarget: options.saveTarget
         };
         broadcastStatus(response.status);
         sendResponse(response);
@@ -726,7 +760,8 @@ chrome.runtime.onMessage.addListener((request: PopupRequest, _sender, sendRespon
             canRetry: false
           },
           recentSaves: await resolvePopupRecentSaves(options.saveTarget, cloudConnection),
-          cloudConnection
+          cloudConnection,
+          saveTarget: options.saveTarget
         };
         broadcastStatus(response.status);
         sendResponse(response);
@@ -750,7 +785,8 @@ chrome.runtime.onMessage.addListener((request: PopupRequest, _sender, sendRespon
             canRetry: false
           },
           recentSaves: await getRecentSaves(),
-          cloudConnection
+          cloudConnection,
+          saveTarget: "cloud"
         };
         broadcastStatus(response.status);
         sendResponse(response);

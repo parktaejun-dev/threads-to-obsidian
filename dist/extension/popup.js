@@ -4754,18 +4754,18 @@ function normalizeStoredSaveTarget(value) {
   }
   return void 0;
 }
-function mergeOptionsWithDefaults(options) {
+function mergeOptionsWithDefaults(options2) {
   return {
     ...DEFAULT_OPTIONS,
-    ...options,
-    saveTarget: normalizeStoredSaveTarget(options?.saveTarget) ?? DEFAULT_OPTIONS.saveTarget,
+    ...options2,
+    saveTarget: normalizeStoredSaveTarget(options2?.saveTarget) ?? DEFAULT_OPTIONS.saveTarget,
     notion: {
       ...DEFAULT_OPTIONS.notion,
-      ...options?.notion ?? {}
+      ...options2?.notion ?? {}
     },
     aiOrganization: {
       ...DEFAULT_OPTIONS.aiOrganization,
-      ...options?.aiOrganization ?? {}
+      ...options2?.aiOrganization ?? {}
     }
   };
 }
@@ -4947,23 +4947,23 @@ async function getPlanStatus() {
   }
 }
 async function getEffectiveOptions() {
-  const [options, planStatus] = await Promise.all([getOptions(), getPlanStatus()]);
+  const [options2, planStatus] = await Promise.all([getOptions(), getPlanStatus()]);
   if (planStatus.tier === "pro") {
-    return options;
+    return options2;
   }
   return {
-    ...options,
-    saveTarget: options.saveTarget === "obsidian" ? "obsidian" : DEFAULT_OPTIONS.saveTarget,
+    ...options2,
+    saveTarget: options2.saveTarget === "obsidian" ? "obsidian" : DEFAULT_OPTIONS.saveTarget,
     filenamePattern: DEFAULT_OPTIONS.filenamePattern,
     savePathPattern: DEFAULT_OPTIONS.savePathPattern,
     notion: {
-      ...options.notion,
+      ...options2.notion,
       parentType: DEFAULT_OPTIONS.notion.parentType,
       dataSourceId: DEFAULT_OPTIONS.notion.dataSourceId,
       uploadMedia: DEFAULT_OPTIONS.notion.uploadMedia
     },
     aiOrganization: {
-      ...options.aiOrganization,
+      ...options2.aiOrganization,
       enabled: false
     }
   };
@@ -6122,9 +6122,8 @@ function renderRecentSaves(items) {
     });
   }
 }
-async function refreshSaveTargetState() {
-  const options = await getEffectiveOptions();
-  cachedSaveTarget = options.saveTarget;
+async function refreshSaveTargetState(saveTargetOverride) {
+  cachedSaveTarget = saveTargetOverride ?? (await getOptions()).saveTarget;
   updateModeBadge();
   if (cachedSaveTarget === "notion") {
     cachedDirectoryHandle = null;
@@ -6164,10 +6163,9 @@ async function refreshSaveTargetState() {
     permission === "granted" ? msg.popupSubtitleConnected : msg.popupSubtitlePermissionCheck
   );
 }
-async function refreshPopupState(useIdleStatus = false, overrideStatus) {
-  const state = await chrome.runtime.sendMessage({ type: "get-popup-state" });
+async function applyPopupState(state, useIdleStatus = false, overrideStatus) {
   cachedCloudConnection = state.cloudConnection;
-  await refreshSaveTargetState();
+  await refreshSaveTargetState(state.saveTarget);
   const repairedRecentSaves = await repairVisibleRecentSaves(state);
   const renderedRecentSaves = filterRecentSavesForCurrentTarget(repairedRecentSaves);
   setStatus(overrideStatus ?? (useIdleStatus ? getIdleStatus(state.supported) : state.status));
@@ -6192,6 +6190,10 @@ async function refreshPopupState(useIdleStatus = false, overrideStatus) {
     ...state,
     recentSaves: renderedRecentSaves
   };
+}
+async function refreshPopupState(useIdleStatus = false, overrideStatus) {
+  const state = await chrome.runtime.sendMessage({ type: "get-popup-state" });
+  return await applyPopupState(state, useIdleStatus, overrideStatus);
 }
 async function extractCurrentPost() {
   const response = await chrome.runtime.sendMessage({ type: "extract-current-post" });
@@ -6303,7 +6305,7 @@ async function tryDirectSaveCurrent() {
   }
   cachedDirectReady = true;
   cachedPermissionState = "granted";
-  const options = await getEffectiveOptions();
+  const options2 = await getEffectiveOptions();
   const post = await extractCurrentPost();
   const existingSave = await findRecentSaveByUrl(post.canonicalUrl, "obsidian");
   if (existingSave) {
@@ -6316,16 +6318,16 @@ async function tryDirectSaveCurrent() {
       }
     };
   }
-  const imagePolicy = await resolveImageDownloadPolicy(post, options.includeImages, true);
+  const imagePolicy = await resolveImageDownloadPolicy(post, options2.includeImages, true);
   try {
     const result = await writePostToDirectory(
       cachedDirectoryHandle,
       post,
-      options.filenamePattern,
+      options2.filenamePattern,
       imagePolicy.allowImageDownloads,
       imagePolicy.fallbackWarning,
-      options.savePathPattern,
-      options.aiOrganization
+      options2.savePathPattern,
+      options2.aiOrganization
     );
     const recent = await recordDirectSave(post, result.archiveName, result.savedRelativePath, result.warning);
     return {
@@ -6343,8 +6345,8 @@ async function tryDirectSaveCurrent() {
   }
 }
 async function resolveZipImageOverride(post) {
-  const options = await getEffectiveOptions();
-  const imagePolicy = await resolveImageDownloadPolicy(post, options.includeImages, true);
+  const options2 = await getEffectiveOptions();
+  const imagePolicy = await resolveImageDownloadPolicy(post, options2.includeImages, true);
   return {
     allowImageDownloads: imagePolicy.allowImageDownloads,
     imageFallbackWarning: imagePolicy.fallbackWarning
@@ -6353,8 +6355,8 @@ async function resolveZipImageOverride(post) {
 async function saveCurrent() {
   setStatus({ kind: "saving", message: msg.statusSaving });
   try {
-    const options = await getEffectiveOptions();
-    if (options.saveTarget === "notion" || options.saveTarget === "cloud") {
+    const options2 = await getEffectiveOptions();
+    if (options2.saveTarget === "notion" || options2.saveTarget === "cloud") {
       const status = await chrome.runtime.sendMessage({
         type: "save-current-post",
         allowDuplicate: false
@@ -6428,16 +6430,16 @@ async function resaveRecent(item) {
   cachedDirectReady = true;
   cachedPermissionState = "granted";
   try {
-    const options = await getEffectiveOptions();
-    const imagePolicy = await resolveImageDownloadPolicy(item.post, options.includeImages, true);
+    const options2 = await getEffectiveOptions();
+    const imagePolicy = await resolveImageDownloadPolicy(item.post, options2.includeImages, true);
     const result = await writePostToDirectory(
       cachedDirectoryHandle,
       item.post,
-      options.filenamePattern,
+      options2.filenamePattern,
       imagePolicy.allowImageDownloads,
       imagePolicy.fallbackWarning,
-      options.savePathPattern,
-      options.aiOrganization
+      options2.savePathPattern,
+      options2.aiOrganization
     );
     const updatedSave = {
       ...item,
@@ -6552,6 +6554,11 @@ chrome.runtime.onMessage.addListener((message) => {
     if (cachedSaveTarget === "cloud") {
       void refreshPopupState(true);
     }
+    return;
+  }
+  if (message?.type === "popup-state-refresh" && message.state) {
+    const keepCurrentStatus = Boolean(latestStatus && latestStatus.kind !== "idle" && latestStatus.kind !== "unsupported");
+    void applyPopupState(message.state, !keepCurrentStatus);
   }
 });
 void (async () => {
