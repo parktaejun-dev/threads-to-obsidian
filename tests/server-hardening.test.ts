@@ -782,3 +782,197 @@ test("paypal webhooks are verified through paypal's verification API", async () 
     }
   }
 });
+
+test("ignored webhook events can be retried later and are tracked in the event ledger", async () => {
+  const previousAdminToken = process.env.THREADS_WEB_ADMIN_TOKEN;
+  const previousDbFile = process.env.THREADS_WEB_DB_FILE;
+  const previousPrivateJwkFile = process.env.SS_THREADS_PRO_PRIVATE_JWK_FILE;
+  const previousStripeWebhookSecret = process.env.THREADS_WEBHOOK_SECRET_STRIPE;
+  const tempDir = await mkdtemp(path.join(tmpdir(), "threads-server-hardening-"));
+  const dbFile = path.join(tempDir, "web-admin-data.json");
+
+  process.env.THREADS_WEB_ADMIN_TOKEN = "threads-admin-secret";
+  process.env.THREADS_WEB_DB_FILE = dbFile;
+  process.env.SS_THREADS_PRO_PRIVATE_JWK_FILE = privateKeyFile;
+  process.env.THREADS_WEBHOOK_SECRET_STRIPE = "whsec_test";
+
+  const { server, origin } = await startTestServer();
+
+  try {
+    const payload = JSON.stringify({
+      id: "evt_late_order",
+      type: "checkout.session.completed",
+      data: {
+        object: {
+          id: "cs_test_late",
+          customer_email: "late@example.com"
+        }
+      }
+    });
+
+    const ignored = await fetch(`${origin}/api/public/webhooks/stripe`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "stripe-signature": createStripeSignature("whsec_test", payload)
+      },
+      body: payload
+    });
+    assert.equal(ignored.status, 200);
+    const ignoredBody = await ignored.json() as { reason?: string; status?: string };
+    assert.equal(ignoredBody.reason, "order_not_found");
+    assert.equal(ignoredBody.status, "received");
+
+    const createOrder = await fetch(`${origin}/api/public/orders`, {
+      method: "POST",
+      headers: {
+        origin,
+        "content-type": "application/json"
+      },
+      body: JSON.stringify({
+        buyerName: "Late Buyer",
+        buyerEmail: "late@example.com",
+        paymentMethodId: "pm-stripe"
+      })
+    });
+    assert.equal(createOrder.status, 201);
+
+    const accepted = await fetch(`${origin}/api/public/webhooks/stripe`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "stripe-signature": createStripeSignature("whsec_test", payload)
+      },
+      body: payload
+    });
+    assert.equal(accepted.status, 200);
+    const acceptedBody = await accepted.json() as { reason?: string; status?: string };
+    assert.equal(acceptedBody.reason, "issued");
+    assert.equal(acceptedBody.status, "ok");
+
+    const dashboard = await fetch(`${origin}/api/admin/dashboard`, {
+      headers: {
+        authorization: "Bearer threads-admin-secret"
+      }
+    });
+    assert.equal(dashboard.status, 200);
+    const dashboardBody = await dashboard.json() as {
+      webhookEvents?: Array<{ eventId: string; status: string; attempts: number; reason: string | null }>;
+    };
+    const event = dashboardBody.webhookEvents?.find((candidate) => candidate.eventId === "evt_late_order");
+    assert.ok(event);
+    assert.equal(event?.status, "processed");
+    assert.equal(event?.attempts, 2);
+    assert.equal(event?.reason, "issued");
+  } finally {
+    await stopTestServer(server);
+    if (typeof previousAdminToken === "string") {
+      process.env.THREADS_WEB_ADMIN_TOKEN = previousAdminToken;
+    } else {
+      delete process.env.THREADS_WEB_ADMIN_TOKEN;
+    }
+    if (typeof previousDbFile === "string") {
+      process.env.THREADS_WEB_DB_FILE = previousDbFile;
+    } else {
+      delete process.env.THREADS_WEB_DB_FILE;
+    }
+    if (typeof previousPrivateJwkFile === "string") {
+      process.env.SS_THREADS_PRO_PRIVATE_JWK_FILE = previousPrivateJwkFile;
+    } else {
+      delete process.env.SS_THREADS_PRO_PRIVATE_JWK_FILE;
+    }
+    if (typeof previousStripeWebhookSecret === "string") {
+      process.env.THREADS_WEBHOOK_SECRET_STRIPE = previousStripeWebhookSecret;
+    } else {
+      delete process.env.THREADS_WEBHOOK_SECRET_STRIPE;
+    }
+  }
+});
+
+test("dashboard and monitoring expose recent request metrics", async () => {
+  const previousAdminToken = process.env.THREADS_WEB_ADMIN_TOKEN;
+  const previousDbFile = process.env.THREADS_WEB_DB_FILE;
+  const tempDir = await mkdtemp(path.join(tmpdir(), "threads-server-hardening-"));
+  const dbFile = path.join(tempDir, "web-admin-data.json");
+
+  process.env.THREADS_WEB_ADMIN_TOKEN = "threads-admin-secret";
+  process.env.THREADS_WEB_DB_FILE = dbFile;
+
+  const { server, origin } = await startTestServer();
+
+  try {
+    await fetch(`${origin}/health`);
+    await fetch(`${origin}/api/public/unknown`);
+
+    for (let index = 0; index < 21; index += 1) {
+      await fetch(`${origin}/api/extension/cloud/save`, {
+        method: "POST",
+        headers: {
+          origin: "chrome-extension://test-extension-id",
+          authorization: "Bearer ext-token-1",
+          "content-type": "application/json"
+        },
+        body: JSON.stringify({
+          token: "pro-token",
+          deviceId: "device-1",
+          deviceLabel: "Test device",
+          post: {}
+        })
+      });
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    const dashboard = await fetch(`${origin}/api/admin/dashboard`, {
+      headers: {
+        authorization: "Bearer threads-admin-secret"
+      }
+    });
+    assert.equal(dashboard.status, 200);
+    const dashboardBody = await dashboard.json() as {
+      requestMetrics?: {
+        totalRequests: number;
+        clientErrors: number;
+        rateLimitedResponses: number;
+      };
+      recentRequests?: Array<{ pathname: string; statusCode: number }>;
+    };
+    assert.ok(dashboardBody.requestMetrics);
+    assert.equal((dashboardBody.requestMetrics?.totalRequests ?? 0) >= 23, true);
+    assert.equal((dashboardBody.requestMetrics?.clientErrors ?? 0) >= 2, true);
+    assert.equal((dashboardBody.requestMetrics?.rateLimitedResponses ?? 0) >= 1, true);
+    assert.equal(
+      dashboardBody.recentRequests?.some(
+        (entry) => entry.pathname === "/api/extension/cloud/save" && entry.statusCode === 429
+      ),
+      true
+    );
+
+    const overview = await fetch(`${origin}/api/admin/monitoring/overview`, {
+      headers: {
+        authorization: "Bearer threads-admin-secret"
+      }
+    });
+    assert.equal(overview.status, 200);
+    const overviewBody = await overview.json() as {
+      requestMetrics?: {
+        totalRequests: number;
+        rateLimitedResponses: number;
+      };
+    };
+    assert.equal((overviewBody.requestMetrics?.totalRequests ?? 0) >= 23, true);
+    assert.equal((overviewBody.requestMetrics?.rateLimitedResponses ?? 0) >= 1, true);
+  } finally {
+    await stopTestServer(server);
+    if (typeof previousAdminToken === "string") {
+      process.env.THREADS_WEB_ADMIN_TOKEN = previousAdminToken;
+    } else {
+      delete process.env.THREADS_WEB_ADMIN_TOKEN;
+    }
+    if (typeof previousDbFile === "string") {
+      process.env.THREADS_WEB_DB_FILE = previousDbFile;
+    } else {
+      delete process.env.THREADS_WEB_DB_FILE;
+    }
+  }
+});

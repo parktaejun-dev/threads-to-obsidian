@@ -527,8 +527,57 @@ export interface AdminMonitoringOverviewResponse {
   fallbackRatio: number;
   policyReviewPending: number;
   currentBotHandle: string;
+  requestMetrics: RequestMetricsSummary;
   channels: AdminMonitoringChannelState[];
   recentRuns: AdminMonitoringRunRecord[];
+}
+
+export type WebhookEventStatus = "received" | "processed" | "ignored" | "rejected";
+
+export interface WebhookEventRecord {
+  id: string;
+  provider: string;
+  eventId: string;
+  dedupeKey: string;
+  payloadHash: string;
+  orderId: string | null;
+  paymentMethodId: string | null;
+  licenseId: string | null;
+  status: WebhookEventStatus;
+  reason: string | null;
+  attempts: number;
+  firstSeenAt: string;
+  lastSeenAt: string;
+  handledAt: string | null;
+  responseStatusCode: number | null;
+}
+
+export type RequestLogCategory = "admin_api" | "extension_api" | "public_api" | "webhook" | "health";
+
+export interface RequestLogRecord {
+  id: string;
+  requestId: string;
+  method: string;
+  pathname: string;
+  category: RequestLogCategory;
+  statusCode: number;
+  durationMs: number;
+  startedAt: string;
+  completedAt: string;
+}
+
+export interface RequestMetricsSummary {
+  totalRequests: number;
+  lastHourRequests: number;
+  successResponses: number;
+  clientErrors: number;
+  serverErrors: number;
+  rateLimitedResponses: number;
+  webhookRequests: number;
+  adminRequests: number;
+  averageDurationMs: number;
+  p95DurationMs: number;
+  lastRequestAt: string | null;
 }
 
 export interface AdminHistoryEvent {
@@ -576,6 +625,8 @@ export interface WebDatabase {
   trackedPosts: TrackedPostRecord[];
   insightsSnapshots: InsightsSnapshotRecord[];
   savedViews: SavedViewRecord[];
+  webhookEvents: WebhookEventRecord[];
+  requestLogs: RequestLogRecord[];
   history: AdminHistoryEvent[];
   monitorRuns: AdminMonitoringRunRecord[];
   monitorIncidents: AdminMonitoringIncidentRecord[];
@@ -629,6 +680,9 @@ export interface RevenueReport {
 export interface AdminDashboardResponse extends PublicStorefrontResponse {
   orders: PurchaseOrder[];
   licenses: LicenseRecord[];
+  webhookEvents: WebhookEventRecord[];
+  recentRequests: RequestLogRecord[];
+  requestMetrics: RequestMetricsSummary;
   history: AdminHistoryEvent[];
   summary: DashboardSummary;
   revenueReport: RevenueReport;
@@ -745,6 +799,8 @@ export function buildDefaultDatabase(now = new Date().toISOString()): WebDatabas
     trackedPosts: [],
     insightsSnapshots: [],
     savedViews: [],
+    webhookEvents: [],
+    requestLogs: [],
     history: [],
     monitorRuns: [],
     monitorIncidents: []

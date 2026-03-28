@@ -248,6 +248,7 @@ cp "$THREADS_WEB_DB_FILE" "$THREADS_WEB_DB_FILE.backup-$(date +%F_%H%M%S)"
 - 관리자 `History`에서 웹훅 수신 성공/실패/중복(재시도) 이벤트를 함께 확인 가능
 - 운영 추적성 강화:
   - 대시보드에 웹훅 처리/무시/거부/중복(재시도) 집계 수치 표시
+  - 최근 webhook event ledger와 최근 API 요청 로그, request latency/error 메트릭 표시
   - 히스토리에서 이벤트 종류/결제사/provider/사유(reason) 필터로 빠르게 추적
 
 웹훅 검증 방식:
@@ -301,7 +302,8 @@ THREADS_WEB_ADMIN_TOKEN=... SS_THREADS_PRO_PRIVATE_JWK_FILE=... npm run web:star
    - `/api/public/webhooks/stripe`
    - `/api/public/webhooks/paypal`
    - 검증 헤더: `x-stableorder-signature`, `stripe-signature`, `paypal-transmission-*`
-9. 키 전달 SLA(예: 30분 이내)와 환불 규칙을 정책 문서에 고정
+9. 필요하면 `THREADS_WEB_STRUCTURED_REQUEST_LOGS=true` 로 JSON request 로그를 stdout에 출력
+10. 키 전달 SLA(예: 30분 이내)와 환불 규칙을 정책 문서에 고정
 
 ---
 
@@ -466,6 +468,7 @@ Orders are created on the public storefront and automatically move to key issuan
 - Admin pages remain as manual fallback for edge cases.
 - Admin history shows webhook success/failure/duplicate events for troubleshooting.
   - Dashboard exposes webhook processed/ignored/rejected/retry counters.
+  - Dashboard also exposes recent webhook ledger entries plus recent request logs and request metrics.
   - Event filtering is available by kind/provider/reason in the history table.
 - Stripe webhooks are verified against the raw request body using `stripe-signature`.
 - PayPal webhooks are verified through PayPal's `verify-webhook-signature` API.

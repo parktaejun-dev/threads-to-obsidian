@@ -106,12 +106,27 @@ import {
 } from "./server/monitoring-service";
 import { fetchWithTimeout } from "./server/http-client";
 import {
+  appendRequestLog,
+  buildRequestMetricsSummary,
+  classifyRequestCategory,
+  emitStructuredRequestLog,
+  listRecentRequestLogs,
+  shouldPersistRequestLog
+} from "./server/request-observability";
+import {
   activateRuntimeConfig,
   getPersistedRuntimeConfigSnapshot,
   getRuntimeConfigSnapshot,
   normalizeRuntimeConfig,
   saveRuntimeConfig
 } from "./server/runtime-config";
+import {
+  buildWebhookPayloadHash,
+  isProcessedWebhookDuplicate,
+  listRecentWebhookEvents,
+  markWebhookEventOutcome,
+  recordWebhookEventAttempt
+} from "./server/webhook-ledger";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DEFAULT_PORT = 4173;
@@ -3943,11 +3958,22 @@ async function handlePublicWebhook(
 
   const { value: rawPayload, rawText } = await readJsonBody<unknown>(request, config.maxBodyBytes);
   const webhookHints = buildWebhookHints(provider, rawPayload);
+  const payloadHash = buildWebhookPayloadHash(rawText);
   try {
     await verifyWebhookAuth(provider, request.headers, rawText, rawPayload);
   } catch (error) {
     if (error instanceof RequestError) {
       await withDatabaseTransaction(async (data) => {
+        const ledgerEvent = recordWebhookEventAttempt(data, {
+          provider,
+          eventId: webhookHints.eventId,
+          payloadHash
+        });
+        markWebhookEventOutcome(ledgerEvent, {
+          status: "rejected",
+          reason: "signature_rejected",
+          responseStatusCode: error.statusCode
+        });
         appendWebhookHistory(
           data,
           provider,
@@ -3967,9 +3993,58 @@ async function handlePublicWebhook(
 
   const result = await withDatabaseTransaction(async (data) => {
     const hints = webhookHints;
+    const ledgerEvent = recordWebhookEventAttempt(data, {
+      provider,
+      eventId: hints.eventId,
+      payloadHash
+    });
+    if (isProcessedWebhookDuplicate(ledgerEvent)) {
+      const duplicateOrder = ledgerEvent?.orderId
+        ? data.orders.find((candidate) => candidate.id === ledgerEvent.orderId) ?? null
+        : null;
+      const duplicateLicense = ledgerEvent?.licenseId
+        ? data.licenses.find((candidate) => candidate.id === ledgerEvent.licenseId) ?? null
+        : null;
+      markWebhookEventOutcome(ledgerEvent, {
+        status: "processed",
+        reason: "already_processed",
+        orderId: duplicateOrder?.id ?? null,
+        paymentMethodId: duplicateOrder?.paymentMethodId ?? null,
+        licenseId: duplicateLicense?.id ?? null,
+        responseStatusCode: 200
+      });
+      appendWebhookHistory(
+        data,
+        provider,
+        "webhook_ignored",
+        "already_processed",
+        duplicateOrder?.id ?? null,
+        "Webhook duplicate ignored via event ledger.",
+        duplicateOrder?.paymentMethodId ?? null,
+        duplicateLicense?.id ?? null,
+        hints.eventId
+      );
+      return {
+        ok: true as const,
+        status: 200,
+        reason: "already_processed",
+        provider,
+        paid: true,
+        webhookReason: "already_processed",
+        webhookProvider: provider,
+        order: duplicateOrder ? { id: duplicateOrder.id, status: duplicateOrder.status } : undefined,
+        license: duplicateLicense
+      };
+    }
+
     const order = resolveOrderForWebhook(data, provider, hints);
 
     if (!order) {
+      markWebhookEventOutcome(ledgerEvent, {
+        status: "ignored",
+        reason: "order_not_found",
+        responseStatusCode: 404
+      });
       appendWebhookHistory(
         data,
         provider,
@@ -3993,6 +4068,13 @@ async function handlePublicWebhook(
     }
 
     if (!hints.paid) {
+      markWebhookEventOutcome(ledgerEvent, {
+        status: "ignored",
+        reason: "payment_not_completed",
+        orderId: order.id,
+        paymentMethodId: order.paymentMethodId,
+        responseStatusCode: 200
+      });
       appendWebhookHistory(
         data,
         provider,
@@ -4018,6 +4100,14 @@ async function handlePublicWebhook(
 
     const now = new Date().toISOString();
     if (hints.eventId && order.paymentProviderEventId === hints.eventId && order.status === "key_issued") {
+      markWebhookEventOutcome(ledgerEvent, {
+        status: "processed",
+        reason: "already_processed",
+        orderId: order.id,
+        paymentMethodId: order.paymentMethodId,
+        licenseId: order.issuedLicenseId,
+        responseStatusCode: 200
+      });
       appendWebhookHistory(
         data,
         provider,
@@ -4072,6 +4162,14 @@ async function handlePublicWebhook(
       issued.license.id,
       hints.eventId
     );
+    markWebhookEventOutcome(ledgerEvent, {
+      status: "processed",
+      reason: issued.issued ? "issued" : "no_change",
+      orderId: order.id,
+      paymentMethodId: order.paymentMethodId,
+      licenseId: issued.license.id,
+      responseStatusCode: 200
+    });
 
     // Auto-send email (non-blocking — update delivery status in a follow-up transaction)
     void tryAutoSendEmail(issued.order, issued.license).then(({ sent }) => {
@@ -4517,6 +4615,9 @@ async function handleAdminRoutes(
       paymentMethods: [...data.paymentMethods].sort((left, right) => left.sortOrder - right.sortOrder),
       orders: data.orders,
       licenses: data.licenses,
+      webhookEvents: listRecentWebhookEvents(data),
+      recentRequests: listRecentRequestLogs(data.requestLogs),
+      requestMetrics: buildRequestMetricsSummary(data.requestLogs),
       history: data.history,
       summary: buildDashboardSummary(data),
       revenueReport: buildRevenueReport(data),
@@ -5022,7 +5123,47 @@ function createWebRuntime(port?: number): {
     config,
     collector,
     requestHandler: async (request: IncomingMessage, response: ServerResponse) => {
-      await handleRequest(request, response, config, collector);
+      const startedAt = new Date().toISOString();
+      const startedAtMs = Date.now();
+      const requestId = crypto.randomUUID();
+      let pathname = "/";
+
+      try {
+        pathname = new URL(request.url ?? "/", `http://${request.headers.host ?? `127.0.0.1:${config.port}`}`).pathname;
+      } catch {
+        pathname = "/invalid";
+      }
+
+      if (!response.headersSent) {
+        response.setHeader("x-request-id", requestId);
+      }
+
+      try {
+        await handleRequest(request, response, config, collector);
+      } finally {
+        const completedAt = new Date().toISOString();
+        const durationMs = Math.max(0, Date.now() - startedAtMs);
+        const statusCode = response.statusCode || 500;
+        const requestLog = {
+          requestId,
+          method: toRequestMethod(request),
+          pathname,
+          category: classifyRequestCategory(pathname),
+          statusCode,
+          durationMs,
+          startedAt,
+          completedAt
+        } as const;
+
+        emitStructuredRequestLog(requestLog);
+        if (shouldPersistRequestLog(pathname)) {
+          void withDatabaseTransaction(async (data) => {
+            appendRequestLog(data, requestLog);
+          }).catch((error) => {
+            logUnexpectedError("request log write failed", error);
+          });
+        }
+      }
     },
     shutdown: async () => {
       collector.stop();

@@ -10,6 +10,7 @@ import type {
   WebDatabase
 } from "@threads/web-schema";
 
+import { buildRequestMetricsSummary } from "./request-observability";
 import { getRuntimeConfigSnapshot } from "./runtime-config";
 import { loadDatabase, withDatabaseTransaction } from "./store";
 
@@ -284,6 +285,7 @@ function buildOverviewFromData(
     fallbackRatio: 0,
     policyReviewPending: 0,
     currentBotHandle,
+    requestMetrics: buildRequestMetricsSummary(data.requestLogs),
     channels,
     recentRuns
   };

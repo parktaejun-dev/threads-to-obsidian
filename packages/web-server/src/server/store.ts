@@ -24,6 +24,7 @@ import {
   type NotionConnectionRecord,
   type PaymentMethod,
   type PurchaseOrder,
+  type RequestLogRecord,
   type PublicStorefrontResponse,
   type RevenueReport,
   type SavedViewRecord,
@@ -32,6 +33,7 @@ import {
   type RuntimeDatabaseConfig,
   type StorefrontSettings,
   type TrackedPostRecord,
+  type WebhookEventRecord,
   type WatchlistRecord,
   type WebDatabase
 } from "@threads/web-schema";
@@ -264,6 +266,12 @@ function normalizeDatabasePayload(raw: unknown): WebDatabase {
   const monitorIncidents = Array.isArray(parsed.monitorIncidents)
     ? parsed.monitorIncidents as AdminMonitoringIncidentRecord[]
     : [];
+  const webhookEvents = Array.isArray(parsed.webhookEvents)
+    ? parsed.webhookEvents as WebhookEventRecord[]
+    : [];
+  const requestLogs = Array.isArray(parsed.requestLogs)
+    ? parsed.requestLogs as RequestLogRecord[]
+    : [];
 
   return {
     settings,
@@ -288,6 +296,8 @@ function normalizeDatabasePayload(raw: unknown): WebDatabase {
     trackedPosts: Array.isArray(parsed.trackedPosts) ? parsed.trackedPosts : [],
     insightsSnapshots: Array.isArray(parsed.insightsSnapshots) ? parsed.insightsSnapshots : [],
     savedViews: Array.isArray(parsed.savedViews) ? parsed.savedViews : [],
+    webhookEvents,
+    requestLogs,
     history: Array.isArray(parsed.history) ? parsed.history : [],
     monitorRuns,
     monitorIncidents
