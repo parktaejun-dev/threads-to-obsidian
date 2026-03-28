@@ -2168,6 +2168,10 @@ var adminMessageLocales = {
 // src/lib/web-i18n.ts
 var LS_KEY = "web-locale";
 var COOKIE_KEY = "threads-web-locale";
+var EXTENSION_RELEASE_ASSET_NAME = "threads-saver-extension.zip";
+var EXTENSION_RELEASE_DOWNLOAD_URL = `https://github.com/parktaejun-dev/threads-to-obsidian/releases/latest/download/${EXTENSION_RELEASE_ASSET_NAME}`;
+var LEGACY_EXTENSION_REPO_URL = "https://github.com/parktaejun-dev/threads-to-obsidian";
+var LEGACY_EXTENSION_SOURCE_ZIP_URL = `${LEGACY_EXTENSION_REPO_URL}/archive/refs/heads/main.zip`;
 function readLocaleCookie() {
   if (typeof document === "undefined") {
     return null;
@@ -2322,7 +2326,7 @@ var obsidianLandingMessages = {
     productBTag: "Mention bot",
     productBTitle: "Mention Scrapbook",
     productBDesc: "\uBAA8\uBC14\uC77C\uC5D0\uC11C\uB294 \uB313\uAE00 \uBA58\uC158\uC73C\uB85C \uBAA8\uC544\uC11C \uB098\uC911\uC5D0 \uAEBC\uB0B4\uAE30.",
-    productBCta: "scrapbook \uC5F4\uAE30",
+    productBCta: "Scrapbook \uBC14\uB85C\uAC00\uAE30",
     pricingEyebrow: "Pricing",
     pricingTitle: "\uACB0\uC81C\uB294 \uB2E8\uC21C\uD558\uAC8C.",
     pricingCopy: "",
@@ -2432,7 +2436,7 @@ var obsidianLandingMessages = {
     productBTag: "Mention bot",
     productBTitle: "Mention Scrapbook",
     productBDesc: "Use mention replies on mobile, then export later.",
-    productBCta: "Open scrapbook",
+    productBCta: "Go to Scrapbook",
     pricingEyebrow: "Pricing",
     pricingTitle: "Simple billing.",
     pricingCopy: "",
@@ -2550,7 +2554,7 @@ var landingMessages = {
 var obsidianLandingStorefrontCopy = {
   ko: {
     productName: "Threads Saver",
-    headline: "PC\uB294 extension.<br/>\uBAA8\uBC14\uC77C\uC740 mention.",
+    headline: '<span class="headline-row"><span>PC</span><span>extension.</span></span><span class="headline-row"><span>Mobile</span><span>mention.</span></span>',
     subheadline: "\uC9C0\uAE08 \uBCF4\uB294 \uAE00\uC740 Chrome extension\uC73C\uB85C \uC800\uC7A5\uD558\uACE0, \uBAA8\uBC14\uC77C\uC5D0\uC11C\uB294 mention scrapbook\uC73C\uB85C \uBAA8\uC74D\uB2C8\uB2E4.",
     priceLabel: "Threads Saver Pro",
     includedUpdates: "29\uB2EC\uB7EC 1\uD68C \uACB0\uC81C \xB7 Extension Pro + Scrapbook core \xB7 7\uC77C \uD658\uBD88",
@@ -2598,7 +2602,7 @@ var obsidianLandingStorefrontCopy = {
   },
   en: {
     productName: "Threads Saver",
-    headline: "Desktop extension. Mobile mention.",
+    headline: '<span class="headline-row"><span>PC</span><span>extension.</span></span><span class="headline-row"><span>Mobile</span><span>mention.</span></span>',
     subheadline: "Save the current post using the Chrome extension, or collect it later via mention scrapbook on mobile.",
     priceLabel: "Threads Saver Pro",
     includedUpdates: "$29 one-time \xB7 extension Pro + scrapbook core \xB7 7-day refund",

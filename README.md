@@ -32,8 +32,8 @@ Threads 글을 PC Chrome에서 Obsidian 또는 Notion으로 저장하는 Chrome 
 
 ### 설치 방법
 
-1. 이 저장소를 다운로드합니다:
-   - **[ZIP 다운로드](https://github.com/parktaejun-dev/threads-to-obsidian/archive/refs/heads/main.zip)** 후 압축 해제
+1. 확장 프로그램 ZIP을 다운로드합니다:
+   - **[ZIP 다운로드](https://github.com/parktaejun-dev/threads-to-obsidian/releases/latest/download/threads-saver-extension.zip)** 후 압축 해제
    - 또는 `git clone https://github.com/parktaejun-dev/threads-to-obsidian.git`
 
 2. Chrome에서 `chrome://extensions` 접속
@@ -42,7 +42,8 @@ Threads 글을 PC Chrome에서 Obsidian 또는 Notion으로 저장하는 Chrome 
 
 4. **압축해제된 확장 프로그램을 로드합니다** 클릭
 
-5. 다운받은 폴더 안의 **`dist/extension`** 폴더 선택
+5. ZIP으로 설치했다면 압축 해제한 **`threads-saver-extension`** 폴더를 선택
+   - 저장소를 직접 clone 했다면 **`dist/extension`** 폴더를 선택
 
 6. 완료! Threads 개별 포스트 페이지에서 확장 아이콘을 클릭하면 바로 사용할 수 있습니다.
 
@@ -281,8 +282,8 @@ The advanced feature roadmap lives in [docs/advanced-features-roadmap.md](docs/a
 
 ### Installation
 
-1. Download this repository:
-   - **[Download ZIP](https://github.com/parktaejun-dev/threads-to-obsidian/archive/refs/heads/main.zip)** and unzip
+1. Download the extension ZIP:
+   - **[Download ZIP](https://github.com/parktaejun-dev/threads-to-obsidian/releases/latest/download/threads-saver-extension.zip)** and unzip
    - Or `git clone https://github.com/parktaejun-dev/threads-to-obsidian.git`
 
 2. Open `chrome://extensions` in Chrome
@@ -291,7 +292,8 @@ The advanced feature roadmap lives in [docs/advanced-features-roadmap.md](docs/a
 
 4. Click **Load unpacked**
 
-5. Select the **`dist/extension`** folder inside the downloaded folder
+5. If you used the ZIP, select the extracted **`threads-saver-extension`** folder
+   - If you cloned the repository, select **`dist/extension`**
 
 6. Done! Navigate to any Threads post and click the extension icon to start saving.
 

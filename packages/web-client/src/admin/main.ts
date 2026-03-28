@@ -907,7 +907,7 @@ function renderOrders(): void {
       adminAuthenticated
         ? msg.ordersEmptyCopy ?? "New purchase requests will appear here."
         : getLockedEmptyCopy(),
-      5
+      6
     );
     return;
   }
@@ -916,7 +916,7 @@ function renderOrders(): void {
     ordersList.innerHTML = tableEmptyMarkup(
       msg.ordersEmptyTitle ?? "No purchase requests yet",
       msg.ordersEmptyCopy ?? "New purchase requests will appear here.",
-      5
+      6
     );
     return;
   }
@@ -925,14 +925,23 @@ function renderOrders(): void {
     .map((order) => {
       const variant =
         order.status === "key_issued" ? "success" : order.status === "payment_confirmed" ? "neutral" : "warning";
+      let nextActionMarkup = `<span class="table-subtle">${msg.noActions}</span>`;
       const actions: string[] = [];
       if (order.status === "pending") {
+        nextActionMarkup = statusPill(msg.btnMarkPaid, "warning");
         actions.push(`<button class="ghost small" data-mark-paid="${order.id}" type="button">${msg.btnMarkPaid}</button>`);
       }
       if (order.status === "payment_confirmed") {
+        nextActionMarkup = statusPill(msg.btnIssueKey, "neutral");
         actions.push(`<button class="ghost small" data-issue-license="${order.id}" type="button">${msg.btnIssueKey}</button>`);
       }
       if (order.status === "key_issued") {
+        nextActionMarkup =
+          order.deliveryStatus === "ready_to_send"
+            ? statusPill(msg.btnSendEmail, "success")
+            : order.deliveryStatus === "sent"
+              ? statusPill(msg.statDeliverySent ?? "Delivered", "success")
+              : statusPill(msg.btnPreviewEmail, "neutral");
         actions.push(`<button class="ghost small" data-email-preview="${order.id}" type="button">${msg.btnPreviewEmail}</button>`);
         actions.push(`<button class="ghost small" data-reissue="${order.id}" type="button">${msg.btnReissueKey}</button>`);
         if (order.deliveryStatus === "ready_to_send") {
@@ -948,6 +957,7 @@ function renderOrders(): void {
           </td>
           <td data-label="${escapeHtml(msg.colMethod)}">${escapeHtml(paymentMethodName(order.paymentMethodId))}</td>
           <td data-label="${escapeHtml(msg.colStatus)}">${statusPill(order.status.replaceAll("_", " "), variant)}</td>
+          <td data-label="${escapeHtml(msg.colAction)}" class="action-next">${nextActionMarkup}</td>
           <td data-label="${escapeHtml(msg.colCreated)}">${new Date(order.createdAt).toLocaleString()}</td>
           <td data-label="${escapeHtml(msg.colActions)}" class="action-cell">${actions.join("") || `<span class="table-subtle">${msg.noActions}</span>`}</td>
         </tr>
@@ -1668,7 +1678,7 @@ function bindEvents(): void {
       const normalizedHandle = handleField.value.trim().replace(/^@+/, "").toLowerCase();
       if (!normalizedHandle || !/^[a-z0-9._]+$/.test(normalizedHandle)) {
         event.preventDefault();
-        setStatus(collectorStatus, "Enter a valid Threads bot handle.", "error");
+        setStatus(collectorStatusText, "Enter a valid Threads bot handle.", "error");
         handleField.focus();
         return;
       }

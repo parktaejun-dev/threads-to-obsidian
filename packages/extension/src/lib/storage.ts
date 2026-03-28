@@ -2,7 +2,7 @@ import { DEFAULT_OPTIONS } from "./config";
 import { validateProLicenseToken } from "./license";
 import { getOrCreateProDevice } from "./pro-device";
 import { activateLicenseWithServer, getServerLicenseStatus, mapServerFailureToActivationState, releaseLicenseWithServer } from "./pro-activation";
-import type { CloudConnectionStatus, ExtensionOptions, LicensePayload, PlanStatus, RecentSave, SaveTarget } from "./types";
+import type { CloudArchiveRecentRecord, CloudConnectionStatus, ExtensionOptions, LicensePayload, PlanStatus, RecentSave, SaveTarget } from "./types";
 import { decodeEscapedJsonString } from "./utils";
 
 const OPTIONS_KEY = "options";
@@ -440,6 +440,46 @@ export async function getRecentSaves(): Promise<RecentSave[]> {
   return recent;
 }
 
+async function setRecentSaves(recent: RecentSave[]): Promise<RecentSave[]> {
+  await chrome.storage.local.set({ [RECENT_SAVES_KEY]: recent });
+  return recent;
+}
+
+export function buildRecentSaveFromCloudArchive(record: CloudArchiveRecentRecord): RecentSave {
+  return {
+    id: record.archiveId,
+    saveTarget: "cloud",
+    canonicalUrl: record.post.canonicalUrl,
+    shortcode: record.post.shortcode,
+    author: record.post.author,
+    title: record.post.title,
+    downloadedAt: record.updatedAt,
+    archiveName: record.title,
+    contentHash: record.post.contentHash,
+    status: "complete",
+    savedVia: "cloud",
+    savedRelativePath: null,
+    remotePageId: record.archiveId,
+    remotePageUrl: record.archiveUrl,
+    warning: record.warning,
+    post: record.post
+  };
+}
+
+export function mergeRecentSavesWithCloudArchives(recent: RecentSave[], cloudArchives: CloudArchiveRecentRecord[]): RecentSave[] {
+  const cloudRecentSaves = cloudArchives.map(buildRecentSaveFromCloudArchive);
+  const nonCloudRecentSaves = recent.filter((item) => item.saveTarget !== "cloud");
+  return [...cloudRecentSaves, ...nonCloudRecentSaves]
+    .sort((left, right) => Date.parse(right.downloadedAt) - Date.parse(left.downloadedAt))
+    .slice(0, MAX_RECENT_SAVES);
+}
+
+export async function syncCloudRecentSaves(cloudArchives: CloudArchiveRecentRecord[]): Promise<RecentSave[]> {
+  const recent = await getRecentSaves();
+  const next = mergeRecentSavesWithCloudArchives(recent, cloudArchives);
+  return await setRecentSaves(next);
+}
+
 export async function upsertRecentSave(save: RecentSave): Promise<RecentSave[]> {
   const recent = await getRecentSaves();
   const filtered = recent.filter(
@@ -447,9 +487,7 @@ export async function upsertRecentSave(save: RecentSave): Promise<RecentSave[]> 
   );
   filtered.unshift(save);
   const next = filtered.slice(0, MAX_RECENT_SAVES);
-  await chrome.storage.local.set({ [RECENT_SAVES_KEY]: next });
-
-  return next;
+  return await setRecentSaves(next);
 }
 
 export async function findRecentSaveById(id: string): Promise<RecentSave | null> {
@@ -460,12 +498,11 @@ export async function findRecentSaveById(id: string): Promise<RecentSave | null>
 export async function removeRecentSaveById(id: string): Promise<RecentSave[]> {
   const recent = await getRecentSaves();
   const next = recent.filter((item) => item.id !== id);
-  await chrome.storage.local.set({ [RECENT_SAVES_KEY]: next });
-  return next;
+  return await setRecentSaves(next);
 }
 
 export async function clearRecentSaves(): Promise<void> {
-  await chrome.storage.local.set({ [RECENT_SAVES_KEY]: [] });
+  await setRecentSaves([]);
 }
 
 export async function findDuplicateSave(canonicalUrl: string, contentHash: string, saveTarget: SaveTarget): Promise<RecentSave | null> {

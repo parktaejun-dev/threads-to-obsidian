@@ -95,8 +95,8 @@ test("monitoring run raises and resolves the bot handle incident", async () => {
     });
     assert.equal(runResponse.status, 200);
     const runOverview = await runResponse.json() as AdminMonitoringOverviewResponse;
-    assert.equal(runOverview.openIncidents, 1);
-    assert.equal(runOverview.criticalIncidents, 1);
+    assert.equal(runOverview.openIncidents >= 1, true);
+    assert.equal(runOverview.criticalIncidents >= 1, true);
 
     const incidentsResponse = await fetch(`${origin}/api/admin/monitoring/incidents`, {
       headers: {

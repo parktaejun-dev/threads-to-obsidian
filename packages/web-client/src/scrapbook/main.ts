@@ -262,7 +262,13 @@ const avatarFallback = document.querySelector<HTMLElement>("#profile-avatar-fall
 const archivesEl = document.querySelector<HTMLElement>("#archives");
 const archivesBoard = document.querySelector<HTMLElement>("#archives-board");
 const archivesEmptyEl = document.querySelector<HTMLElement>("#archives-empty");
-const archiveDetailEl = document.querySelector<HTMLElement>("#archive-detail");
+const archivesPaginationEl = document.querySelector<HTMLElement>("#archives-pagination");
+const archivesPerPageSelect = document.querySelector<HTMLSelectElement>("#archives-per-page-select");
+const archivesPagePrev = document.querySelector<HTMLButtonElement>("#archives-page-prev");
+const archivesPageNext = document.querySelector<HTMLButtonElement>("#archives-page-next");
+const archivesPageInfo = document.querySelector<HTMLSpanElement>("#archives-page-info");
+let archivesPage = 1;
+let archivesPerPage = 10;
 const archivesToolbar = document.querySelector<HTMLElement>("#archives-toolbar");
 const archivesToolbarMeta = document.querySelector<HTMLElement>("#archives-toolbar-meta");
 const archivesSelectAll = document.querySelector<HTMLInputElement>("#archives-select-all");
@@ -843,16 +849,20 @@ function filterArchives(items: BotArchiveView[]): BotArchiveView[] {
 
   if (archiveSearchQuery.trim()) {
     const query = archiveSearchQuery.trim().toLowerCase();
+    const activeBotHandle = (latestConfig?.botHandle || latestState?.botHandle || "").toLowerCase();
     filtered = filtered.filter((item) => {
       const searchable = [
         item.targetText,
         item.targetAuthorHandle ?? "",
         item.targetAuthorDisplayName ?? "",
         item.noteText ?? "",
+        item.targetUrl,
         ...item.tags,
+        item.mentionUrl ?? "",
         item.mentionAuthorHandle ?? "",
         item.mentionAuthorDisplayName ?? "",
-        ...item.authorReplies.map((r) => r.text)
+        ...item.authorReplies.map((r) => r.text),
+        activeBotHandle
       ].join(" ").toLowerCase();
       return searchable.includes(query);
     });
@@ -1164,17 +1174,7 @@ async function exportArchivesZip(archiveIds: string[]): Promise<void> {
   }
 }
 
-function renderArchiveDetail(item: BotArchiveView | null): void {
-  if (!archiveDetailEl) {
-    return;
-  }
-
-  if (!item) {
-    archiveDetailEl.innerHTML = "";
-    archiveDetailEl.classList.add("hidden");
-    return;
-  }
-
+function renderArchiveDetailHtml(item: BotArchiveView): string {
   const tagsLabel = buildArchiveTagsLabel(item);
   const totalMediaCount = countArchiveMedia(item);
   const hasMedia = totalMediaCount > 0;
@@ -1183,59 +1183,38 @@ function renderArchiveDetail(item: BotArchiveView | null): void {
     ? `<a class="topbar-link archive-action-link" href="${escapeHtml(item.mentionUrl)}" target="_blank" rel="noreferrer">${escapeHtml(t("scrapbookTriggerView"))}</a>`
     : "";
 
-  archiveDetailEl.classList.remove("hidden");
-  archiveDetailEl.innerHTML = `
-    <div class="archive-detail-head">
-      <div>
-        <h3>${escapeHtml(buildArchiveTitle(item))}</h3>
-        <div class="archive-detail-meta">
-          <span class="archive-chip">${escapeHtml(formatDate(item.archivedAt))}</span>
-          ${buildArchiveSource(item) ? `<span class="archive-chip">${escapeHtml(buildArchiveSource(item))}</span>` : ""}
-          ${tagsLabel ? `<span class="archive-chip">${escapeHtml(tagsLabel)}</span>` : ""}
+  return `
+    <div class="archive-detail-inline">
+      <div class="archive-detail-head">
+        <div>
+          <h3>${escapeHtml(buildArchiveTitle(item))}</h3>
+          <div class="archive-detail-meta">
+            <span class="archive-chip">${escapeHtml(formatDate(item.archivedAt))}</span>
+            ${buildArchiveSource(item) ? `<span class="archive-chip">${escapeHtml(buildArchiveSource(item))}</span>` : ""}
+            ${tagsLabel ? `<span class="archive-chip">${escapeHtml(tagsLabel)}</span>` : ""}
+          </div>
         </div>
       </div>
-    </div>
-    <p class="archive-detail-body">${escapeHtml(item.targetText)}</p>
-    ${
-      hasMedia
-        ? `<button class="secondary-cta archive-media-toggle" type="button" data-media-toggle="${item.id}">${escapeHtml(
-            showMedia ? t("scrapbookImagesHide") : t("scrapbookImagesShow", { count: totalMediaCount })
-          )}</button>`
-        : ""
-    }
-    ${hasMedia && showMedia && item.mediaUrls.length > 0 ? renderMediaPreviewUrls(item.mediaUrls) : ""}
-    ${renderReplyBlocks(item, showMedia)}
-    <div class="archive-actions">
-      <a class="secondary-cta archive-action-link" href="${escapeHtml(item.targetUrl)}" target="_blank" rel="noreferrer">${escapeHtml(t("scrapbookOpenOriginal"))}</a>
-      ${triggerLink}
-      <button class="topbar-link archive-copy" type="button" data-copy="${item.id}">${escapeHtml(t("scrapbookCopyMarkdown"))}</button>
-      <a class="topbar-link archive-action-link" href="/api/public/bot/archive/${encodeURIComponent(item.id)}.md">${escapeHtml(t("scrapbookDownloadMarkdown"))}</a>
-      <a class="topbar-link archive-action-link" href="/api/public/bot/archive/${encodeURIComponent(item.id)}.zip">${escapeHtml(t("scrapbookDownloadZip"))}</a>
-      <button class="topbar-link archive-action-link" type="button" data-archive-delete="${item.id}">${escapeHtml(t("scrapbookDelete"))}</button>
+      <div class="archive-detail-body">${escapeHtml(item.targetText)}</div>
+      ${
+        hasMedia
+          ? `<button class="secondary-cta archive-media-toggle" type="button" data-media-toggle="${item.id}">${escapeHtml(
+              showMedia ? t("scrapbookImagesHide") : t("scrapbookImagesShow", { count: totalMediaCount })
+            )}</button>`
+          : ""
+      }
+      ${hasMedia && showMedia && item.mediaUrls.length > 0 ? renderMediaPreviewUrls(item.mediaUrls) : ""}
+      ${renderReplyBlocks(item, showMedia)}
+      <div class="archive-actions">
+        <a class="secondary-cta archive-action-link" href="${escapeHtml(item.targetUrl)}" target="_blank" rel="noreferrer">${escapeHtml(t("scrapbookOpenOriginal"))}</a>
+        ${triggerLink}
+        <button class="topbar-link archive-copy" type="button" data-copy="${item.id}">${escapeHtml(t("scrapbookCopyMarkdown"))}</button>
+        <a class="topbar-link archive-action-link" href="/api/public/bot/archive/${encodeURIComponent(item.id)}.md">${escapeHtml(t("scrapbookDownloadMarkdown"))}</a>
+        <a class="topbar-link archive-action-link" href="/api/public/bot/archive/${encodeURIComponent(item.id)}.zip">${escapeHtml(t("scrapbookDownloadZip"))}</a>
+        <button class="topbar-link archive-action-link" type="button" data-archive-delete="${item.id}">${escapeHtml(t("scrapbookDelete"))}</button>
+      </div>
     </div>
   `;
-
-  const copyButton = archiveDetailEl.querySelector<HTMLButtonElement>("[data-copy]");
-  if (copyButton) {
-    copyButton.addEventListener("click", () => void copyArchiveMarkdown(item, copyButton));
-  }
-
-  const mediaToggle = archiveDetailEl.querySelector<HTMLButtonElement>("[data-media-toggle]");
-  if (mediaToggle) {
-    mediaToggle.addEventListener("click", () => {
-      if (expandedMediaArchiveIds.has(item.id)) {
-        expandedMediaArchiveIds.delete(item.id);
-      } else {
-        expandedMediaArchiveIds.add(item.id);
-      }
-      renderArchiveDetail(item);
-    });
-  }
-
-  const archiveDeleteButton = archiveDetailEl.querySelector<HTMLButtonElement>("[data-archive-delete]");
-  if (archiveDeleteButton) {
-    archiveDeleteButton.addEventListener("click", () => void deleteArchiveRequest(item.id));
-  }
 }
 
 function renderArchives(items: BotArchiveView[], isAuthenticated: boolean): void {
@@ -1243,68 +1222,64 @@ function renderArchives(items: BotArchiveView[], isAuthenticated: boolean): void
     return;
   }
 
-  if (!isAuthenticated) {
+  if (!isAuthenticated || items.length === 0) {
     archivesEl.innerHTML = "";
     archivesBoard.classList.add("hidden");
     archivesEmptyEl.classList.remove("hidden");
-    archivesEmptyEl.innerHTML =
-      `<strong>${escapeHtml(t("scrapbookArchiveLoginTitle"))}</strong><span>${escapeHtml(t("scrapbookArchiveLoginRequiredCopy"))}</span>`;
+    archivesEmptyEl.innerHTML = !isAuthenticated
+      ? `<strong>${escapeHtml(t("scrapbookArchiveLoginTitle"))}</strong><span>${escapeHtml(t("scrapbookArchiveLoginRequiredCopy"))}</span>`
+      : `<strong>${escapeHtml(t("scrapbookArchiveEmptyTitle"))}</strong><span>${escapeHtml(t("scrapbookArchiveEmptyCopy"))}</span>`;
     activeArchiveId = null;
-    updateArchivesToolbar([], false);
-    renderArchiveDetail(null);
-    archivesFilterBar?.classList.add("hidden");
-    return;
-  }
-
-  if (items.length === 0) {
-    archivesEl.innerHTML = "";
-    archivesBoard.classList.add("hidden");
-    archivesEmptyEl.classList.remove("hidden");
-    archivesEmptyEl.innerHTML =
-      `<strong>${escapeHtml(t("scrapbookArchiveEmptyTitle"))}</strong><span>${escapeHtml(t("scrapbookArchiveEmptyCopy"))}</span>`;
-    activeArchiveId = null;
-    updateArchivesToolbar([], true);
-    renderArchiveDetail(null);
-    archivesFilterBar?.classList.add("hidden");
+    archivesPaginationEl?.classList.add("hidden");
+    updateArchivesToolbar([], isAuthenticated);
+    archivesFilterBar?.classList.toggle("hidden", true);
     return;
   }
 
   archivesFilterBar?.classList.remove("hidden");
-  renderFolderStrip(items);
+  const ordered = [...items].sort((left, right) => {
+    const archivedDelta = Date.parse(right.archivedAt) - Date.parse(left.archivedAt);
+    if (archivedDelta !== 0) {
+      return archivedDelta;
+    }
+    return Date.parse(right.updatedAt) - Date.parse(left.updatedAt);
+  });
+  renderFolderStrip(ordered);
 
-  const filtered = filterArchives(items);
+  const filtered = filterArchives(ordered);
 
   syncSelectedArchiveIds(filtered);
   if (!filtered.some((item) => item.id === activeArchiveId)) {
-    activeArchiveId = filtered[0]?.id ?? null;
+    activeArchiveId = null; 
   }
 
   archivesEmptyEl.classList.add("hidden");
   archivesBoard.classList.remove("hidden");
 
   if (filtered.length === 0) {
-    const noResultLabel = currentLocale === "ko" ? "검색 결과가 없습니다" : "No results found";
-    archivesEl.innerHTML = `<tr><td colspan="6" class="archive-no-results">${escapeHtml(noResultLabel)}</td></tr>`;
+    archivesEl.innerHTML = `<tr><td colspan="5" class="archive-no-results">${escapeHtml(t("scrapbookNoResults"))}</td></tr>`;
+    archivesPaginationEl?.classList.add("hidden");
     updateArchivesToolbar(filtered, isAuthenticated);
-    renderArchiveDetail(null);
     return;
   }
 
-  const folderMap = loadFolderMap();
-  const folders = loadFolders();
-  const folderNameMap: Record<string, string> = {};
-  for (const f of folders) {
-    folderNameMap[f.id] = f.name;
-  }
+  const totalPages = Math.max(1, Math.ceil(filtered.length / archivesPerPage));
+  if (archivesPage > totalPages) archivesPage = totalPages;
+  if (archivesPaginationEl) archivesPaginationEl.classList.remove("hidden");
+  if (archivesPageInfo) archivesPageInfo.textContent = `${archivesPage} / ${totalPages}`;
+  if (archivesPagePrev) archivesPagePrev.disabled = archivesPage <= 1;
+  if (archivesPageNext) archivesPageNext.disabled = archivesPage >= totalPages;
 
-  archivesEl.innerHTML = filtered
-    .map((item) => {
-      const isSelected = selectedArchiveIds.has(item.id);
-      const isActive = activeArchiveId === item.id;
-      const source = buildArchiveSource(item);
-      const tagsLabel = buildArchiveTagsLabel(item);
-      const folderName = folderMap[item.id] ? folderNameMap[folderMap[item.id]] || "" : "";
-      return `
+  const startIndex = (archivesPage - 1) * archivesPerPage;
+  const paginated = filtered.slice(startIndex, startIndex + archivesPerPage);
+
+  let html = "";
+  for (const item of paginated) {
+    const isSelected = selectedArchiveIds.has(item.id);
+    const isActive = activeArchiveId === item.id;
+    const source = buildArchiveSource(item);
+    const tagsLabel = buildArchiveTagsLabel(item);
+    html += `
         <tr class="${isActive ? "is-active" : ""}" data-open="${item.id}">
           <td class="archive-table-select">
             <label class="archive-row-checkbox">
@@ -1314,14 +1289,17 @@ function renderArchives(items: BotArchiveView[], isAuthenticated: boolean): void
           <td>
             <button class="archive-row-title" type="button" data-open="${item.id}">${escapeHtml(buildArchiveTitle(item))}</button>
           </td>
-          <td class="archive-row-folder">${folderName ? `<span class="archive-folder-badge">${escapeHtml(folderName)}</span>` : ""}</td>
           <td class="archive-row-date">${escapeHtml(formatDate(item.archivedAt))}</td>
           <td class="archive-row-source">${escapeHtml(source)}</td>
           <td class="archive-row-tags">${escapeHtml(tagsLabel)}</td>
         </tr>
       `;
-    })
-    .join("");
+    if (isActive) {
+      html += `<tr class="archive-row-detail"><td colspan="5">${renderArchiveDetailHtml(item)}</td></tr>`;
+    }
+  }
+
+  archivesEl.innerHTML = html;
 
   for (const input of archivesEl.querySelectorAll<HTMLInputElement>("[data-select]")) {
     input.addEventListener("change", () => {
@@ -1347,13 +1325,41 @@ function renderArchives(items: BotArchiveView[], isAuthenticated: boolean): void
       if (event.target instanceof HTMLInputElement) {
         return;
       }
-      activeArchiveId = archiveId;
+      if (activeArchiveId === archiveId) {
+        activeArchiveId = null;
+      } else {
+        activeArchiveId = archiveId;
+      }
       renderArchives(items, isAuthenticated);
     });
   }
 
+  const detailItem = paginated.find((item) => item.id === activeArchiveId);
+  if (detailItem) {
+    const copyButton = archivesEl.querySelector<HTMLButtonElement>("[data-copy]");
+    if (copyButton) {
+      copyButton.addEventListener("click", () => void copyArchiveMarkdown(detailItem, copyButton));
+    }
+
+    const mediaToggle = archivesEl.querySelector<HTMLButtonElement>("[data-media-toggle]");
+    if (mediaToggle) {
+      mediaToggle.addEventListener("click", () => {
+        if (expandedMediaArchiveIds.has(detailItem.id)) {
+          expandedMediaArchiveIds.delete(detailItem.id);
+        } else {
+          expandedMediaArchiveIds.add(detailItem.id);
+        }
+        renderArchives(items, isAuthenticated);
+      });
+    }
+
+    const archiveDeleteButton = archivesEl.querySelector<HTMLButtonElement>("[data-archive-delete]");
+    if (archiveDeleteButton) {
+      archiveDeleteButton.addEventListener("click", () => void deleteArchiveRequest(detailItem.id));
+    }
+  }
+
   updateArchivesToolbar(filtered, isAuthenticated);
-  renderArchiveDetail(filtered.find((item) => item.id === activeArchiveId) ?? null);
 }
 
 function renderUser(user: BotUserView | null): void {
@@ -2161,3 +2167,27 @@ void (async () => {
     renderConnectButtons();
   }
 })();
+
+archivesPerPageSelect?.addEventListener("change", () => {
+  archivesPerPage = parseInt(archivesPerPageSelect.value, 10);
+  archivesPage = 1;
+  if (latestState) {
+    renderArchives(latestState.archives, latestState.authenticated && Boolean(latestState.user));
+  }
+});
+
+archivesPagePrev?.addEventListener("click", () => {
+  if (archivesPage > 1) {
+    archivesPage--;
+    if (latestState) {
+      renderArchives(latestState.archives, latestState.authenticated && Boolean(latestState.user));
+    }
+  }
+});
+
+archivesPageNext?.addEventListener("click", () => {
+  archivesPage++;
+  if (latestState) {
+    renderArchives(latestState.archives, latestState.authenticated && Boolean(latestState.user));
+  }
+});

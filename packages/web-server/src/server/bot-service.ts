@@ -9,6 +9,7 @@ import { renderMarkdown } from "@threads/shared/markdown";
 import type {
   AiOrganizationResult,
   AuthorReply,
+  CloudArchiveRecentRecord,
   CloudConnectionStatus,
   ExtractedPost,
   FrontmatterPrimitive
@@ -25,6 +26,12 @@ import type {
   WebDatabase
 } from "@threads/web-schema";
 import {
+  deleteBotArchiveRecord,
+  findBotArchiveById,
+  findBotArchivesByIds,
+  findBotUserById,
+  listBotArchivesForUser,
+  withPrimaryDatabaseTransaction,
   upsertBotArchive,
   upsertBotExtensionAccessToken,
   upsertBotExtensionLinkSession,
@@ -170,6 +177,11 @@ export interface BotIngestResult {
   created: boolean;
   archiveId: string | null;
   reason: string | null;
+}
+
+export interface MaterializedBotMentionArchive {
+  result: BotIngestResult;
+  archive: BotArchiveRecord | null;
 }
 
 export interface CloudArchiveSaveInput {
@@ -1286,6 +1298,40 @@ function toCloudArchiveView(item: CloudArchiveRecord): BotArchiveView {
   };
 }
 
+function buildFallbackExtractedPostFromCloudArchive(item: CloudArchiveRecord): ExtractedPost {
+  return {
+    canonicalUrl: item.canonicalUrl,
+    shortcode: item.shortcode,
+    author: item.targetAuthorHandle ?? "",
+    title: item.targetTitle,
+    text: item.targetText,
+    publishedAt: item.targetPublishedAt,
+    capturedAt: item.updatedAt,
+    sourceType: "text",
+    imageUrls: [],
+    videoUrl: null,
+    externalUrl: null,
+    quotedPostUrl: null,
+    repliedToUrl: null,
+    thumbnailUrl: null,
+    authorReplies: [],
+    extractorVersion: "server-cloud-cache",
+    contentHash: item.contentHash
+  };
+}
+
+function toCloudArchiveRecentRecord(item: CloudArchiveRecord, publicOrigin: string): CloudArchiveRecentRecord {
+  const payload = readCloudArchivePayload(item.rawPayloadJson);
+  return {
+    archiveId: item.id,
+    archiveUrl: buildCloudArchiveUrl(publicOrigin, item.id),
+    title: item.targetTitle,
+    updatedAt: item.updatedAt,
+    warning: payload.aiWarning,
+    post: payload.extractedPost ?? buildFallbackExtractedPostFromCloudArchive(item)
+  };
+}
+
 function getBotUserByThreadsUserId(data: WebDatabase, threadsUserId: string): BotUserRecord | null {
   return (
     data.botUsers.find(
@@ -1958,6 +2004,71 @@ export function getBotSessionState(data: WebDatabase, rawSession: string | null 
   };
 }
 
+function buildUnauthenticatedSessionState(): BotSessionState {
+  return {
+    authenticated: false,
+    botHandle: readBotHandle(),
+    oauthConfigured: isThreadsOauthConfigured(),
+    user: null,
+    archives: []
+  };
+}
+
+export async function getBotSessionStateFromStore(
+  rawSession: string | null | undefined
+): Promise<BotSessionState> {
+  const snapshot = await withPrimaryDatabaseTransaction((data) => {
+    const session = getBotSessionRecord(data, rawSession);
+    if (!session) {
+      return {
+        session: null,
+        userId: null,
+        cloudArchives: [] as CloudArchiveRecord[]
+      };
+    }
+
+    return {
+      session: { ...session },
+      userId: session.userId,
+      cloudArchives: data.cloudArchives
+        .filter((candidate) => candidate.userId === session.userId)
+        .map((candidate) => ({ ...candidate, mediaUrls: [...candidate.mediaUrls] }))
+    };
+  });
+
+  if (!snapshot.session || !snapshot.userId) {
+    return buildUnauthenticatedSessionState();
+  }
+
+  const user = await findBotUserById(snapshot.userId);
+  if (!user) {
+    await withPrimaryDatabaseTransaction((data) => {
+      const session = getBotSessionRecord(data, rawSession);
+      if (!session) {
+        return;
+      }
+      session.status = "revoked";
+      session.revokedAt = new Date().toISOString();
+      upsertBotSession(data, session);
+    });
+    return buildUnauthenticatedSessionState();
+  }
+
+  const mentionArchives = await listBotArchivesForUser(user.id);
+  const archives = [
+    ...mentionArchives.map(toBotArchiveView),
+    ...snapshot.cloudArchives.map(toCloudArchiveView)
+  ].sort((left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt));
+
+  return {
+    authenticated: true,
+    botHandle: readBotHandle(),
+    oauthConfigured: isThreadsOauthConfigured(),
+    user: toBotUserView(user),
+    archives
+  };
+}
+
 export function revokeBotSession(data: WebDatabase, rawSession: string | null | undefined): void {
   const session = getBotSessionRecord(data, rawSession);
   if (!session) {
@@ -2006,6 +2117,53 @@ export function readBotArchiveMarkdown(
   };
 }
 
+export async function readBotArchiveMarkdownFromStore(
+  rawSession: string | null | undefined,
+  archiveId: string
+): Promise<{ filename: string; markdownContent: string }> {
+  const snapshot = await withPrimaryDatabaseTransaction((data) => {
+    const session = getBotSessionRecord(data, rawSession);
+    if (!session) {
+      return { userId: null, cloudArchive: null as CloudArchiveRecord | null };
+    }
+
+    return {
+      userId: session.userId,
+      cloudArchive:
+        data.cloudArchives.find((candidate) => candidate.id === archiveId && candidate.userId === session.userId) ??
+        null
+    };
+  });
+
+  if (!snapshot.userId) {
+    throw new Error("You need to sign in first.");
+  }
+
+  const mentionArchive = await findBotArchiveById(snapshot.userId, archiveId);
+  if (mentionArchive) {
+    const extractedPost = readArchiveExtractedPost(mentionArchive.rawPayloadJson);
+    const titleText = extractedPost?.text ?? mentionArchive.targetText;
+    const titleAuthor = mentionArchive.targetAuthorHandle ?? extractedPost?.author ?? null;
+    return {
+      filename: `${buildArchiveFilenameBase(titleAuthor, titleText)}.md`,
+      markdownContent: buildArchiveMarkdownFromRecord(mentionArchive, mentionArchive.mediaUrls)
+    };
+  }
+
+  if (!snapshot.cloudArchive) {
+    throw new Error("The requested archive could not be found.");
+  }
+
+  const payload = readCloudArchivePayload(snapshot.cloudArchive.rawPayloadJson);
+  const titleText = payload.extractedPost?.text ?? snapshot.cloudArchive.targetText;
+  const titleAuthor = snapshot.cloudArchive.targetAuthorHandle ?? payload.extractedPost?.author ?? null;
+  return {
+    filename: `${buildArchiveFilenameBase(titleAuthor, titleText)}.md`,
+    markdownContent:
+      safeText(snapshot.cloudArchive.markdownContent) || `# ${buildArchiveTitle(titleAuthor, titleText)}\n`
+  };
+}
+
 export async function readBotArchiveZip(
   data: WebDatabase,
   rawSession: string | null | undefined,
@@ -2037,6 +2195,57 @@ export async function readBotArchiveZip(
   return buildArchiveZipBundle(archives);
 }
 
+export async function readBotArchiveZipFromStore(
+  rawSession: string | null | undefined,
+  archiveIds: string[]
+): Promise<BotArchiveZipResult> {
+  const requestedIds = [...new Set(archiveIds.map((value) => safeText(value)).filter(Boolean))];
+  if (requestedIds.length === 0) {
+    throw new Error("Select at least one archive to export.");
+  }
+
+  const snapshot = await withPrimaryDatabaseTransaction((data) => {
+    const session = getBotSessionRecord(data, rawSession);
+    if (!session) {
+      return {
+        userId: null,
+        cloudArchives: [] as CloudArchiveRecord[]
+      };
+    }
+
+    const requestedIdSet = new Set(requestedIds);
+    return {
+      userId: session.userId,
+      cloudArchives: data.cloudArchives
+        .filter((candidate) => candidate.userId === session.userId && requestedIdSet.has(candidate.id))
+        .map((candidate) => ({ ...candidate, mediaUrls: [...candidate.mediaUrls] }))
+    };
+  });
+
+  if (!snapshot.userId) {
+    throw new Error("You need to sign in first.");
+  }
+
+  const mentionArchives = await findBotArchivesByIds(snapshot.userId, requestedIds);
+  const archiveMap = new Map<string, StoredArchiveRecord>();
+  for (const archive of mentionArchives) {
+    archiveMap.set(archive.id, archive);
+  }
+  for (const archive of snapshot.cloudArchives) {
+    archiveMap.set(archive.id, archive);
+  }
+
+  const archives = requestedIds
+    .map((archiveId) => archiveMap.get(archiveId) ?? null)
+    .filter((candidate): candidate is StoredArchiveRecord => Boolean(candidate));
+
+  if (archives.length === 0) {
+    throw new Error("The requested archives could not be found.");
+  }
+
+  return buildArchiveZipBundle(archives);
+}
+
 function buildArchiveRawPayload(payload: BotIngestPayload): string | null {
   if (payload.rawPayload === undefined && !payload.extractedPost) {
     return null;
@@ -2054,14 +2263,11 @@ function buildArchiveRawPayload(payload: BotIngestPayload): string | null {
   return JSON.stringify(value);
 }
 
-export function validateBotIngestRequest(authHeader: string | null | undefined): void {
-  const expected = requireBotIngestToken();
-  if (safeText(authHeader) !== `Bearer ${expected}`) {
-    throw new Error("Unauthorized bot ingest request.");
-  }
-}
-
-export function ingestBotMention(data: WebDatabase, payload: BotIngestPayload): BotIngestResult {
+export function materializeBotMentionArchive(
+  user: BotUserRecord | null,
+  existingArchive: BotArchiveRecord | null,
+  payload: BotIngestPayload
+): MaterializedBotMentionArchive {
   const mentionUrl = safeText(payload.mentionUrl);
   const mentionAuthorUserId = safeText(payload.mentionAuthorUserId) || null;
   const mentionAuthorHandle = normalizeThreadsHandle(payload.mentionAuthorHandle ?? "");
@@ -2073,16 +2279,16 @@ export function ingestBotMention(data: WebDatabase, payload: BotIngestPayload): 
     throw new Error("mentionUrl, mentionAuthor identity, and targetUrl are required.");
   }
 
-  const user =
-    (mentionAuthorUserId ? getBotUserByThreadsUserId(data, mentionAuthorUserId) : null) ??
-    (mentionAuthorHandle ? getBotUserByHandle(data, mentionAuthorHandle) : null);
   if (!user) {
     return {
-      ok: true,
-      matched: false,
-      created: false,
-      archiveId: null,
-      reason: "user_not_found"
+      result: {
+        ok: true,
+        matched: false,
+        created: false,
+        archiveId: null,
+        reason: "user_not_found"
+      },
+      archive: null
     };
   }
 
@@ -2122,36 +2328,31 @@ export function ingestBotMention(data: WebDatabase, payload: BotIngestPayload): 
   >;
   const markdownContent = buildArchiveMarkdownFromRecord(archiveDraft, mediaUrls);
 
-  const existing = data.botArchives.find((candidate) => {
-    if (candidate.userId !== user.id) {
-      return false;
-    }
-    if (payload.mentionId && candidate.mentionId) {
-      return candidate.mentionId === safeText(payload.mentionId);
-    }
-    return candidate.mentionUrl === mentionUrl;
-  });
-
-  if (existing) {
-    existing.mentionAuthorHandle = mentionAuthorHandle || existing.mentionAuthorHandle;
-    existing.mentionAuthorDisplayName = safeText(payload.mentionAuthorDisplayName) || existing.mentionAuthorDisplayName;
-    existing.noteText = noteText ?? existing.noteText;
-    existing.targetUrl = targetUrl;
-    existing.targetAuthorHandle = safeText(payload.targetAuthorHandle) || extractedPost?.author || null;
-    existing.targetAuthorDisplayName = safeText(payload.targetAuthorDisplayName) || null;
-    existing.targetText = targetText;
-    existing.targetPublishedAt = safeText(extractedPost?.publishedAt ?? payload.targetPublishedAt) || null;
-    existing.mediaUrls = mediaUrls;
-    existing.markdownContent = markdownContent;
-    existing.rawPayloadJson = rawPayloadJson ?? existing.rawPayloadJson;
-    existing.updatedAt = now;
-    upsertBotArchive(data, existing);
+  if (existingArchive) {
     return {
-      ok: true,
-      matched: true,
-      created: false,
-      archiveId: existing.id,
-      reason: null
+      result: {
+        ok: true,
+        matched: true,
+        created: false,
+        archiveId: existingArchive.id,
+        reason: null
+      },
+      archive: {
+        ...existingArchive,
+        mentionAuthorHandle: mentionAuthorHandle || existingArchive.mentionAuthorHandle,
+        mentionAuthorDisplayName:
+          safeText(payload.mentionAuthorDisplayName) || existingArchive.mentionAuthorDisplayName,
+        noteText: noteText ?? existingArchive.noteText,
+        targetUrl,
+        targetAuthorHandle: safeText(payload.targetAuthorHandle) || extractedPost?.author || null,
+        targetAuthorDisplayName: safeText(payload.targetAuthorDisplayName) || null,
+        targetText,
+        targetPublishedAt: safeText(extractedPost?.publishedAt ?? payload.targetPublishedAt) || null,
+        mediaUrls,
+        markdownContent,
+        rawPayloadJson: rawPayloadJson ?? existingArchive.rawPayloadJson,
+        updatedAt: now
+      }
     };
   }
 
@@ -2175,15 +2376,51 @@ export function ingestBotMention(data: WebDatabase, payload: BotIngestPayload): 
     updatedAt: now,
     status: "saved"
   };
-  upsertBotArchive(data, archive);
 
   return {
-    ok: true,
-    matched: true,
-    created: true,
-    archiveId: archive.id,
-    reason: null
+    result: {
+      ok: true,
+      matched: true,
+      created: true,
+      archiveId: archive.id,
+      reason: null
+    },
+    archive
   };
+}
+
+export function validateBotIngestRequest(authHeader: string | null | undefined): void {
+  const expected = requireBotIngestToken();
+  if (safeText(authHeader) !== `Bearer ${expected}`) {
+    throw new Error("Unauthorized bot ingest request.");
+  }
+}
+
+export function ingestBotMention(data: WebDatabase, payload: BotIngestPayload): BotIngestResult {
+  const mentionUrl = safeText(payload.mentionUrl);
+  const mentionAuthorUserId = safeText(payload.mentionAuthorUserId) || null;
+  const mentionAuthorHandle = normalizeThreadsHandle(payload.mentionAuthorHandle ?? "");
+
+  const user =
+    (mentionAuthorUserId ? getBotUserByThreadsUserId(data, mentionAuthorUserId) : null) ??
+    (mentionAuthorHandle ? getBotUserByHandle(data, mentionAuthorHandle) : null);
+
+  const existing = data.botArchives.find((candidate) => {
+    if (!user || candidate.userId !== user.id) {
+      return false;
+    }
+    if (payload.mentionId && candidate.mentionId) {
+      return candidate.mentionId === safeText(payload.mentionId);
+    }
+    return candidate.mentionUrl === mentionUrl;
+  });
+
+  const materialized = materializeBotMentionArchive(user, existing ?? null, payload);
+  if (materialized.archive) {
+    upsertBotArchive(data, materialized.archive);
+  }
+
+  return materialized.result;
 }
 
 export async function saveCloudArchive(
@@ -2307,6 +2544,43 @@ export async function saveCloudArchiveWithExtensionToken(
   return saveCloudArchiveForUser(data, user, input, publicOrigin);
 }
 
+export function listExtensionCloudArchives(
+  data: WebDatabase,
+  rawToken: string | null | undefined,
+  publicOrigin: string,
+  limit = 10
+): CloudArchiveRecentRecord[] {
+  const { user } = requireExtensionLinkUser(data, rawToken);
+  const normalizedLimit = Number.isFinite(limit) ? Math.max(1, Math.min(50, Math.trunc(limit))) : 10;
+  return data.cloudArchives
+    .filter((candidate) => candidate.userId === user.id)
+    .sort((left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt))
+    .slice(0, normalizedLimit)
+    .map((item) => toCloudArchiveRecentRecord(item, publicOrigin));
+}
+
+export function deleteExtensionCloudArchive(
+  data: WebDatabase,
+  rawToken: string | null | undefined,
+  archiveId: string
+): void {
+  const { user } = requireExtensionLinkUser(data, rawToken);
+  const normalizedId = safeText(archiveId);
+  if (!normalizedId) {
+    throw new Error("Select an archive to delete.");
+  }
+
+  const cloudIndex = data.cloudArchives.findIndex(
+    (candidate) => candidate.id === normalizedId && candidate.userId === user.id
+  );
+  if (cloudIndex < 0) {
+    throw new Error("The requested archive could not be found.");
+  }
+
+  data.cloudArchives.splice(cloudIndex, 1);
+  clearArchiveReferences(data, user.id, normalizedId);
+}
+
 function clearArchiveReferences(data: WebDatabase, userId: string, archiveId: string): void {
   for (const result of data.searchResults) {
     if (result.userId !== userId || result.archiveId !== archiveId) {
@@ -2364,6 +2638,62 @@ export function deleteArchive(
   throw new Error("The requested archive could not be found.");
 }
 
+export async function deleteArchiveFromStore(
+  rawSession: string | null | undefined,
+  archiveId: string
+): Promise<BotSessionState> {
+  const normalizedId = safeText(archiveId);
+  if (!normalizedId) {
+    throw new Error("Select an archive to delete.");
+  }
+
+  const snapshot = await withPrimaryDatabaseTransaction((data) => {
+    const session = getBotSessionRecord(data, rawSession);
+    if (!session) {
+      return {
+        sessionUserId: null,
+        hasCloudArchive: false
+      };
+    }
+
+    return {
+      sessionUserId: session.userId,
+      hasCloudArchive: data.cloudArchives.some(
+        (candidate) => candidate.id === normalizedId && candidate.userId === session.userId
+      )
+    };
+  });
+
+  if (!snapshot.sessionUserId) {
+    throw new Error("You need to sign in first.");
+  }
+
+  const mentionArchive = await findBotArchiveById(snapshot.sessionUserId, normalizedId);
+  if (mentionArchive) {
+    await deleteBotArchiveRecord(snapshot.sessionUserId, normalizedId);
+    await withPrimaryDatabaseTransaction((data) => {
+      clearArchiveReferences(data, snapshot.sessionUserId!, normalizedId);
+    });
+    return getBotSessionStateFromStore(rawSession);
+  }
+
+  if (snapshot.hasCloudArchive) {
+    await withPrimaryDatabaseTransaction((data) => {
+      const index = data.cloudArchives.findIndex(
+        (candidate) => candidate.id === normalizedId && candidate.userId === snapshot.sessionUserId
+      );
+      if (index < 0) {
+        throw new Error("The requested archive could not be found.");
+      }
+      data.cloudArchives.splice(index, 1);
+      clearArchiveReferences(data, snapshot.sessionUserId!, normalizedId);
+    });
+    return getBotSessionStateFromStore(rawSession);
+  }
+
+  throw new Error("The requested archive could not be found.");
+}
+
 export function getBotUserAccessToken(data: WebDatabase, rawSession: string | null | undefined): string | null {
   const session = getBotSessionRecord(data, rawSession);
   if (!session) {
@@ -2398,7 +2728,10 @@ export function getBotScopeVersion(): number {
   return BOT_SCOPE_VERSION;
 }
 
-async function getFreshAccessTokenForUser(data: WebDatabase, user: BotUserRecord): Promise<string | null> {
+export async function getFreshAccessTokenForUserRecord(
+  user: BotUserRecord,
+  persistUser: (user: BotUserRecord) => Promise<void> | void
+): Promise<string | null> {
   if (!user.accessTokenCiphertext) {
     return null;
   }
@@ -2415,7 +2748,7 @@ async function getFreshAccessTokenForUser(data: WebDatabase, user: BotUserRecord
     user.accessTokenCiphertext = encryptSecret(nextToken);
     user.tokenExpiresAt = buildBotAccessTokenExpiry(refreshed.expires_in);
     user.updatedAt = new Date().toISOString();
-    upsertBotUser(data, user);
+    await persistUser(user);
     return nextToken;
   } catch {
     if (expiry > Date.now()) {
@@ -2424,6 +2757,12 @@ async function getFreshAccessTokenForUser(data: WebDatabase, user: BotUserRecord
 
     throw new Error("The stored Threads access token expired. Sign in with Threads again.");
   }
+}
+
+async function getFreshAccessTokenForUser(data: WebDatabase, user: BotUserRecord): Promise<string | null> {
+  return getFreshAccessTokenForUserRecord(user, (nextUser) => {
+    upsertBotUser(data, nextUser);
+  });
 }
 
 export async function getBotAccessTokenForHandle(

@@ -4942,6 +4942,40 @@ async function getRecentSaves() {
   await chrome.storage.local.set({ [RECENT_SAVES_KEY]: recent });
   return recent;
 }
+async function setRecentSaves(recent) {
+  await chrome.storage.local.set({ [RECENT_SAVES_KEY]: recent });
+  return recent;
+}
+function buildRecentSaveFromCloudArchive(record) {
+  return {
+    id: record.archiveId,
+    saveTarget: "cloud",
+    canonicalUrl: record.post.canonicalUrl,
+    shortcode: record.post.shortcode,
+    author: record.post.author,
+    title: record.post.title,
+    downloadedAt: record.updatedAt,
+    archiveName: record.title,
+    contentHash: record.post.contentHash,
+    status: "complete",
+    savedVia: "cloud",
+    savedRelativePath: null,
+    remotePageId: record.archiveId,
+    remotePageUrl: record.archiveUrl,
+    warning: record.warning,
+    post: record.post
+  };
+}
+function mergeRecentSavesWithCloudArchives(recent, cloudArchives) {
+  const cloudRecentSaves = cloudArchives.map(buildRecentSaveFromCloudArchive);
+  const nonCloudRecentSaves = recent.filter((item) => item.saveTarget !== "cloud");
+  return [...cloudRecentSaves, ...nonCloudRecentSaves].sort((left, right) => Date.parse(right.downloadedAt) - Date.parse(left.downloadedAt)).slice(0, MAX_RECENT_SAVES);
+}
+async function syncCloudRecentSaves(cloudArchives) {
+  const recent = await getRecentSaves();
+  const next = mergeRecentSavesWithCloudArchives(recent, cloudArchives);
+  return await setRecentSaves(next);
+}
 async function upsertRecentSave(save) {
   const recent = await getRecentSaves();
   const filtered = recent.filter(
@@ -4949,8 +4983,7 @@ async function upsertRecentSave(save) {
   );
   filtered.unshift(save);
   const next = filtered.slice(0, MAX_RECENT_SAVES);
-  await chrome.storage.local.set({ [RECENT_SAVES_KEY]: next });
-  return next;
+  return await setRecentSaves(next);
 }
 async function findRecentSaveById(id) {
   const recent = await getRecentSaves();
@@ -4959,11 +4992,10 @@ async function findRecentSaveById(id) {
 async function removeRecentSaveById(id) {
   const recent = await getRecentSaves();
   const next = recent.filter((item) => item.id !== id);
-  await chrome.storage.local.set({ [RECENT_SAVES_KEY]: next });
-  return next;
+  return await setRecentSaves(next);
 }
 async function clearRecentSaves() {
-  await chrome.storage.local.set({ [RECENT_SAVES_KEY]: [] });
+  await setRecentSaves([]);
 }
 async function findDuplicateSave(canonicalUrl, contentHash, saveTarget) {
   const recent = await getRecentSaves();
@@ -5128,6 +5160,33 @@ async function disconnectCloudConnection() {
       linkedAt: record.linkedAt
     };
   }
+}
+async function fetchCloudArchivesWithServer() {
+  const cloudLink = await requireCloudLinkRecord();
+  const result = await requestJsonFromOrigins(
+    `${EXTENSION_API_PATH}/cloud/archives`,
+    {
+      method: "GET"
+    },
+    {
+      authToken: cloudLink.token,
+      treatUnauthorizedAsExpired: true
+    }
+  );
+  return result.archives ?? [];
+}
+async function deleteCloudArchiveWithServer(archiveId) {
+  const cloudLink = await requireCloudLinkRecord();
+  await requestJsonFromOrigins(
+    `${EXTENSION_API_PATH}/cloud/archive/${encodeURIComponent(archiveId)}`,
+    {
+      method: "DELETE"
+    },
+    {
+      authToken: cloudLink.token,
+      treatUnauthorizedAsExpired: true
+    }
+  );
 }
 async function savePostToCloudWithServer(post, aiResult, aiWarning) {
   const [auth, locale, cloudLink] = await Promise.all([
@@ -6067,7 +6126,7 @@ async function createNotionRecentSave(post, pageId, pageUrl, warning) {
 }
 async function createCloudRecentSave(post, archiveId, archiveUrl, archiveTitle, warning) {
   return {
-    id: crypto.randomUUID(),
+    id: archiveId,
     saveTarget: "cloud",
     canonicalUrl: post.canonicalUrl,
     shortcode: post.shortcode,
@@ -6111,6 +6170,17 @@ async function requestExtraction(tabId, message) {
     }
     await ensureContentScript(tabId);
     return await chrome.tabs.sendMessage(tabId, message);
+  }
+}
+async function resolvePopupRecentSaves(saveTarget, cloudConnection) {
+  if (saveTarget !== "cloud" || cloudConnection.state !== "linked") {
+    return await getRecentSaves();
+  }
+  try {
+    const cloudArchives = await fetchCloudArchivesWithServer();
+    return await syncCloudRecentSaves(cloudArchives);
+  } catch {
+    return await getRecentSaves();
   }
 }
 async function extractPostFromTab(tab) {
@@ -6164,6 +6234,7 @@ async function saveCurrentPost(tab, allowDuplicate = false, imageOverride) {
       const duplicate2 = await findDuplicateSave(post.canonicalUrl, post.contentHash, "cloud");
       const recent2 = duplicate2 && allowDuplicate ? {
         ...duplicate2,
+        id: cloudResult.archiveId,
         saveTarget: "cloud",
         canonicalUrl: post.canonicalUrl,
         shortcode: post.shortcode,
@@ -6307,6 +6378,7 @@ async function redownloadSave(saveId, successMessage, imageOverride) {
       );
       const updatedSave2 = {
         ...recentSave,
+        id: cloudResult.archiveId,
         saveTarget: "cloud",
         downloadedAt: (/* @__PURE__ */ new Date()).toISOString(),
         archiveName: cloudResult.title,
@@ -6419,9 +6491,10 @@ chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
     switch (request.type) {
       case "get-popup-state": {
         const tab = await getActiveTab();
-        const recentSaves = await getRecentSaves();
+        const options = await getEffectiveOptions();
         const supported = Boolean(tab?.url && isSupportedPermalink(tab.url));
         const cloudConnection = await fetchCloudConnectionStatus();
+        const recentSaves = await resolvePopupRecentSaves(options.saveTarget, cloudConnection);
         const response = {
           supported,
           currentUrl: tab?.url ?? null,
@@ -6474,10 +6547,36 @@ chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
         break;
       }
       case "delete-recent-save": {
-        const recentSaves = await removeRecentSaveById(request.saveId);
+        const recentSave = await findRecentSaveById(request.saveId);
+        if (recentSave?.saveTarget === "cloud" && recentSave.remotePageId) {
+          try {
+            await deleteCloudArchiveWithServer(recentSave.remotePageId);
+          } catch (error) {
+            const tab2 = await getActiveTab();
+            const cloudConnection2 = await fetchCloudConnectionStatus();
+            const options2 = await getEffectiveOptions();
+            const response2 = {
+              supported: Boolean(tab2?.url && isSupportedPermalink(tab2.url)),
+              currentUrl: tab2?.url ?? null,
+              status: {
+                kind: "error",
+                message: error instanceof Error ? error.message : (await t()).statusError,
+                canRetry: false
+              },
+              recentSaves: await resolvePopupRecentSaves(options2.saveTarget, cloudConnection2),
+              cloudConnection: cloudConnection2
+            };
+            broadcastStatus(response2.status);
+            sendResponse(response2);
+            return;
+          }
+        }
+        await removeRecentSaveById(request.saveId);
         const tab = await getActiveTab();
         const msg = await t();
+        const options = await getEffectiveOptions();
         const cloudConnection = await fetchCloudConnectionStatus();
+        const recentSaves = await resolvePopupRecentSaves(options.saveTarget, cloudConnection);
         const response = {
           supported: Boolean(tab?.url && isSupportedPermalink(tab.url)),
           currentUrl: tab?.url ?? null,
@@ -6497,6 +6596,7 @@ chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
         await clearRecentSaves();
         const tab = await getActiveTab();
         const msg = await t();
+        const options = await getEffectiveOptions();
         const cloudConnection = await fetchCloudConnectionStatus();
         const response = {
           supported: Boolean(tab?.url && isSupportedPermalink(tab.url)),
@@ -6506,7 +6606,7 @@ chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
             message: msg.statusClearedRecents,
             canRetry: false
           },
-          recentSaves: [],
+          recentSaves: await resolvePopupRecentSaves(options.saveTarget, cloudConnection),
           cloudConnection
         };
         broadcastStatus(response.status);

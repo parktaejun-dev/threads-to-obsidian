@@ -377,6 +377,33 @@ export interface BotMentionSyncSummary {
   skippedInvalid: number;
 }
 
+export type BotMentionJobStatus =
+  | "queued"
+  | "processing"
+  | "completed"
+  | "failed"
+  | "invalid"
+  | "unmatched";
+
+export interface BotMentionJobRecord {
+  id: string;
+  mentionId: string;
+  mentionUrl: string | null;
+  mentionAuthorHandle: string | null;
+  mentionAuthorUserId: string | null;
+  mentionText: string | null;
+  mentionPublishedAt: string | null;
+  rawSummaryJson: string | null;
+  attempts: number;
+  status: BotMentionJobStatus;
+  lastError: string | null;
+  availableAt: string;
+  leasedAt: string | null;
+  processedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface BotMentionCollectorStatus {
   enabled: boolean;
   running: boolean;
@@ -536,6 +563,7 @@ export interface WebDatabase {
   botSessions: BotSessionRecord[];
   botExtensionLinkSessions: BotExtensionLinkSessionRecord[];
   botExtensionAccessTokens: BotExtensionAccessTokenRecord[];
+  botMentionJobs: BotMentionJobRecord[];
   botArchives: BotArchiveRecord[];
   cloudArchives: CloudArchiveRecord[];
   watchlists: WatchlistRecord[];
@@ -704,6 +732,7 @@ export function buildDefaultDatabase(now = new Date().toISOString()): WebDatabas
     botSessions: [],
     botExtensionLinkSessions: [],
     botExtensionAccessTokens: [],
+    botMentionJobs: [],
     botArchives: [],
     cloudArchives: [],
     watchlists: [],

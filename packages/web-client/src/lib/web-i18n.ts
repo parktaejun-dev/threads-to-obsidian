@@ -15,6 +15,11 @@ export type WebLocale = SupportedLocale;
 
 const LS_KEY = "web-locale";
 const COOKIE_KEY = "threads-web-locale";
+export const EXTENSION_RELEASE_ASSET_NAME = "threads-saver-extension.zip";
+export const EXTENSION_RELEASE_DOWNLOAD_URL = `https://github.com/parktaejun-dev/threads-to-obsidian/releases/latest/download/${EXTENSION_RELEASE_ASSET_NAME}`;
+const EXTENSION_UNPACKED_FOLDER = "threads-saver-extension";
+const LEGACY_EXTENSION_REPO_URL = "https://github.com/parktaejun-dev/threads-to-obsidian";
+const LEGACY_EXTENSION_SOURCE_ZIP_URL = `${LEGACY_EXTENSION_REPO_URL}/archive/refs/heads/main.zip`;
 
 function readLocaleCookie(): WebLocale | null {
   if (typeof document === "undefined") {
@@ -139,6 +144,27 @@ export function bindLangToggle(onSwitch: (locale: WebLocale) => void): void {
       onSwitch(next);
     });
   }
+}
+
+export function applyExtensionInstallCopy<T>(value: T): T {
+  if (typeof value === "string") {
+    return value
+      .replaceAll(LEGACY_EXTENSION_SOURCE_ZIP_URL, EXTENSION_RELEASE_DOWNLOAD_URL)
+      .replaceAll(LEGACY_EXTENSION_REPO_URL, EXTENSION_RELEASE_DOWNLOAD_URL)
+      .replaceAll("dist/extension", EXTENSION_UNPACKED_FOLDER) as T;
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((entry) => applyExtensionInstallCopy(entry)) as T;
+  }
+
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, entry]) => [key, applyExtensionInstallCopy(entry)])
+    ) as T;
+  }
+
+  return value;
 }
 
 // ─── Landing messages ────────────────────────────────────────────────────────
@@ -598,7 +624,7 @@ export interface LandingStorefrontCopy {
 const obsidianLandingStorefrontCopy: { ko: LandingStorefrontCopy; en: LandingStorefrontCopy } = {
   ko: {
     productName: "Threads Saver",
-    headline: "PC는 extension.<br/>모바일은 mention.",
+    headline: "<span class=\"headline-row\"><span>PC</span><span>extension.</span></span><span class=\"headline-row\"><span>Mobile</span><span>mention.</span></span>",
     subheadline: "지금 보는 글은 Chrome extension으로 저장하고, 모바일에서는 mention scrapbook으로 모읍니다.",
     priceLabel: "Threads Saver Pro",
     includedUpdates: "29달러 1회 결제 · Extension Pro + Scrapbook core · 7일 환불",
@@ -646,7 +672,7 @@ const obsidianLandingStorefrontCopy: { ko: LandingStorefrontCopy; en: LandingSto
   },
   en: {
     productName: "Threads Saver",
-    headline: "Desktop extension. Mobile mention.",
+    headline: "<span class=\"headline-row\"><span>PC</span><span>extension.</span></span><span class=\"headline-row\"><span>Mobile</span><span>mention.</span></span>",
     subheadline: "Save the current post using the Chrome extension, or collect it later via mention scrapbook on mobile.",
     priceLabel: "Threads Saver Pro",
     includedUpdates: "$29 one-time · extension Pro + scrapbook core · 7-day refund",
@@ -1508,7 +1534,7 @@ export const scrapbookMessages = {
     scrapbookHeroLead:
       "저장하고 싶은 글에 {handleStrong} 을 멘션하면, 서비스 계정은 멘션만 받고 로그인으로 연결한 내 Threads 계정의 scrapbook에만 보관됩니다.",
     scrapbookConnectButton: "Threads로 로그인",
-    scrapbookConnectBusy: "Threads로 이동 중...",
+    scrapbookConnectBusy: "연결 페이지 여는 중...",
     scrapbookCopyLoginLink: "로그인 링크 복사",
     scrapbookHeroHowItWorks: "작동 방식",
     scrapbookMobileOauthNote:
@@ -1553,6 +1579,7 @@ export const scrapbookMessages = {
     scrapbookArchiveTableDate: "수집일자",
     scrapbookArchiveTableSource: "출처",
     scrapbookArchiveTableTags: "태그",
+    scrapbookNoResults: "검색 결과가 없습니다.",
     scrapbookWatchlistsEyebrow: "Watchlists",
     scrapbookWatchlistsTitle: "공개 계정 감시",
     scrapbookWatchlistsCopy: "공개 Threads 계정을 등록하고, 조건에 맞는 새 글만 모읍니다.",
@@ -1719,7 +1746,7 @@ export const scrapbookMessages = {
     scrapbookHeroLead:
       "Mention {handleStrong} on a post you want to save. The service account only receives the mention, and the result is stored only in the scrapbook tied to your signed-in Threads account.",
     scrapbookConnectButton: "Continue with Threads",
-    scrapbookConnectBusy: "Opening Threads...",
+    scrapbookConnectBusy: "Opening the sign-in page...",
     scrapbookCopyLoginLink: "Copy sign-in link",
     scrapbookHeroHowItWorks: "How it works",
     scrapbookMobileOauthNote:
@@ -1764,6 +1791,7 @@ export const scrapbookMessages = {
     scrapbookArchiveTableDate: "Saved at",
     scrapbookArchiveTableSource: "Source",
     scrapbookArchiveTableTags: "Tags",
+    scrapbookNoResults: "No results found.",
     scrapbookWatchlistsEyebrow: "Watchlists",
     scrapbookWatchlistsTitle: "Track public accounts",
     scrapbookWatchlistsCopy: "Register public Threads accounts and collect only new posts that match your rules.",
@@ -1931,7 +1959,7 @@ export const scrapbookMessages = {
     scrapbookHeroLead:
       "保存したい投稿に {handleStrong} をメンションすると、サービス用アカウントはメンションだけを受け取り、サインイン済みの Threads アカウントに紐づく scrapbook にだけ保存します。",
     scrapbookConnectButton: "Threads でログイン",
-    scrapbookConnectBusy: "Threads を開いています...",
+    scrapbookConnectBusy: "接続ページを開いています...",
     scrapbookCopyLoginLink: "ログインリンクをコピー",
     scrapbookHeroHowItWorks: "仕組み",
     scrapbookMobileOauthNote:
@@ -1976,6 +2004,7 @@ export const scrapbookMessages = {
     scrapbookArchiveTableDate: "保存日時",
     scrapbookArchiveTableSource: "ソース",
     scrapbookArchiveTableTags: "タグ",
+    scrapbookNoResults: "一致する結果はありません。",
     scrapbookWatchlistsEyebrow: "Watchlists",
     scrapbookWatchlistsTitle: "公開アカウントを監視",
     scrapbookWatchlistsCopy: "公開 Threads アカウントを登録し、条件に合う新規投稿だけを集めます。",
@@ -2143,7 +2172,7 @@ export const scrapbookMessages = {
     scrapbookHeroLead:
       "Mencione {handleStrong} no post que deseja salvar. A conta do serviço recebe apenas a menção, e o resultado é guardado somente no scrapbook ligado à sua conta do Threads conectada.",
     scrapbookConnectButton: "Entrar com Threads",
-    scrapbookConnectBusy: "Abrindo o Threads...",
+    scrapbookConnectBusy: "Abrindo a página de conexão...",
     scrapbookCopyLoginLink: "Copiar link de login",
     scrapbookHeroHowItWorks: "Como funciona",
     scrapbookMobileOauthNote:
@@ -2188,6 +2217,7 @@ export const scrapbookMessages = {
     scrapbookArchiveTableDate: "Salvo em",
     scrapbookArchiveTableSource: "Origem",
     scrapbookArchiveTableTags: "Tags",
+    scrapbookNoResults: "Nenhum resultado encontrado.",
     scrapbookWatchlistsEyebrow: "Listas de monitoramento",
     scrapbookWatchlistsTitle: "Monitorar contas públicas",
     scrapbookWatchlistsCopy: "Cadastre contas públicas do Threads e colete apenas os novos posts que combinarem com suas regras.",
@@ -2355,7 +2385,7 @@ export const scrapbookMessages = {
     scrapbookHeroLead:
       "Menciona {handleStrong} en la publicación que quieras guardar. La cuenta del servicio solo recibe la mención y el resultado se almacena únicamente en el scrapbook vinculado a tu cuenta de Threads conectada.",
     scrapbookConnectButton: "Iniciar sesión con Threads",
-    scrapbookConnectBusy: "Abriendo Threads...",
+    scrapbookConnectBusy: "Abriendo la página de acceso...",
     scrapbookCopyLoginLink: "Copiar enlace de acceso",
     scrapbookHeroHowItWorks: "Cómo funciona",
     scrapbookMobileOauthNote:
@@ -2400,6 +2430,7 @@ export const scrapbookMessages = {
     scrapbookArchiveTableDate: "Guardado el",
     scrapbookArchiveTableSource: "Origen",
     scrapbookArchiveTableTags: "Etiquetas",
+    scrapbookNoResults: "No se encontraron resultados.",
     scrapbookWatchlistsEyebrow: "Listas de seguimiento",
     scrapbookWatchlistsTitle: "Vigilar cuentas públicas",
     scrapbookWatchlistsCopy: "Registra cuentas públicas de Threads y recopila solo las nuevas publicaciones que coincidan con tus reglas.",
@@ -2567,7 +2598,7 @@ export const scrapbookMessages = {
     scrapbookHeroLead:
       "在想保存的貼文中提及 {handleStrong}。服務帳號只會收到提及訊號，內容只會存進與你登入 Threads 帳號綁定的 scrapbook。",
     scrapbookConnectButton: "使用 Threads 登入",
-    scrapbookConnectBusy: "正在開啟 Threads...",
+    scrapbookConnectBusy: "正在開啟登入頁面...",
     scrapbookCopyLoginLink: "複製登入連結",
     scrapbookHeroHowItWorks: "運作方式",
     scrapbookMobileOauthNote:
@@ -2612,6 +2643,7 @@ export const scrapbookMessages = {
     scrapbookArchiveTableDate: "保存時間",
     scrapbookArchiveTableSource: "來源",
     scrapbookArchiveTableTags: "標籤",
+    scrapbookNoResults: "沒有符合的結果。",
     scrapbookWatchlistsEyebrow: "監看清單",
     scrapbookWatchlistsTitle: "追蹤公開帳號",
     scrapbookWatchlistsCopy: "註冊公開 Threads 帳號，只收集符合規則的新貼文。",
@@ -2779,7 +2811,7 @@ export const scrapbookMessages = {
     scrapbookHeroLead:
       "Hãy mention {handleStrong} trong bài bạn muốn lưu. Tài khoản dịch vụ chỉ nhận tín hiệu mention, còn nội dung chỉ được lưu vào scrapbook gắn với tài khoản Threads bạn đã đăng nhập.",
     scrapbookConnectButton: "Đăng nhập bằng Threads",
-    scrapbookConnectBusy: "Đang mở Threads...",
+    scrapbookConnectBusy: "Đang mở trang đăng nhập...",
     scrapbookCopyLoginLink: "Sao chép liên kết đăng nhập",
     scrapbookHeroHowItWorks: "Cách hoạt động",
     scrapbookMobileOauthNote:
@@ -2824,6 +2856,7 @@ export const scrapbookMessages = {
     scrapbookArchiveTableDate: "Thời điểm lưu",
     scrapbookArchiveTableSource: "Nguồn",
     scrapbookArchiveTableTags: "Thẻ",
+    scrapbookNoResults: "Không có kết quả phù hợp.",
     scrapbookWatchlistsEyebrow: "Danh sách theo dõi",
     scrapbookWatchlistsTitle: "Theo dõi tài khoản công khai",
     scrapbookWatchlistsCopy: "Đăng ký tài khoản Threads công khai và chỉ thu các bài mới khớp với điều kiện của bạn.",

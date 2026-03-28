@@ -2398,7 +2398,7 @@ var require_jszip_min = __commonJS({
 
 // src/lib/config.ts
 var DEFAULT_AI_ORGANIZATION_PROMPT = "Summarize the post in 1-3 sentences. Add up to 5 concise tags. Add only useful flat frontmatter fields when confident, such as topic, language, sentiment, or source_kind.";
-var NOTION_UI_HIDDEN = true;
+var NOTION_UI_HIDDEN = false;
 var AI_PROVIDER_PRESETS = {
   openai: {
     baseUrl: "https://api.openai.com/v1",

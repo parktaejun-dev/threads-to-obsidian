@@ -40,16 +40,18 @@ import {
   completeExtensionLinkCode,
   type BotIngestPayload,
   createExtensionLinkCode,
-  deleteArchive,
+  deleteArchiveFromStore,
+  deleteExtensionCloudArchive,
   completeBotOauth,
   getExtensionCloudConnectionStatus,
   getBotPublicConfig,
-  readBotArchiveZip,
-  getBotSessionState,
+  getBotSessionStateFromStore,
+  listExtensionCloudArchives,
+  readBotArchiveZipFromStore,
   ingestBotMention,
   pollBotOauthSession,
   revokeExtensionCloudConnection,
-  readBotArchiveMarkdown,
+  readBotArchiveMarkdownFromStore,
   saveCloudArchiveWithExtensionToken,
   revokeBotSession,
   startBotOauth,
@@ -741,15 +743,23 @@ const serverPageCopy: Record<SupportedLocale, ServerPageCopy> = {
   ko: {
     oauthTitle: "Threads 로그인",
     oauthEyebrow: "Threads OAuth",
-    oauthHeading: "Threads 앱으로 로그인",
+    oauthHeading: "브라우저에서 로그인 계속",
     oauthLead:
-      "{handle} scrapbook 연결을 위해 Threads 계정을 연결하세요. 앱이 설치되어 있으면 비밀번호 입력 없이 바로 인증됩니다.",
-    oauthAuthorizeButton: "Threads로 로그인",
-    oauthWaitingStatus: "Threads 앱에서 인증을 완료해 주세요...",
+      "모바일에서는 로그인 링크를 복사해 새 브라우저 탭 주소창에 붙여넣는 방식이 가장 안정적입니다. {handle} scrapbook 연결을 위해 아래 순서대로 진행해 주세요.",
+    oauthAuthorizeButton: "로그인 링크 직접 열기",
+    oauthStep1: "로그인 링크 복사를 누릅니다.",
+    oauthStep2: "브라우저에서 새 탭을 열고 주소창에 붙여넣습니다.",
+    oauthStep3: "붙여넣은 URL을 열어 Threads 로그인을 완료합니다.",
+    oauthCopyButton: "로그인 링크 복사",
+    oauthCopiedButton: "복사 완료",
+    oauthCopiedStatus: "로그인 링크를 복사했습니다. 새 브라우저 탭 주소창에 붙여넣어 진행해 주세요.",
+    oauthCopyFailedStatus: "자동 복사에 실패했습니다. 아래 링크가 선택되었으니 길게 눌러 직접 복사해 주세요.",
+    oauthHint: "자동 복사가 막히면 아래 링크를 길게 눌러 복사한 뒤, 새 브라우저 탭에서 열 수 있습니다.",
+    oauthWaitingStatus: "브라우저에서 인증이 끝나면 연결을 확인합니다...",
     oauthAuthorizedStatus: "인증 완료! 잠시 후 이동합니다...",
     oauthExpiredStatus: "로그인 세션이 만료되었습니다. 페이지를 새로고침해 주세요.",
     oauthTimeoutStatus: "응답이 없습니다. 인증을 취소했거나 시간이 초과됐을 수 있습니다.",
-    oauthFallbackHint: "Threads 앱이 없다면 버튼을 눌러 브라우저에서 로그인하세요.",
+    oauthFallbackHint: "Threads 앱으로 바로 여는 방식보다 브라우저에서 링크를 붙여넣는 편이 더 안정적입니다.",
     privacyTitle: "Threads Archive 개인정보 처리방침",
     privacyDescription: "Threads Archive OAuth 및 scrapbook 저장소에 대한 개인정보 안내입니다.",
     privacyHeading: "Threads Archive 개인정보 처리방침",
@@ -790,15 +800,23 @@ const serverPageCopy: Record<SupportedLocale, ServerPageCopy> = {
   en: {
     oauthTitle: "Sign In with Threads",
     oauthEyebrow: "Threads OAuth",
-    oauthHeading: "Sign in with Threads",
+    oauthHeading: "Continue sign-in in your browser",
     oauthLead:
-      "Connect your Threads account to the {handle} scrapbook. If you have the Threads app installed, you can authorize without entering your password.",
-    oauthAuthorizeButton: "Sign in with Threads",
-    oauthWaitingStatus: "Complete authorization in the Threads app...",
+      "On mobile, the most reliable flow is to copy the sign-in link, paste it into a new browser tab, and complete the Threads OAuth flow there for the {handle} scrapbook.",
+    oauthAuthorizeButton: "Open sign-in link directly",
+    oauthStep1: "Tap Copy sign-in link.",
+    oauthStep2: "Open a new browser tab and paste the link into the address bar.",
+    oauthStep3: "Open the pasted URL and complete the Threads sign-in flow.",
+    oauthCopyButton: "Copy sign-in link",
+    oauthCopiedButton: "Copied",
+    oauthCopiedStatus: "The sign-in link is copied. Paste it into a new browser tab to continue.",
+    oauthCopyFailedStatus: "Automatic copy failed. The link below is selected so you can copy it manually.",
+    oauthHint: "If clipboard access is blocked, long-press the link below and copy it manually.",
+    oauthWaitingStatus: "Waiting for browser sign-in to complete...",
     oauthAuthorizedStatus: "Authorized! Redirecting...",
     oauthExpiredStatus: "Sign-in session expired. Please refresh the page.",
     oauthTimeoutStatus: "No response. You may have cancelled, or the request timed out.",
-    oauthFallbackHint: "If you don't have the Threads app, tap the button to sign in through your browser.",
+    oauthFallbackHint: "This browser flow is more reliable on mobile than jumping straight into the Threads app.",
     privacyTitle: "Threads Archive Privacy Policy",
     privacyDescription: "Privacy details for Threads Archive OAuth and scrapbook storage.",
     privacyHeading: "Threads Archive Privacy Policy",
@@ -1172,6 +1190,10 @@ function renderOauthBridgePage(
   const safePollUrlJson = JSON.stringify(`${publicOrigin}/api/public/bot/oauth/poll`).replace(/</g, "\\u003c");
   const safeActivateUrlJson = JSON.stringify(`${publicOrigin}/api/public/bot/oauth/activate`).replace(/</g, "\\u003c");
   const safePollTokenJson = JSON.stringify(pollToken).replace(/</g, "\\u003c");
+  const steps = [msg.oauthStep1, msg.oauthStep2, msg.oauthStep3].filter((value): value is string => Boolean(value));
+  const stepsMarkup = steps.length > 0
+    ? `<ol class="steps">${steps.map((step) => `<li>${escapeHtml(step)}</li>`).join("")}</ol>`
+    : "";
   return `<!doctype html>
 <html lang="${escapeHtml(locale)}">
   <head>
@@ -1243,6 +1265,15 @@ function renderOauthBridgePage(
         gap: 10px;
         margin-top: 24px;
       }
+      .steps {
+        margin: 18px 0 0;
+        padding-left: 18px;
+        color: var(--muted);
+        line-height: 1.6;
+      }
+      .steps li + li {
+        margin-top: 8px;
+      }
       .cta {
         display: inline-flex;
         align-items: center;
@@ -1262,6 +1293,42 @@ function renderOauthBridgePage(
       .cta:disabled {
         opacity: 0.5;
         cursor: not-allowed;
+      }
+      .secondary-link {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 48px;
+        border-radius: 14px;
+        text-decoration: none;
+        font-weight: 700;
+        font-size: 0.95rem;
+        border: 1px solid var(--line);
+        color: var(--ink);
+        background: #fff;
+      }
+      .link-box {
+        margin-top: 16px;
+      }
+      .link-box label {
+        display: block;
+        margin-bottom: 8px;
+        font-size: 12px;
+        font-weight: 700;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+      .link-box textarea {
+        width: 100%;
+        min-height: 104px;
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 12px 14px;
+        font: inherit;
+        color: var(--ink);
+        background: #f8fafc;
+        resize: none;
       }
       .spinner {
         display: inline-block;
@@ -1301,13 +1368,19 @@ function renderOauthBridgePage(
       <p class="eyebrow">${escapeHtml(msg.oauthEyebrow)}</p>
       <h1>${escapeHtml(msg.oauthHeading)}</h1>
       <p>${escapeHtml(interpolateServerText(msg.oauthLead, { handle: `@${escapeHtml(botHandle)}` }))}</p>
+      ${stepsMarkup}
       <div class="actions">
-        <a id="auth-button" class="cta" href="${escapeHtml(authorizeUrl)}" target="_blank" rel="noopener">
-          ${escapeHtml(String(msg.oauthAuthorizeButton ?? "Sign in with Threads"))}
-        </a>
+        <button id="copy-button" class="cta" type="button">
+          ${escapeHtml(String(msg.oauthCopyButton ?? "Copy sign-in link"))}
+        </button>
       </div>
       <p id="auth-status" class="status" aria-live="polite" aria-atomic="true"></p>
+      <div class="link-box">
+        <label for="login-link">Login link</label>
+        <textarea id="login-link" readonly spellcheck="false">${escapeHtml(authorizeUrl)}</textarea>
+      </div>
       <p class="hint">${escapeHtml(String(msg.oauthFallbackHint ?? "Open the sign-in flow in your browser if the Threads app is unavailable."))}</p>
+      <p class="hint">${escapeHtml(String(msg.oauthHint ?? ""))}</p>
     </main>
     <script>
       (() => {
@@ -1315,13 +1388,18 @@ function renderOauthBridgePage(
         const activateUrl = ${safeActivateUrlJson};
         const pollToken = ${safePollTokenJson};
         const authorizeUrl = ${safeAuthorizeUrlJson};
+        const copiedText = ${JSON.stringify(msg.oauthCopiedStatus ?? "Copied the sign-in link. Paste it into a new browser tab to continue.").replace(/</g, "\\u003c")};
+        const copyFailedText = ${JSON.stringify(msg.oauthCopyFailedStatus ?? "Automatic copy failed. Copy the selected link manually.").replace(/</g, "\\u003c")};
         const waitingText = ${JSON.stringify(msg.oauthWaitingStatus ?? "Complete authorization in the Threads app...").replace(/</g, "\\u003c")};
         const authorizedText = ${JSON.stringify(msg.oauthAuthorizedStatus ?? "Authorized! Redirecting...").replace(/</g, "\\u003c")};
         const expiredText = ${JSON.stringify(msg.oauthExpiredStatus ?? "Sign-in session expired. Please refresh the page.").replace(/</g, "\\u003c")};
         const timeoutText = ${JSON.stringify(msg.oauthTimeoutStatus ?? "No response. You may have cancelled, or the request timed out.").replace(/</g, "\\u003c")};
+        const copyButtonText = ${JSON.stringify(msg.oauthCopyButton ?? "Copy sign-in link").replace(/</g, "\\u003c")};
+        const copiedButtonText = ${JSON.stringify(msg.oauthCopiedButton ?? "Copied").replace(/</g, "\\u003c")};
         const POLL_TIMEOUT_MS = 3 * 60 * 1000;
 
-        const authButton = document.getElementById("auth-button");
+        const copyButton = document.getElementById("copy-button");
+        const loginLinkEl = document.getElementById("login-link");
         const statusEl = document.getElementById("auth-status");
 
         let polling = false;
@@ -1337,11 +1415,17 @@ function renderOauthBridgePage(
         }
 
         function setButtonEnabled(enabled) {
-          if (authButton instanceof HTMLElement) {
-            authButton.style.opacity = enabled ? "" : "0.5";
-            authButton.style.pointerEvents = enabled ? "" : "none";
-            authButton.setAttribute("aria-disabled", enabled ? "false" : "true");
+          if (copyButton instanceof HTMLButtonElement) {
+            copyButton.disabled = !enabled;
+            copyButton.textContent = enabled ? copyButtonText : copiedButtonText;
           }
+        }
+
+        function selectLink() {
+          if (!(loginLinkEl instanceof HTMLTextAreaElement)) return;
+          loginLinkEl.focus();
+          loginLinkEl.select();
+          loginLinkEl.setSelectionRange(0, loginLinkEl.value.length);
         }
 
         function stopPolling(statusText, cls) {
@@ -1352,12 +1436,12 @@ function renderOauthBridgePage(
           setButtonEnabled(true);
         }
 
-        function startPolling() {
+        function startPolling(initialText) {
           if (polling) return;
           polling = true;
           everPolled = true;
           setButtonEnabled(false);
-          setStatus(waitingText);
+          setStatus(initialText || waitingText);
           pollTimeoutId = setTimeout(() => stopPolling(timeoutText, "error"), POLL_TIMEOUT_MS);
           pollInterval = setInterval(async () => {
             try {
@@ -1372,26 +1456,36 @@ function renderOauthBridgePage(
                 window.location.href = activateUrl + "?code=" + encodeURIComponent(data.activationCode);
               } else if (data.status === "expired") {
                 stopPolling(expiredText, "error");
+              } else if (statusEl && !statusEl.textContent) {
+                setStatus(waitingText);
               }
             } catch (_) {}
           }, 2000);
         }
 
-        if (authButton) {
-          authButton.addEventListener("click", (e) => {
-            if (polling) {
-              e.preventDefault();
-              return;
-            }
+        if (copyButton instanceof HTMLButtonElement) {
+          copyButton.addEventListener("click", async () => {
+            if (polling) return;
             if (everPolled) {
-              // 이전 시도가 만료/타임아웃으로 종료 → 새 세션이 필요하므로 페이지 리로드
-              e.preventDefault();
               window.location.reload();
               return;
             }
-            // 첫 클릭: 링크가 Threads 앱을 열고, polling 시작
-            setTimeout(startPolling, 500);
+
+            try {
+              await navigator.clipboard.writeText(authorizeUrl);
+              setStatus(copiedText);
+            } catch (_) {
+              selectLink();
+              setStatus(copyFailedText);
+            }
+
+            startPolling(statusEl && statusEl.textContent ? statusEl.textContent : waitingText);
           });
+        }
+
+        if (loginLinkEl instanceof HTMLTextAreaElement) {
+          loginLinkEl.addEventListener("focus", selectLink);
+          loginLinkEl.addEventListener("click", selectLink);
         }
       })();
     </script>
@@ -3113,8 +3207,9 @@ async function handlePublicBotRoute(
 
     try {
       const rawSession = readCookie(request.headers, BOT_SESSION_COOKIE);
-      const { filename, markdownContent } = await withDatabaseTransaction((data) =>
-        readBotArchiveMarkdown(data, rawSession, archiveMatch[1] ?? "")
+      const { filename, markdownContent } = await readBotArchiveMarkdownFromStore(
+        rawSession,
+        archiveMatch[1] ?? ""
       );
       response.writeHead(200, {
         "content-type": "text/markdown; charset=utf-8",
@@ -3139,9 +3234,9 @@ async function handlePublicBotRoute(
 
     try {
       const rawSession = readCookie(request.headers, BOT_SESSION_COOKIE);
-      const { filename, content } = await withDatabaseTransaction((data) =>
-        readBotArchiveZip(data, rawSession, [archiveZipMatch[1] ?? ""])
-      );
+      const { filename, content } = await readBotArchiveZipFromStore(rawSession, [
+        archiveZipMatch[1] ?? ""
+      ]);
       response.writeHead(200, {
         "content-type": "application/zip",
         "content-disposition": `attachment; filename="${filename.replace(/"/g, "")}"`,
@@ -3164,7 +3259,7 @@ async function handlePublicBotRoute(
     }
 
     const rawSession = readCookie(request.headers, BOT_SESSION_COOKIE);
-    const state = getBotSessionState(await loadDatabase(), rawSession);
+    const state = await getBotSessionStateFromStore(rawSession);
     json(response, 200, state);
     return;
   }
@@ -3198,8 +3293,9 @@ async function handlePublicBotRoute(
     if ((request.method ?? "GET") === "DELETE" && archiveDeleteMatch) {
       const rawSession = readCookie(request.headers, BOT_SESSION_COOKIE);
       try {
-        const state = await withDatabaseTransaction((data) =>
-          deleteArchive(data, rawSession, decodeURIComponent(archiveDeleteMatch[1] ?? ""))
+        const state = await deleteArchiveFromStore(
+          rawSession,
+          decodeURIComponent(archiveDeleteMatch[1] ?? "")
         );
         json(response, 200, state);
       } catch (error) {
@@ -3248,7 +3344,7 @@ async function handlePublicBotRoute(
 
   if (pathname === "/api/public/bot/sync") {
     const rawSession = readCookie(request.headers, BOT_SESSION_COOKIE);
-    const state = getBotSessionState(await loadDatabase(), rawSession);
+    const state = await getBotSessionStateFromStore(rawSession);
     if (!state.authenticated || !state.user) {
       unauthorized(response);
       return;
@@ -3256,7 +3352,7 @@ async function handlePublicBotRoute(
 
     try {
       await collector.syncNow("user_sync");
-      const nextState = getBotSessionState(await loadDatabase(), rawSession);
+      const nextState = await getBotSessionStateFromStore(rawSession);
       json(response, 200, nextState);
     } catch (error) {
       json(response, 502, {
@@ -3456,8 +3552,9 @@ async function handlePublicBotRoute(
     const body = await parseJsonBody<{ ids?: string[] }>(request, config.maxBodyBytes);
 
     try {
-      const { filename, content } = await withDatabaseTransaction((data) =>
-        readBotArchiveZip(data, rawSession, Array.isArray(body?.ids) ? body.ids : [])
+      const { filename, content } = await readBotArchiveZipFromStore(
+        rawSession,
+        Array.isArray(body?.ids) ? body.ids : []
       );
       response.writeHead(200, {
         "content-type": "application/zip",
@@ -3741,6 +3838,59 @@ async function handleExtensionRoutes(
       Promise.resolve(revokeExtensionCloudConnection(data, bearerToken))
     );
     json(response, 200, status);
+    return;
+  }
+
+  if (pathname === "/api/extension/cloud/archives") {
+    if ((request.method ?? "GET") !== "GET") {
+      methodNotAllowed(response);
+      return;
+    }
+
+    if (!bearerToken) {
+      json(response, 401, {
+        error: "Connect the extension to Threads Archive scrapbook first."
+      });
+      return;
+    }
+
+    try {
+      const rawLimit = requestUrl.searchParams.get("limit");
+      const limit = rawLimit ? Number.parseInt(rawLimit, 10) : 10;
+      const archives = listExtensionCloudArchives(await loadDatabase(), bearerToken, publicOrigin, limit);
+      json(response, 200, { archives });
+    } catch (error) {
+      json(response, 401, {
+        error: toPublicErrorMessage(error, "Could not load cloud archives.")
+      });
+    }
+    return;
+  }
+
+  const cloudArchiveDeleteMatch = pathname.match(/^\/api\/extension\/cloud\/archive\/([^/]+)$/);
+  if (cloudArchiveDeleteMatch) {
+    if ((request.method ?? "GET") !== "DELETE") {
+      methodNotAllowed(response);
+      return;
+    }
+
+    if (!bearerToken) {
+      json(response, 401, {
+        error: "Connect the extension to Threads Archive scrapbook first."
+      });
+      return;
+    }
+
+    try {
+      await withDatabaseTransaction((data) =>
+        Promise.resolve(deleteExtensionCloudArchive(data, bearerToken, decodeURIComponent(cloudArchiveDeleteMatch[1] ?? "")))
+      );
+      json(response, 200, { ok: true });
+    } catch (error) {
+      json(response, 401, {
+        error: toPublicErrorMessage(error, "Could not delete the cloud archive.")
+      });
+    }
     return;
   }
 
@@ -4503,7 +4653,8 @@ function createWebRuntime(port?: number): {
 } {
   const config = resolveConfig(port);
   const collector = createBotMentionCollector({
-    runTransaction: withDatabaseTransaction
+    runTransaction: withDatabaseTransaction,
+    loadDatabase
   });
   configureMonitoringService({
     getCollectorStatus: () => collector.getStatus()

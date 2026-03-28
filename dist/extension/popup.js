@@ -4327,8 +4327,55 @@ function tSync(locale) {
   return dictionaries[locale];
 }
 
-// src/lib/package.ts
-var import_jszip = __toESM(require_jszip_min(), 1);
+// src/lib/pro-activation.ts
+var PRIMARY_BACKEND_ORIGIN = "https://ss-threads.dahanda.dev";
+var BACKEND_ORIGINS = [PRIMARY_BACKEND_ORIGIN];
+var PRO_ACTIVATION_PATH = "/api/public/licenses";
+function shouldTryNextOrigin(response) {
+  return response.status === 404 || response.status >= 500;
+}
+async function postActivation(path, payload) {
+  let fallbackError = null;
+  for (const origin of BACKEND_ORIGINS) {
+    try {
+      const response = await fetch(`${origin}${PRO_ACTIVATION_PATH}${path}`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json"
+        },
+        body: JSON.stringify(payload)
+      });
+      const json = await response.json().catch(() => null);
+      if (!response.ok && json && typeof json === "object" && "ok" in json) {
+        return json;
+      }
+      if (!response.ok) {
+        const errorMessage = json && typeof json === "object" && "error" in json && json.error || `Activation request failed (${response.status})`;
+        if (shouldTryNextOrigin(response)) {
+          fallbackError = new Error(`${origin}: ${errorMessage}`);
+          continue;
+        }
+        throw new Error(errorMessage);
+      }
+      return json;
+    } catch (error) {
+      fallbackError = error instanceof Error ? error : new Error(String(error));
+    }
+  }
+  throw fallbackError ?? new Error(`Activation backend is not reachable at ${BACKEND_ORIGINS.join(" or ")}.`);
+}
+async function getServerLicenseStatus(token, deviceId, deviceLabel) {
+  return await postActivation("/status", { token, deviceId, deviceLabel });
+}
+function mapServerFailureToActivationState(reason) {
+  if (reason === "seat_limit") {
+    return "seat_limit";
+  }
+  if (reason === "revoked") {
+    return "revoked";
+  }
+  return "required";
+}
 
 // src/lib/config.ts
 var DEFAULT_AI_ORGANIZATION_PROMPT = "Summarize the post in 1-3 sentences. Add up to 5 concise tags. Add only useful flat frontmatter fields when confident, such as topic, language, sentiment, or source_kind.";
@@ -4402,6 +4449,529 @@ var DEFAULT_OPTIONS = {
   },
   aiOrganization: DEFAULT_AI_ORGANIZATION_SETTINGS
 };
+
+// ../shared/src/license.ts
+var PRO_LICENSE_PUBLIC_KEY = {
+  kty: "EC",
+  x: "sACfUItyPveEEvzTzJRpeoBqpsg7DBTcmidebSuJ29U",
+  y: "lv68pNMuUrDUT0SgjTTmWigwcItjIBtRqE3pRxdSKLM",
+  crv: "P-256"
+};
+var cachedPublicKey = null;
+function toBase64UrlBytes(value) {
+  const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
+  const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, "=");
+  const binary = atob(padded);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+  return bytes;
+}
+function decodePayloadSegment(segment) {
+  try {
+    const bytes = toBase64UrlBytes(segment);
+    const raw = new TextDecoder().decode(bytes);
+    const parsed = JSON.parse(raw);
+    if (parsed.plan !== "pro" || typeof parsed.issuedAt !== "string") {
+      return null;
+    }
+    if (parsed.expiresAt !== null && parsed.expiresAt !== void 0 && typeof parsed.expiresAt !== "string") {
+      return null;
+    }
+    if (parsed.holder !== null && parsed.holder !== void 0 && typeof parsed.holder !== "string") {
+      return null;
+    }
+    return {
+      plan: "pro",
+      holder: parsed.holder ?? null,
+      issuedAt: parsed.issuedAt,
+      expiresAt: parsed.expiresAt ?? null
+    };
+  } catch {
+    return null;
+  }
+}
+function hasExpired(payload) {
+  if (!payload.expiresAt) {
+    return false;
+  }
+  const expiresAt = Date.parse(payload.expiresAt);
+  if (!Number.isFinite(expiresAt)) {
+    return true;
+  }
+  return expiresAt < Date.now();
+}
+async function importPublicKey(publicKey) {
+  return await crypto.subtle.importKey(
+    "jwk",
+    publicKey,
+    {
+      name: "ECDSA",
+      namedCurve: "P-256"
+    },
+    false,
+    ["verify"]
+  );
+}
+async function getPublicKey(publicKey = PRO_LICENSE_PUBLIC_KEY) {
+  if (publicKey !== PRO_LICENSE_PUBLIC_KEY) {
+    return await importPublicKey(publicKey);
+  }
+  cachedPublicKey ??= importPublicKey(publicKey);
+  return await cachedPublicKey;
+}
+async function validateProLicenseToken(token, publicKey = PRO_LICENSE_PUBLIC_KEY) {
+  const normalized = token.trim();
+  if (!normalized) {
+    return { state: "none", payload: null };
+  }
+  const [payloadSegment, signatureSegment, ...rest] = normalized.split(".");
+  if (!payloadSegment || !signatureSegment || rest.length > 0) {
+    return { state: "invalid", payload: null };
+  }
+  const payload = decodePayloadSegment(payloadSegment);
+  if (!payload) {
+    return { state: "invalid", payload: null };
+  }
+  try {
+    const key = await getPublicKey(publicKey);
+    const signatureBytes = toBase64UrlBytes(signatureSegment);
+    const signature = new Uint8Array(signatureBytes.length);
+    signature.set(signatureBytes);
+    const data = new TextEncoder().encode(payloadSegment);
+    const verified = await crypto.subtle.verify(
+      {
+        name: "ECDSA",
+        hash: "SHA-256"
+      },
+      key,
+      signature,
+      data
+    );
+    if (!verified) {
+      return { state: "invalid", payload: null };
+    }
+  } catch {
+    return { state: "invalid", payload: null };
+  }
+  if (hasExpired(payload)) {
+    return { state: "expired", payload };
+  }
+  return { state: "valid", payload };
+}
+
+// src/lib/pro-device.ts
+var PRO_DEVICE_KEY = "pro-device";
+function inferBrowserName() {
+  const ua = navigator.userAgent;
+  if (/Edg\//.test(ua)) {
+    return "Edge";
+  }
+  if (/Chrome\//.test(ua)) {
+    return "Chrome";
+  }
+  if (/Firefox\//.test(ua)) {
+    return "Firefox";
+  }
+  if (/Safari\//.test(ua)) {
+    return "Safari";
+  }
+  return "Browser";
+}
+function inferPlatformLabel() {
+  const value = (
+    // userAgentData isn't always available in extension pages.
+    (navigator.userAgentData?.platform ?? navigator.platform ?? "").trim()
+  );
+  if (!value) {
+    return "device";
+  }
+  return value.replace(/^Mac/i, "macOS").replace(/^Win/i, "Windows");
+}
+function buildDeviceLabel() {
+  return `${inferBrowserName()} on ${inferPlatformLabel()}`;
+}
+async function getOrCreateProDevice() {
+  const stored = await chrome.storage.local.get(PRO_DEVICE_KEY);
+  const existing = stored[PRO_DEVICE_KEY];
+  if (existing?.id && existing.label) {
+    return existing;
+  }
+  const created = {
+    id: crypto.randomUUID(),
+    label: buildDeviceLabel(),
+    createdAt: (/* @__PURE__ */ new Date()).toISOString()
+  };
+  await chrome.storage.local.set({ [PRO_DEVICE_KEY]: created });
+  return created;
+}
+
+// ../shared/src/config.ts
+var BUNDLED_EXTRACTOR_CONFIG = {
+  version: "2026-03-08",
+  noisePatterns: ["\uBC88\uC5ED\uD558\uAE30", "\uB354 \uBCF4\uAE30", "\uC88B\uC544\uC694", "\uB313\uAE00", "\uB9AC\uD3EC\uC2A4\uD2B8", "\uACF5\uC720\uD558\uAE30"],
+  maxRecentSaves: 10
+};
+
+// ../shared/src/utils.ts
+function normalizeThreadsUrl(url) {
+  const parsed = new URL(url);
+  parsed.hash = "";
+  parsed.search = "";
+  parsed.hostname = "www.threads.com";
+  parsed.pathname = parsed.pathname.replace(/(\/@[^/]+\/post\/[^/]+)\/media(?:\/.*)?$/i, "$1");
+  return parsed.toString().replace(/\/$/, "");
+}
+function sanitizeFilenamePart(value) {
+  return value.replace(/[\\/:*?"<>|]+/g, "").replace(/[.!?。！？]+$/g, "").replace(/\s+/g, "_").replace(/_+/g, "_").replace(/^_+|_+$/g, "").slice(0, 60);
+}
+function truncateFilenamePart(value, maxLength) {
+  return value.slice(0, maxLength).replace(/_+$/g, "");
+}
+function extractFirstSentence(text) {
+  const normalized = decodeEscapedJsonString(text).trim();
+  if (!normalized) {
+    return "";
+  }
+  const firstBlock = normalized.split(/\n+/).map((line) => line.trim()).find(Boolean);
+  if (!firstBlock) {
+    return "";
+  }
+  const sentenceMatch = firstBlock.match(/^(.+?[.!?。！？])(?:\s|$)/u);
+  return (sentenceMatch?.[1] ?? firstBlock).trim();
+}
+function resolvePatternTokens(pattern, post) {
+  const date = (post.publishedAt ?? post.capturedAt).slice(0, 10);
+  const firstSentence = extractFirstSentence(post.text) || post.title || post.shortcode;
+  const sanitizedFirstSentence = sanitizeFilenamePart(firstSentence);
+  return pattern.replaceAll("{date}", sanitizeFilenamePart(date)).replaceAll("{author}", sanitizeFilenamePart(post.author)).replaceAll("{first_sentence_20}", truncateFilenamePart(sanitizedFirstSentence, 20)).replaceAll("{first_sentence}", sanitizedFirstSentence).replaceAll("{shortcode}", sanitizeFilenamePart(post.shortcode));
+}
+function buildArchiveBaseName(pattern, post) {
+  const resolved = resolvePatternTokens(pattern, post);
+  const firstSentence = extractFirstSentence(post.text) || post.title || post.shortcode;
+  return resolved || `${sanitizeFilenamePart(post.author)}_${sanitizeFilenamePart(firstSentence)}`;
+}
+function buildPathPatternParts(pattern, post) {
+  if (!pattern.trim()) {
+    return [];
+  }
+  return resolvePatternTokens(pattern, post).replace(/\\/g, "/").split("/").map((part) => sanitizeFilenamePart(part.trim())).filter(Boolean);
+}
+function dedupeStrings(values) {
+  const seen = /* @__PURE__ */ new Set();
+  const result = [];
+  for (const value of values) {
+    if (!value) {
+      continue;
+    }
+    const trimmed = value.trim();
+    if (!trimmed || seen.has(trimmed)) {
+      continue;
+    }
+    seen.add(trimmed);
+    result.push(trimmed);
+  }
+  return result;
+}
+function decodeEscapedJsonString(value) {
+  let current = value;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    if (!/\\u[0-9a-fA-F]{4}|\\[nrt"\\/]/.test(current)) {
+      return current;
+    }
+    try {
+      const parsed = JSON.parse(`"${current}"`);
+      if (parsed === current) {
+        return current;
+      }
+      current = parsed;
+      continue;
+    } catch {
+      current = current.replaceAll("\\n", "\n").replaceAll("\\r", "\r").replaceAll("\\t", "	").replaceAll('\\"', '"').replaceAll("\\\\", "\\");
+    }
+  }
+  return current;
+}
+function cleanTextLines(text, author, config = BUNDLED_EXTRACTOR_CONFIG) {
+  const lines = dedupeStrings(
+    text.split(/\n+/).map((line) => line.trim()).filter(Boolean)
+  );
+  const filtered = [];
+  for (const line of lines) {
+    if (line === author || line === `@${author}`) {
+      continue;
+    }
+    if (line === "\uC2A4\uB808\uB4DC" || line === "\uC778\uAE30\uC21C" || line === "\uD65C\uB3D9 \uBCF4\uAE30" || /^조회\s+[\d.,]+(?:천|만)?회$/u.test(line) || /^Threads에 가입하여 .*$/u.test(line) || /^Threads에 가입해 .*$/u.test(line) || /^Threads에 로그인 또는 가입하기$/u.test(line) || /^사람들의 이야기를 확인하고 대화에 참여해보세요\.$/u.test(line)) {
+      continue;
+    }
+    if (config.noisePatterns.some((pattern) => line === pattern || line.startsWith(`${pattern} `))) {
+      break;
+    }
+    if (/^\d+\s*(초|분|시간|일|주|개월|년)$/.test(line)) {
+      continue;
+    }
+    if (/^[\d.,]+(?:천|만)?$/u.test(line) || /^\d+\s*\/\s*\d+$/u.test(line) || line === "/") {
+      continue;
+    }
+    filtered.push(line);
+  }
+  return filtered.join("\n\n").trim();
+}
+
+// src/lib/storage.ts
+var OPTIONS_KEY = "options";
+var RECENT_SAVES_KEY = "recent-saves";
+var LICENSE_KEY = "pro-license";
+var LEGACY_DEFAULT_FILENAME_PATTERN = "{date}__{author}__{shortcode}";
+var PREVIOUS_DEFAULT_FILENAME_PATTERN = "{date}_{author}_{shortcode}";
+var OLD_FIRST_SENTENCE_DEFAULT_FILENAME_PATTERN = "{author}_{first_sentence}";
+var PREVIOUS_SHORTCODE_DEFAULT_FILENAME_PATTERN = "{author}_{shortcode}";
+var MAX_RECENT_SAVES = 10;
+var PLAN_STATUS_TTL_MS = 5 * 6e4;
+function mergeOptionsWithDefaults(options) {
+  return {
+    ...DEFAULT_OPTIONS,
+    ...options,
+    notion: {
+      ...DEFAULT_OPTIONS.notion,
+      ...options?.notion ?? {}
+    },
+    aiOrganization: {
+      ...DEFAULT_OPTIONS.aiOrganization,
+      ...options?.aiOrganization ?? {}
+    }
+  };
+}
+function normalizeRecentSave(item) {
+  const archiveName = item.archiveName ?? item.zipFilename?.replace(/\.zip$/i, "") ?? "";
+  const saveTarget = item.saveTarget ?? (item.savedVia === "notion" ? "notion" : item.savedVia === "cloud" ? "cloud" : "obsidian");
+  const post = {
+    ...item.post,
+    videoUrl: item.post.videoUrl ?? null,
+    title: decodeEscapedJsonString(item.post.title),
+    text: decodeEscapedJsonString(item.post.text),
+    authorReplies: item.post.authorReplies.map((reply) => ({
+      ...reply,
+      videoUrl: reply.videoUrl ?? null,
+      text: decodeEscapedJsonString(reply.text)
+    }))
+  };
+  return {
+    ...item,
+    archiveName,
+    saveTarget,
+    savedVia: item.savedVia ?? "zip",
+    savedRelativePath: item.savedRelativePath ?? null,
+    remotePageId: item.remotePageId ?? null,
+    remotePageUrl: item.remotePageUrl ?? null,
+    warning: item.warning ?? null,
+    post,
+    title: decodeEscapedJsonString(item.title)
+  };
+}
+async function getOptions() {
+  const stored = await chrome.storage.local.get(OPTIONS_KEY);
+  const storedOptions = stored[OPTIONS_KEY];
+  const merged = mergeOptionsWithDefaults(storedOptions);
+  let shouldPersist = false;
+  if (!merged.filenamePattern || merged.filenamePattern === LEGACY_DEFAULT_FILENAME_PATTERN || merged.filenamePattern === PREVIOUS_DEFAULT_FILENAME_PATTERN || merged.filenamePattern === OLD_FIRST_SENTENCE_DEFAULT_FILENAME_PATTERN || merged.filenamePattern === PREVIOUS_SHORTCODE_DEFAULT_FILENAME_PATTERN) {
+    merged.filenamePattern = DEFAULT_OPTIONS.filenamePattern;
+    shouldPersist = true;
+  }
+  if (merged.obsidianFolderLabel === void 0) {
+    merged.obsidianFolderLabel = DEFAULT_OPTIONS.obsidianFolderLabel;
+    shouldPersist = true;
+  }
+  if (merged.saveTarget === void 0) {
+    merged.saveTarget = DEFAULT_OPTIONS.saveTarget;
+    shouldPersist = true;
+  }
+  if (merged.savePathPattern === void 0) {
+    merged.savePathPattern = DEFAULT_OPTIONS.savePathPattern;
+    shouldPersist = true;
+  }
+  if (!storedOptions?.notion) {
+    shouldPersist = true;
+  } else {
+    const expectedNotionKeys = Object.keys(DEFAULT_OPTIONS.notion);
+    for (const key of expectedNotionKeys) {
+      if (storedOptions.notion[key] === void 0) {
+        shouldPersist = true;
+        break;
+      }
+    }
+  }
+  if (!storedOptions?.aiOrganization) {
+    shouldPersist = true;
+  } else {
+    const expectedAiKeys = Object.keys(DEFAULT_OPTIONS.aiOrganization);
+    for (const key of expectedAiKeys) {
+      if (storedOptions.aiOrganization[key] === void 0) {
+        shouldPersist = true;
+        break;
+      }
+    }
+  }
+  if (shouldPersist) {
+    await chrome.storage.local.set({ [OPTIONS_KEY]: merged });
+  }
+  return merged;
+}
+function buildPlanStatus(licenseState, payload, overrides = {}) {
+  return {
+    tier: licenseState === "valid" && payload && overrides.activationState === "active" ? "pro" : "free",
+    licenseState,
+    holder: payload?.holder ?? null,
+    expiresAt: payload?.expiresAt ?? null,
+    activationState: overrides.activationState ?? "none",
+    seatLimit: overrides.seatLimit ?? null,
+    seatsUsed: overrides.seatsUsed ?? null,
+    deviceLabel: overrides.deviceLabel ?? null,
+    activatedAt: overrides.activatedAt ?? null
+  };
+}
+function isActivationFresh(record) {
+  if (!record?.validatedAt) {
+    return false;
+  }
+  return Date.now() - Date.parse(record.validatedAt) < PLAN_STATUS_TTL_MS;
+}
+async function readStoredLicenseRecord() {
+  const stored = await chrome.storage.local.get(LICENSE_KEY);
+  return stored[LICENSE_KEY] ?? null;
+}
+async function writeStoredLicenseRecord(record) {
+  await chrome.storage.local.set({ [LICENSE_KEY]: record });
+}
+async function getPlanStatus() {
+  const record = await readStoredLicenseRecord();
+  if (!record?.key) {
+    return buildPlanStatus("none", null);
+  }
+  const validation = await validateProLicenseToken(record.key);
+  if (validation.state !== "valid" || !validation.payload) {
+    return buildPlanStatus(validation.state, validation.payload);
+  }
+  if (isActivationFresh(record.activation)) {
+    const activation = record.activation;
+    return buildPlanStatus("valid", validation.payload, {
+      activationState: "active",
+      seatLimit: activation?.seatLimit ?? null,
+      seatsUsed: activation?.seatsUsed ?? null,
+      deviceLabel: activation?.deviceLabel ?? null,
+      activatedAt: activation?.activatedAt ?? null
+    });
+  }
+  const device = await getOrCreateProDevice();
+  try {
+    const server = await getServerLicenseStatus(record.key, device.id, device.label);
+    if (server.ok) {
+      const nextRecord2 = {
+        ...record,
+        payload: validation.payload,
+        activation: {
+          state: "active",
+          deviceId: server.deviceId,
+          deviceLabel: server.deviceLabel,
+          seatLimit: server.seatLimit,
+          seatsUsed: server.seatsUsed,
+          activatedAt: server.activatedAt,
+          validatedAt: (/* @__PURE__ */ new Date()).toISOString()
+        }
+      };
+      await writeStoredLicenseRecord(nextRecord2);
+      return buildPlanStatus("valid", validation.payload, {
+        activationState: "active",
+        seatLimit: server.seatLimit,
+        seatsUsed: server.seatsUsed,
+        deviceLabel: server.deviceLabel,
+        activatedAt: server.activatedAt
+      });
+    }
+    const nextRecord = {
+      ...record,
+      payload: validation.payload,
+      activation: null
+    };
+    await writeStoredLicenseRecord(nextRecord);
+    return buildPlanStatus("valid", validation.payload, {
+      activationState: mapServerFailureToActivationState(server.reason),
+      seatLimit: server.seatLimit,
+      seatsUsed: server.seatsUsed
+    });
+  } catch {
+    if (record.activation) {
+      return buildPlanStatus("valid", validation.payload, {
+        activationState: "active",
+        seatLimit: record.activation.seatLimit,
+        seatsUsed: record.activation.seatsUsed,
+        deviceLabel: record.activation.deviceLabel,
+        activatedAt: record.activation.activatedAt
+      });
+    }
+    return buildPlanStatus("valid", validation.payload, {
+      activationState: "offline"
+    });
+  }
+}
+async function getEffectiveOptions() {
+  const [options, planStatus] = await Promise.all([getOptions(), getPlanStatus()]);
+  if (planStatus.tier === "pro") {
+    return options;
+  }
+  return {
+    ...options,
+    saveTarget: options.saveTarget === "obsidian" ? "obsidian" : DEFAULT_OPTIONS.saveTarget,
+    filenamePattern: DEFAULT_OPTIONS.filenamePattern,
+    savePathPattern: DEFAULT_OPTIONS.savePathPattern,
+    notion: {
+      ...options.notion,
+      parentType: DEFAULT_OPTIONS.notion.parentType,
+      dataSourceId: DEFAULT_OPTIONS.notion.dataSourceId,
+      uploadMedia: DEFAULT_OPTIONS.notion.uploadMedia
+    },
+    aiOrganization: {
+      ...options.aiOrganization,
+      enabled: false
+    }
+  };
+}
+async function getRecentSaves() {
+  const stored = await chrome.storage.local.get(RECENT_SAVES_KEY);
+  const recent = (stored[RECENT_SAVES_KEY] ?? []).map(normalizeRecentSave);
+  await chrome.storage.local.set({ [RECENT_SAVES_KEY]: recent });
+  return recent;
+}
+async function setRecentSaves(recent) {
+  await chrome.storage.local.set({ [RECENT_SAVES_KEY]: recent });
+  return recent;
+}
+async function upsertRecentSave(save) {
+  const recent = await getRecentSaves();
+  const filtered = recent.filter(
+    (item) => item.id !== save.id && !(item.canonicalUrl === save.canonicalUrl && item.saveTarget === save.saveTarget)
+  );
+  filtered.unshift(save);
+  const next = filtered.slice(0, MAX_RECENT_SAVES);
+  return await setRecentSaves(next);
+}
+async function findDuplicateSave(canonicalUrl, contentHash, saveTarget) {
+  const recent = await getRecentSaves();
+  return recent.find((item) => item.canonicalUrl === canonicalUrl && item.contentHash === contentHash && item.saveTarget === saveTarget) ?? null;
+}
+async function findRecentSaveByUrl(canonicalUrl, saveTarget) {
+  const recent = await getRecentSaves();
+  return recent.find((item) => item.canonicalUrl === canonicalUrl && item.saveTarget === saveTarget) ?? null;
+}
+
+// src/lib/cloud-server.ts
+function buildCloudScrapbookUrl() {
+  return new URL("/scrapbook", PRIMARY_BACKEND_ORIGIN).toString();
+}
+
+// src/lib/package.ts
+var import_jszip = __toESM(require_jszip_min(), 1);
 
 // src/lib/llm.ts
 var RESERVED_FRONTMATTER_KEYS = /* @__PURE__ */ new Set([
@@ -4889,118 +5459,6 @@ async function renderMarkdown(post, mediaRefs, warning, aiResult = null, locale)
   return [...frontmatter, ...body].join("\n").trimEnd() + "\n";
 }
 
-// ../shared/src/config.ts
-var BUNDLED_EXTRACTOR_CONFIG = {
-  version: "2026-03-08",
-  noisePatterns: ["\uBC88\uC5ED\uD558\uAE30", "\uB354 \uBCF4\uAE30", "\uC88B\uC544\uC694", "\uB313\uAE00", "\uB9AC\uD3EC\uC2A4\uD2B8", "\uACF5\uC720\uD558\uAE30"],
-  maxRecentSaves: 10
-};
-
-// ../shared/src/utils.ts
-function normalizeThreadsUrl(url) {
-  const parsed = new URL(url);
-  parsed.hash = "";
-  parsed.search = "";
-  parsed.hostname = "www.threads.com";
-  parsed.pathname = parsed.pathname.replace(/(\/@[^/]+\/post\/[^/]+)\/media(?:\/.*)?$/i, "$1");
-  return parsed.toString().replace(/\/$/, "");
-}
-function sanitizeFilenamePart(value) {
-  return value.replace(/[\\/:*?"<>|]+/g, "").replace(/[.!?。！？]+$/g, "").replace(/\s+/g, "_").replace(/_+/g, "_").replace(/^_+|_+$/g, "").slice(0, 60);
-}
-function truncateFilenamePart(value, maxLength) {
-  return value.slice(0, maxLength).replace(/_+$/g, "");
-}
-function extractFirstSentence(text) {
-  const normalized = decodeEscapedJsonString(text).trim();
-  if (!normalized) {
-    return "";
-  }
-  const firstBlock = normalized.split(/\n+/).map((line) => line.trim()).find(Boolean);
-  if (!firstBlock) {
-    return "";
-  }
-  const sentenceMatch = firstBlock.match(/^(.+?[.!?。！？])(?:\s|$)/u);
-  return (sentenceMatch?.[1] ?? firstBlock).trim();
-}
-function resolvePatternTokens(pattern, post) {
-  const date = (post.publishedAt ?? post.capturedAt).slice(0, 10);
-  const firstSentence = extractFirstSentence(post.text) || post.title || post.shortcode;
-  const sanitizedFirstSentence = sanitizeFilenamePart(firstSentence);
-  return pattern.replaceAll("{date}", sanitizeFilenamePart(date)).replaceAll("{author}", sanitizeFilenamePart(post.author)).replaceAll("{first_sentence_20}", truncateFilenamePart(sanitizedFirstSentence, 20)).replaceAll("{first_sentence}", sanitizedFirstSentence).replaceAll("{shortcode}", sanitizeFilenamePart(post.shortcode));
-}
-function buildArchiveBaseName(pattern, post) {
-  const resolved = resolvePatternTokens(pattern, post);
-  const firstSentence = extractFirstSentence(post.text) || post.title || post.shortcode;
-  return resolved || `${sanitizeFilenamePart(post.author)}_${sanitizeFilenamePart(firstSentence)}`;
-}
-function buildPathPatternParts(pattern, post) {
-  if (!pattern.trim()) {
-    return [];
-  }
-  return resolvePatternTokens(pattern, post).replace(/\\/g, "/").split("/").map((part) => sanitizeFilenamePart(part.trim())).filter(Boolean);
-}
-function dedupeStrings(values) {
-  const seen = /* @__PURE__ */ new Set();
-  const result = [];
-  for (const value of values) {
-    if (!value) {
-      continue;
-    }
-    const trimmed = value.trim();
-    if (!trimmed || seen.has(trimmed)) {
-      continue;
-    }
-    seen.add(trimmed);
-    result.push(trimmed);
-  }
-  return result;
-}
-function decodeEscapedJsonString(value) {
-  let current = value;
-  for (let attempt = 0; attempt < 3; attempt += 1) {
-    if (!/\\u[0-9a-fA-F]{4}|\\[nrt"\\/]/.test(current)) {
-      return current;
-    }
-    try {
-      const parsed = JSON.parse(`"${current}"`);
-      if (parsed === current) {
-        return current;
-      }
-      current = parsed;
-      continue;
-    } catch {
-      current = current.replaceAll("\\n", "\n").replaceAll("\\r", "\r").replaceAll("\\t", "	").replaceAll('\\"', '"').replaceAll("\\\\", "\\");
-    }
-  }
-  return current;
-}
-function cleanTextLines(text, author, config = BUNDLED_EXTRACTOR_CONFIG) {
-  const lines = dedupeStrings(
-    text.split(/\n+/).map((line) => line.trim()).filter(Boolean)
-  );
-  const filtered = [];
-  for (const line of lines) {
-    if (line === author || line === `@${author}`) {
-      continue;
-    }
-    if (line === "\uC2A4\uB808\uB4DC" || line === "\uC778\uAE30\uC21C" || line === "\uD65C\uB3D9 \uBCF4\uAE30" || /^조회\s+[\d.,]+(?:천|만)?회$/u.test(line) || /^Threads에 가입하여 .*$/u.test(line) || /^Threads에 가입해 .*$/u.test(line) || /^Threads에 로그인 또는 가입하기$/u.test(line) || /^사람들의 이야기를 확인하고 대화에 참여해보세요\.$/u.test(line)) {
-      continue;
-    }
-    if (config.noisePatterns.some((pattern) => line === pattern || line.startsWith(`${pattern} `))) {
-      break;
-    }
-    if (/^\d+\s*(초|분|시간|일|주|개월|년)$/.test(line)) {
-      continue;
-    }
-    if (/^[\d.,]+(?:천|만)?$/u.test(line) || /^\d+\s*\/\s*\d+$/u.test(line) || line === "/") {
-      continue;
-    }
-    filtered.push(line);
-  }
-  return filtered.join("\n\n").trim();
-}
-
 // src/lib/package.ts
 function prefixAssetBasePath(orderPrefix, basename) {
   return `${orderPrefix}. ${basename}`;
@@ -5375,456 +5833,6 @@ function isNotionConfigured(settings) {
   return settings.oauthConnected && targetId.trim().length > 0;
 }
 
-// ../shared/src/license.ts
-var PRO_LICENSE_PUBLIC_KEY = {
-  kty: "EC",
-  x: "sACfUItyPveEEvzTzJRpeoBqpsg7DBTcmidebSuJ29U",
-  y: "lv68pNMuUrDUT0SgjTTmWigwcItjIBtRqE3pRxdSKLM",
-  crv: "P-256"
-};
-var cachedPublicKey = null;
-function toBase64UrlBytes(value) {
-  const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
-  const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, "=");
-  const binary = atob(padded);
-  const bytes = new Uint8Array(binary.length);
-  for (let index = 0; index < binary.length; index += 1) {
-    bytes[index] = binary.charCodeAt(index);
-  }
-  return bytes;
-}
-function decodePayloadSegment(segment) {
-  try {
-    const bytes = toBase64UrlBytes(segment);
-    const raw = new TextDecoder().decode(bytes);
-    const parsed = JSON.parse(raw);
-    if (parsed.plan !== "pro" || typeof parsed.issuedAt !== "string") {
-      return null;
-    }
-    if (parsed.expiresAt !== null && parsed.expiresAt !== void 0 && typeof parsed.expiresAt !== "string") {
-      return null;
-    }
-    if (parsed.holder !== null && parsed.holder !== void 0 && typeof parsed.holder !== "string") {
-      return null;
-    }
-    return {
-      plan: "pro",
-      holder: parsed.holder ?? null,
-      issuedAt: parsed.issuedAt,
-      expiresAt: parsed.expiresAt ?? null
-    };
-  } catch {
-    return null;
-  }
-}
-function hasExpired(payload) {
-  if (!payload.expiresAt) {
-    return false;
-  }
-  const expiresAt = Date.parse(payload.expiresAt);
-  if (!Number.isFinite(expiresAt)) {
-    return true;
-  }
-  return expiresAt < Date.now();
-}
-async function importPublicKey(publicKey) {
-  return await crypto.subtle.importKey(
-    "jwk",
-    publicKey,
-    {
-      name: "ECDSA",
-      namedCurve: "P-256"
-    },
-    false,
-    ["verify"]
-  );
-}
-async function getPublicKey(publicKey = PRO_LICENSE_PUBLIC_KEY) {
-  if (publicKey !== PRO_LICENSE_PUBLIC_KEY) {
-    return await importPublicKey(publicKey);
-  }
-  cachedPublicKey ??= importPublicKey(publicKey);
-  return await cachedPublicKey;
-}
-async function validateProLicenseToken(token, publicKey = PRO_LICENSE_PUBLIC_KEY) {
-  const normalized = token.trim();
-  if (!normalized) {
-    return { state: "none", payload: null };
-  }
-  const [payloadSegment, signatureSegment, ...rest] = normalized.split(".");
-  if (!payloadSegment || !signatureSegment || rest.length > 0) {
-    return { state: "invalid", payload: null };
-  }
-  const payload = decodePayloadSegment(payloadSegment);
-  if (!payload) {
-    return { state: "invalid", payload: null };
-  }
-  try {
-    const key = await getPublicKey(publicKey);
-    const signatureBytes = toBase64UrlBytes(signatureSegment);
-    const signature = new Uint8Array(signatureBytes.length);
-    signature.set(signatureBytes);
-    const data = new TextEncoder().encode(payloadSegment);
-    const verified = await crypto.subtle.verify(
-      {
-        name: "ECDSA",
-        hash: "SHA-256"
-      },
-      key,
-      signature,
-      data
-    );
-    if (!verified) {
-      return { state: "invalid", payload: null };
-    }
-  } catch {
-    return { state: "invalid", payload: null };
-  }
-  if (hasExpired(payload)) {
-    return { state: "expired", payload };
-  }
-  return { state: "valid", payload };
-}
-
-// src/lib/pro-device.ts
-var PRO_DEVICE_KEY = "pro-device";
-function inferBrowserName() {
-  const ua = navigator.userAgent;
-  if (/Edg\//.test(ua)) {
-    return "Edge";
-  }
-  if (/Chrome\//.test(ua)) {
-    return "Chrome";
-  }
-  if (/Firefox\//.test(ua)) {
-    return "Firefox";
-  }
-  if (/Safari\//.test(ua)) {
-    return "Safari";
-  }
-  return "Browser";
-}
-function inferPlatformLabel() {
-  const value = (
-    // userAgentData isn't always available in extension pages.
-    (navigator.userAgentData?.platform ?? navigator.platform ?? "").trim()
-  );
-  if (!value) {
-    return "device";
-  }
-  return value.replace(/^Mac/i, "macOS").replace(/^Win/i, "Windows");
-}
-function buildDeviceLabel() {
-  return `${inferBrowserName()} on ${inferPlatformLabel()}`;
-}
-async function getOrCreateProDevice() {
-  const stored = await chrome.storage.local.get(PRO_DEVICE_KEY);
-  const existing = stored[PRO_DEVICE_KEY];
-  if (existing?.id && existing.label) {
-    return existing;
-  }
-  const created = {
-    id: crypto.randomUUID(),
-    label: buildDeviceLabel(),
-    createdAt: (/* @__PURE__ */ new Date()).toISOString()
-  };
-  await chrome.storage.local.set({ [PRO_DEVICE_KEY]: created });
-  return created;
-}
-
-// src/lib/pro-activation.ts
-var PRIMARY_BACKEND_ORIGIN = "https://ss-threads.dahanda.dev";
-var BACKEND_ORIGINS = [PRIMARY_BACKEND_ORIGIN];
-var PRO_ACTIVATION_PATH = "/api/public/licenses";
-function shouldTryNextOrigin(response) {
-  return response.status === 404 || response.status >= 500;
-}
-async function postActivation(path, payload) {
-  let fallbackError = null;
-  for (const origin of BACKEND_ORIGINS) {
-    try {
-      const response = await fetch(`${origin}${PRO_ACTIVATION_PATH}${path}`, {
-        method: "POST",
-        headers: {
-          "content-type": "application/json"
-        },
-        body: JSON.stringify(payload)
-      });
-      const json = await response.json().catch(() => null);
-      if (!response.ok && json && typeof json === "object" && "ok" in json) {
-        return json;
-      }
-      if (!response.ok) {
-        const errorMessage = json && typeof json === "object" && "error" in json && json.error || `Activation request failed (${response.status})`;
-        if (shouldTryNextOrigin(response)) {
-          fallbackError = new Error(`${origin}: ${errorMessage}`);
-          continue;
-        }
-        throw new Error(errorMessage);
-      }
-      return json;
-    } catch (error) {
-      fallbackError = error instanceof Error ? error : new Error(String(error));
-    }
-  }
-  throw fallbackError ?? new Error(`Activation backend is not reachable at ${BACKEND_ORIGINS.join(" or ")}.`);
-}
-async function getServerLicenseStatus(token, deviceId, deviceLabel) {
-  return await postActivation("/status", { token, deviceId, deviceLabel });
-}
-function mapServerFailureToActivationState(reason) {
-  if (reason === "seat_limit") {
-    return "seat_limit";
-  }
-  if (reason === "revoked") {
-    return "revoked";
-  }
-  return "required";
-}
-
-// src/lib/storage.ts
-var OPTIONS_KEY = "options";
-var RECENT_SAVES_KEY = "recent-saves";
-var LICENSE_KEY = "pro-license";
-var LEGACY_DEFAULT_FILENAME_PATTERN = "{date}__{author}__{shortcode}";
-var PREVIOUS_DEFAULT_FILENAME_PATTERN = "{date}_{author}_{shortcode}";
-var OLD_FIRST_SENTENCE_DEFAULT_FILENAME_PATTERN = "{author}_{first_sentence}";
-var PREVIOUS_SHORTCODE_DEFAULT_FILENAME_PATTERN = "{author}_{shortcode}";
-var MAX_RECENT_SAVES = 10;
-var PLAN_STATUS_TTL_MS = 5 * 6e4;
-function mergeOptionsWithDefaults(options) {
-  return {
-    ...DEFAULT_OPTIONS,
-    ...options,
-    notion: {
-      ...DEFAULT_OPTIONS.notion,
-      ...options?.notion ?? {}
-    },
-    aiOrganization: {
-      ...DEFAULT_OPTIONS.aiOrganization,
-      ...options?.aiOrganization ?? {}
-    }
-  };
-}
-function normalizeRecentSave(item) {
-  const archiveName = item.archiveName ?? item.zipFilename?.replace(/\.zip$/i, "") ?? "";
-  const saveTarget = item.saveTarget ?? (item.savedVia === "notion" ? "notion" : item.savedVia === "cloud" ? "cloud" : "obsidian");
-  const post = {
-    ...item.post,
-    videoUrl: item.post.videoUrl ?? null,
-    title: decodeEscapedJsonString(item.post.title),
-    text: decodeEscapedJsonString(item.post.text),
-    authorReplies: item.post.authorReplies.map((reply) => ({
-      ...reply,
-      videoUrl: reply.videoUrl ?? null,
-      text: decodeEscapedJsonString(reply.text)
-    }))
-  };
-  return {
-    ...item,
-    archiveName,
-    saveTarget,
-    savedVia: item.savedVia ?? "zip",
-    savedRelativePath: item.savedRelativePath ?? null,
-    remotePageId: item.remotePageId ?? null,
-    remotePageUrl: item.remotePageUrl ?? null,
-    warning: item.warning ?? null,
-    post,
-    title: decodeEscapedJsonString(item.title)
-  };
-}
-async function getOptions() {
-  const stored = await chrome.storage.local.get(OPTIONS_KEY);
-  const storedOptions = stored[OPTIONS_KEY];
-  const merged = mergeOptionsWithDefaults(storedOptions);
-  let shouldPersist = false;
-  if (!merged.filenamePattern || merged.filenamePattern === LEGACY_DEFAULT_FILENAME_PATTERN || merged.filenamePattern === PREVIOUS_DEFAULT_FILENAME_PATTERN || merged.filenamePattern === OLD_FIRST_SENTENCE_DEFAULT_FILENAME_PATTERN || merged.filenamePattern === PREVIOUS_SHORTCODE_DEFAULT_FILENAME_PATTERN) {
-    merged.filenamePattern = DEFAULT_OPTIONS.filenamePattern;
-    shouldPersist = true;
-  }
-  if (merged.obsidianFolderLabel === void 0) {
-    merged.obsidianFolderLabel = DEFAULT_OPTIONS.obsidianFolderLabel;
-    shouldPersist = true;
-  }
-  if (merged.saveTarget === void 0) {
-    merged.saveTarget = DEFAULT_OPTIONS.saveTarget;
-    shouldPersist = true;
-  }
-  if (merged.savePathPattern === void 0) {
-    merged.savePathPattern = DEFAULT_OPTIONS.savePathPattern;
-    shouldPersist = true;
-  }
-  if (!storedOptions?.notion) {
-    shouldPersist = true;
-  } else {
-    const expectedNotionKeys = Object.keys(DEFAULT_OPTIONS.notion);
-    for (const key of expectedNotionKeys) {
-      if (storedOptions.notion[key] === void 0) {
-        shouldPersist = true;
-        break;
-      }
-    }
-  }
-  if (!storedOptions?.aiOrganization) {
-    shouldPersist = true;
-  } else {
-    const expectedAiKeys = Object.keys(DEFAULT_OPTIONS.aiOrganization);
-    for (const key of expectedAiKeys) {
-      if (storedOptions.aiOrganization[key] === void 0) {
-        shouldPersist = true;
-        break;
-      }
-    }
-  }
-  if (shouldPersist) {
-    await chrome.storage.local.set({ [OPTIONS_KEY]: merged });
-  }
-  return merged;
-}
-function buildPlanStatus(licenseState, payload, overrides = {}) {
-  return {
-    tier: licenseState === "valid" && payload && overrides.activationState === "active" ? "pro" : "free",
-    licenseState,
-    holder: payload?.holder ?? null,
-    expiresAt: payload?.expiresAt ?? null,
-    activationState: overrides.activationState ?? "none",
-    seatLimit: overrides.seatLimit ?? null,
-    seatsUsed: overrides.seatsUsed ?? null,
-    deviceLabel: overrides.deviceLabel ?? null,
-    activatedAt: overrides.activatedAt ?? null
-  };
-}
-function isActivationFresh(record) {
-  if (!record?.validatedAt) {
-    return false;
-  }
-  return Date.now() - Date.parse(record.validatedAt) < PLAN_STATUS_TTL_MS;
-}
-async function readStoredLicenseRecord() {
-  const stored = await chrome.storage.local.get(LICENSE_KEY);
-  return stored[LICENSE_KEY] ?? null;
-}
-async function writeStoredLicenseRecord(record) {
-  await chrome.storage.local.set({ [LICENSE_KEY]: record });
-}
-async function getPlanStatus() {
-  const record = await readStoredLicenseRecord();
-  if (!record?.key) {
-    return buildPlanStatus("none", null);
-  }
-  const validation = await validateProLicenseToken(record.key);
-  if (validation.state !== "valid" || !validation.payload) {
-    return buildPlanStatus(validation.state, validation.payload);
-  }
-  if (isActivationFresh(record.activation)) {
-    const activation = record.activation;
-    return buildPlanStatus("valid", validation.payload, {
-      activationState: "active",
-      seatLimit: activation?.seatLimit ?? null,
-      seatsUsed: activation?.seatsUsed ?? null,
-      deviceLabel: activation?.deviceLabel ?? null,
-      activatedAt: activation?.activatedAt ?? null
-    });
-  }
-  const device = await getOrCreateProDevice();
-  try {
-    const server = await getServerLicenseStatus(record.key, device.id, device.label);
-    if (server.ok) {
-      const nextRecord2 = {
-        ...record,
-        payload: validation.payload,
-        activation: {
-          state: "active",
-          deviceId: server.deviceId,
-          deviceLabel: server.deviceLabel,
-          seatLimit: server.seatLimit,
-          seatsUsed: server.seatsUsed,
-          activatedAt: server.activatedAt,
-          validatedAt: (/* @__PURE__ */ new Date()).toISOString()
-        }
-      };
-      await writeStoredLicenseRecord(nextRecord2);
-      return buildPlanStatus("valid", validation.payload, {
-        activationState: "active",
-        seatLimit: server.seatLimit,
-        seatsUsed: server.seatsUsed,
-        deviceLabel: server.deviceLabel,
-        activatedAt: server.activatedAt
-      });
-    }
-    const nextRecord = {
-      ...record,
-      payload: validation.payload,
-      activation: null
-    };
-    await writeStoredLicenseRecord(nextRecord);
-    return buildPlanStatus("valid", validation.payload, {
-      activationState: mapServerFailureToActivationState(server.reason),
-      seatLimit: server.seatLimit,
-      seatsUsed: server.seatsUsed
-    });
-  } catch {
-    if (record.activation) {
-      return buildPlanStatus("valid", validation.payload, {
-        activationState: "active",
-        seatLimit: record.activation.seatLimit,
-        seatsUsed: record.activation.seatsUsed,
-        deviceLabel: record.activation.deviceLabel,
-        activatedAt: record.activation.activatedAt
-      });
-    }
-    return buildPlanStatus("valid", validation.payload, {
-      activationState: "offline"
-    });
-  }
-}
-async function getEffectiveOptions() {
-  const [options, planStatus] = await Promise.all([getOptions(), getPlanStatus()]);
-  if (planStatus.tier === "pro") {
-    return options;
-  }
-  return {
-    ...options,
-    saveTarget: options.saveTarget === "obsidian" ? "obsidian" : DEFAULT_OPTIONS.saveTarget,
-    filenamePattern: DEFAULT_OPTIONS.filenamePattern,
-    savePathPattern: DEFAULT_OPTIONS.savePathPattern,
-    notion: {
-      ...options.notion,
-      parentType: DEFAULT_OPTIONS.notion.parentType,
-      dataSourceId: DEFAULT_OPTIONS.notion.dataSourceId,
-      uploadMedia: DEFAULT_OPTIONS.notion.uploadMedia
-    },
-    aiOrganization: {
-      ...options.aiOrganization,
-      enabled: false
-    }
-  };
-}
-async function getRecentSaves() {
-  const stored = await chrome.storage.local.get(RECENT_SAVES_KEY);
-  const recent = (stored[RECENT_SAVES_KEY] ?? []).map(normalizeRecentSave);
-  await chrome.storage.local.set({ [RECENT_SAVES_KEY]: recent });
-  return recent;
-}
-async function upsertRecentSave(save) {
-  const recent = await getRecentSaves();
-  const filtered = recent.filter(
-    (item) => item.id !== save.id && !(item.canonicalUrl === save.canonicalUrl && item.saveTarget === save.saveTarget)
-  );
-  filtered.unshift(save);
-  const next = filtered.slice(0, MAX_RECENT_SAVES);
-  await chrome.storage.local.set({ [RECENT_SAVES_KEY]: next });
-  return next;
-}
-async function findDuplicateSave(canonicalUrl, contentHash, saveTarget) {
-  const recent = await getRecentSaves();
-  return recent.find((item) => item.canonicalUrl === canonicalUrl && item.contentHash === contentHash && item.saveTarget === saveTarget) ?? null;
-}
-async function findRecentSaveByUrl(canonicalUrl, saveTarget) {
-  const recent = await getRecentSaves();
-  return recent.find((item) => item.canonicalUrl === canonicalUrl && item.saveTarget === saveTarget) ?? null;
-}
-
 // src/popup.ts
 var statusLabel = document.querySelector("#status-label");
 var subtitle = document.querySelector("#subtitle");
@@ -5834,8 +5842,11 @@ var retryButton = document.querySelector("#retry-button");
 var recentList = document.querySelector("#recent-list");
 var openOptionsButton = document.querySelector("#open-options");
 var clearRecentsButton = document.querySelector("#clear-recents");
+var openCloudButton = document.querySelector("#open-cloud-button");
 var languageSwitch = document.querySelector("#language-switch");
 var languageSelect = document.querySelector("#language-select");
+var modeLabel = document.querySelector("#mode-label");
+var modeBadge = document.querySelector("#mode-badge");
 var latestStatus = null;
 var cachedDirectoryHandle = null;
 var cachedDirectReady = false;
@@ -5909,6 +5920,28 @@ function setStatus(status) {
   retryButton.classList.toggle("hidden", !status.canRetry);
   retryButton.textContent = status.kind === "error" ? msg.statusRetry : msg.statusResaveButton;
 }
+function getCurrentSaveTargetLabel() {
+  if (cachedSaveTarget === "cloud") {
+    return msg.optionsSaveTargetCloud;
+  }
+  if (cachedSaveTarget === "notion") {
+    return msg.optionsSaveTargetNotion;
+  }
+  return msg.optionsSaveTargetObsidian;
+}
+function updateModeBadge() {
+  if (modeLabel) {
+    modeLabel.textContent = msg.optionsSaveTarget;
+  }
+  if (!modeBadge) {
+    return;
+  }
+  modeBadge.textContent = getCurrentSaveTargetLabel();
+  modeBadge.classList.remove("mode-cloud", "mode-local", "mode-notion");
+  modeBadge.classList.add(
+    cachedSaveTarget === "cloud" ? "mode-cloud" : cachedSaveTarget === "notion" ? "mode-notion" : "mode-local"
+  );
+}
 function applyLanguageSwitch(locale) {
   if (languageSelect && languageSelect.options.length === 0) {
     for (const supportedLocale of SUPPORTED_LOCALES) {
@@ -5966,12 +5999,15 @@ function truncateText(value, maxLength) {
   }
   return `${value.slice(0, maxLength).trimEnd()}\u2026`;
 }
+function filterRecentSavesForCurrentTarget(items) {
+  return items.filter((item) => item.saveTarget === cachedSaveTarget);
+}
 function renderRecentSaves(items) {
   if (!recentList) {
     return;
   }
   activeRecentSaves = items;
-  clearRecentsButton?.classList.toggle("hidden", items.length === 0);
+  clearRecentsButton?.classList.toggle("hidden", items.length === 0 || cachedSaveTarget === "cloud");
   if (items.length === 0) {
     recentList.innerHTML = `<li class="empty">${escapeHtml(msg.popupEmpty)}</li>`;
     return;
@@ -6047,6 +6083,7 @@ function renderRecentSaves(items) {
 async function refreshSaveTargetState() {
   const options = await getEffectiveOptions();
   cachedSaveTarget = options.saveTarget;
+  updateModeBadge();
   if (cachedSaveTarget === "notion") {
     cachedDirectoryHandle = null;
     cachedDirectReady = false;
@@ -6097,7 +6134,8 @@ async function refreshPopupState(useIdleStatus = false, overrideStatus) {
   const state = await chrome.runtime.sendMessage({ type: "get-popup-state" });
   cachedCloudConnection = state.cloudConnection;
   await refreshSaveTargetState();
-  const renderedRecentSaves = await repairVisibleRecentSaves(state);
+  const repairedRecentSaves = await repairVisibleRecentSaves(state);
+  const renderedRecentSaves = filterRecentSavesForCurrentTarget(repairedRecentSaves);
   setStatus(overrideStatus ?? (useIdleStatus ? getIdleStatus(state.supported) : state.status));
   renderRecentSaves(renderedRecentSaves);
   if (saveButton) {
@@ -6110,6 +6148,10 @@ async function refreshPopupState(useIdleStatus = false, overrideStatus) {
       const connected = cachedCloudConnection?.state === "linked" || cachedCloudConnection?.state === "offline";
       cloudLinkButton.textContent = connected ? msg.popupCloudDisconnect : msg.popupCloudConnect;
     }
+  }
+  if (openCloudButton) {
+    openCloudButton.classList.toggle("hidden", cachedSaveTarget !== "cloud");
+    openCloudButton.textContent = msg.popupOpenRemote;
   }
   return {
     ...state,
@@ -6409,6 +6451,20 @@ async function openLocalizedOptionsPage() {
   }
   await chrome.tabs.create({ url: optionsUrl });
 }
+async function openCloudScrapbookPage() {
+  const url = buildCloudScrapbookUrl();
+  const [existingTab] = await chrome.tabs.query({
+    url: [url, `${url}?*`, `${url}#*`]
+  });
+  if (existingTab?.id) {
+    await chrome.tabs.update(existingTab.id, { active: true, url });
+    if (typeof existingTab.windowId === "number") {
+      await chrome.windows.update(existingTab.windowId, { focused: true });
+    }
+    return;
+  }
+  await chrome.tabs.create({ url });
+}
 saveButton?.addEventListener("click", async () => {
   await saveCurrent();
 });
@@ -6424,6 +6480,9 @@ retryButton?.addEventListener("click", async () => {
 });
 openOptionsButton?.addEventListener("click", async () => {
   await openLocalizedOptionsPage();
+});
+openCloudButton?.addEventListener("click", async () => {
+  await openCloudScrapbookPage();
 });
 cloudLinkButton?.addEventListener("click", async () => {
   if (cachedSaveTarget !== "cloud") {
@@ -6490,11 +6549,20 @@ void (async () => {
   if (clearRecentsButton) {
     clearRecentsButton.textContent = msg.popupClearAll;
   }
+  if (modeLabel) {
+    modeLabel.textContent = msg.optionsSaveTarget;
+  }
+  if (modeBadge) {
+    modeBadge.textContent = msg.optionsSaveTargetObsidian;
+  }
   if (openOptionsButton) {
     openOptionsButton.textContent = msg.popupSettings;
   }
   if (cloudLinkButton) {
     cloudLinkButton.textContent = msg.popupCloudConnect;
+  }
+  if (openCloudButton) {
+    openCloudButton.textContent = msg.popupOpenRemote;
   }
   const promoTitle = document.querySelector("#promo-slot-title");
   if (promoTitle) {

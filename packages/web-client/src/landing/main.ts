@@ -4,6 +4,7 @@ import {
   getLocale,
   applyTranslations,
   applyLangToggle,
+  applyExtensionInstallCopy,
   bindLangToggle,
   getLandingVariant,
   landingMessages,
@@ -81,7 +82,7 @@ function setHref(element: HTMLAnchorElement | null, href: string): void {
 }
 
 function renderLocalizedStorefront(locale: WebLocale): void {
-  const copy = applyBotHandleToCopy(landingStorefrontCopy[locale][landingVariant]);
+  const copy = applyBotHandleToCopy(applyExtensionInstallCopy(landingStorefrontCopy[locale][landingVariant]));
 
   if (brandName) {
     brandName.textContent = copy.productName;
@@ -143,7 +144,7 @@ async function loadBotConfig(): Promise<void> {
 
 function applyLocale(locale: WebLocale): void {
   currentLocale = locale;
-  msg = applyBotHandleToCopy(landingMessages[locale][landingVariant]);
+  msg = applyBotHandleToCopy(applyExtensionInstallCopy(landingMessages[locale][landingVariant]));
   document.documentElement.lang = locale;
   applyTranslations(buildTranslationDict(msg));
   applyLangToggle(locale);

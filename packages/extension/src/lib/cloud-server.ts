@@ -8,7 +8,7 @@ import {
   setCloudLinkRecord,
   type StoredCloudLinkRecord
 } from "./storage";
-import type { AiOrganizationResult, CloudConnectionStatus, CloudSaveResult, ExtractedPost } from "./types";
+import type { AiOrganizationResult, CloudArchiveRecentRecord, CloudConnectionStatus, CloudSaveResult, ExtractedPost } from "./types";
 
 const PUBLIC_BOT_PATH = "/api/public/bot";
 const EXTENSION_API_PATH = "/api/extension";
@@ -105,6 +105,10 @@ export function buildCloudLinkStartUrl(state: string): string {
   const url = new URL(`${PRIMARY_BACKEND_ORIGIN}${PUBLIC_BOT_PATH}/extension/link/start`);
   url.searchParams.set("state", state);
   return url.toString();
+}
+
+export function buildCloudScrapbookUrl(): string {
+  return new URL("/scrapbook", PRIMARY_BACKEND_ORIGIN).toString();
 }
 
 export async function completeCloudLink(code: string, state: string): Promise<CloudConnectionStatus> {
@@ -206,6 +210,35 @@ export async function disconnectCloudConnection(): Promise<CloudConnectionStatus
       linkedAt: record.linkedAt
     };
   }
+}
+
+export async function fetchCloudArchivesWithServer(): Promise<CloudArchiveRecentRecord[]> {
+  const cloudLink = await requireCloudLinkRecord();
+  const result = await requestJsonFromOrigins<{ archives?: CloudArchiveRecentRecord[] }>(
+    `${EXTENSION_API_PATH}/cloud/archives`,
+    {
+      method: "GET"
+    },
+    {
+      authToken: cloudLink.token,
+      treatUnauthorizedAsExpired: true
+    }
+  );
+  return result.archives ?? [];
+}
+
+export async function deleteCloudArchiveWithServer(archiveId: string): Promise<void> {
+  const cloudLink = await requireCloudLinkRecord();
+  await requestJsonFromOrigins<{ ok?: boolean }>(
+    `${EXTENSION_API_PATH}/cloud/archive/${encodeURIComponent(archiveId)}`,
+    {
+      method: "DELETE"
+    },
+    {
+      authToken: cloudLink.token,
+      treatUnauthorizedAsExpired: true
+    }
+  );
 }
 
 export async function savePostToCloudWithServer(

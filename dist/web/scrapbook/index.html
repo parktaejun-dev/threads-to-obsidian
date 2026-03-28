@@ -36,12 +36,24 @@
         </a>
 
         <div class="topbar-actions">
-          <label class="topbar-link" for="scrapbook-locale-select">
-            <span data-i18n="scrapbookLocaleLabel">Language</span>
-            <select id="scrapbook-locale-select" aria-label="Language"></select>
-          </label>
+          <div class="web-lang-switch" aria-label="Language switcher">
+            <select id="scrapbook-locale-select" class="web-lang-select" aria-label="Language"></select>
+          </div>
           <a class="topbar-link" href="/" data-i18n="scrapbookNavHome">홈으로</a>
           <a class="topbar-link topbar-link-strong" href="#archives-section" data-i18n="scrapbookNavCurrent">내 scrapbook</a>
+          
+          <div id="session-panel" class="topbar-profile hidden">
+            <a id="session-profile-link" class="profile-avatar-small" href="#" target="_blank" rel="noreferrer" title="Threads 프로필">
+              <img id="profile-avatar-image" class="hidden" alt="" />
+              <span id="profile-avatar-fallback">T</span>
+            </a>
+            <button id="logout" class="topbar-logout" type="button" data-i18n="scrapbookLogout">로그아웃</button>
+            <span id="session-name" class="hidden"></span>
+            <span id="session-meta" class="hidden"></span>
+            <span id="session-bio" class="hidden"></span>
+            <span id="session-routing" class="hidden"></span>
+            <span id="scope-status" class="hidden"></span>
+          </div>
         </div>
       </header>
 
@@ -50,79 +62,31 @@
           <div class="hero-copy">
             <p class="eyebrow" data-i18n="scrapbookHeroEyebrow">Mention scrapbook</p>
             <h1 data-i18n="scrapbookHeroTitle">멘션으로 모은 Threads를 private scrapbook에 저장.</h1>
-            <p class="lead" data-i18n="scrapbookHeroLead">
-              저장하고 싶은 글에 <strong data-bot-handle>@your-bot</strong> 을 멘션하면, 서비스 계정은 멘션만 받고 로그인으로 연결한 내 Threads 계정의 scrapbook에만 보관됩니다.
-            </p>
 
             <div class="hero-actions">
               <button class="primary-cta" type="button" data-bot-connect data-i18n="scrapbookConnectButton">Threads로 로그인</button>
-              <a class="secondary-cta" href="#how-it-works" data-i18n="scrapbookHeroHowItWorks">작동 방식</a>
             </div>
             <p class="status-panel status-panel-warning hidden" data-mobile-oauth-note data-i18n="scrapbookMobileOauthNote">
               모바일에서는 브라우저용 연결 페이지에서 <strong>로그인 링크 복사</strong>를 누른 뒤, 새 탭 주소창에 붙여넣는 방식으로 진행해 주세요.
             </p>
-
-            <div class="hero-notes">
-              <span class="value-pill" data-i18n="scrapbookHeroNoteOauth">Threads OAuth</span>
-              <span class="value-pill" data-i18n="scrapbookHeroNotePrivate">private scrapbook</span>
-              <span class="value-pill" data-i18n="scrapbookHeroNoteExport">Markdown export</span>
-            </div>
           </div>
-
-          <aside class="price-card flow-card">
-            <p class="price-label" data-i18n="scrapbookFlowLabel">Flow</p>
-            <ol class="flow-list">
-              <li data-i18n="scrapbookFlowStep1">내 Threads 계정을 한 번 연결합니다.</li>
-              <li data-i18n="scrapbookFlowStep2">Threads에서 저장할 글에 <span data-bot-handle>@your-bot</span> 을 멘션합니다.</li>
-              <li data-i18n="scrapbookFlowStep3">저장된 항목을 웹에서 확인하고 Markdown으로 꺼냅니다.</li>
-            </ol>
-          </aside>
         </section>
 
         <section class="section">
           <p id="page-status" class="status-panel hidden"></p>
-          <div class="auth-grid">
+          <div class="auth-grid customer-hidden">
             <article id="auth-panel" class="panel panel-prominent">
-              <p class="product-tag" data-i18n="scrapbookConnectTag">Connect Threads</p>
-              <h2 data-i18n="scrapbookConnectTitle">내 Threads 계정 연결</h2>
-              <p class="section-copy" data-i18n="scrapbookConnectCopy">
-                여기서는 내 scrapbook 소유 계정만 연결합니다. 서비스 계정은 <span data-bot-handle>@your-bot</span> 으로 따로 운영되고, 로그인한 계정과 댓글 작성 계정이 일치할 때만 내 보관함으로 들어옵니다.
-              </p>
               <p class="status-panel status-panel-warning hidden" data-mobile-oauth-note data-i18n="scrapbookMobileOauthNote">
                 모바일에서는 브라우저용 연결 페이지에서 <strong>로그인 링크 복사</strong>를 누른 뒤, 새 탭 주소창에 붙여넣는 방식으로 진행해 주세요.
               </p>
               <button class="primary-cta primary-cta-block" type="button" data-bot-connect data-i18n="scrapbookConnectButton">Threads로 로그인</button>
             </article>
 
-            <article id="session-panel" class="panel hidden">
-              <div class="profile-head">
-                <div class="profile-avatar">
-                  <img id="profile-avatar-image" class="hidden" alt="" />
-                  <span id="profile-avatar-fallback">T</span>
-                </div>
 
-                <div class="profile-copy">
-                  <p class="product-tag" data-i18n="scrapbookConnectedTag">Connected</p>
-                  <h2 id="session-name"></h2>
-                  <p id="session-meta" class="section-copy"></p>
-                </div>
-              </div>
-
-              <p id="session-bio" class="session-bio hidden"></p>
-              <p id="session-routing" class="session-routing"></p>
-              <p id="scope-status" class="session-routing hidden"></p>
-
-              <div class="session-actions">
-                <a id="session-profile-link" class="secondary-cta" href="#" target="_blank" rel="noreferrer">
-                  <span data-i18n="scrapbookProfileLink">Threads 프로필 보기</span>
-                </a>
-                <button id="logout" class="disconnect-cta" type="button" data-i18n="scrapbookLogout">내 계정 연결 끊기</button>
-              </div>
-            </article>
           </div>
         </section>
 
-        <section class="section">
+        <section class="section customer-hidden">
           <nav id="workspace-tabs" class="workspace-tabs hidden" aria-label="Scrapbook workspace">
             <button class="workspace-tab is-active" type="button" data-tab="inbox" data-i18n="scrapbookTabInbox">Inbox</button>
             <button class="workspace-tab" type="button" data-tab="watchlists" data-i18n="scrapbookTabWatchlists">Watchlists</button>
@@ -131,7 +95,7 @@
           </nav>
         </section>
 
-        <section id="how-it-works" class="section">
+        <section id="how-it-works" class="section customer-hidden">
           <div class="section-head">
             <p class="eyebrow" data-i18n="scrapbookHowEyebrow">How it works</p>
             <h2 data-i18n="scrapbookHowTitle">설정은 한 번, 저장은 멘션만.</h2>
@@ -165,9 +129,6 @@
           <div class="section-head">
             <p class="eyebrow" data-i18n="scrapbookInboxEyebrow">Inbox</p>
             <h2 data-i18n="scrapbookInboxTitle">멘션으로 모은 inbox</h2>
-            <p class="section-copy" data-i18n="scrapbookInboxCopy">
-              저장된 항목은 게시판처럼 한 줄씩 정리되며, 행을 클릭하면 본문과 내보내기 메뉴가 열립니다.
-            </p>
           </div>
 
           <div id="archives-toolbar" class="archives-toolbar hidden">
@@ -177,8 +138,6 @@
                 <input id="archives-select-all" type="checkbox" />
                 <span data-i18n="scrapbookSelectAll">전체 선택</span>
               </label>
-              <button id="archives-move-selected" class="secondary-cta" type="button" disabled>폴더로 이동</button>
-              <button id="archives-delete-selected" class="disconnect-cta" type="button" disabled>선택 삭제</button>
               <button id="archives-export-selected" class="secondary-cta" type="button" data-i18n="scrapbookExportSelected">선택 ZIP 내보내기</button>
               <button id="archives-export-all" class="primary-cta" type="button" data-i18n="scrapbookExportAll">전체 ZIP 내보내기</button>
             </div>
@@ -186,9 +145,9 @@
 
           <div id="archives-filter-bar" class="archives-filter-bar hidden">
             <div class="archives-search-wrap">
-              <input id="archives-search" class="archives-search" type="search" placeholder="검색..." autocomplete="off" />
+              <input id="archives-search" class="archives-search" type="search" data-i18n-ph="scrapbookSearchQueryPh" autocomplete="off" />
             </div>
-            <div id="archives-folder-strip" class="archives-folder-strip"></div>
+            <div id="archives-folder-strip" class="archives-folder-strip customer-hidden"></div>
           </div>
 
           <div id="archives-empty" class="empty-state">
@@ -202,7 +161,6 @@
                 <tr>
                   <th class="archive-table-select" scope="col"></th>
                   <th scope="col" data-i18n="scrapbookArchiveTableTitle">제목</th>
-                  <th scope="col" class="archive-table-folder">폴더</th>
                   <th scope="col" data-i18n="scrapbookArchiveTableDate">수집일자</th>
                   <th scope="col" data-i18n="scrapbookArchiveTableSource">출처</th>
                   <th scope="col" data-i18n="scrapbookArchiveTableTags">태그</th>
@@ -210,12 +168,25 @@
               </thead>
               <tbody id="archives"></tbody>
             </table>
+            <div id="archives-pagination" class="archives-pagination hidden">
+              <div class="archives-pagination-per-page">
+                <select id="archives-per-page-select">
+                  <option value="10">10</option>
+                  <option value="20">20</option>
+                  <option value="50">50</option>
+                  <option value="100">100</option>
+                </select>
+              </div>
+              <div class="archives-pagination-controls">
+                <button id="archives-page-prev" class="archives-pagination-button" type="button" aria-label="Previous page">‹</button>
+                <span id="archives-page-info">1 / 1</span>
+                <button id="archives-page-next" class="archives-pagination-button" type="button" aria-label="Next page">›</button>
+              </div>
+            </div>
           </div>
-
-          <article id="archive-detail" class="panel archive-detail hidden"></article>
         </section>
 
-        <section class="section tab-panel hidden" data-tab-panel="watchlists">
+        <section class="section tab-panel hidden customer-hidden" data-tab-panel="watchlists">
           <div class="section-head">
             <p class="eyebrow" data-i18n="scrapbookWatchlistsEyebrow">Watchlists</p>
             <h2 data-i18n="scrapbookWatchlistsTitle">공개 계정 감시</h2>
@@ -263,7 +234,7 @@
           </div>
         </section>
 
-        <section class="section tab-panel hidden" data-tab-panel="searches">
+        <section class="section tab-panel hidden customer-hidden" data-tab-panel="searches">
           <div class="section-head">
             <p class="eyebrow" data-i18n="scrapbookSearchesEyebrow">Searches</p>
             <h2 data-i18n="scrapbookSearchesTitle">키워드 모니터링</h2>
@@ -309,7 +280,7 @@
           </div>
         </section>
 
-        <section class="section tab-panel hidden" data-tab-panel="insights">
+        <section class="section tab-panel hidden customer-hidden" data-tab-panel="insights">
           <div class="section-head">
             <p class="eyebrow" data-i18n="scrapbookInsightsEyebrow">Insights</p>
             <h2 data-i18n="scrapbookInsightsTitle">내 계정 성과 추적</h2>

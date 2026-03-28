@@ -2180,6 +2180,10 @@ var adminMessageLocales = {
 // src/lib/web-i18n.ts
 var LS_KEY = "web-locale";
 var COOKIE_KEY = "threads-web-locale";
+var EXTENSION_RELEASE_ASSET_NAME = "threads-saver-extension.zip";
+var EXTENSION_RELEASE_DOWNLOAD_URL = `https://github.com/parktaejun-dev/threads-to-obsidian/releases/latest/download/${EXTENSION_RELEASE_ASSET_NAME}`;
+var LEGACY_EXTENSION_REPO_URL = "https://github.com/parktaejun-dev/threads-to-obsidian";
+var LEGACY_EXTENSION_SOURCE_ZIP_URL = `${LEGACY_EXTENSION_REPO_URL}/archive/refs/heads/main.zip`;
 function readLocaleCookie() {
   if (typeof document === "undefined") {
     return null;
@@ -2336,7 +2340,7 @@ var obsidianLandingMessages = {
     productBTag: "Mention bot",
     productBTitle: "Mention Scrapbook",
     productBDesc: "\uBAA8\uBC14\uC77C\uC5D0\uC11C\uB294 \uB313\uAE00 \uBA58\uC158\uC73C\uB85C \uBAA8\uC544\uC11C \uB098\uC911\uC5D0 \uAEBC\uB0B4\uAE30.",
-    productBCta: "scrapbook \uC5F4\uAE30",
+    productBCta: "Scrapbook \uBC14\uB85C\uAC00\uAE30",
     pricingEyebrow: "Pricing",
     pricingTitle: "\uACB0\uC81C\uB294 \uB2E8\uC21C\uD558\uAC8C.",
     pricingCopy: "",
@@ -2446,7 +2450,7 @@ var obsidianLandingMessages = {
     productBTag: "Mention bot",
     productBTitle: "Mention Scrapbook",
     productBDesc: "Use mention replies on mobile, then export later.",
-    productBCta: "Open scrapbook",
+    productBCta: "Go to Scrapbook",
     pricingEyebrow: "Pricing",
     pricingTitle: "Simple billing.",
     pricingCopy: "",
@@ -2564,7 +2568,7 @@ var landingMessages = {
 var obsidianLandingStorefrontCopy = {
   ko: {
     productName: "Threads Saver",
-    headline: "PC\uB294 extension.<br/>\uBAA8\uBC14\uC77C\uC740 mention.",
+    headline: '<span class="headline-row"><span>PC</span><span>extension.</span></span><span class="headline-row"><span>Mobile</span><span>mention.</span></span>',
     subheadline: "\uC9C0\uAE08 \uBCF4\uB294 \uAE00\uC740 Chrome extension\uC73C\uB85C \uC800\uC7A5\uD558\uACE0, \uBAA8\uBC14\uC77C\uC5D0\uC11C\uB294 mention scrapbook\uC73C\uB85C \uBAA8\uC74D\uB2C8\uB2E4.",
     priceLabel: "Threads Saver Pro",
     includedUpdates: "29\uB2EC\uB7EC 1\uD68C \uACB0\uC81C \xB7 Extension Pro + Scrapbook core \xB7 7\uC77C \uD658\uBD88",
@@ -2612,7 +2616,7 @@ var obsidianLandingStorefrontCopy = {
   },
   en: {
     productName: "Threads Saver",
-    headline: "Desktop extension. Mobile mention.",
+    headline: '<span class="headline-row"><span>PC</span><span>extension.</span></span><span class="headline-row"><span>Mobile</span><span>mention.</span></span>',
     subheadline: "Save the current post using the Chrome extension, or collect it later via mention scrapbook on mobile.",
     priceLabel: "Threads Saver Pro",
     includedUpdates: "$29 one-time \xB7 extension Pro + scrapbook core \xB7 7-day refund",
@@ -3236,7 +3240,7 @@ var scrapbookMessages = {
     scrapbookHeroTitle: "\uBA58\uC158\uC73C\uB85C \uBAA8\uC740 Threads\uB97C private scrapbook\uC5D0 \uC800\uC7A5.",
     scrapbookHeroLead: "\uC800\uC7A5\uD558\uACE0 \uC2F6\uC740 \uAE00\uC5D0 {handleStrong} \uC744 \uBA58\uC158\uD558\uBA74, \uC11C\uBE44\uC2A4 \uACC4\uC815\uC740 \uBA58\uC158\uB9CC \uBC1B\uACE0 \uB85C\uADF8\uC778\uC73C\uB85C \uC5F0\uACB0\uD55C \uB0B4 Threads \uACC4\uC815\uC758 scrapbook\uC5D0\uB9CC \uBCF4\uAD00\uB429\uB2C8\uB2E4.",
     scrapbookConnectButton: "Threads\uB85C \uB85C\uADF8\uC778",
-    scrapbookConnectBusy: "Threads\uB85C \uC774\uB3D9 \uC911...",
+    scrapbookConnectBusy: "\uC5F0\uACB0 \uD398\uC774\uC9C0 \uC5EC\uB294 \uC911...",
     scrapbookCopyLoginLink: "\uB85C\uADF8\uC778 \uB9C1\uD06C \uBCF5\uC0AC",
     scrapbookHeroHowItWorks: "\uC791\uB3D9 \uBC29\uC2DD",
     scrapbookMobileOauthNote: "\uBAA8\uBC14\uC77C\uC5D0\uC11C\uB294 \uBE0C\uB77C\uC6B0\uC800\uC6A9 \uC5F0\uACB0 \uD398\uC774\uC9C0\uC5D0\uC11C {copyLoginLinkStrong}\uB97C \uB204\uB978 \uB4A4, \uC0C8 \uD0ED \uC8FC\uC18C\uCC3D\uC5D0 \uBD99\uC5EC\uB123\uB294 \uBC29\uC2DD\uC73C\uB85C \uC9C4\uD589\uD574 \uC8FC\uC138\uC694.",
@@ -3278,6 +3282,7 @@ var scrapbookMessages = {
     scrapbookArchiveTableDate: "\uC218\uC9D1\uC77C\uC790",
     scrapbookArchiveTableSource: "\uCD9C\uCC98",
     scrapbookArchiveTableTags: "\uD0DC\uADF8",
+    scrapbookNoResults: "\uAC80\uC0C9 \uACB0\uACFC\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4.",
     scrapbookWatchlistsEyebrow: "Watchlists",
     scrapbookWatchlistsTitle: "\uACF5\uAC1C \uACC4\uC815 \uAC10\uC2DC",
     scrapbookWatchlistsCopy: "\uACF5\uAC1C Threads \uACC4\uC815\uC744 \uB4F1\uB85D\uD558\uACE0, \uC870\uAC74\uC5D0 \uB9DE\uB294 \uC0C8 \uAE00\uB9CC \uBAA8\uC74D\uB2C8\uB2E4.",
@@ -3439,7 +3444,7 @@ var scrapbookMessages = {
     scrapbookHeroTitle: "Save Threads posts collected by mentions into a private scrapbook.",
     scrapbookHeroLead: "Mention {handleStrong} on a post you want to save. The service account only receives the mention, and the result is stored only in the scrapbook tied to your signed-in Threads account.",
     scrapbookConnectButton: "Continue with Threads",
-    scrapbookConnectBusy: "Opening Threads...",
+    scrapbookConnectBusy: "Opening the sign-in page...",
     scrapbookCopyLoginLink: "Copy sign-in link",
     scrapbookHeroHowItWorks: "How it works",
     scrapbookMobileOauthNote: "On mobile, open the browser-based connect page, tap {copyLoginLinkStrong}, then paste the link into a new tab's address bar.",
@@ -3481,6 +3486,7 @@ var scrapbookMessages = {
     scrapbookArchiveTableDate: "Saved at",
     scrapbookArchiveTableSource: "Source",
     scrapbookArchiveTableTags: "Tags",
+    scrapbookNoResults: "No results found.",
     scrapbookWatchlistsEyebrow: "Watchlists",
     scrapbookWatchlistsTitle: "Track public accounts",
     scrapbookWatchlistsCopy: "Register public Threads accounts and collect only new posts that match your rules.",
@@ -3642,7 +3648,7 @@ var scrapbookMessages = {
     scrapbookHeroTitle: "\u30E1\u30F3\u30B7\u30E7\u30F3\u3067\u96C6\u3081\u305F Threads \u3092\u975E\u516C\u958B\u306E scrapbook \u306B\u4FDD\u5B58\u3002",
     scrapbookHeroLead: "\u4FDD\u5B58\u3057\u305F\u3044\u6295\u7A3F\u306B {handleStrong} \u3092\u30E1\u30F3\u30B7\u30E7\u30F3\u3059\u308B\u3068\u3001\u30B5\u30FC\u30D3\u30B9\u7528\u30A2\u30AB\u30A6\u30F3\u30C8\u306F\u30E1\u30F3\u30B7\u30E7\u30F3\u3060\u3051\u3092\u53D7\u3051\u53D6\u308A\u3001\u30B5\u30A4\u30F3\u30A4\u30F3\u6E08\u307F\u306E Threads \u30A2\u30AB\u30A6\u30F3\u30C8\u306B\u7D10\u3065\u304F scrapbook \u306B\u3060\u3051\u4FDD\u5B58\u3057\u307E\u3059\u3002",
     scrapbookConnectButton: "Threads \u3067\u30ED\u30B0\u30A4\u30F3",
-    scrapbookConnectBusy: "Threads \u3092\u958B\u3044\u3066\u3044\u307E\u3059...",
+    scrapbookConnectBusy: "\u63A5\u7D9A\u30DA\u30FC\u30B8\u3092\u958B\u3044\u3066\u3044\u307E\u3059...",
     scrapbookCopyLoginLink: "\u30ED\u30B0\u30A4\u30F3\u30EA\u30F3\u30AF\u3092\u30B3\u30D4\u30FC",
     scrapbookHeroHowItWorks: "\u4ED5\u7D44\u307F",
     scrapbookMobileOauthNote: "\u30E2\u30D0\u30A4\u30EB\u3067\u306F\u30D6\u30E9\u30A6\u30B6\u7528\u306E\u63A5\u7D9A\u30DA\u30FC\u30B8\u3067 {copyLoginLinkStrong} \u3092\u62BC\u3057\u3001\u305D\u306E\u30EA\u30F3\u30AF\u3092\u65B0\u3057\u3044\u30BF\u30D6\u306E\u30A2\u30C9\u30EC\u30B9\u30D0\u30FC\u306B\u8CBC\u308A\u4ED8\u3051\u3066\u9032\u3081\u3066\u304F\u3060\u3055\u3044\u3002",
@@ -3684,6 +3690,7 @@ var scrapbookMessages = {
     scrapbookArchiveTableDate: "\u4FDD\u5B58\u65E5\u6642",
     scrapbookArchiveTableSource: "\u30BD\u30FC\u30B9",
     scrapbookArchiveTableTags: "\u30BF\u30B0",
+    scrapbookNoResults: "\u4E00\u81F4\u3059\u308B\u7D50\u679C\u306F\u3042\u308A\u307E\u305B\u3093\u3002",
     scrapbookWatchlistsEyebrow: "Watchlists",
     scrapbookWatchlistsTitle: "\u516C\u958B\u30A2\u30AB\u30A6\u30F3\u30C8\u3092\u76E3\u8996",
     scrapbookWatchlistsCopy: "\u516C\u958B Threads \u30A2\u30AB\u30A6\u30F3\u30C8\u3092\u767B\u9332\u3057\u3001\u6761\u4EF6\u306B\u5408\u3046\u65B0\u898F\u6295\u7A3F\u3060\u3051\u3092\u96C6\u3081\u307E\u3059\u3002",
@@ -3845,7 +3852,7 @@ var scrapbookMessages = {
     scrapbookHeroTitle: "Salve no scrapbook privado os Threads coletados por men\xE7\xF5es.",
     scrapbookHeroLead: "Mencione {handleStrong} no post que deseja salvar. A conta do servi\xE7o recebe apenas a men\xE7\xE3o, e o resultado \xE9 guardado somente no scrapbook ligado \xE0 sua conta do Threads conectada.",
     scrapbookConnectButton: "Entrar com Threads",
-    scrapbookConnectBusy: "Abrindo o Threads...",
+    scrapbookConnectBusy: "Abrindo a p\xE1gina de conex\xE3o...",
     scrapbookCopyLoginLink: "Copiar link de login",
     scrapbookHeroHowItWorks: "Como funciona",
     scrapbookMobileOauthNote: "No celular, abra a p\xE1gina de conex\xE3o no navegador, toque em {copyLoginLinkStrong} e depois cole o link na barra de endere\xE7o de uma nova aba.",
@@ -3887,6 +3894,7 @@ var scrapbookMessages = {
     scrapbookArchiveTableDate: "Salvo em",
     scrapbookArchiveTableSource: "Origem",
     scrapbookArchiveTableTags: "Tags",
+    scrapbookNoResults: "Nenhum resultado encontrado.",
     scrapbookWatchlistsEyebrow: "Listas de monitoramento",
     scrapbookWatchlistsTitle: "Monitorar contas p\xFAblicas",
     scrapbookWatchlistsCopy: "Cadastre contas p\xFAblicas do Threads e colete apenas os novos posts que combinarem com suas regras.",
@@ -4048,7 +4056,7 @@ var scrapbookMessages = {
     scrapbookHeroTitle: "Guarda en un scrapbook privado los Threads recogidos por menciones.",
     scrapbookHeroLead: "Menciona {handleStrong} en la publicaci\xF3n que quieras guardar. La cuenta del servicio solo recibe la menci\xF3n y el resultado se almacena \xFAnicamente en el scrapbook vinculado a tu cuenta de Threads conectada.",
     scrapbookConnectButton: "Iniciar sesi\xF3n con Threads",
-    scrapbookConnectBusy: "Abriendo Threads...",
+    scrapbookConnectBusy: "Abriendo la p\xE1gina de acceso...",
     scrapbookCopyLoginLink: "Copiar enlace de acceso",
     scrapbookHeroHowItWorks: "C\xF3mo funciona",
     scrapbookMobileOauthNote: "En m\xF3vil, abre la p\xE1gina de conexi\xF3n en el navegador, pulsa {copyLoginLinkStrong} y luego pega el enlace en la barra de direcciones de una nueva pesta\xF1a.",
@@ -4090,6 +4098,7 @@ var scrapbookMessages = {
     scrapbookArchiveTableDate: "Guardado el",
     scrapbookArchiveTableSource: "Origen",
     scrapbookArchiveTableTags: "Etiquetas",
+    scrapbookNoResults: "No se encontraron resultados.",
     scrapbookWatchlistsEyebrow: "Listas de seguimiento",
     scrapbookWatchlistsTitle: "Vigilar cuentas p\xFAblicas",
     scrapbookWatchlistsCopy: "Registra cuentas p\xFAblicas de Threads y recopila solo las nuevas publicaciones que coincidan con tus reglas.",
@@ -4251,7 +4260,7 @@ var scrapbookMessages = {
     scrapbookHeroTitle: "\u628A\u900F\u904E\u63D0\u53CA\u6536\u96C6\u7684 Threads \u5B58\u9032\u79C1\u5BC6 scrapbook\u3002",
     scrapbookHeroLead: "\u5728\u60F3\u4FDD\u5B58\u7684\u8CBC\u6587\u4E2D\u63D0\u53CA {handleStrong}\u3002\u670D\u52D9\u5E33\u865F\u53EA\u6703\u6536\u5230\u63D0\u53CA\u8A0A\u865F\uFF0C\u5167\u5BB9\u53EA\u6703\u5B58\u9032\u8207\u4F60\u767B\u5165 Threads \u5E33\u865F\u7D81\u5B9A\u7684 scrapbook\u3002",
     scrapbookConnectButton: "\u4F7F\u7528 Threads \u767B\u5165",
-    scrapbookConnectBusy: "\u6B63\u5728\u958B\u555F Threads...",
+    scrapbookConnectBusy: "\u6B63\u5728\u958B\u555F\u767B\u5165\u9801\u9762...",
     scrapbookCopyLoginLink: "\u8907\u88FD\u767B\u5165\u9023\u7D50",
     scrapbookHeroHowItWorks: "\u904B\u4F5C\u65B9\u5F0F",
     scrapbookMobileOauthNote: "\u5728\u624B\u6A5F\u4E0A\uFF0C\u8ACB\u5148\u958B\u555F\u700F\u89BD\u5668\u7248\u9023\u7DDA\u9801\u9762\uFF0C\u6309\u4E0B {copyLoginLinkStrong}\uFF0C\u518D\u628A\u9023\u7D50\u8CBC\u5230\u65B0\u5206\u9801\u7684\u7DB2\u5740\u5217\u4E2D\u7E7C\u7E8C\u3002",
@@ -4293,6 +4302,7 @@ var scrapbookMessages = {
     scrapbookArchiveTableDate: "\u4FDD\u5B58\u6642\u9593",
     scrapbookArchiveTableSource: "\u4F86\u6E90",
     scrapbookArchiveTableTags: "\u6A19\u7C64",
+    scrapbookNoResults: "\u6C92\u6709\u7B26\u5408\u7684\u7D50\u679C\u3002",
     scrapbookWatchlistsEyebrow: "\u76E3\u770B\u6E05\u55AE",
     scrapbookWatchlistsTitle: "\u8FFD\u8E64\u516C\u958B\u5E33\u865F",
     scrapbookWatchlistsCopy: "\u8A3B\u518A\u516C\u958B Threads \u5E33\u865F\uFF0C\u53EA\u6536\u96C6\u7B26\u5408\u898F\u5247\u7684\u65B0\u8CBC\u6587\u3002",
@@ -4454,7 +4464,7 @@ var scrapbookMessages = {
     scrapbookHeroTitle: "L\u01B0u c\xE1c b\xE0i Threads \u0111\u01B0\u1EE3c gom b\u1EB1ng mention v\xE0o scrapbook ri\xEAng t\u01B0.",
     scrapbookHeroLead: "H\xE3y mention {handleStrong} trong b\xE0i b\u1EA1n mu\u1ED1n l\u01B0u. T\xE0i kho\u1EA3n d\u1ECBch v\u1EE5 ch\u1EC9 nh\u1EADn t\xEDn hi\u1EC7u mention, c\xF2n n\u1ED9i dung ch\u1EC9 \u0111\u01B0\u1EE3c l\u01B0u v\xE0o scrapbook g\u1EAFn v\u1EDBi t\xE0i kho\u1EA3n Threads b\u1EA1n \u0111\xE3 \u0111\u0103ng nh\u1EADp.",
     scrapbookConnectButton: "\u0110\u0103ng nh\u1EADp b\u1EB1ng Threads",
-    scrapbookConnectBusy: "\u0110ang m\u1EDF Threads...",
+    scrapbookConnectBusy: "\u0110ang m\u1EDF trang \u0111\u0103ng nh\u1EADp...",
     scrapbookCopyLoginLink: "Sao ch\xE9p li\xEAn k\u1EBFt \u0111\u0103ng nh\u1EADp",
     scrapbookHeroHowItWorks: "C\xE1ch ho\u1EA1t \u0111\u1ED9ng",
     scrapbookMobileOauthNote: "Tr\xEAn di \u0111\u1ED9ng, h\xE3y m\u1EDF trang k\u1EBFt n\u1ED1i b\u1EB1ng tr\xECnh duy\u1EC7t, b\u1EA5m {copyLoginLinkStrong}, r\u1ED3i d\xE1n li\xEAn k\u1EBFt v\xE0o thanh \u0111\u1ECBa ch\u1EC9 c\u1EE7a tab m\u1EDBi \u0111\u1EC3 ti\u1EBFp t\u1EE5c.",
@@ -4496,6 +4506,7 @@ var scrapbookMessages = {
     scrapbookArchiveTableDate: "Th\u1EDDi \u0111i\u1EC3m l\u01B0u",
     scrapbookArchiveTableSource: "Ngu\u1ED3n",
     scrapbookArchiveTableTags: "Th\u1EBB",
+    scrapbookNoResults: "Kh\xF4ng c\xF3 k\u1EBFt qu\u1EA3 ph\xF9 h\u1EE3p.",
     scrapbookWatchlistsEyebrow: "Danh s\xE1ch theo d\xF5i",
     scrapbookWatchlistsTitle: "Theo d\xF5i t\xE0i kho\u1EA3n c\xF4ng khai",
     scrapbookWatchlistsCopy: "\u0110\u0103ng k\xFD t\xE0i kho\u1EA3n Threads c\xF4ng khai v\xE0 ch\u1EC9 thu c\xE1c b\xE0i m\u1EDBi kh\u1EDBp v\u1EDBi \u0111i\u1EC1u ki\u1EC7n c\u1EE7a b\u1EA1n.",
@@ -4712,7 +4723,13 @@ var avatarFallback = document.querySelector("#profile-avatar-fallback");
 var archivesEl = document.querySelector("#archives");
 var archivesBoard = document.querySelector("#archives-board");
 var archivesEmptyEl = document.querySelector("#archives-empty");
-var archiveDetailEl = document.querySelector("#archive-detail");
+var archivesPaginationEl = document.querySelector("#archives-pagination");
+var archivesPerPageSelect = document.querySelector("#archives-per-page-select");
+var archivesPagePrev = document.querySelector("#archives-page-prev");
+var archivesPageNext = document.querySelector("#archives-page-next");
+var archivesPageInfo = document.querySelector("#archives-page-info");
+var archivesPage = 1;
+var archivesPerPage = 10;
 var archivesToolbar = document.querySelector("#archives-toolbar");
 var archivesToolbarMeta = document.querySelector("#archives-toolbar-meta");
 var archivesSelectAll = document.querySelector("#archives-select-all");
@@ -5204,16 +5221,20 @@ function filterArchives(items) {
   }
   if (archiveSearchQuery.trim()) {
     const query = archiveSearchQuery.trim().toLowerCase();
+    const activeBotHandle = (latestConfig?.botHandle || latestState?.botHandle || "").toLowerCase();
     filtered = filtered.filter((item) => {
       const searchable = [
         item.targetText,
         item.targetAuthorHandle ?? "",
         item.targetAuthorDisplayName ?? "",
         item.noteText ?? "",
+        item.targetUrl,
         ...item.tags,
+        item.mentionUrl ?? "",
         item.mentionAuthorHandle ?? "",
         item.mentionAuthorDisplayName ?? "",
-        ...item.authorReplies.map((r) => r.text)
+        ...item.authorReplies.map((r) => r.text),
+        activeBotHandle
       ].join(" ").toLowerCase();
       return searchable.includes(query);
     });
@@ -5470,122 +5491,93 @@ async function exportArchivesZip(archiveIds) {
     }
   }
 }
-function renderArchiveDetail(item) {
-  if (!archiveDetailEl) {
-    return;
-  }
-  if (!item) {
-    archiveDetailEl.innerHTML = "";
-    archiveDetailEl.classList.add("hidden");
-    return;
-  }
+function renderArchiveDetailHtml(item) {
   const tagsLabel = buildArchiveTagsLabel(item);
   const totalMediaCount = countArchiveMedia(item);
   const hasMedia = totalMediaCount > 0;
   const showMedia = expandedMediaArchiveIds.has(item.id);
   const triggerLink = item.mentionUrl ? `<a class="topbar-link archive-action-link" href="${escapeHtml(item.mentionUrl)}" target="_blank" rel="noreferrer">${escapeHtml(t("scrapbookTriggerView"))}</a>` : "";
-  archiveDetailEl.classList.remove("hidden");
-  archiveDetailEl.innerHTML = `
-    <div class="archive-detail-head">
-      <div>
-        <h3>${escapeHtml(buildArchiveTitle(item))}</h3>
-        <div class="archive-detail-meta">
-          <span class="archive-chip">${escapeHtml(formatDate(item.archivedAt))}</span>
-          ${buildArchiveSource(item) ? `<span class="archive-chip">${escapeHtml(buildArchiveSource(item))}</span>` : ""}
-          ${tagsLabel ? `<span class="archive-chip">${escapeHtml(tagsLabel)}</span>` : ""}
+  return `
+    <div class="archive-detail-inline">
+      <div class="archive-detail-head">
+        <div>
+          <h3>${escapeHtml(buildArchiveTitle(item))}</h3>
+          <div class="archive-detail-meta">
+            <span class="archive-chip">${escapeHtml(formatDate(item.archivedAt))}</span>
+            ${buildArchiveSource(item) ? `<span class="archive-chip">${escapeHtml(buildArchiveSource(item))}</span>` : ""}
+            ${tagsLabel ? `<span class="archive-chip">${escapeHtml(tagsLabel)}</span>` : ""}
+          </div>
         </div>
       </div>
-    </div>
-    <p class="archive-detail-body">${escapeHtml(item.targetText)}</p>
-    ${hasMedia ? `<button class="secondary-cta archive-media-toggle" type="button" data-media-toggle="${item.id}">${escapeHtml(
+      <div class="archive-detail-body">${escapeHtml(item.targetText)}</div>
+      ${hasMedia ? `<button class="secondary-cta archive-media-toggle" type="button" data-media-toggle="${item.id}">${escapeHtml(
     showMedia ? t("scrapbookImagesHide") : t("scrapbookImagesShow", { count: totalMediaCount })
   )}</button>` : ""}
-    ${hasMedia && showMedia && item.mediaUrls.length > 0 ? renderMediaPreviewUrls(item.mediaUrls) : ""}
-    ${renderReplyBlocks(item, showMedia)}
-    <div class="archive-actions">
-      <a class="secondary-cta archive-action-link" href="${escapeHtml(item.targetUrl)}" target="_blank" rel="noreferrer">${escapeHtml(t("scrapbookOpenOriginal"))}</a>
-      ${triggerLink}
-      <button class="topbar-link archive-copy" type="button" data-copy="${item.id}">${escapeHtml(t("scrapbookCopyMarkdown"))}</button>
-      <a class="topbar-link archive-action-link" href="/api/public/bot/archive/${encodeURIComponent(item.id)}.md">${escapeHtml(t("scrapbookDownloadMarkdown"))}</a>
-      <a class="topbar-link archive-action-link" href="/api/public/bot/archive/${encodeURIComponent(item.id)}.zip">${escapeHtml(t("scrapbookDownloadZip"))}</a>
-      <button class="topbar-link archive-action-link" type="button" data-archive-delete="${item.id}">${escapeHtml(t("scrapbookDelete"))}</button>
+      ${hasMedia && showMedia && item.mediaUrls.length > 0 ? renderMediaPreviewUrls(item.mediaUrls) : ""}
+      ${renderReplyBlocks(item, showMedia)}
+      <div class="archive-actions">
+        <a class="secondary-cta archive-action-link" href="${escapeHtml(item.targetUrl)}" target="_blank" rel="noreferrer">${escapeHtml(t("scrapbookOpenOriginal"))}</a>
+        ${triggerLink}
+        <button class="topbar-link archive-copy" type="button" data-copy="${item.id}">${escapeHtml(t("scrapbookCopyMarkdown"))}</button>
+        <a class="topbar-link archive-action-link" href="/api/public/bot/archive/${encodeURIComponent(item.id)}.md">${escapeHtml(t("scrapbookDownloadMarkdown"))}</a>
+        <a class="topbar-link archive-action-link" href="/api/public/bot/archive/${encodeURIComponent(item.id)}.zip">${escapeHtml(t("scrapbookDownloadZip"))}</a>
+        <button class="topbar-link archive-action-link" type="button" data-archive-delete="${item.id}">${escapeHtml(t("scrapbookDelete"))}</button>
+      </div>
     </div>
   `;
-  const copyButton = archiveDetailEl.querySelector("[data-copy]");
-  if (copyButton) {
-    copyButton.addEventListener("click", () => void copyArchiveMarkdown(item, copyButton));
-  }
-  const mediaToggle = archiveDetailEl.querySelector("[data-media-toggle]");
-  if (mediaToggle) {
-    mediaToggle.addEventListener("click", () => {
-      if (expandedMediaArchiveIds.has(item.id)) {
-        expandedMediaArchiveIds.delete(item.id);
-      } else {
-        expandedMediaArchiveIds.add(item.id);
-      }
-      renderArchiveDetail(item);
-    });
-  }
-  const archiveDeleteButton = archiveDetailEl.querySelector("[data-archive-delete]");
-  if (archiveDeleteButton) {
-    archiveDeleteButton.addEventListener("click", () => void deleteArchiveRequest(item.id));
-  }
 }
 function renderArchives(items, isAuthenticated) {
   if (!archivesEl || !archivesEmptyEl || !archivesBoard) {
     return;
   }
-  if (!isAuthenticated) {
+  if (!isAuthenticated || items.length === 0) {
     archivesEl.innerHTML = "";
     archivesBoard.classList.add("hidden");
     archivesEmptyEl.classList.remove("hidden");
-    archivesEmptyEl.innerHTML = `<strong>${escapeHtml(t("scrapbookArchiveLoginTitle"))}</strong><span>${escapeHtml(t("scrapbookArchiveLoginRequiredCopy"))}</span>`;
+    archivesEmptyEl.innerHTML = !isAuthenticated ? `<strong>${escapeHtml(t("scrapbookArchiveLoginTitle"))}</strong><span>${escapeHtml(t("scrapbookArchiveLoginRequiredCopy"))}</span>` : `<strong>${escapeHtml(t("scrapbookArchiveEmptyTitle"))}</strong><span>${escapeHtml(t("scrapbookArchiveEmptyCopy"))}</span>`;
     activeArchiveId = null;
-    updateArchivesToolbar([], false);
-    renderArchiveDetail(null);
-    archivesFilterBar?.classList.add("hidden");
-    return;
-  }
-  if (items.length === 0) {
-    archivesEl.innerHTML = "";
-    archivesBoard.classList.add("hidden");
-    archivesEmptyEl.classList.remove("hidden");
-    archivesEmptyEl.innerHTML = `<strong>${escapeHtml(t("scrapbookArchiveEmptyTitle"))}</strong><span>${escapeHtml(t("scrapbookArchiveEmptyCopy"))}</span>`;
-    activeArchiveId = null;
-    updateArchivesToolbar([], true);
-    renderArchiveDetail(null);
-    archivesFilterBar?.classList.add("hidden");
+    archivesPaginationEl?.classList.add("hidden");
+    updateArchivesToolbar([], isAuthenticated);
+    archivesFilterBar?.classList.toggle("hidden", true);
     return;
   }
   archivesFilterBar?.classList.remove("hidden");
-  renderFolderStrip(items);
-  const filtered = filterArchives(items);
+  const ordered = [...items].sort((left, right) => {
+    const archivedDelta = Date.parse(right.archivedAt) - Date.parse(left.archivedAt);
+    if (archivedDelta !== 0) {
+      return archivedDelta;
+    }
+    return Date.parse(right.updatedAt) - Date.parse(left.updatedAt);
+  });
+  renderFolderStrip(ordered);
+  const filtered = filterArchives(ordered);
   syncSelectedArchiveIds(filtered);
   if (!filtered.some((item) => item.id === activeArchiveId)) {
-    activeArchiveId = filtered[0]?.id ?? null;
+    activeArchiveId = null;
   }
   archivesEmptyEl.classList.add("hidden");
   archivesBoard.classList.remove("hidden");
   if (filtered.length === 0) {
-    const noResultLabel = currentLocale === "ko" ? "\uAC80\uC0C9 \uACB0\uACFC\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4" : "No results found";
-    archivesEl.innerHTML = `<tr><td colspan="6" class="archive-no-results">${escapeHtml(noResultLabel)}</td></tr>`;
+    archivesEl.innerHTML = `<tr><td colspan="5" class="archive-no-results">${escapeHtml(t("scrapbookNoResults"))}</td></tr>`;
+    archivesPaginationEl?.classList.add("hidden");
     updateArchivesToolbar(filtered, isAuthenticated);
-    renderArchiveDetail(null);
     return;
   }
-  const folderMap = loadFolderMap();
-  const folders = loadFolders();
-  const folderNameMap = {};
-  for (const f of folders) {
-    folderNameMap[f.id] = f.name;
-  }
-  archivesEl.innerHTML = filtered.map((item) => {
+  const totalPages = Math.max(1, Math.ceil(filtered.length / archivesPerPage));
+  if (archivesPage > totalPages) archivesPage = totalPages;
+  if (archivesPaginationEl) archivesPaginationEl.classList.remove("hidden");
+  if (archivesPageInfo) archivesPageInfo.textContent = `${archivesPage} / ${totalPages}`;
+  if (archivesPagePrev) archivesPagePrev.disabled = archivesPage <= 1;
+  if (archivesPageNext) archivesPageNext.disabled = archivesPage >= totalPages;
+  const startIndex = (archivesPage - 1) * archivesPerPage;
+  const paginated = filtered.slice(startIndex, startIndex + archivesPerPage);
+  let html = "";
+  for (const item of paginated) {
     const isSelected = selectedArchiveIds.has(item.id);
     const isActive = activeArchiveId === item.id;
     const source = buildArchiveSource(item);
     const tagsLabel = buildArchiveTagsLabel(item);
-    const folderName = folderMap[item.id] ? folderNameMap[folderMap[item.id]] || "" : "";
-    return `
+    html += `
         <tr class="${isActive ? "is-active" : ""}" data-open="${item.id}">
           <td class="archive-table-select">
             <label class="archive-row-checkbox">
@@ -5595,13 +5587,16 @@ function renderArchives(items, isAuthenticated) {
           <td>
             <button class="archive-row-title" type="button" data-open="${item.id}">${escapeHtml(buildArchiveTitle(item))}</button>
           </td>
-          <td class="archive-row-folder">${folderName ? `<span class="archive-folder-badge">${escapeHtml(folderName)}</span>` : ""}</td>
           <td class="archive-row-date">${escapeHtml(formatDate(item.archivedAt))}</td>
           <td class="archive-row-source">${escapeHtml(source)}</td>
           <td class="archive-row-tags">${escapeHtml(tagsLabel)}</td>
         </tr>
       `;
-  }).join("");
+    if (isActive) {
+      html += `<tr class="archive-row-detail"><td colspan="5">${renderArchiveDetailHtml(item)}</td></tr>`;
+    }
+  }
+  archivesEl.innerHTML = html;
   for (const input of archivesEl.querySelectorAll("[data-select]")) {
     input.addEventListener("change", () => {
       const archiveId = input.dataset.select;
@@ -5625,12 +5620,37 @@ function renderArchives(items, isAuthenticated) {
       if (event.target instanceof HTMLInputElement) {
         return;
       }
-      activeArchiveId = archiveId;
+      if (activeArchiveId === archiveId) {
+        activeArchiveId = null;
+      } else {
+        activeArchiveId = archiveId;
+      }
       renderArchives(items, isAuthenticated);
     });
   }
+  const detailItem = paginated.find((item) => item.id === activeArchiveId);
+  if (detailItem) {
+    const copyButton = archivesEl.querySelector("[data-copy]");
+    if (copyButton) {
+      copyButton.addEventListener("click", () => void copyArchiveMarkdown(detailItem, copyButton));
+    }
+    const mediaToggle = archivesEl.querySelector("[data-media-toggle]");
+    if (mediaToggle) {
+      mediaToggle.addEventListener("click", () => {
+        if (expandedMediaArchiveIds.has(detailItem.id)) {
+          expandedMediaArchiveIds.delete(detailItem.id);
+        } else {
+          expandedMediaArchiveIds.add(detailItem.id);
+        }
+        renderArchives(items, isAuthenticated);
+      });
+    }
+    const archiveDeleteButton = archivesEl.querySelector("[data-archive-delete]");
+    if (archiveDeleteButton) {
+      archiveDeleteButton.addEventListener("click", () => void deleteArchiveRequest(detailItem.id));
+    }
+  }
   updateArchivesToolbar(filtered, isAuthenticated);
-  renderArchiveDetail(filtered.find((item) => item.id === activeArchiveId) ?? null);
 }
 function renderUser(user) {
   if (!user) {
@@ -6332,3 +6352,24 @@ void (async () => {
     renderConnectButtons();
   }
 })();
+archivesPerPageSelect?.addEventListener("change", () => {
+  archivesPerPage = parseInt(archivesPerPageSelect.value, 10);
+  archivesPage = 1;
+  if (latestState) {
+    renderArchives(latestState.archives, latestState.authenticated && Boolean(latestState.user));
+  }
+});
+archivesPagePrev?.addEventListener("click", () => {
+  if (archivesPage > 1) {
+    archivesPage--;
+    if (latestState) {
+      renderArchives(latestState.archives, latestState.authenticated && Boolean(latestState.user));
+    }
+  }
+});
+archivesPageNext?.addEventListener("click", () => {
+  archivesPage++;
+  if (latestState) {
+    renderArchives(latestState.archives, latestState.authenticated && Boolean(latestState.user));
+  }
+});

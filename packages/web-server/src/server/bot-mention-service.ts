@@ -5,24 +5,50 @@ import { extractPostFromDocument } from "@threads/shared/extractor";
 import type { ExtractedPost } from "@threads/shared/types";
 import type {
   BotMentionCollectorStatus,
+  BotMentionJobRecord,
   BotMentionSyncSummary,
   RuntimeCollectorConfig,
   WebDatabase
 } from "@threads/web-schema";
-import type { BotIngestPayload } from "./bot-service";
+import type { BotIngestPayload, BotIngestResult } from "./bot-service";
 import {
+  getFreshAccessTokenForUserRecord,
   getBotAccessTokenForThreadsUserId,
   getBotAccessTokenForHandle,
   getConfiguredBotHandle,
-  ingestBotMention
+  ingestBotMention,
+  materializeBotMentionArchive
 } from "./bot-service";
 import { getRuntimeConfigSnapshot } from "./runtime-config";
+import {
+  claimBotMentionJobs as claimStoredBotMentionJobs,
+  enqueueBotMentionJobs as enqueueStoredBotMentionJobs,
+  findBotArchiveByMention,
+  findBotUserByHandle,
+  findBotUserByThreadsUserId,
+  finalizeBotMentionJob as finalizeStoredBotMentionJob,
+  loadBotMentionReadState,
+  loadBotMentionJobs,
+  pruneBotMentionJobs,
+  saveBotArchiveRecord,
+  saveBotUserRecord,
+  upsertBotMentionJob
+} from "./store";
 
 const THREADS_GRAPH_BASE_URL = "https://graph.threads.net";
 const DEFAULT_POLL_INTERVAL_MS = 60_000;
 const DEFAULT_FETCH_LIMIT = 25;
 const DEFAULT_MAX_PAGES = 5;
 const MAX_FETCH_LIMIT = 100;
+const DEFAULT_PROCESSING_CONCURRENCY = 4;
+const MAX_PROCESSING_CONCURRENCY = 32;
+const DEFAULT_WORKER_INTERVAL_MS = 1_000;
+const DEFAULT_JOB_BATCH_SIZE = 25;
+const MAX_JOB_BATCH_SIZE = 100;
+const DEFAULT_JOB_LEASE_MS = 2 * 60_000;
+const DEFAULT_JOB_RETRY_BASE_MS = 15_000;
+const MAX_JOB_RETRY_DELAY_MS = 15 * 60_000;
+const DEFAULT_JOB_RETENTION_MS = 7 * 24 * 60 * 60_000;
 
 const THREAD_FIELDS = [
   "id",
@@ -47,6 +73,11 @@ const THREAD_DETAIL_FIELDS = [...THREAD_FIELDS, ...THREAD_RELATION_FIELDS];
 type LoggerLike = Pick<Console, "error" | "info">;
 
 type DatabaseRunner = <T>(operation: (data: WebDatabase) => Promise<T> | T) => Promise<T>;
+type DatabaseLoader = () => Promise<WebDatabase>;
+type ThreadsAccessTokenResolver = (
+  rawThreadsUserId: string | null | undefined,
+  rawHandle: string | null | undefined
+) => Promise<string | null>;
 
 interface ThreadsPaging {
   cursors?: {
@@ -66,6 +97,23 @@ interface ThreadsListResponse {
 type ThreadsNode = Record<string, unknown>;
 
 type MentionCollectorConfig = RuntimeCollectorConfig;
+
+interface MentionSyncReadState {
+  activeUserIds: Set<string>;
+  activeUserHandles: Set<string>;
+  knownMentionIds: Set<string>;
+}
+
+type MentionPreparationResult =
+  | { kind: "invalid" }
+  | { kind: "unmatched" }
+  | { kind: "payload"; payload: BotIngestPayload };
+
+type MentionProcessResult =
+  | { kind: "invalid" }
+  | { kind: "unmatched" }
+  | { kind: "failed"; error: unknown }
+  | { kind: "ingested"; ingest: BotIngestResult };
 
 export interface BotMentionCollector {
   start: () => void;
@@ -109,6 +157,26 @@ function normalizeHandle(value: string | null | undefined): string {
 
 function safeText(value: string | null | undefined): string {
   return (value ?? "").trim();
+}
+
+function createSummary(
+  mode: string,
+  overrides: Partial<BotMentionSyncSummary>
+): BotMentionSyncSummary {
+  return {
+    ok: true,
+    reason: null,
+    mode,
+    fetchedPages: 0,
+    fetchedMentions: 0,
+    processedMentions: 0,
+    createdArchives: 0,
+    updatedArchives: 0,
+    unmatchedMentions: 0,
+    skippedExisting: 0,
+    skippedInvalid: 0,
+    ...overrides
+  };
 }
 
 function toCollectorStatusError(error: unknown): string {
@@ -253,6 +321,330 @@ function readCollectorConfig(): MentionCollectorConfig {
     fetchLimit: parsePositiveInt(runtime.fetchLimit, DEFAULT_FETCH_LIMIT, 1, MAX_FETCH_LIMIT),
     maxPages: parsePositiveInt(runtime.maxPages, DEFAULT_MAX_PAGES, 1, 20)
   };
+}
+
+function readProcessingConcurrency(): number {
+  return parsePositiveIntEnv(
+    "THREADS_BOT_MENTION_PROCESSING_CONCURRENCY",
+    DEFAULT_PROCESSING_CONCURRENCY,
+    1,
+    MAX_PROCESSING_CONCURRENCY
+  );
+}
+
+function readWorkerIntervalMs(): number {
+  return parsePositiveIntEnv(
+    "THREADS_BOT_MENTION_WORKER_INTERVAL_MS",
+    DEFAULT_WORKER_INTERVAL_MS,
+    250,
+    60_000
+  );
+}
+
+function useExternalizedMentionJobs(): boolean {
+  const database = getRuntimeConfigSnapshot().database;
+  return database.backend === "postgres" && Boolean(database.postgresUrl.trim());
+}
+
+function readJobBatchSize(): number {
+  return parsePositiveIntEnv(
+    "THREADS_BOT_MENTION_JOB_BATCH_SIZE",
+    DEFAULT_JOB_BATCH_SIZE,
+    1,
+    MAX_JOB_BATCH_SIZE
+  );
+}
+
+function readJobLeaseMs(): number {
+  return parsePositiveIntEnv(
+    "THREADS_BOT_MENTION_JOB_LEASE_MS",
+    DEFAULT_JOB_LEASE_MS,
+    5_000,
+    15 * 60_000
+  );
+}
+
+function safeTime(value: string | null | undefined, fallback = 0): number {
+  if (!value) {
+    return fallback;
+  }
+
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function safeJsonStringify(value: unknown): string | null {
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return null;
+  }
+}
+
+function parseMentionSummaryJobPayload(job: BotMentionJobRecord): ThreadsNode | null {
+  if (job.rawSummaryJson) {
+    try {
+      return toRecord(JSON.parse(job.rawSummaryJson));
+    } catch {
+      // Ignore malformed stored payloads and fall back to the lightweight fields below.
+    }
+  }
+
+  return toRecord({
+    id: job.mentionId,
+    permalink: job.mentionUrl,
+    username: job.mentionAuthorHandle,
+    text: job.mentionText,
+    timestamp: job.mentionPublishedAt
+  });
+}
+
+function buildMentionJobRecord(mentionSummary: ThreadsNode, now: string): BotMentionJobRecord | null {
+  const mentionId = safeText(readNestedString(mentionSummary, ["id"]) || "");
+  if (!mentionId) {
+    return null;
+  }
+
+  return {
+    id: mentionId,
+    mentionId,
+    mentionUrl: buildThreadPermalink(mentionSummary),
+    mentionAuthorHandle: extractThreadHandle(mentionSummary),
+    mentionAuthorUserId: extractThreadUserId(mentionSummary),
+    mentionText: safeText(extractThreadText(mentionSummary) || "") || null,
+    mentionPublishedAt: extractThreadTimestamp(mentionSummary),
+    rawSummaryJson: safeJsonStringify(mentionSummary),
+    attempts: 0,
+    status: "queued",
+    lastError: null,
+    availableAt: now,
+    leasedAt: null,
+    processedAt: null,
+    createdAt: now,
+    updatedAt: now
+  };
+}
+
+function pruneMentionJobs(data: WebDatabase, now: string): void {
+  const cutoff = safeTime(now) - DEFAULT_JOB_RETENTION_MS;
+  if (!Number.isFinite(cutoff)) {
+    return;
+  }
+
+  data.botMentionJobs = data.botMentionJobs.filter((job) => {
+    if (job.status === "queued" || job.status === "processing" || job.status === "failed") {
+      return true;
+    }
+
+    return safeTime(job.updatedAt, 0) >= cutoff;
+  });
+}
+
+function enqueueMentionJobs(
+  data: WebDatabase,
+  mentionSummaries: ThreadsNode[],
+  now: string,
+  forceRequeue: boolean
+): { enqueued: number; invalid: number } {
+  let enqueued = 0;
+  let invalid = 0;
+  for (const mentionSummary of mentionSummaries) {
+    const job = buildMentionJobRecord(mentionSummary, now);
+    if (!job) {
+      invalid += 1;
+      continue;
+    }
+
+    const existingJob = data.botMentionJobs.find((candidate) => candidate.mentionId === job.mentionId);
+    const existingArchive = data.botArchives.some((candidate) => safeText(candidate.mentionId) === job.mentionId);
+    if (!forceRequeue && (existingJob || existingArchive)) {
+      continue;
+    }
+
+    if (existingJob) {
+      existingJob.mentionUrl = job.mentionUrl;
+      existingJob.mentionAuthorHandle = job.mentionAuthorHandle;
+      existingJob.mentionAuthorUserId = job.mentionAuthorUserId;
+      existingJob.mentionText = job.mentionText;
+      existingJob.mentionPublishedAt = job.mentionPublishedAt;
+      existingJob.rawSummaryJson = job.rawSummaryJson;
+      existingJob.status = "queued";
+      existingJob.lastError = null;
+      existingJob.availableAt = now;
+      existingJob.leasedAt = null;
+      existingJob.processedAt = null;
+      existingJob.updatedAt = now;
+      upsertBotMentionJob(data, existingJob);
+      enqueued += 1;
+      continue;
+    }
+
+    upsertBotMentionJob(data, job);
+    enqueued += 1;
+  }
+
+  pruneMentionJobs(data, now);
+  return { enqueued, invalid };
+}
+
+function isClaimableJob(job: BotMentionJobRecord, now: number, leaseMs: number): boolean {
+  if (safeTime(job.availableAt, 0) > now) {
+    return false;
+  }
+
+  if (job.status === "queued" || job.status === "failed") {
+    return true;
+  }
+
+  if (job.status !== "processing") {
+    return false;
+  }
+
+  return safeTime(job.leasedAt, 0) + leaseMs <= now;
+}
+
+function claimMentionJobs(
+  data: WebDatabase,
+  now: string,
+  batchSize: number,
+  leaseMs: number
+): BotMentionJobRecord[] {
+  const nowMs = safeTime(now);
+  const claimed = data.botMentionJobs
+    .filter((candidate) => isClaimableJob(candidate, nowMs, leaseMs))
+    .sort((left, right) => safeTime(left.availableAt) - safeTime(right.availableAt) || safeTime(left.createdAt) - safeTime(right.createdAt))
+    .slice(0, batchSize);
+
+  for (const job of claimed) {
+    job.status = "processing";
+    job.attempts = Math.max(0, job.attempts) + 1;
+    job.leasedAt = now;
+    job.updatedAt = now;
+    upsertBotMentionJob(data, job);
+  }
+
+  return claimed.map((candidate) => structuredClone(candidate) as BotMentionJobRecord);
+}
+
+function retryDelayMs(attempts: number): number {
+  const exponent = Math.max(0, attempts - 1);
+  return Math.min(DEFAULT_JOB_RETRY_BASE_MS * (2 ** exponent), MAX_JOB_RETRY_DELAY_MS);
+}
+
+function completeMentionJob(
+  data: WebDatabase,
+  mentionId: string,
+  input: {
+    now: string;
+    status: "completed" | "failed" | "invalid" | "unmatched";
+    lastError?: string | null;
+    attempts?: number;
+  }
+): void {
+  const job = data.botMentionJobs.find((candidate) => candidate.mentionId === mentionId);
+  if (!job) {
+    return;
+  }
+
+  job.status = input.status;
+  job.lastError = input.lastError ?? null;
+  job.leasedAt = null;
+  job.updatedAt = input.now;
+
+  if (input.status === "failed") {
+    job.availableAt = new Date(safeTime(input.now) + retryDelayMs(input.attempts ?? job.attempts)).toISOString();
+    job.processedAt = null;
+  } else {
+    job.availableAt = input.now;
+    job.processedAt = input.now;
+  }
+
+  upsertBotMentionJob(data, job);
+  pruneMentionJobs(data, input.now);
+}
+
+function buildMentionSyncReadState(input: {
+  activeUserIds: Iterable<string>;
+  activeUserHandles: Iterable<string>;
+  knownMentionIds: Iterable<string>;
+}): MentionSyncReadState {
+  return {
+    activeUserIds: new Set([...input.activeUserIds].map((value) => safeText(value)).filter(Boolean)),
+    activeUserHandles: new Set([...input.activeUserHandles].map((value) => normalizeHandle(value)).filter(Boolean)),
+    knownMentionIds: new Set([...input.knownMentionIds].map((value) => safeText(value)).filter(Boolean))
+  };
+}
+
+function createMentionSyncReadState(data: WebDatabase): MentionSyncReadState {
+  const activeUserIds: string[] = [];
+  const activeUserHandles: string[] = [];
+  for (const candidate of data.botUsers) {
+    if (candidate.status !== "active") {
+      continue;
+    }
+
+    const threadsUserId = safeText(candidate.threadsUserId);
+    if (threadsUserId) {
+      activeUserIds.push(threadsUserId);
+    }
+
+    const threadsHandle = normalizeHandle(candidate.threadsHandle);
+    if (threadsHandle) {
+      activeUserHandles.push(threadsHandle);
+    }
+  }
+
+  return buildMentionSyncReadState({
+    activeUserIds,
+    activeUserHandles,
+    knownMentionIds: [
+      ...data.botArchives.map((candidate) => safeText(candidate.mentionId)),
+      ...data.botMentionJobs.map((candidate) => safeText(candidate.mentionId))
+    ]
+  });
+}
+
+function hasMatchedUser(
+  readState: MentionSyncReadState,
+  rawThreadsUserId: string | null | undefined,
+  rawHandle: string | null | undefined
+): boolean {
+  const threadsUserId = safeText(rawThreadsUserId);
+  if (threadsUserId && readState.activeUserIds.has(threadsUserId)) {
+    return true;
+  }
+
+  const handle = normalizeHandle(rawHandle);
+  return Boolean(handle && readState.activeUserHandles.has(handle));
+}
+
+async function mapWithConcurrency<T, TResult>(
+  items: readonly T[],
+  concurrency: number,
+  worker: (item: T) => Promise<TResult>
+): Promise<TResult[]> {
+  if (items.length === 0) {
+    return [];
+  }
+
+  const results = new Array<TResult>(items.length);
+  let cursor = 0;
+  const workerCount = Math.min(Math.max(concurrency, 1), items.length);
+
+  const runWorker = async (): Promise<void> => {
+    while (true) {
+      const index = cursor;
+      cursor += 1;
+      if (index >= items.length) {
+        return;
+      }
+
+      results[index] = await worker(items[index] as T);
+    }
+  };
+
+  await Promise.all(Array.from({ length: workerCount }, () => runWorker()));
+  return results;
 }
 
 function createInitialStatus(config: MentionCollectorConfig): BotMentionCollectorStatus {
@@ -486,16 +878,20 @@ function isSameThread(left: ThreadsNode | null, rightId: string | null, rightPer
 }
 
 async function resolveTargetFromRepliesFeed(
-  data: WebDatabase,
   config: MentionCollectorConfig,
+  resolveAccessToken: ThreadsAccessTokenResolver,
   mentionId: string,
   mentionUrl: string,
   mentionAuthorUserId: string | null,
   mentionAuthorHandle: string | null
 ): Promise<ThreadsNode | null> {
-  const ownerAccessToken =
-    (mentionAuthorUserId ? await getBotAccessTokenForThreadsUserId(data, mentionAuthorUserId) : null) ??
-    (mentionAuthorHandle ? await getBotAccessTokenForHandle(data, mentionAuthorHandle) : null);
+  let ownerAccessToken: string | null;
+  try {
+    ownerAccessToken = await resolveAccessToken(mentionAuthorUserId, mentionAuthorHandle);
+  } catch {
+    return null;
+  }
+
   if (!ownerAccessToken) {
     return null;
   }
@@ -534,14 +930,15 @@ function buildFallbackTargetText(node: ThreadsNode | null): string {
 }
 
 async function buildIngestPayload(
-  data: WebDatabase,
+  readState: MentionSyncReadState,
   config: MentionCollectorConfig,
   accessToken: string,
-  mentionSummary: ThreadsNode
-): Promise<BotIngestPayload | null> {
+  mentionSummary: ThreadsNode,
+  resolveRepliesAccessToken: ThreadsAccessTokenResolver
+): Promise<MentionPreparationResult> {
   const mentionId = readNestedString(mentionSummary, ["id"]);
   if (!mentionId) {
-    return null;
+    return { kind: "invalid" };
   }
 
   const mentionDetail = await fetchThreadNode(config, accessToken, mentionId, true);
@@ -549,7 +946,11 @@ async function buildIngestPayload(
   const mentionAuthorHandle = extractThreadHandle(mentionDetail) || extractThreadHandle(mentionSummary);
   const mentionAuthorUserId = extractThreadUserId(mentionDetail) || extractThreadUserId(mentionSummary);
   if (!mentionUrl || !mentionAuthorHandle) {
-    return null;
+    return { kind: "invalid" };
+  }
+
+  if (!hasMatchedUser(readState, mentionAuthorUserId, mentionAuthorHandle)) {
+    return { kind: "unmatched" };
   }
 
   const relatedThreadId = extractRelatedThreadId(mentionDetail);
@@ -562,8 +963,8 @@ async function buildIngestPayload(
     relatedThreadNode ??
     (relatedThreadId ? await fetchThreadNode(config, accessToken, relatedThreadId, false) : null) ??
     (await resolveTargetFromRepliesFeed(
-      data,
       config,
+      resolveRepliesAccessToken,
       mentionId,
       mentionUrl,
       mentionAuthorUserId,
@@ -582,23 +983,26 @@ async function buildIngestPayload(
   const targetIsSeparate = targetUrl !== mentionUrl || targetText !== mentionText;
 
   return {
-    mentionId,
-    mentionUrl,
-    mentionAuthorUserId,
-    mentionAuthorHandle,
-    mentionAuthorDisplayName: extractThreadDisplayName(mentionDetail) || extractThreadDisplayName(mentionSummary),
-    noteText: targetIsSeparate ? mentionText || null : null,
-    targetUrl,
-    targetAuthorHandle: safeText(extractedTargetPost?.author) || extractThreadHandle(targetNode),
-    targetAuthorDisplayName: extractThreadDisplayName(targetNode),
-    targetText,
-    targetPublishedAt: safeText(extractedTargetPost?.publishedAt) || extractThreadTimestamp(targetNode),
-    mediaUrls: extractedTargetPost ? summarizeExtractedPostPreviewMediaUrls(extractedTargetPost) : extractMediaUrls(targetNode),
-    extractedPost: extractedTargetPost,
-    rawPayload: {
-      mention: mentionDetail ?? mentionSummary,
-      target: targetNode,
-      extractedPost: extractedTargetPost
+    kind: "payload",
+    payload: {
+      mentionId,
+      mentionUrl,
+      mentionAuthorUserId,
+      mentionAuthorHandle,
+      mentionAuthorDisplayName: extractThreadDisplayName(mentionDetail) || extractThreadDisplayName(mentionSummary),
+      noteText: targetIsSeparate ? mentionText || null : null,
+      targetUrl,
+      targetAuthorHandle: safeText(extractedTargetPost?.author) || extractThreadHandle(targetNode),
+      targetAuthorDisplayName: extractThreadDisplayName(targetNode),
+      targetText,
+      targetPublishedAt: safeText(extractedTargetPost?.publishedAt) || extractThreadTimestamp(targetNode),
+      mediaUrls: extractedTargetPost ? summarizeExtractedPostPreviewMediaUrls(extractedTargetPost) : extractMediaUrls(targetNode),
+      extractedPost: extractedTargetPost,
+      rawPayload: {
+        mention: mentionDetail ?? mentionSummary,
+        target: targetNode,
+        extractedPost: extractedTargetPost
+      }
     }
   };
 }
@@ -614,56 +1018,74 @@ async function resolveCollectorAccessToken(
   return getBotAccessTokenForHandle(data, config.botHandle);
 }
 
-async function syncMentions(
-  data: WebDatabase,
-  config: MentionCollectorConfig,
-  mode: string
-): Promise<BotMentionSyncSummary> {
-  if (!config.botHandle) {
-    return {
-      ok: false,
-      reason: "bot_handle_missing",
-      mode,
-      fetchedPages: 0,
-      fetchedMentions: 0,
-      processedMentions: 0,
-      createdArchives: 0,
-      updatedArchives: 0,
-      unmatchedMentions: 0,
-      skippedExisting: 0,
-      skippedInvalid: 0
-    };
+async function resolveStoredAccessToken(
+  rawThreadsUserId: string | null | undefined,
+  rawHandle: string | null | undefined
+): Promise<string | null> {
+  const user =
+    (rawThreadsUserId ? await findBotUserByThreadsUserId(rawThreadsUserId) : null) ??
+    (rawHandle ? await findBotUserByHandle(rawHandle) : null);
+  if (!user) {
+    return null;
   }
 
-  const accessToken = await resolveCollectorAccessToken(config, data);
-  if (!accessToken) {
-    return {
-      ok: false,
-      reason: "access_token_missing",
-      mode,
-      fetchedPages: 0,
-      fetchedMentions: 0,
-      processedMentions: 0,
-      createdArchives: 0,
-      updatedArchives: 0,
-      unmatchedMentions: 0,
-      skippedExisting: 0,
-      skippedInvalid: 0
-    };
+  return getFreshAccessTokenForUserRecord(user, async (nextUser) => {
+    await saveBotUserRecord(nextUser);
+  });
+}
+
+async function ingestMentionPayload(
+  payload: BotIngestPayload,
+  runTransaction: DatabaseRunner
+): Promise<BotIngestResult> {
+  if (!useExternalizedMentionJobs()) {
+    return runTransaction((data) => ingestBotMention(data, payload));
   }
 
-  const knownMentionIds = new Set(
-    data.botArchives
-      .map((candidate) => safeText(candidate.mentionId))
-      .filter(Boolean)
+  const user =
+    (payload.mentionAuthorUserId ? await findBotUserByThreadsUserId(payload.mentionAuthorUserId) : null) ??
+    (payload.mentionAuthorHandle ? await findBotUserByHandle(payload.mentionAuthorHandle) : null);
+  const existingArchive =
+    user && payload.mentionUrl
+      ? await findBotArchiveByMention(user.id, payload.mentionId ?? null, safeText(payload.mentionUrl))
+      : null;
+  const materialized = materializeBotMentionArchive(user, existingArchive, payload);
+  if (materialized.archive) {
+    await saveBotArchiveRecord(materialized.archive);
+  }
+  return materialized.result;
+}
+
+function mergeSummaries(mode: string, ...summaries: BotMentionSyncSummary[]): BotMentionSyncSummary {
+  return summaries.reduce(
+    (accumulator, summary) =>
+      createSummary(mode, {
+        ok: accumulator.ok && summary.ok,
+        reason: accumulator.reason ?? summary.reason,
+        fetchedPages: accumulator.fetchedPages + summary.fetchedPages,
+        fetchedMentions: accumulator.fetchedMentions + summary.fetchedMentions,
+        processedMentions: accumulator.processedMentions + summary.processedMentions,
+        createdArchives: accumulator.createdArchives + summary.createdArchives,
+        updatedArchives: accumulator.updatedArchives + summary.updatedArchives,
+        unmatchedMentions: accumulator.unmatchedMentions + summary.unmatchedMentions,
+        skippedExisting: accumulator.skippedExisting + summary.skippedExisting,
+        skippedInvalid: accumulator.skippedInvalid + summary.skippedInvalid
+      }),
+    createSummary(mode, {})
   );
+}
+
+async function enqueueMentionSyncJobs(
+  readState: MentionSyncReadState,
+  config: MentionCollectorConfig,
+  mode: string,
+  accessToken: string,
+  runTransaction: DatabaseRunner
+): Promise<BotMentionSyncSummary> {
+  const knownMentionIds = new Set(readState.knownMentionIds);
 
   let fetchedPages = 0;
   let fetchedMentions = 0;
-  let processedMentions = 0;
-  let createdArchives = 0;
-  let updatedArchives = 0;
-  let unmatchedMentions = 0;
   let skippedExisting = 0;
   let skippedInvalid = 0;
   let afterCursor: string | null = null;
@@ -674,6 +1096,7 @@ async function syncMentions(
     fetchedMentions += pageResult.items.length;
 
     let sawOnlyExisting = true;
+    const queuedMentions: ThreadsNode[] = [];
     for (const mentionSummary of pageResult.items) {
       const mentionId = safeText(readNestedString(mentionSummary, ["id"]) || "");
       if (mode === "interval" && mentionId && knownMentionIds.has(mentionId)) {
@@ -682,27 +1105,28 @@ async function syncMentions(
       }
 
       sawOnlyExisting = false;
-      const payload = await buildIngestPayload(data, config, accessToken, mentionSummary);
-      if (!payload) {
-        skippedInvalid += 1;
-        continue;
+      if (mentionId) {
+        knownMentionIds.add(mentionId);
       }
+      queuedMentions.push(mentionSummary);
+    }
 
-      processedMentions += 1;
-      const ingest = ingestBotMention(data, payload);
-      if (payload.mentionId) {
-        knownMentionIds.add(payload.mentionId);
-      }
-
-      if (!ingest.matched) {
-        unmatchedMentions += 1;
-        continue;
-      }
-
-      if (ingest.created) {
-        createdArchives += 1;
+    if (queuedMentions.length > 0) {
+      const now = new Date().toISOString();
+      if (useExternalizedMentionJobs()) {
+        const jobs = queuedMentions
+          .map((mentionSummary) => buildMentionJobRecord(mentionSummary, now))
+          .filter((job): job is BotMentionJobRecord => Boolean(job));
+        skippedInvalid += queuedMentions.length - jobs.length;
+        await enqueueStoredBotMentionJobs(jobs, {
+          forceRequeue: mode !== "interval"
+        });
+        await pruneBotMentionJobs(new Date(Date.now() - DEFAULT_JOB_RETENTION_MS).toISOString());
       } else {
-        updatedArchives += 1;
+        const enqueueResult = await runTransaction((data) =>
+          enqueueMentionJobs(data, queuedMentions, now, mode !== "interval")
+        );
+        skippedInvalid += enqueueResult.invalid;
       }
     }
 
@@ -712,32 +1136,301 @@ async function syncMentions(
     }
   }
 
-  return {
-    ok: true,
-    reason: null,
-    mode,
+  return createSummary(mode, {
     fetchedPages,
     fetchedMentions,
-    processedMentions,
-    createdArchives,
-    updatedArchives,
-    unmatchedMentions,
     skippedExisting,
     skippedInvalid
-  };
+  });
+}
+
+async function processMentionJob(
+  job: BotMentionJobRecord,
+  readState: MentionSyncReadState,
+  config: MentionCollectorConfig,
+  accessToken: string,
+  resolveRepliesAccessToken: ThreadsAccessTokenResolver,
+  runTransaction: DatabaseRunner
+): Promise<MentionProcessResult> {
+  const mentionSummary = parseMentionSummaryJobPayload(job);
+  if (!mentionSummary) {
+    return { kind: "invalid" };
+  }
+
+  try {
+    const prepared = await buildIngestPayload(
+      readState,
+      config,
+      accessToken,
+      mentionSummary,
+      resolveRepliesAccessToken
+    );
+    if (prepared.kind === "invalid") {
+      return { kind: "invalid" };
+    }
+    if (prepared.kind === "unmatched") {
+      return { kind: "unmatched" };
+    }
+
+    const ingest = await ingestMentionPayload(prepared.payload, runTransaction);
+    return {
+      kind: "ingested",
+      ingest
+    };
+  } catch (error) {
+    return {
+      kind: "failed",
+      error
+    };
+  }
+}
+
+async function drainMentionSyncJobs(
+  config: MentionCollectorConfig,
+  mode: string,
+  options: {
+    loadReadState: () => Promise<MentionSyncReadState>;
+    processingConcurrency: number;
+    resolveRepliesAccessToken: ThreadsAccessTokenResolver;
+    runTransaction: DatabaseRunner;
+    resolveCollectorAccessToken: () => Promise<string | null>;
+    jobBatchSize: number;
+    jobLeaseMs: number;
+  }
+): Promise<BotMentionSyncSummary> {
+  if (!config.botHandle) {
+    return createSummary(mode, {
+      ok: false,
+      reason: "bot_handle_missing"
+    });
+  }
+
+  const accessToken = await options.resolveCollectorAccessToken();
+  if (!accessToken) {
+    return createSummary(mode, {
+      ok: false,
+      reason: "access_token_missing"
+    });
+  }
+
+  const summary = createSummary(mode, {});
+
+  while (true) {
+    const claimedJobs = useExternalizedMentionJobs()
+      ? await claimStoredBotMentionJobs(
+          new Date().toISOString(),
+          options.jobBatchSize,
+          options.jobLeaseMs
+        )
+      : await options.runTransaction((data) =>
+          claimMentionJobs(data, new Date().toISOString(), options.jobBatchSize, options.jobLeaseMs)
+        );
+    if (claimedJobs.length === 0) {
+      break;
+    }
+
+    const readState = await options.loadReadState();
+    const results = await mapWithConcurrency(
+      claimedJobs,
+      options.processingConcurrency,
+      async (job): Promise<MentionProcessResult> =>
+        processMentionJob(
+          job,
+          readState,
+          config,
+          accessToken,
+          options.resolveRepliesAccessToken,
+          options.runTransaction
+        )
+    );
+
+    for (let index = 0; index < claimedJobs.length; index += 1) {
+      const job = claimedJobs[index] as BotMentionJobRecord;
+      const result = results[index] as MentionProcessResult;
+
+      if (result.kind === "invalid") {
+        summary.skippedInvalid += 1;
+        if (useExternalizedMentionJobs()) {
+          await finalizeStoredBotMentionJob(job.mentionId, {
+            status: "invalid",
+            lastError: null,
+            availableAt: new Date().toISOString(),
+            leasedAt: null,
+            processedAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          });
+        } else {
+          await options.runTransaction((data) => {
+            completeMentionJob(data, job.mentionId, {
+              now: new Date().toISOString(),
+              status: "invalid"
+            });
+          });
+        }
+        continue;
+      }
+
+      summary.processedMentions += 1;
+
+      if (result.kind === "failed") {
+        summary.ok = false;
+        summary.reason = summary.reason ?? toCollectorStatusError(result.error);
+        const now = new Date().toISOString();
+        if (useExternalizedMentionJobs()) {
+          await finalizeStoredBotMentionJob(job.mentionId, {
+            status: "failed",
+            lastError: toCollectorStatusError(result.error),
+            availableAt: new Date(safeTime(now) + retryDelayMs(job.attempts)).toISOString(),
+            leasedAt: null,
+            processedAt: null,
+            updatedAt: now
+          });
+        } else {
+          await options.runTransaction((data) => {
+            completeMentionJob(data, job.mentionId, {
+              now,
+              status: "failed",
+              lastError: toCollectorStatusError(result.error),
+              attempts: job.attempts
+            });
+          });
+        }
+        continue;
+      }
+
+      if (result.kind === "unmatched") {
+        summary.unmatchedMentions += 1;
+        if (useExternalizedMentionJobs()) {
+          await finalizeStoredBotMentionJob(job.mentionId, {
+            status: "unmatched",
+            lastError: null,
+            availableAt: new Date().toISOString(),
+            leasedAt: null,
+            processedAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          });
+        } else {
+          await options.runTransaction((data) => {
+            completeMentionJob(data, job.mentionId, {
+              now: new Date().toISOString(),
+              status: "unmatched"
+            });
+          });
+        }
+        continue;
+      }
+
+      if (!result.ingest.matched) {
+        summary.unmatchedMentions += 1;
+        if (useExternalizedMentionJobs()) {
+          await finalizeStoredBotMentionJob(job.mentionId, {
+            status: "unmatched",
+            lastError: null,
+            availableAt: new Date().toISOString(),
+            leasedAt: null,
+            processedAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          });
+        } else {
+          await options.runTransaction((data) => {
+            completeMentionJob(data, job.mentionId, {
+              now: new Date().toISOString(),
+              status: "unmatched"
+            });
+          });
+        }
+        continue;
+      }
+
+      if (result.ingest.created) {
+        summary.createdArchives += 1;
+      } else {
+        summary.updatedArchives += 1;
+      }
+
+      if (useExternalizedMentionJobs()) {
+        await finalizeStoredBotMentionJob(job.mentionId, {
+          status: "completed",
+          lastError: null,
+          availableAt: new Date().toISOString(),
+          leasedAt: null,
+          processedAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        });
+      } else {
+        await options.runTransaction((data) => {
+          completeMentionJob(data, job.mentionId, {
+            now: new Date().toISOString(),
+            status: "completed"
+          });
+        });
+      }
+    }
+  }
+
+  return summary;
 }
 
 export function createBotMentionCollector(deps: {
   runTransaction: DatabaseRunner;
+  loadDatabase?: DatabaseLoader;
   logger?: LoggerLike;
 }): BotMentionCollector {
   let config = readCollectorConfig();
   const logger = deps.logger ?? console;
   const status = createInitialStatus(config);
+  const loadBaseDatabaseSnapshot =
+    deps.loadDatabase ??
+    (() => deps.runTransaction((data) => structuredClone(data) as WebDatabase));
+  const loadDatabaseSnapshot = async (): Promise<WebDatabase> => {
+    const database = await loadBaseDatabaseSnapshot();
+    if (useExternalizedMentionJobs()) {
+      database.botMentionJobs = await loadBotMentionJobs();
+    }
+    return database;
+  };
+  const loadReadState = async (): Promise<MentionSyncReadState> => {
+    if (useExternalizedMentionJobs()) {
+      return buildMentionSyncReadState(await loadBotMentionReadState());
+    }
+    return createMentionSyncReadState(await loadDatabaseSnapshot());
+  };
 
-  let timer: ReturnType<typeof setInterval> | null = null;
-  let inFlight: Promise<BotMentionSyncSummary> | null = null;
+  let pollTimer: ReturnType<typeof setInterval> | null = null;
+  let workerTimer: ReturnType<typeof setInterval> | null = null;
+  let pollInFlight: Promise<BotMentionSyncSummary> | null = null;
+  let drainInFlight: Promise<BotMentionSyncSummary> | null = null;
+  let syncInFlight: Promise<BotMentionSyncSummary> | null = null;
   let started = false;
+  const workerIntervalMs = readWorkerIntervalMs();
+  const jobBatchSize = readJobBatchSize();
+  const jobLeaseMs = readJobLeaseMs();
+
+  const resolveCollectorToken = async (): Promise<string | null> => {
+    if (config.accessTokenOverride.trim()) {
+      return config.accessTokenOverride;
+    }
+
+    if (useExternalizedMentionJobs()) {
+      return resolveStoredAccessToken(null, config.botHandle);
+    }
+
+    return deps.runTransaction((data) => resolveCollectorAccessToken(config, data));
+  };
+
+  const resolveRepliesAccessToken: ThreadsAccessTokenResolver = (rawThreadsUserId, rawHandle) =>
+    useExternalizedMentionJobs()
+      ? resolveStoredAccessToken(rawThreadsUserId, rawHandle)
+      : deps.runTransaction(async (data) => {
+      const tokenByUserId = rawThreadsUserId
+        ? await getBotAccessTokenForThreadsUserId(data, rawThreadsUserId)
+        : null;
+      if (tokenByUserId) {
+        return tokenByUserId;
+      }
+
+      return rawHandle ? getBotAccessTokenForHandle(data, rawHandle) : null;
+    });
 
   const applyStatusConfig = (): void => {
     status.enabled = Boolean(config.botHandle) && config.intervalMs > 0;
@@ -747,83 +1440,210 @@ export function createBotMentionCollector(deps: {
     status.maxPages = config.maxPages;
   };
 
-  const scheduleTimer = (): void => {
-    if (!started || !status.enabled || timer) {
+  const updateRunningState = (): void => {
+    status.running = Boolean(syncInFlight || pollInFlight || drainInFlight);
+  };
+
+  const commitSummary = (summary: BotMentionSyncSummary): BotMentionSyncSummary => {
+    status.lastSummary = summary;
+    status.lastCompletedAt = new Date().toISOString();
+    if (summary.ok) {
+      status.lastSucceededAt = status.lastCompletedAt;
+      status.lastError = null;
+    } else {
+      status.lastError = summary.reason;
+    }
+    return summary;
+  };
+
+  const commitUnexpectedError = (error: unknown): never => {
+    status.lastCompletedAt = new Date().toISOString();
+    status.lastError = toCollectorStatusError(error);
+    throw error;
+  };
+
+  const enqueueNow = async (mode: string): Promise<BotMentionSyncSummary> => {
+    if (!config.botHandle) {
+      return createSummary(mode, {
+        ok: false,
+        reason: "bot_handle_missing"
+      });
+    }
+
+    const accessToken = await resolveCollectorToken();
+    if (!accessToken) {
+      return createSummary(mode, {
+        ok: false,
+        reason: "access_token_missing"
+      });
+    }
+
+    const readState = await loadReadState();
+    return enqueueMentionSyncJobs(readState, config, mode, accessToken, deps.runTransaction);
+  };
+
+  const drainNow = async (mode: string): Promise<BotMentionSyncSummary> =>
+    drainMentionSyncJobs(config, mode, {
+      loadReadState,
+      processingConcurrency: readProcessingConcurrency(),
+      resolveRepliesAccessToken,
+      runTransaction: deps.runTransaction,
+      resolveCollectorAccessToken: resolveCollectorToken,
+      jobBatchSize,
+      jobLeaseMs
+    });
+
+  const schedulePollTimer = (): void => {
+    if (!started || !status.enabled || pollTimer) {
       return;
     }
 
-    timer = setInterval(() => {
-      void runSync("interval").catch((error) => {
+    pollTimer = setInterval(() => {
+      if (syncInFlight) {
+        return;
+      }
+
+      void runPollCycle("interval").catch((error) => {
         logger.error("[threads-bot] mention sync failed:", error);
       });
     }, config.intervalMs);
   };
 
-  const restartTimer = (): void => {
-    if (timer) {
-      clearInterval(timer);
-      timer = null;
+  const scheduleWorkerTimer = (): void => {
+    if (!started || !status.enabled || workerTimer) {
+      return;
     }
 
-    scheduleTimer();
+    workerTimer = setInterval(() => {
+      if (syncInFlight) {
+        return;
+      }
+
+      void runDrainCycle("worker").catch((error) => {
+        logger.error("[threads-bot] mention worker failed:", error);
+      });
+    }, workerIntervalMs);
   };
 
-  const runSync = async (mode = "manual"): Promise<BotMentionSyncSummary> => {
-    if (inFlight) {
-      return inFlight;
+  const restartTimers = (): void => {
+    if (pollTimer) {
+      clearInterval(pollTimer);
+      pollTimer = null;
+    }
+    if (workerTimer) {
+      clearInterval(workerTimer);
+      workerTimer = null;
     }
 
-    status.running = true;
+    schedulePollTimer();
+    scheduleWorkerTimer();
+  };
+
+  const runPollCycle = async (mode: string): Promise<BotMentionSyncSummary> => {
+    if (pollInFlight) {
+      return pollInFlight;
+    }
+
     status.lastStartedAt = new Date().toISOString();
     status.lastError = null;
+    updateRunningState();
 
-    inFlight = deps
-      .runTransaction((data) => syncMentions(data, config, mode))
+    pollInFlight = enqueueNow(mode)
       .then((summary) => {
-        status.lastSummary = summary;
-        status.lastCompletedAt = new Date().toISOString();
-        if (summary.ok) {
-          status.lastSucceededAt = status.lastCompletedAt;
-        } else {
-          status.lastError = summary.reason;
+        commitSummary(summary);
+        return summary;
+      })
+      .catch(commitUnexpectedError)
+      .finally(() => {
+        pollInFlight = null;
+        updateRunningState();
+        if (started && status.enabled && !syncInFlight) {
+          void runDrainCycle(`${mode}_drain`).catch((error) => {
+            logger.error("[threads-bot] mention drain failed:", error);
+          });
+        }
+      });
+
+    updateRunningState();
+    return pollInFlight;
+  };
+
+  const runDrainCycle = async (mode: string): Promise<BotMentionSyncSummary> => {
+    if (drainInFlight) {
+      return drainInFlight;
+    }
+
+    status.lastStartedAt = new Date().toISOString();
+    status.lastError = null;
+    updateRunningState();
+
+    drainInFlight = drainNow(mode)
+      .then((summary) => {
+        if (summary.processedMentions > 0 || summary.skippedInvalid > 0 || !summary.ok) {
+          commitSummary(summary);
         }
         return summary;
       })
-      .catch((error) => {
-        status.lastCompletedAt = new Date().toISOString();
-        status.lastError = toCollectorStatusError(error);
-        throw error;
-      })
+      .catch(commitUnexpectedError)
       .finally(() => {
-        status.running = false;
-        inFlight = null;
+        drainInFlight = null;
+        updateRunningState();
       });
 
-    return inFlight;
+    updateRunningState();
+    return drainInFlight;
+  };
+
+  const runSync = async (mode = "manual"): Promise<BotMentionSyncSummary> => {
+    if (syncInFlight) {
+      return syncInFlight;
+    }
+
+    status.lastStartedAt = new Date().toISOString();
+    status.lastError = null;
+    updateRunningState();
+
+    syncInFlight = (async () => {
+      const enqueueSummary = pollInFlight ? await pollInFlight : await enqueueNow(mode);
+      const priorDrainSummary = drainInFlight ? await drainInFlight : createSummary(mode, {});
+      const drainSummary = await drainNow(mode);
+      return commitSummary(mergeSummaries(mode, enqueueSummary, priorDrainSummary, drainSummary));
+    })()
+      .catch(commitUnexpectedError)
+      .finally(() => {
+        syncInFlight = null;
+        updateRunningState();
+      });
+
+    updateRunningState();
+    return syncInFlight;
   };
 
   return {
     start() {
       started = true;
       applyStatusConfig();
-      if (!status.enabled || timer) {
+      if (!status.enabled) {
         return;
       }
 
-      void runSync("startup").catch((error) => {
+      void runPollCycle("startup").catch((error) => {
         logger.error("[threads-bot] initial mention sync failed:", error);
       });
-      scheduleTimer();
+      schedulePollTimer();
+      scheduleWorkerTimer();
     },
 
     stop() {
       started = false;
-      if (!timer) {
-        return;
+      if (pollTimer) {
+        clearInterval(pollTimer);
+        pollTimer = null;
       }
-
-      clearInterval(timer);
-      timer = null;
+      if (workerTimer) {
+        clearInterval(workerTimer);
+        workerTimer = null;
+      }
     },
 
     syncNow(mode = "manual") {
@@ -839,9 +1659,9 @@ export function createBotMentionCollector(deps: {
     reloadConfig() {
       config = readCollectorConfig();
       applyStatusConfig();
-      restartTimer();
+      restartTimers();
       if (started && status.enabled) {
-        void runSync("config_reload").catch((error) => {
+        void runPollCycle("config_reload").catch((error) => {
           logger.error("[threads-bot] collector reload sync failed:", error);
         });
       }

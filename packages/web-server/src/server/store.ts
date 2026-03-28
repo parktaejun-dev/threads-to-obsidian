@@ -11,6 +11,7 @@ import {
   type BotExtensionAccessTokenRecord,
   type BotExtensionLinkSessionRecord,
   type BotLoginTokenRecord,
+  type BotMentionJobRecord,
   type BotOauthSessionRecord,
   type BotSessionRecord,
   type BotUserRecord,
@@ -62,6 +63,11 @@ let databaseOperationChain: Promise<void> = Promise.resolve();
 let postgresPool: PgPool | null = null;
 let postgresPoolConnectionString: string | null = null;
 const ensuredPostgresStores = new Set<string>();
+const ensuredPostgresMentionJobStores = new Set<string>();
+const ensuredPostgresBotUserStores = new Set<string>();
+const ensuredPostgresBotArchiveStores = new Set<string>();
+const seededPostgresBotUserStores = new Set<string>();
+const seededPostgresBotArchiveStores = new Set<string>();
 let activeDatabaseAccessCount = 0;
 let databaseReconfigurationBarrier: Promise<void> | null = null;
 let releaseDatabaseReconfigurationBarrier: (() => void) | null = null;
@@ -173,6 +179,20 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+function normalizeThreadsHandle(value: string | null | undefined): string {
+  return (value ?? "").trim().replace(/^@+/, "").toLowerCase();
+}
+
+function readStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map((entry) => (typeof entry === "string" ? entry.trim() : ""))
+    .filter((entry): entry is string => Boolean(entry));
+}
+
 function normalizeDatabasePayload(raw: unknown): WebDatabase {
   const parsed = isRecord(raw) ? (raw as Partial<WebDatabase>) : {};
   const fallback = buildDefaultDatabase();
@@ -236,6 +256,7 @@ function normalizeDatabasePayload(raw: unknown): WebDatabase {
     botSessions: Array.isArray(parsed.botSessions) ? parsed.botSessions : [],
     botExtensionLinkSessions: Array.isArray(parsed.botExtensionLinkSessions) ? parsed.botExtensionLinkSessions : [],
     botExtensionAccessTokens: Array.isArray(parsed.botExtensionAccessTokens) ? parsed.botExtensionAccessTokens : [],
+    botMentionJobs: Array.isArray(parsed.botMentionJobs) ? parsed.botMentionJobs : [],
     botArchives: Array.isArray(parsed.botArchives) ? parsed.botArchives : [],
     cloudArchives: Array.isArray(parsed.cloudArchives) ? parsed.cloudArchives : [],
     watchlists: Array.isArray(parsed.watchlists) ? parsed.watchlists : [],
@@ -281,6 +302,606 @@ async function ensurePostgresStore(client: PgPool | PoolClient, tableName: strin
     )`
   );
   ensuredPostgresStores.add(cacheKey);
+}
+
+function getPostgresMentionJobsTableName(tableName: string): string {
+  const parts = tableName.split(".");
+  const baseName = parts.pop() ?? DEFAULT_POSTGRES_TABLE;
+  return [...parts, `${baseName}_bot_mention_jobs`].join(".");
+}
+
+function getPostgresBotUsersTableName(tableName: string): string {
+  const parts = tableName.split(".");
+  const baseName = parts.pop() ?? DEFAULT_POSTGRES_TABLE;
+  return [...parts, `${baseName}_bot_users`].join(".");
+}
+
+function getPostgresBotArchivesTableName(tableName: string): string {
+  const parts = tableName.split(".");
+  const baseName = parts.pop() ?? DEFAULT_POSTGRES_TABLE;
+  return [...parts, `${baseName}_bot_archives`].join(".");
+}
+
+async function ensurePostgresMentionJobsStore(client: PgPool | PoolClient, tableName: string): Promise<void> {
+  const mentionJobsTableName = getPostgresMentionJobsTableName(tableName);
+  const cacheKey = `${postgresPoolConnectionString ?? "unknown"}::${mentionJobsTableName}`;
+  if (ensuredPostgresMentionJobStores.has(cacheKey)) {
+    return;
+  }
+
+  const escapedTableName = escapeQualifiedIdentifier(mentionJobsTableName);
+  await client.query(
+    `CREATE TABLE IF NOT EXISTS ${escapedTableName} (
+      id TEXT PRIMARY KEY,
+      mention_id TEXT NOT NULL UNIQUE,
+      mention_url TEXT,
+      mention_author_handle TEXT,
+      mention_author_user_id TEXT,
+      mention_text TEXT,
+      mention_published_at TIMESTAMPTZ,
+      raw_summary_json JSONB,
+      attempts INTEGER NOT NULL DEFAULT 0,
+      status TEXT NOT NULL,
+      last_error TEXT,
+      available_at TIMESTAMPTZ NOT NULL,
+      leased_at TIMESTAMPTZ,
+      processed_at TIMESTAMPTZ,
+      created_at TIMESTAMPTZ NOT NULL,
+      updated_at TIMESTAMPTZ NOT NULL
+    )`
+  );
+  await client.query(
+    `CREATE INDEX IF NOT EXISTS ${escapeQualifiedIdentifier(`${mentionJobsTableName.replaceAll(".", "_")}_claimable_idx`)}
+     ON ${escapedTableName} (status, available_at, created_at)`
+  );
+  ensuredPostgresMentionJobStores.add(cacheKey);
+}
+
+async function ensurePostgresBotUsersStore(client: PgPool | PoolClient, tableName: string): Promise<void> {
+  const botUsersTableName = getPostgresBotUsersTableName(tableName);
+  const cacheKey = `${postgresPoolConnectionString ?? "unknown"}::${botUsersTableName}`;
+  if (ensuredPostgresBotUserStores.has(cacheKey)) {
+    return;
+  }
+
+  const escapedTableName = escapeQualifiedIdentifier(botUsersTableName);
+  await client.query(
+    `CREATE TABLE IF NOT EXISTS ${escapedTableName} (
+      id TEXT PRIMARY KEY,
+      threads_user_id TEXT,
+      threads_handle TEXT NOT NULL,
+      display_name TEXT,
+      profile_picture_url TEXT,
+      biography TEXT,
+      is_verified BOOLEAN NOT NULL DEFAULT FALSE,
+      access_token_ciphertext TEXT,
+      token_expires_at TIMESTAMPTZ,
+      email TEXT,
+      granted_scopes JSONB NOT NULL DEFAULT '[]'::jsonb,
+      scope_version INTEGER NOT NULL DEFAULT 0,
+      last_scope_upgrade_at TIMESTAMPTZ,
+      created_at TIMESTAMPTZ NOT NULL,
+      updated_at TIMESTAMPTZ NOT NULL,
+      last_login_at TIMESTAMPTZ,
+      status TEXT NOT NULL
+    )`
+  );
+  await client.query(
+    `CREATE UNIQUE INDEX IF NOT EXISTS ${escapeQualifiedIdentifier(`${botUsersTableName.replaceAll(".", "_")}_threads_handle_uidx`)}
+     ON ${escapedTableName} (threads_handle)`
+  );
+  await client.query(
+    `CREATE UNIQUE INDEX IF NOT EXISTS ${escapeQualifiedIdentifier(`${botUsersTableName.replaceAll(".", "_")}_threads_user_id_uidx`)}
+     ON ${escapedTableName} (threads_user_id)
+     WHERE threads_user_id IS NOT NULL`
+  );
+  await client.query(
+    `CREATE INDEX IF NOT EXISTS ${escapeQualifiedIdentifier(`${botUsersTableName.replaceAll(".", "_")}_active_handle_idx`)}
+     ON ${escapedTableName} (status, threads_handle)`
+  );
+  await client.query(
+    `CREATE INDEX IF NOT EXISTS ${escapeQualifiedIdentifier(`${botUsersTableName.replaceAll(".", "_")}_active_user_id_idx`)}
+     ON ${escapedTableName} (status, threads_user_id)`
+  );
+  ensuredPostgresBotUserStores.add(cacheKey);
+}
+
+async function ensurePostgresBotArchivesStore(client: PgPool | PoolClient, tableName: string): Promise<void> {
+  const botArchivesTableName = getPostgresBotArchivesTableName(tableName);
+  const cacheKey = `${postgresPoolConnectionString ?? "unknown"}::${botArchivesTableName}`;
+  if (ensuredPostgresBotArchiveStores.has(cacheKey)) {
+    return;
+  }
+
+  const escapedTableName = escapeQualifiedIdentifier(botArchivesTableName);
+  await client.query(
+    `CREATE TABLE IF NOT EXISTS ${escapedTableName} (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      mention_id TEXT,
+      mention_url TEXT NOT NULL,
+      mention_author_handle TEXT NOT NULL,
+      mention_author_display_name TEXT,
+      note_text TEXT,
+      target_url TEXT NOT NULL,
+      target_author_handle TEXT,
+      target_author_display_name TEXT,
+      target_text TEXT NOT NULL,
+      target_published_at TIMESTAMPTZ,
+      media_urls JSONB NOT NULL DEFAULT '[]'::jsonb,
+      markdown_content TEXT NOT NULL,
+      raw_payload_json TEXT,
+      archived_at TIMESTAMPTZ NOT NULL,
+      updated_at TIMESTAMPTZ NOT NULL,
+      status TEXT NOT NULL
+    )`
+  );
+  await client.query(
+    `CREATE UNIQUE INDEX IF NOT EXISTS ${escapeQualifiedIdentifier(`${botArchivesTableName.replaceAll(".", "_")}_mention_id_uidx`)}
+     ON ${escapedTableName} (user_id, mention_id)
+     WHERE mention_id IS NOT NULL`
+  );
+  await client.query(
+    `CREATE UNIQUE INDEX IF NOT EXISTS ${escapeQualifiedIdentifier(`${botArchivesTableName.replaceAll(".", "_")}_mention_url_uidx`)}
+     ON ${escapedTableName} (user_id, mention_url)`
+  );
+  await client.query(
+    `CREATE INDEX IF NOT EXISTS ${escapeQualifiedIdentifier(`${botArchivesTableName.replaceAll(".", "_")}_user_updated_idx`)}
+     ON ${escapedTableName} (user_id, updated_at DESC)`
+  );
+  await client.query(
+    `CREATE INDEX IF NOT EXISTS ${escapeQualifiedIdentifier(`${botArchivesTableName.replaceAll(".", "_")}_mention_lookup_idx`)}
+     ON ${escapedTableName} (mention_id, mention_url)`
+  );
+  ensuredPostgresBotArchiveStores.add(cacheKey);
+}
+
+function serializeDatabaseForPostgres(data: WebDatabase): WebDatabase {
+  return {
+    ...data,
+    botUsers: [],
+    botMentionJobs: [],
+    botArchives: []
+  };
+}
+
+function toIsoString(value: unknown): string | null {
+  if (value instanceof Date) {
+    return value.toISOString();
+  }
+  if (typeof value === "string") {
+    return value;
+  }
+  return null;
+}
+
+function normalizePostgresBotMentionJob(row: Record<string, unknown>): BotMentionJobRecord {
+  return {
+    id: typeof row.id === "string" ? row.id : typeof row.mention_id === "string" ? row.mention_id : crypto.randomUUID(),
+    mentionId: typeof row.mention_id === "string" ? row.mention_id : typeof row.id === "string" ? row.id : "",
+    mentionUrl: typeof row.mention_url === "string" ? row.mention_url : null,
+    mentionAuthorHandle: typeof row.mention_author_handle === "string" ? row.mention_author_handle : null,
+    mentionAuthorUserId: typeof row.mention_author_user_id === "string" ? row.mention_author_user_id : null,
+    mentionText: typeof row.mention_text === "string" ? row.mention_text : null,
+    mentionPublishedAt: toIsoString(row.mention_published_at),
+    rawSummaryJson: row.raw_summary_json == null ? null : JSON.stringify(row.raw_summary_json),
+    attempts: typeof row.attempts === "number" ? row.attempts : Number(row.attempts ?? 0),
+    status: typeof row.status === "string" ? row.status as BotMentionJobRecord["status"] : "queued",
+    lastError: typeof row.last_error === "string" ? row.last_error : null,
+    availableAt: toIsoString(row.available_at) ?? new Date().toISOString(),
+    leasedAt: toIsoString(row.leased_at),
+    processedAt: toIsoString(row.processed_at),
+    createdAt: toIsoString(row.created_at) ?? new Date().toISOString(),
+    updatedAt: toIsoString(row.updated_at) ?? new Date().toISOString()
+  };
+}
+
+function normalizePostgresBotUser(row: Record<string, unknown>): BotUserRecord {
+  const now = new Date().toISOString();
+  return {
+    id: typeof row.id === "string" ? row.id : crypto.randomUUID(),
+    threadsUserId: typeof row.threads_user_id === "string" ? row.threads_user_id : null,
+    threadsHandle:
+      typeof row.threads_handle === "string" ? normalizeThreadsHandle(row.threads_handle) : "",
+    displayName: typeof row.display_name === "string" ? row.display_name : null,
+    profilePictureUrl: typeof row.profile_picture_url === "string" ? row.profile_picture_url : null,
+    biography: typeof row.biography === "string" ? row.biography : null,
+    isVerified: row.is_verified === true,
+    accessTokenCiphertext:
+      typeof row.access_token_ciphertext === "string" ? row.access_token_ciphertext : null,
+    tokenExpiresAt: toIsoString(row.token_expires_at),
+    email: typeof row.email === "string" ? row.email : null,
+    grantedScopes: readStringArray(row.granted_scopes),
+    scopeVersion: typeof row.scope_version === "number" ? row.scope_version : Number(row.scope_version ?? 0),
+    lastScopeUpgradeAt: toIsoString(row.last_scope_upgrade_at),
+    createdAt: toIsoString(row.created_at) ?? now,
+    updatedAt: toIsoString(row.updated_at) ?? now,
+    lastLoginAt: toIsoString(row.last_login_at),
+    status: row.status === "disabled" ? "disabled" : "active"
+  };
+}
+
+function normalizePostgresBotArchive(row: Record<string, unknown>): BotArchiveRecord {
+  const now = new Date().toISOString();
+  return {
+    id: typeof row.id === "string" ? row.id : crypto.randomUUID(),
+    userId: typeof row.user_id === "string" ? row.user_id : "",
+    mentionId: typeof row.mention_id === "string" ? row.mention_id : null,
+    mentionUrl: typeof row.mention_url === "string" ? row.mention_url : "",
+    mentionAuthorHandle: typeof row.mention_author_handle === "string" ? row.mention_author_handle : "",
+    mentionAuthorDisplayName:
+      typeof row.mention_author_display_name === "string" ? row.mention_author_display_name : null,
+    noteText: typeof row.note_text === "string" ? row.note_text : null,
+    targetUrl: typeof row.target_url === "string" ? row.target_url : "",
+    targetAuthorHandle: typeof row.target_author_handle === "string" ? row.target_author_handle : null,
+    targetAuthorDisplayName:
+      typeof row.target_author_display_name === "string" ? row.target_author_display_name : null,
+    targetText: typeof row.target_text === "string" ? row.target_text : "",
+    targetPublishedAt: toIsoString(row.target_published_at),
+    mediaUrls: readStringArray(row.media_urls),
+    markdownContent: typeof row.markdown_content === "string" ? row.markdown_content : "",
+    rawPayloadJson: typeof row.raw_payload_json === "string" ? row.raw_payload_json : null,
+    archivedAt: toIsoString(row.archived_at) ?? now,
+    updatedAt: toIsoString(row.updated_at) ?? now,
+    status: "saved"
+  };
+}
+
+function buildBotUserSyncMarker(user: BotUserRecord): string {
+  return [
+    user.id,
+    user.threadsUserId ?? "",
+    user.threadsHandle,
+    user.updatedAt,
+    user.status
+  ].join("|");
+}
+
+function buildBotArchiveSyncMarker(archive: BotArchiveRecord): string {
+  return [
+    archive.id,
+    archive.userId,
+    archive.mentionId ?? "",
+    archive.mentionUrl,
+    archive.updatedAt,
+    archive.status
+  ].join("|");
+}
+
+async function upsertPostgresBotUsers(
+  client: PgPool | PoolClient,
+  tableName: string,
+  users: readonly BotUserRecord[]
+): Promise<void> {
+  if (users.length === 0) {
+    return;
+  }
+
+  await ensurePostgresBotUsersStore(client, tableName);
+  const escapedTableName = escapeQualifiedIdentifier(getPostgresBotUsersTableName(tableName));
+  const values: unknown[] = [];
+  const placeholders = users
+    .map((user, index) => {
+      const offset = index * 17;
+      values.push(
+        user.id,
+        user.threadsUserId,
+        normalizeThreadsHandle(user.threadsHandle),
+        user.displayName,
+        user.profilePictureUrl,
+        user.biography,
+        user.isVerified,
+        user.accessTokenCiphertext,
+        user.tokenExpiresAt,
+        user.email,
+        JSON.stringify(user.grantedScopes),
+        user.scopeVersion,
+        user.lastScopeUpgradeAt,
+        user.createdAt,
+        user.updatedAt,
+        user.lastLoginAt,
+        user.status
+      );
+      return `($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5}, $${offset + 6}, $${offset + 7}, $${offset + 8}, $${offset + 9}::timestamptz, $${offset + 10}, $${offset + 11}::jsonb, $${offset + 12}, $${offset + 13}::timestamptz, $${offset + 14}::timestamptz, $${offset + 15}::timestamptz, $${offset + 16}::timestamptz, $${offset + 17})`;
+    })
+    .join(", ");
+
+  await client.query(
+    `INSERT INTO ${escapedTableName} (
+       id,
+       threads_user_id,
+       threads_handle,
+       display_name,
+       profile_picture_url,
+       biography,
+       is_verified,
+       access_token_ciphertext,
+       token_expires_at,
+       email,
+       granted_scopes,
+       scope_version,
+       last_scope_upgrade_at,
+       created_at,
+       updated_at,
+       last_login_at,
+       status
+     )
+     VALUES ${placeholders}
+     ON CONFLICT (id) DO UPDATE SET
+       threads_user_id = EXCLUDED.threads_user_id,
+       threads_handle = EXCLUDED.threads_handle,
+       display_name = EXCLUDED.display_name,
+       profile_picture_url = EXCLUDED.profile_picture_url,
+       biography = EXCLUDED.biography,
+       is_verified = EXCLUDED.is_verified,
+       access_token_ciphertext = EXCLUDED.access_token_ciphertext,
+       token_expires_at = EXCLUDED.token_expires_at,
+       email = EXCLUDED.email,
+       granted_scopes = EXCLUDED.granted_scopes,
+       scope_version = EXCLUDED.scope_version,
+       last_scope_upgrade_at = EXCLUDED.last_scope_upgrade_at,
+       created_at = EXCLUDED.created_at,
+       updated_at = EXCLUDED.updated_at,
+       last_login_at = EXCLUDED.last_login_at,
+       status = EXCLUDED.status`,
+    values
+  );
+}
+
+async function deletePostgresBotUsers(
+  client: PgPool | PoolClient,
+  tableName: string,
+  ids: readonly string[]
+): Promise<void> {
+  if (ids.length === 0) {
+    return;
+  }
+
+  await ensurePostgresBotUsersStore(client, tableName);
+  const escapedTableName = escapeQualifiedIdentifier(getPostgresBotUsersTableName(tableName));
+  await client.query(
+    `DELETE FROM ${escapedTableName}
+     WHERE id = ANY($1::text[])`,
+    [ids]
+  );
+}
+
+async function upsertPostgresBotArchives(
+  client: PgPool | PoolClient,
+  tableName: string,
+  archives: readonly BotArchiveRecord[]
+): Promise<void> {
+  if (archives.length === 0) {
+    return;
+  }
+
+  await ensurePostgresBotArchivesStore(client, tableName);
+  const escapedTableName = escapeQualifiedIdentifier(getPostgresBotArchivesTableName(tableName));
+  const values: unknown[] = [];
+  const placeholders = archives
+    .map((archive, index) => {
+      const offset = index * 18;
+      values.push(
+        archive.id,
+        archive.userId,
+        archive.mentionId,
+        archive.mentionUrl,
+        archive.mentionAuthorHandle,
+        archive.mentionAuthorDisplayName,
+        archive.noteText,
+        archive.targetUrl,
+        archive.targetAuthorHandle,
+        archive.targetAuthorDisplayName,
+        archive.targetText,
+        archive.targetPublishedAt,
+        JSON.stringify(archive.mediaUrls),
+        archive.markdownContent,
+        archive.rawPayloadJson,
+        archive.archivedAt,
+        archive.updatedAt,
+        archive.status
+      );
+      return `($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5}, $${offset + 6}, $${offset + 7}, $${offset + 8}, $${offset + 9}, $${offset + 10}, $${offset + 11}, $${offset + 12}::timestamptz, $${offset + 13}::jsonb, $${offset + 14}, $${offset + 15}, $${offset + 16}::timestamptz, $${offset + 17}::timestamptz, $${offset + 18})`;
+    })
+    .join(", ");
+
+  await client.query(
+    `INSERT INTO ${escapedTableName} (
+       id,
+       user_id,
+       mention_id,
+       mention_url,
+       mention_author_handle,
+       mention_author_display_name,
+       note_text,
+       target_url,
+       target_author_handle,
+       target_author_display_name,
+       target_text,
+       target_published_at,
+       media_urls,
+       markdown_content,
+       raw_payload_json,
+       archived_at,
+       updated_at,
+       status
+     )
+     VALUES ${placeholders}
+     ON CONFLICT (id) DO UPDATE SET
+       user_id = EXCLUDED.user_id,
+       mention_id = EXCLUDED.mention_id,
+       mention_url = EXCLUDED.mention_url,
+       mention_author_handle = EXCLUDED.mention_author_handle,
+       mention_author_display_name = EXCLUDED.mention_author_display_name,
+       note_text = EXCLUDED.note_text,
+       target_url = EXCLUDED.target_url,
+       target_author_handle = EXCLUDED.target_author_handle,
+       target_author_display_name = EXCLUDED.target_author_display_name,
+       target_text = EXCLUDED.target_text,
+       target_published_at = EXCLUDED.target_published_at,
+       media_urls = EXCLUDED.media_urls,
+       markdown_content = EXCLUDED.markdown_content,
+       raw_payload_json = EXCLUDED.raw_payload_json,
+       archived_at = EXCLUDED.archived_at,
+       updated_at = EXCLUDED.updated_at,
+       status = EXCLUDED.status`,
+    values
+  );
+}
+
+async function deletePostgresBotArchives(
+  client: PgPool | PoolClient,
+  tableName: string,
+  ids: readonly string[]
+): Promise<void> {
+  if (ids.length === 0) {
+    return;
+  }
+
+  await ensurePostgresBotArchivesStore(client, tableName);
+  const escapedTableName = escapeQualifiedIdentifier(getPostgresBotArchivesTableName(tableName));
+  await client.query(
+    `DELETE FROM ${escapedTableName}
+     WHERE id = ANY($1::text[])`,
+    [ids]
+  );
+}
+
+async function loadPrimaryDatabasePayload(
+  client: PgPool | PoolClient,
+  backend: PostgresDatabaseBackend
+): Promise<WebDatabase> {
+  await ensurePostgresStore(client, backend.tableName);
+  const escapedTableName = escapeQualifiedIdentifier(backend.tableName);
+  const selected = await client.query<{ payload: unknown }>(
+    `SELECT payload FROM ${escapedTableName} WHERE store_key = $1 LIMIT 1`,
+    [backend.storeKey]
+  );
+  if (selected.rows[0]) {
+    return normalizeDatabasePayload(selected.rows[0].payload);
+  }
+
+  return buildDefaultDatabase();
+}
+
+async function ensurePrimaryPostgresStoreRow(
+  client: PgPool | PoolClient,
+  backend: PostgresDatabaseBackend
+): Promise<void> {
+  await ensurePostgresStore(client, backend.tableName);
+  const escapedTableName = escapeQualifiedIdentifier(backend.tableName);
+  await client.query(
+    `INSERT INTO ${escapedTableName} (store_key, payload, updated_at)
+     VALUES ($1, $2::jsonb, NOW())
+     ON CONFLICT (store_key) DO NOTHING`,
+    [backend.storeKey, JSON.stringify(serializeDatabaseForPostgres(buildDefaultDatabase()))]
+  );
+}
+
+async function maybeSeedPostgresBotUsersStore(
+  client: PgPool | PoolClient,
+  backend: PostgresDatabaseBackend
+): Promise<void> {
+  const botUsersTableName = getPostgresBotUsersTableName(backend.tableName);
+  const cacheKey = `${postgresPoolConnectionString ?? "unknown"}::${botUsersTableName}`;
+  if (seededPostgresBotUserStores.has(cacheKey)) {
+    return;
+  }
+
+  await ensurePostgresBotUsersStore(client, backend.tableName);
+  const escapedTableName = escapeQualifiedIdentifier(botUsersTableName);
+  const countResult = await client.query<{ count: string }>(
+    `SELECT COUNT(*)::text AS count FROM ${escapedTableName}`
+  );
+  if ((countResult.rows[0]?.count ?? "0") === "0") {
+    const database = await loadPrimaryDatabasePayload(client, backend);
+    await upsertPostgresBotUsers(client, backend.tableName, database.botUsers);
+  }
+
+  seededPostgresBotUserStores.add(cacheKey);
+}
+
+async function maybeSeedPostgresBotArchivesStore(
+  client: PgPool | PoolClient,
+  backend: PostgresDatabaseBackend
+): Promise<void> {
+  const botArchivesTableName = getPostgresBotArchivesTableName(backend.tableName);
+  const cacheKey = `${postgresPoolConnectionString ?? "unknown"}::${botArchivesTableName}`;
+  if (seededPostgresBotArchiveStores.has(cacheKey)) {
+    return;
+  }
+
+  await ensurePostgresBotArchivesStore(client, backend.tableName);
+  const escapedTableName = escapeQualifiedIdentifier(botArchivesTableName);
+  const countResult = await client.query<{ count: string }>(
+    `SELECT COUNT(*)::text AS count FROM ${escapedTableName}`
+  );
+  if ((countResult.rows[0]?.count ?? "0") === "0") {
+    const database = await loadPrimaryDatabasePayload(client, backend);
+    await upsertPostgresBotArchives(client, backend.tableName, database.botArchives);
+  }
+
+  seededPostgresBotArchiveStores.add(cacheKey);
+}
+
+async function loadPostgresBotUsers(
+  client: PgPool | PoolClient,
+  backend: PostgresDatabaseBackend
+): Promise<BotUserRecord[]> {
+  await ensurePostgresBotUsersStore(client, backend.tableName);
+  await maybeSeedPostgresBotUsersStore(client, backend);
+  const escapedTableName = escapeQualifiedIdentifier(getPostgresBotUsersTableName(backend.tableName));
+  const result = await client.query<Record<string, unknown>>(
+    `SELECT *
+     FROM ${escapedTableName}
+     ORDER BY updated_at DESC, created_at DESC`
+  );
+  return result.rows.map(normalizePostgresBotUser);
+}
+
+async function loadPostgresBotArchives(
+  client: PgPool | PoolClient,
+  backend: PostgresDatabaseBackend
+): Promise<BotArchiveRecord[]> {
+  await ensurePostgresBotArchivesStore(client, backend.tableName);
+  await maybeSeedPostgresBotArchivesStore(client, backend);
+  const escapedTableName = escapeQualifiedIdentifier(getPostgresBotArchivesTableName(backend.tableName));
+  const result = await client.query<Record<string, unknown>>(
+    `SELECT *
+     FROM ${escapedTableName}
+     ORDER BY updated_at DESC, archived_at DESC`
+  );
+  return result.rows.map(normalizePostgresBotArchive);
+}
+
+async function syncPostgresBotUsers(
+  client: PgPool | PoolClient,
+  backend: PostgresDatabaseBackend,
+  initialUsers: readonly BotUserRecord[],
+  nextUsers: readonly BotUserRecord[]
+): Promise<void> {
+  const initialMarkers = new Map(initialUsers.map((user) => [user.id, buildBotUserSyncMarker(user)]));
+  const nextIds = new Set(nextUsers.map((user) => user.id));
+  const changed = nextUsers.filter((user) => initialMarkers.get(user.id) !== buildBotUserSyncMarker(user));
+  const removed = initialUsers.filter((user) => !nextIds.has(user.id)).map((user) => user.id);
+  await upsertPostgresBotUsers(client, backend.tableName, changed);
+  await deletePostgresBotUsers(client, backend.tableName, removed);
+}
+
+async function syncPostgresBotArchives(
+  client: PgPool | PoolClient,
+  backend: PostgresDatabaseBackend,
+  initialArchives: readonly BotArchiveRecord[],
+  nextArchives: readonly BotArchiveRecord[]
+): Promise<void> {
+  const initialMarkers = new Map(initialArchives.map((archive) => [archive.id, buildBotArchiveSyncMarker(archive)]));
+  const nextIds = new Set(nextArchives.map((archive) => archive.id));
+  const changed = nextArchives.filter(
+    (archive) => initialMarkers.get(archive.id) !== buildBotArchiveSyncMarker(archive)
+  );
+  const removed = initialArchives.filter((archive) => !nextIds.has(archive.id)).map((archive) => archive.id);
+  await upsertPostgresBotArchives(client, backend.tableName, changed);
+  await deletePostgresBotArchives(client, backend.tableName, removed);
 }
 
 async function ensureParentDirectory(filePath: string): Promise<void> {
@@ -354,47 +975,43 @@ async function saveFileDatabase(data: WebDatabase, filePath: string): Promise<vo
 
 async function savePostgresDatabase(data: WebDatabase, backend: PostgresDatabaseBackend): Promise<void> {
   const pool = await getPostgresPool(backend.connectionString);
-  await ensurePostgresStore(pool, backend.tableName);
+  const client = await pool.connect();
   const escapedTableName = escapeQualifiedIdentifier(backend.tableName);
-  await pool.query(
-    `INSERT INTO ${escapedTableName} (store_key, payload, updated_at)
-     VALUES ($1, $2::jsonb, NOW())
-     ON CONFLICT (store_key)
-     DO UPDATE SET payload = EXCLUDED.payload, updated_at = NOW()`,
-    [backend.storeKey, JSON.stringify(data)]
-  );
+
+  try {
+    await client.query("BEGIN");
+    await ensurePrimaryPostgresStoreRow(client, backend);
+    await ensurePostgresBotUsersStore(client, backend.tableName);
+    await ensurePostgresBotArchivesStore(client, backend.tableName);
+
+    const initialBotUsers = await loadPostgresBotUsers(client, backend);
+    const initialBotArchives = await loadPostgresBotArchives(client, backend);
+    await syncPostgresBotUsers(client, backend, initialBotUsers, data.botUsers);
+    await syncPostgresBotArchives(client, backend, initialBotArchives, data.botArchives);
+    await client.query(
+      `INSERT INTO ${escapedTableName} (store_key, payload, updated_at)
+       VALUES ($1, $2::jsonb, NOW())
+       ON CONFLICT (store_key)
+       DO UPDATE SET payload = EXCLUDED.payload, updated_at = NOW()`,
+      [backend.storeKey, JSON.stringify(serializeDatabaseForPostgres(data))]
+    );
+    await client.query("COMMIT");
+  } catch (error) {
+    await client.query("ROLLBACK").catch(() => undefined);
+    throw error;
+  } finally {
+    client.release();
+  }
 }
 
 async function loadDatabaseFromPostgres(backend: PostgresDatabaseBackend): Promise<WebDatabase> {
   const pool = await getPostgresPool(backend.connectionString);
-  await ensurePostgresStore(pool, backend.tableName);
-  const escapedTableName = escapeQualifiedIdentifier(backend.tableName);
-  const selected = await pool.query<{ payload: unknown }>(
-    `SELECT payload FROM ${escapedTableName} WHERE store_key = $1 LIMIT 1`,
-    [backend.storeKey]
-  );
+  await ensurePrimaryPostgresStoreRow(pool, backend);
+  let database = await loadPrimaryDatabasePayload(pool, backend);
 
-  if (selected.rows[0]) {
-    return normalizeDatabasePayload(selected.rows[0].payload);
-  }
-
-  const initial = buildDefaultDatabase();
-  const inserted = await pool.query<{ payload: unknown }>(
-    `INSERT INTO ${escapedTableName} (store_key, payload, updated_at)
-     VALUES ($1, $2::jsonb, NOW())
-     ON CONFLICT (store_key) DO NOTHING
-     RETURNING payload`,
-    [backend.storeKey, JSON.stringify(initial)]
-  );
-  if (inserted.rows[0]) {
-    return normalizeDatabasePayload(inserted.rows[0].payload);
-  }
-
-  const reloaded = await pool.query<{ payload: unknown }>(
-    `SELECT payload FROM ${escapedTableName} WHERE store_key = $1 LIMIT 1`,
-    [backend.storeKey]
-  );
-  return reloaded.rows[0] ? normalizeDatabasePayload(reloaded.rows[0].payload) : initial;
+  database.botUsers = await loadPostgresBotUsers(pool, backend);
+  database.botArchives = await loadPostgresBotArchives(pool, backend);
+  return database;
 }
 
 async function withPostgresDatabaseTransaction<T>(
@@ -407,26 +1024,28 @@ async function withPostgresDatabaseTransaction<T>(
 
   try {
     await client.query("BEGIN");
-    await ensurePostgresStore(client, backend.tableName);
-    await client.query(
-      `INSERT INTO ${escapedTableName} (store_key, payload, updated_at)
-       VALUES ($1, $2::jsonb, NOW())
-       ON CONFLICT (store_key) DO NOTHING`,
-      [backend.storeKey, JSON.stringify(buildDefaultDatabase())]
-    );
+    await ensurePrimaryPostgresStoreRow(client, backend);
+    await ensurePostgresBotUsersStore(client, backend.tableName);
+    await ensurePostgresBotArchivesStore(client, backend.tableName);
 
     const selected = await client.query<{ payload: unknown }>(
       `SELECT payload FROM ${escapedTableName} WHERE store_key = $1 FOR UPDATE`,
       [backend.storeKey]
     );
     const database = selected.rows[0] ? normalizeDatabasePayload(selected.rows[0].payload) : buildDefaultDatabase();
+    const initialBotUsers = await loadPostgresBotUsers(client, backend);
+    const initialBotArchives = await loadPostgresBotArchives(client, backend);
+    database.botUsers = structuredClone(initialBotUsers) as BotUserRecord[];
+    database.botArchives = structuredClone(initialBotArchives) as BotArchiveRecord[];
     const output = await handler(database);
+    await syncPostgresBotUsers(client, backend, initialBotUsers, database.botUsers);
+    await syncPostgresBotArchives(client, backend, initialBotArchives, database.botArchives);
     await client.query(
       `UPDATE ${escapedTableName}
        SET payload = $2::jsonb,
            updated_at = NOW()
        WHERE store_key = $1`,
-      [backend.storeKey, JSON.stringify(database)]
+      [backend.storeKey, JSON.stringify(serializeDatabaseForPostgres(database))]
     );
     await client.query("COMMIT");
     return output;
@@ -485,6 +1104,67 @@ export async function loadDatabaseForConfig(config: RuntimeDatabaseConfig): Prom
   return backend.kind === "postgres" ? loadDatabaseFromPostgres(backend) : loadDatabaseUnsafe(backend.filePath);
 }
 
+export async function loadPrimaryDatabase(filePath?: string): Promise<WebDatabase> {
+  return withDatabaseAccess(async () => {
+    const backend = resolveDatabaseBackend(filePath);
+    if (backend.kind === "postgres") {
+      const pool = await getPostgresPool(backend.connectionString);
+      await ensurePrimaryPostgresStoreRow(pool, backend);
+      return loadPrimaryDatabasePayload(pool, backend);
+    }
+
+    return loadDatabaseUnsafe(backend.filePath);
+  });
+}
+
+export async function withPrimaryDatabaseTransaction<T>(
+  handler: (database: WebDatabase) => Promise<T> | T,
+  filePath?: string
+): Promise<T> {
+  return withDatabaseAccess(async () => {
+    const backend = resolveDatabaseBackend(filePath);
+    if (backend.kind === "postgres") {
+      const pool = await getPostgresPool(backend.connectionString);
+      const client = await pool.connect();
+      const escapedTableName = escapeQualifiedIdentifier(backend.tableName);
+
+      try {
+        await client.query("BEGIN");
+        await ensurePrimaryPostgresStoreRow(client, backend);
+        const selected = await client.query<{ payload: unknown }>(
+          `SELECT payload FROM ${escapedTableName} WHERE store_key = $1 FOR UPDATE`,
+          [backend.storeKey]
+        );
+        const database = selected.rows[0]
+          ? normalizeDatabasePayload(selected.rows[0].payload)
+          : buildDefaultDatabase();
+        const output = await handler(database);
+        await client.query(
+          `UPDATE ${escapedTableName}
+           SET payload = $2::jsonb,
+               updated_at = NOW()
+           WHERE store_key = $1`,
+          [backend.storeKey, JSON.stringify(serializeDatabaseForPostgres(database))]
+        );
+        await client.query("COMMIT");
+        return output;
+      } catch (error) {
+        await client.query("ROLLBACK").catch(() => undefined);
+        throw error;
+      } finally {
+        client.release();
+      }
+    }
+
+    return withDatabaseLock(async () => {
+      const database = await loadDatabaseUnsafe(backend.filePath);
+      const output = await handler(database);
+      await saveFileDatabase(database, backend.filePath);
+      return output;
+    });
+  });
+}
+
 export async function saveDatabaseForConfig(data: WebDatabase, config: RuntimeDatabaseConfig): Promise<void> {
   const backend = resolveDatabaseBackendFromConfig(config);
   if (backend.kind === "postgres") {
@@ -500,11 +1180,751 @@ export async function testDatabaseConfig(config: RuntimeDatabaseConfig): Promise
   if (backend.kind === "postgres") {
     const pool = await getPostgresPool(backend.connectionString);
     await ensurePostgresStore(pool, backend.tableName);
+    await ensurePostgresMentionJobsStore(pool, backend.tableName);
+    await ensurePostgresBotUsersStore(pool, backend.tableName);
+    await ensurePostgresBotArchivesStore(pool, backend.tableName);
     await pool.query("SELECT 1");
     return;
   }
 
   await ensureParentDirectory(backend.filePath);
+}
+
+export async function loadBotMentionJobs(filePath?: string): Promise<BotMentionJobRecord[]> {
+  return withDatabaseAccess(async () => {
+    const backend = resolveDatabaseBackend(filePath);
+    if (backend.kind === "postgres") {
+      const pool = await getPostgresPool(backend.connectionString);
+      await ensurePostgresMentionJobsStore(pool, backend.tableName);
+      const escapedTableName = escapeQualifiedIdentifier(getPostgresMentionJobsTableName(backend.tableName));
+      const result = await pool.query<Record<string, unknown>>(
+        `SELECT *
+         FROM ${escapedTableName}
+         ORDER BY created_at DESC`
+      );
+      return result.rows.map(normalizePostgresBotMentionJob);
+    }
+
+    return (await loadDatabaseUnsafe(backend.filePath)).botMentionJobs.map((candidate) => ({ ...candidate }));
+  });
+}
+
+export async function loadBotUsers(filePath?: string): Promise<BotUserRecord[]> {
+  return withDatabaseAccess(async () => {
+    const backend = resolveDatabaseBackend(filePath);
+    if (backend.kind === "postgres") {
+      const pool = await getPostgresPool(backend.connectionString);
+      return loadPostgresBotUsers(pool, backend);
+    }
+
+    return (await loadDatabaseUnsafe(backend.filePath)).botUsers.map((candidate) => ({
+      ...candidate,
+      grantedScopes: [...candidate.grantedScopes]
+    }));
+  });
+}
+
+export async function loadBotArchives(filePath?: string): Promise<BotArchiveRecord[]> {
+  return withDatabaseAccess(async () => {
+    const backend = resolveDatabaseBackend(filePath);
+    if (backend.kind === "postgres") {
+      const pool = await getPostgresPool(backend.connectionString);
+      return loadPostgresBotArchives(pool, backend);
+    }
+
+    return (await loadDatabaseUnsafe(backend.filePath)).botArchives.map((candidate) => ({
+      ...candidate,
+      mediaUrls: [...candidate.mediaUrls]
+    }));
+  });
+}
+
+export async function loadBotMentionReadState(filePath?: string): Promise<{
+  activeUserIds: string[];
+  activeUserHandles: string[];
+  knownMentionIds: string[];
+}> {
+  return withDatabaseAccess(async () => {
+    const backend = resolveDatabaseBackend(filePath);
+    if (backend.kind === "postgres") {
+      const pool = await getPostgresPool(backend.connectionString);
+      await ensurePostgresBotUsersStore(pool, backend.tableName);
+      await ensurePostgresBotArchivesStore(pool, backend.tableName);
+      await ensurePostgresMentionJobsStore(pool, backend.tableName);
+      await maybeSeedPostgresBotUsersStore(pool, backend);
+      await maybeSeedPostgresBotArchivesStore(pool, backend);
+
+      const usersTableName = escapeQualifiedIdentifier(getPostgresBotUsersTableName(backend.tableName));
+      const archivesTableName = escapeQualifiedIdentifier(getPostgresBotArchivesTableName(backend.tableName));
+      const mentionJobsTableName = escapeQualifiedIdentifier(getPostgresMentionJobsTableName(backend.tableName));
+
+      const activeUsersResult = await pool.query<Record<string, unknown>>(
+        `SELECT threads_user_id, threads_handle
+         FROM ${usersTableName}
+         WHERE status = 'active'`
+      );
+      const knownMentionIdsResult = await pool.query<Record<string, unknown>>(
+        `SELECT mention_id
+         FROM ${archivesTableName}
+         WHERE mention_id IS NOT NULL
+         UNION
+         SELECT mention_id
+         FROM ${mentionJobsTableName}`
+      );
+
+      return {
+        activeUserIds: activeUsersResult.rows
+          .map((row) => (typeof row.threads_user_id === "string" ? row.threads_user_id : ""))
+          .filter(Boolean),
+        activeUserHandles: activeUsersResult.rows
+          .map((row) => normalizeThreadsHandle(typeof row.threads_handle === "string" ? row.threads_handle : ""))
+          .filter(Boolean),
+        knownMentionIds: knownMentionIdsResult.rows
+          .map((row) => (typeof row.mention_id === "string" ? row.mention_id.trim() : ""))
+          .filter(Boolean)
+      };
+    }
+
+    const database = await loadDatabaseUnsafe(backend.filePath);
+    return {
+      activeUserIds: database.botUsers
+        .filter((candidate) => candidate.status === "active")
+        .map((candidate) => candidate.threadsUserId ?? "")
+        .filter(Boolean),
+      activeUserHandles: database.botUsers
+        .filter((candidate) => candidate.status === "active")
+        .map((candidate) => normalizeThreadsHandle(candidate.threadsHandle))
+        .filter(Boolean),
+      knownMentionIds: [
+        ...database.botArchives.map((candidate) => candidate.mentionId ?? ""),
+        ...database.botMentionJobs.map((candidate) => candidate.mentionId)
+      ].filter(Boolean)
+    };
+  });
+}
+
+export async function findBotUserByThreadsUserId(
+  rawThreadsUserId: string | null | undefined,
+  filePath?: string
+): Promise<BotUserRecord | null> {
+  const threadsUserId = typeof rawThreadsUserId === "string" ? rawThreadsUserId.trim() : "";
+  if (!threadsUserId) {
+    return null;
+  }
+
+  return withDatabaseAccess(async () => {
+    const backend = resolveDatabaseBackend(filePath);
+    if (backend.kind === "postgres") {
+      const pool = await getPostgresPool(backend.connectionString);
+      await ensurePostgresBotUsersStore(pool, backend.tableName);
+      await maybeSeedPostgresBotUsersStore(pool, backend);
+      const escapedTableName = escapeQualifiedIdentifier(getPostgresBotUsersTableName(backend.tableName));
+      const result = await pool.query<Record<string, unknown>>(
+        `SELECT *
+         FROM ${escapedTableName}
+         WHERE threads_user_id = $1
+           AND status = 'active'
+         LIMIT 1`,
+        [threadsUserId]
+      );
+      return result.rows[0] ? normalizePostgresBotUser(result.rows[0]) : null;
+    }
+
+    return (
+      (await loadDatabaseUnsafe(backend.filePath)).botUsers.find(
+        (candidate) => candidate.threadsUserId === threadsUserId && candidate.status === "active"
+      ) ?? null
+    );
+  });
+}
+
+export async function findBotUserByHandle(
+  rawHandle: string | null | undefined,
+  filePath?: string
+): Promise<BotUserRecord | null> {
+  const handle = normalizeThreadsHandle(rawHandle);
+  if (!handle) {
+    return null;
+  }
+
+  return withDatabaseAccess(async () => {
+    const backend = resolveDatabaseBackend(filePath);
+    if (backend.kind === "postgres") {
+      const pool = await getPostgresPool(backend.connectionString);
+      await ensurePostgresBotUsersStore(pool, backend.tableName);
+      await maybeSeedPostgresBotUsersStore(pool, backend);
+      const escapedTableName = escapeQualifiedIdentifier(getPostgresBotUsersTableName(backend.tableName));
+      const result = await pool.query<Record<string, unknown>>(
+        `SELECT *
+         FROM ${escapedTableName}
+         WHERE threads_handle = $1
+           AND status = 'active'
+         LIMIT 1`,
+        [handle]
+      );
+      return result.rows[0] ? normalizePostgresBotUser(result.rows[0]) : null;
+    }
+
+    return (
+      (await loadDatabaseUnsafe(backend.filePath)).botUsers.find(
+        (candidate) => normalizeThreadsHandle(candidate.threadsHandle) === handle && candidate.status === "active"
+      ) ?? null
+    );
+  });
+}
+
+export async function findBotUserById(
+  userId: string | null | undefined,
+  filePath?: string
+): Promise<BotUserRecord | null> {
+  const normalizedUserId = typeof userId === "string" ? userId.trim() : "";
+  if (!normalizedUserId) {
+    return null;
+  }
+
+  return withDatabaseAccess(async () => {
+    const backend = resolveDatabaseBackend(filePath);
+    if (backend.kind === "postgres") {
+      const pool = await getPostgresPool(backend.connectionString);
+      await ensurePostgresBotUsersStore(pool, backend.tableName);
+      await maybeSeedPostgresBotUsersStore(pool, backend);
+      const escapedTableName = escapeQualifiedIdentifier(getPostgresBotUsersTableName(backend.tableName));
+      const result = await pool.query<Record<string, unknown>>(
+        `SELECT *
+         FROM ${escapedTableName}
+         WHERE id = $1
+           AND status = 'active'
+         LIMIT 1`,
+        [normalizedUserId]
+      );
+      return result.rows[0] ? normalizePostgresBotUser(result.rows[0]) : null;
+    }
+
+    return (
+      (await loadDatabaseUnsafe(backend.filePath)).botUsers.find(
+        (candidate) => candidate.id === normalizedUserId && candidate.status === "active"
+      ) ?? null
+    );
+  });
+}
+
+export async function saveBotUserRecord(user: BotUserRecord, filePath?: string): Promise<void> {
+  await withDatabaseAccess(async () => {
+    const backend = resolveDatabaseBackend(filePath);
+    if (backend.kind === "postgres") {
+      const pool = await getPostgresPool(backend.connectionString);
+      await upsertPostgresBotUsers(pool, backend.tableName, [user]);
+      return;
+    }
+
+    await withDatabaseLock(async () => {
+      const database = await loadDatabaseUnsafe(backend.filePath);
+      upsertBotUser(database, user);
+      await saveFileDatabase(database, backend.filePath);
+    });
+  });
+}
+
+export async function findBotArchiveByMention(
+  userId: string,
+  mentionId: string | null | undefined,
+  mentionUrl: string,
+  filePath?: string
+): Promise<BotArchiveRecord | null> {
+  const normalizedUserId = userId.trim();
+  const normalizedMentionId = typeof mentionId === "string" ? mentionId.trim() : "";
+  const normalizedMentionUrl = mentionUrl.trim();
+  if (!normalizedUserId || !normalizedMentionUrl) {
+    return null;
+  }
+
+  return withDatabaseAccess(async () => {
+    const backend = resolveDatabaseBackend(filePath);
+    if (backend.kind === "postgres") {
+      const pool = await getPostgresPool(backend.connectionString);
+      await ensurePostgresBotArchivesStore(pool, backend.tableName);
+      await maybeSeedPostgresBotArchivesStore(pool, backend);
+      const escapedTableName = escapeQualifiedIdentifier(getPostgresBotArchivesTableName(backend.tableName));
+      const result = await pool.query<Record<string, unknown>>(
+        `SELECT *
+         FROM ${escapedTableName}
+         WHERE user_id = $1
+           AND (
+             ($2::text <> '' AND mention_id = $2)
+             OR mention_url = $3
+           )
+         ORDER BY CASE WHEN $2::text <> '' AND mention_id = $2 THEN 0 ELSE 1 END, updated_at DESC
+         LIMIT 1`,
+        [normalizedUserId, normalizedMentionId, normalizedMentionUrl]
+      );
+      return result.rows[0] ? normalizePostgresBotArchive(result.rows[0]) : null;
+    }
+
+    return (
+      (await loadDatabaseUnsafe(backend.filePath)).botArchives.find((candidate) => {
+        if (candidate.userId !== normalizedUserId) {
+          return false;
+        }
+        if (normalizedMentionId && candidate.mentionId) {
+          return candidate.mentionId === normalizedMentionId;
+        }
+        return candidate.mentionUrl === normalizedMentionUrl;
+      }) ?? null
+    );
+  });
+}
+
+export async function findBotArchiveById(
+  userId: string,
+  archiveId: string | null | undefined,
+  filePath?: string
+): Promise<BotArchiveRecord | null> {
+  const normalizedUserId = userId.trim();
+  const normalizedArchiveId = typeof archiveId === "string" ? archiveId.trim() : "";
+  if (!normalizedUserId || !normalizedArchiveId) {
+    return null;
+  }
+
+  return withDatabaseAccess(async () => {
+    const backend = resolveDatabaseBackend(filePath);
+    if (backend.kind === "postgres") {
+      const pool = await getPostgresPool(backend.connectionString);
+      await ensurePostgresBotArchivesStore(pool, backend.tableName);
+      await maybeSeedPostgresBotArchivesStore(pool, backend);
+      const escapedTableName = escapeQualifiedIdentifier(getPostgresBotArchivesTableName(backend.tableName));
+      const result = await pool.query<Record<string, unknown>>(
+        `SELECT *
+         FROM ${escapedTableName}
+         WHERE user_id = $1
+           AND id = $2
+         LIMIT 1`,
+        [normalizedUserId, normalizedArchiveId]
+      );
+      return result.rows[0] ? normalizePostgresBotArchive(result.rows[0]) : null;
+    }
+
+    return (
+      (await loadDatabaseUnsafe(backend.filePath)).botArchives.find(
+        (candidate) => candidate.userId === normalizedUserId && candidate.id === normalizedArchiveId
+      ) ?? null
+    );
+  });
+}
+
+export async function listBotArchivesForUser(
+  userId: string,
+  filePath?: string
+): Promise<BotArchiveRecord[]> {
+  const normalizedUserId = userId.trim();
+  if (!normalizedUserId) {
+    return [];
+  }
+
+  return withDatabaseAccess(async () => {
+    const backend = resolveDatabaseBackend(filePath);
+    if (backend.kind === "postgres") {
+      const pool = await getPostgresPool(backend.connectionString);
+      await ensurePostgresBotArchivesStore(pool, backend.tableName);
+      await maybeSeedPostgresBotArchivesStore(pool, backend);
+      const escapedTableName = escapeQualifiedIdentifier(getPostgresBotArchivesTableName(backend.tableName));
+      const result = await pool.query<Record<string, unknown>>(
+        `SELECT *
+         FROM ${escapedTableName}
+         WHERE user_id = $1
+         ORDER BY updated_at DESC, archived_at DESC`,
+        [normalizedUserId]
+      );
+      return result.rows.map(normalizePostgresBotArchive);
+    }
+
+    return (await loadDatabaseUnsafe(backend.filePath)).botArchives
+      .filter((candidate) => candidate.userId === normalizedUserId)
+      .map((candidate) => ({ ...candidate, mediaUrls: [...candidate.mediaUrls] }));
+  });
+}
+
+export async function findBotArchivesByIds(
+  userId: string,
+  archiveIds: readonly string[],
+  filePath?: string
+): Promise<BotArchiveRecord[]> {
+  const normalizedUserId = userId.trim();
+  const ids = [...new Set(archiveIds.map((value) => value.trim()).filter(Boolean))];
+  if (!normalizedUserId || ids.length === 0) {
+    return [];
+  }
+
+  return withDatabaseAccess(async () => {
+    const backend = resolveDatabaseBackend(filePath);
+    if (backend.kind === "postgres") {
+      const pool = await getPostgresPool(backend.connectionString);
+      await ensurePostgresBotArchivesStore(pool, backend.tableName);
+      await maybeSeedPostgresBotArchivesStore(pool, backend);
+      const escapedTableName = escapeQualifiedIdentifier(getPostgresBotArchivesTableName(backend.tableName));
+      const result = await pool.query<Record<string, unknown>>(
+        `SELECT *
+         FROM ${escapedTableName}
+         WHERE user_id = $1
+           AND id = ANY($2::text[])`,
+        [normalizedUserId, ids]
+      );
+      return result.rows.map(normalizePostgresBotArchive);
+    }
+
+    const byId = new Set(ids);
+    return (await loadDatabaseUnsafe(backend.filePath)).botArchives
+      .filter((candidate) => candidate.userId === normalizedUserId && byId.has(candidate.id))
+      .map((candidate) => ({ ...candidate, mediaUrls: [...candidate.mediaUrls] }));
+  });
+}
+
+export async function saveBotArchiveRecord(archive: BotArchiveRecord, filePath?: string): Promise<void> {
+  await withDatabaseAccess(async () => {
+    const backend = resolveDatabaseBackend(filePath);
+    if (backend.kind === "postgres") {
+      const pool = await getPostgresPool(backend.connectionString);
+      await upsertPostgresBotArchives(pool, backend.tableName, [archive]);
+      return;
+    }
+
+    await withDatabaseLock(async () => {
+      const database = await loadDatabaseUnsafe(backend.filePath);
+      upsertBotArchive(database, archive);
+      await saveFileDatabase(database, backend.filePath);
+    });
+  });
+}
+
+export async function deleteBotArchiveRecord(
+  userId: string,
+  archiveId: string,
+  filePath?: string
+): Promise<boolean> {
+  const normalizedUserId = userId.trim();
+  const normalizedArchiveId = archiveId.trim();
+  if (!normalizedUserId || !normalizedArchiveId) {
+    return false;
+  }
+
+  return withDatabaseAccess(async () => {
+    const backend = resolveDatabaseBackend(filePath);
+    if (backend.kind === "postgres") {
+      const pool = await getPostgresPool(backend.connectionString);
+      await ensurePostgresBotArchivesStore(pool, backend.tableName);
+      const escapedTableName = escapeQualifiedIdentifier(getPostgresBotArchivesTableName(backend.tableName));
+      const result = await pool.query(
+        `DELETE FROM ${escapedTableName}
+         WHERE user_id = $1
+           AND id = $2`,
+        [normalizedUserId, normalizedArchiveId]
+      );
+      return (result.rowCount ?? 0) > 0;
+    }
+
+    return withDatabaseLock(async () => {
+      const database = await loadDatabaseUnsafe(backend.filePath);
+      const index = database.botArchives.findIndex(
+        (candidate) => candidate.userId === normalizedUserId && candidate.id === normalizedArchiveId
+      );
+      if (index < 0) {
+        return false;
+      }
+      database.botArchives.splice(index, 1);
+      await saveFileDatabase(database, backend.filePath);
+      return true;
+    });
+  });
+}
+
+export async function enqueueBotMentionJobs(
+  jobs: BotMentionJobRecord[],
+  options?: {
+    forceRequeue?: boolean;
+    filePath?: string;
+  }
+): Promise<number> {
+  const forceRequeue = options?.forceRequeue === true;
+  return withDatabaseAccess(async () => {
+    const backend = resolveDatabaseBackend(options?.filePath);
+    if (backend.kind === "postgres") {
+      if (jobs.length === 0) {
+        return 0;
+      }
+
+      const pool = await getPostgresPool(backend.connectionString);
+      await ensurePostgresMentionJobsStore(pool, backend.tableName);
+      const escapedTableName = escapeQualifiedIdentifier(getPostgresMentionJobsTableName(backend.tableName));
+      const values: unknown[] = [];
+      const placeholders = jobs.map((job, index) => {
+        const offset = index * 14;
+        values.push(
+          job.id,
+          job.mentionId,
+          job.mentionUrl,
+          job.mentionAuthorHandle,
+          job.mentionAuthorUserId,
+          job.mentionText,
+          job.mentionPublishedAt,
+          job.rawSummaryJson ? JSON.parse(job.rawSummaryJson) : null,
+          job.attempts,
+          job.status,
+          job.lastError,
+          job.availableAt,
+          job.createdAt,
+          job.updatedAt
+        );
+        return `($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5}, $${offset + 6}, $${offset + 7}, $${offset + 8}::jsonb, $${offset + 9}, $${offset + 10}, $${offset + 11}, $${offset + 12}, $${offset + 13}, $${offset + 14})`;
+      }).join(", ");
+
+      const query = forceRequeue
+        ? `INSERT INTO ${escapedTableName} (
+             id,
+             mention_id,
+             mention_url,
+             mention_author_handle,
+             mention_author_user_id,
+             mention_text,
+             mention_published_at,
+             raw_summary_json,
+             attempts,
+             status,
+             last_error,
+             available_at,
+             created_at,
+             updated_at
+           )
+           VALUES ${placeholders}
+           ON CONFLICT (mention_id) DO UPDATE SET
+             mention_url = EXCLUDED.mention_url,
+             mention_author_handle = EXCLUDED.mention_author_handle,
+             mention_author_user_id = EXCLUDED.mention_author_user_id,
+             mention_text = EXCLUDED.mention_text,
+             mention_published_at = EXCLUDED.mention_published_at,
+             raw_summary_json = EXCLUDED.raw_summary_json,
+             status = 'queued',
+             last_error = NULL,
+             available_at = EXCLUDED.available_at,
+             leased_at = NULL,
+             processed_at = NULL,
+             updated_at = EXCLUDED.updated_at`
+        : `INSERT INTO ${escapedTableName} (
+             id,
+             mention_id,
+             mention_url,
+             mention_author_handle,
+             mention_author_user_id,
+             mention_text,
+             mention_published_at,
+             raw_summary_json,
+             attempts,
+             status,
+             last_error,
+             available_at,
+             created_at,
+             updated_at
+           )
+           VALUES ${placeholders}
+           ON CONFLICT (mention_id) DO NOTHING`;
+      const result = await pool.query(query, values);
+      return result.rowCount ?? 0;
+    }
+
+    return withDatabaseLock(async () => {
+      const database = await loadDatabaseUnsafe(backend.filePath);
+      let enqueued = 0;
+      for (const job of jobs) {
+        const existingJob = database.botMentionJobs.find((candidate) => candidate.mentionId === job.mentionId);
+        if (existingJob) {
+          if (!forceRequeue) {
+            continue;
+          }
+
+          Object.assign(existingJob, {
+            ...job,
+            status: "queued",
+            lastError: null,
+            leasedAt: null,
+            processedAt: null
+          });
+          upsertBotMentionJob(database, existingJob);
+          enqueued += 1;
+          continue;
+        }
+
+        upsertBotMentionJob(database, job);
+        enqueued += 1;
+      }
+
+      await saveFileDatabase(database, backend.filePath);
+      return enqueued;
+    });
+  });
+}
+
+export async function claimBotMentionJobs(
+  now: string,
+  batchSize: number,
+  leaseMs: number,
+  filePath?: string
+): Promise<BotMentionJobRecord[]> {
+  return withDatabaseAccess(async () => {
+    const backend = resolveDatabaseBackend(filePath);
+    if (backend.kind === "postgres") {
+      const pool = await getPostgresPool(backend.connectionString);
+      const client = await pool.connect();
+      const escapedTableName = escapeQualifiedIdentifier(getPostgresMentionJobsTableName(backend.tableName));
+      try {
+        await client.query("BEGIN");
+        await ensurePostgresMentionJobsStore(client, backend.tableName);
+        const result = await client.query<Record<string, unknown>>(
+          `WITH claimable AS (
+             SELECT id
+             FROM ${escapedTableName}
+             WHERE available_at <= $1::timestamptz
+               AND (
+                 status IN ('queued', 'failed')
+                 OR (
+                   status = 'processing'
+                   AND COALESCE(leased_at, available_at) <= $2::timestamptz
+                 )
+               )
+             ORDER BY available_at ASC, created_at ASC
+             FOR UPDATE SKIP LOCKED
+             LIMIT $3
+           )
+           UPDATE ${escapedTableName} AS jobs
+           SET status = 'processing',
+               attempts = jobs.attempts + 1,
+               leased_at = $1::timestamptz,
+               updated_at = $1::timestamptz
+           FROM claimable
+           WHERE jobs.id = claimable.id
+           RETURNING jobs.*`,
+          [now, new Date(Date.parse(now) - leaseMs).toISOString(), batchSize]
+        );
+        await client.query("COMMIT");
+        return result.rows.map(normalizePostgresBotMentionJob);
+      } catch (error) {
+        await client.query("ROLLBACK").catch(() => undefined);
+        throw error;
+      } finally {
+        client.release();
+      }
+    }
+
+    return withDatabaseLock(async () => {
+      const database = await loadDatabaseUnsafe(backend.filePath);
+      const nowMs = Date.parse(now);
+      const claimed = database.botMentionJobs
+        .filter((candidate) => {
+          if (Date.parse(candidate.availableAt) > nowMs) {
+            return false;
+          }
+          if (candidate.status === "queued" || candidate.status === "failed") {
+            return true;
+          }
+          if (candidate.status !== "processing") {
+            return false;
+          }
+
+          const leasedAt = candidate.leasedAt ? Date.parse(candidate.leasedAt) : 0;
+          return leasedAt + leaseMs <= nowMs;
+        })
+        .sort((left, right) => Date.parse(left.availableAt) - Date.parse(right.availableAt) || Date.parse(left.createdAt) - Date.parse(right.createdAt))
+        .slice(0, batchSize)
+        .map((candidate) => {
+          candidate.status = "processing";
+          candidate.attempts = Math.max(0, candidate.attempts) + 1;
+          candidate.leasedAt = now;
+          candidate.updatedAt = now;
+          upsertBotMentionJob(database, candidate);
+          return { ...candidate };
+        });
+
+      await saveFileDatabase(database, backend.filePath);
+      return claimed;
+    });
+  });
+}
+
+export async function finalizeBotMentionJob(
+  mentionId: string,
+  update: Pick<BotMentionJobRecord, "status" | "lastError" | "availableAt" | "leasedAt" | "processedAt" | "updatedAt">,
+  filePath?: string
+): Promise<void> {
+  await withDatabaseAccess(async () => {
+    const backend = resolveDatabaseBackend(filePath);
+    if (backend.kind === "postgres") {
+      const pool = await getPostgresPool(backend.connectionString);
+      await ensurePostgresMentionJobsStore(pool, backend.tableName);
+      const escapedTableName = escapeQualifiedIdentifier(getPostgresMentionJobsTableName(backend.tableName));
+      await pool.query(
+        `UPDATE ${escapedTableName}
+         SET status = $2,
+             last_error = $3,
+             available_at = $4::timestamptz,
+             leased_at = $5::timestamptz,
+             processed_at = $6::timestamptz,
+             updated_at = $7::timestamptz
+         WHERE mention_id = $1`,
+        [
+          mentionId,
+          update.status,
+          update.lastError,
+          update.availableAt,
+          update.leasedAt,
+          update.processedAt,
+          update.updatedAt
+        ]
+      );
+      return;
+    }
+
+    await withDatabaseLock(async () => {
+      const database = await loadDatabaseUnsafe(backend.filePath);
+      const job = database.botMentionJobs.find((candidate) => candidate.mentionId === mentionId);
+      if (!job) {
+        return;
+      }
+
+      Object.assign(job, update);
+      upsertBotMentionJob(database, job);
+      await saveFileDatabase(database, backend.filePath);
+    });
+  });
+}
+
+export async function pruneBotMentionJobs(
+  cutoffIso: string,
+  filePath?: string
+): Promise<void> {
+  await withDatabaseAccess(async () => {
+    const backend = resolveDatabaseBackend(filePath);
+    if (backend.kind === "postgres") {
+      const pool = await getPostgresPool(backend.connectionString);
+      await ensurePostgresMentionJobsStore(pool, backend.tableName);
+      const escapedTableName = escapeQualifiedIdentifier(getPostgresMentionJobsTableName(backend.tableName));
+      await pool.query(
+        `DELETE FROM ${escapedTableName}
+         WHERE status IN ('completed', 'invalid', 'unmatched')
+           AND updated_at < $1::timestamptz`,
+        [cutoffIso]
+      );
+      return;
+    }
+
+    await withDatabaseLock(async () => {
+      const database = await loadDatabaseUnsafe(backend.filePath);
+      const cutoff = Date.parse(cutoffIso);
+      database.botMentionJobs = database.botMentionJobs.filter((candidate) => {
+        if (candidate.status === "queued" || candidate.status === "processing" || candidate.status === "failed") {
+          return true;
+        }
+        return Date.parse(candidate.updatedAt) >= cutoff;
+      });
+      await saveFileDatabase(database, backend.filePath);
+    });
+  });
 }
 
 export function buildDashboardSummary(data: WebDatabase): DashboardSummary {
@@ -717,6 +2137,16 @@ export function upsertBotExtensionAccessToken(data: WebDatabase, token: BotExten
   }
 
   data.botExtensionAccessTokens.unshift(token);
+}
+
+export function upsertBotMentionJob(data: WebDatabase, job: BotMentionJobRecord): void {
+  const index = data.botMentionJobs.findIndex((candidate) => candidate.id === job.id);
+  if (index >= 0) {
+    data.botMentionJobs[index] = job;
+    return;
+  }
+
+  data.botMentionJobs.unshift(job);
 }
 
 export function upsertBotArchive(data: WebDatabase, archive: BotArchiveRecord): void {

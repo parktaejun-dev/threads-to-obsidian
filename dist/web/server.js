@@ -10176,6 +10176,7 @@ function buildDefaultDatabase(now = (/* @__PURE__ */ new Date()).toISOString()) 
     botSessions: [],
     botExtensionLinkSessions: [],
     botExtensionAccessTokens: [],
+    botMentionJobs: [],
     botArchives: [],
     cloudArchives: [],
     watchlists: [],
@@ -10423,6 +10424,11 @@ var databaseOperationChain = Promise.resolve();
 var postgresPool = null;
 var postgresPoolConnectionString = null;
 var ensuredPostgresStores = /* @__PURE__ */ new Set();
+var ensuredPostgresMentionJobStores = /* @__PURE__ */ new Set();
+var ensuredPostgresBotUserStores = /* @__PURE__ */ new Set();
+var ensuredPostgresBotArchiveStores = /* @__PURE__ */ new Set();
+var seededPostgresBotUserStores = /* @__PURE__ */ new Set();
+var seededPostgresBotArchiveStores = /* @__PURE__ */ new Set();
 var activeDatabaseAccessCount = 0;
 var databaseReconfigurationBarrier = null;
 var releaseDatabaseReconfigurationBarrier = null;
@@ -10514,6 +10520,15 @@ function escapeQualifiedIdentifier(identifier) {
 function isRecord(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
+function normalizeThreadsHandle(value) {
+  return (value ?? "").trim().replace(/^@+/, "").toLowerCase();
+}
+function readStringArray(value) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value.map((entry) => typeof entry === "string" ? entry.trim() : "").filter((entry) => Boolean(entry));
+}
 function normalizeDatabasePayload(raw) {
   const parsed = isRecord(raw) ? raw : {};
   const fallback = buildDefaultDatabase();
@@ -10568,6 +10583,7 @@ function normalizeDatabasePayload(raw) {
     botSessions: Array.isArray(parsed.botSessions) ? parsed.botSessions : [],
     botExtensionLinkSessions: Array.isArray(parsed.botExtensionLinkSessions) ? parsed.botExtensionLinkSessions : [],
     botExtensionAccessTokens: Array.isArray(parsed.botExtensionAccessTokens) ? parsed.botExtensionAccessTokens : [],
+    botMentionJobs: Array.isArray(parsed.botMentionJobs) ? parsed.botMentionJobs : [],
     botArchives: Array.isArray(parsed.botArchives) ? parsed.botArchives : [],
     cloudArchives: Array.isArray(parsed.cloudArchives) ? parsed.cloudArchives : [],
     watchlists: Array.isArray(parsed.watchlists) ? parsed.watchlists : [],
@@ -10608,6 +10624,515 @@ async function ensurePostgresStore(client, tableName) {
     )`
   );
   ensuredPostgresStores.add(cacheKey);
+}
+function getPostgresMentionJobsTableName(tableName) {
+  const parts = tableName.split(".");
+  const baseName = parts.pop() ?? DEFAULT_POSTGRES_TABLE2;
+  return [...parts, `${baseName}_bot_mention_jobs`].join(".");
+}
+function getPostgresBotUsersTableName(tableName) {
+  const parts = tableName.split(".");
+  const baseName = parts.pop() ?? DEFAULT_POSTGRES_TABLE2;
+  return [...parts, `${baseName}_bot_users`].join(".");
+}
+function getPostgresBotArchivesTableName(tableName) {
+  const parts = tableName.split(".");
+  const baseName = parts.pop() ?? DEFAULT_POSTGRES_TABLE2;
+  return [...parts, `${baseName}_bot_archives`].join(".");
+}
+async function ensurePostgresMentionJobsStore(client, tableName) {
+  const mentionJobsTableName = getPostgresMentionJobsTableName(tableName);
+  const cacheKey = `${postgresPoolConnectionString ?? "unknown"}::${mentionJobsTableName}`;
+  if (ensuredPostgresMentionJobStores.has(cacheKey)) {
+    return;
+  }
+  const escapedTableName = escapeQualifiedIdentifier(mentionJobsTableName);
+  await client.query(
+    `CREATE TABLE IF NOT EXISTS ${escapedTableName} (
+      id TEXT PRIMARY KEY,
+      mention_id TEXT NOT NULL UNIQUE,
+      mention_url TEXT,
+      mention_author_handle TEXT,
+      mention_author_user_id TEXT,
+      mention_text TEXT,
+      mention_published_at TIMESTAMPTZ,
+      raw_summary_json JSONB,
+      attempts INTEGER NOT NULL DEFAULT 0,
+      status TEXT NOT NULL,
+      last_error TEXT,
+      available_at TIMESTAMPTZ NOT NULL,
+      leased_at TIMESTAMPTZ,
+      processed_at TIMESTAMPTZ,
+      created_at TIMESTAMPTZ NOT NULL,
+      updated_at TIMESTAMPTZ NOT NULL
+    )`
+  );
+  await client.query(
+    `CREATE INDEX IF NOT EXISTS ${escapeQualifiedIdentifier(`${mentionJobsTableName.replaceAll(".", "_")}_claimable_idx`)}
+     ON ${escapedTableName} (status, available_at, created_at)`
+  );
+  ensuredPostgresMentionJobStores.add(cacheKey);
+}
+async function ensurePostgresBotUsersStore(client, tableName) {
+  const botUsersTableName = getPostgresBotUsersTableName(tableName);
+  const cacheKey = `${postgresPoolConnectionString ?? "unknown"}::${botUsersTableName}`;
+  if (ensuredPostgresBotUserStores.has(cacheKey)) {
+    return;
+  }
+  const escapedTableName = escapeQualifiedIdentifier(botUsersTableName);
+  await client.query(
+    `CREATE TABLE IF NOT EXISTS ${escapedTableName} (
+      id TEXT PRIMARY KEY,
+      threads_user_id TEXT,
+      threads_handle TEXT NOT NULL,
+      display_name TEXT,
+      profile_picture_url TEXT,
+      biography TEXT,
+      is_verified BOOLEAN NOT NULL DEFAULT FALSE,
+      access_token_ciphertext TEXT,
+      token_expires_at TIMESTAMPTZ,
+      email TEXT,
+      granted_scopes JSONB NOT NULL DEFAULT '[]'::jsonb,
+      scope_version INTEGER NOT NULL DEFAULT 0,
+      last_scope_upgrade_at TIMESTAMPTZ,
+      created_at TIMESTAMPTZ NOT NULL,
+      updated_at TIMESTAMPTZ NOT NULL,
+      last_login_at TIMESTAMPTZ,
+      status TEXT NOT NULL
+    )`
+  );
+  await client.query(
+    `CREATE UNIQUE INDEX IF NOT EXISTS ${escapeQualifiedIdentifier(`${botUsersTableName.replaceAll(".", "_")}_threads_handle_uidx`)}
+     ON ${escapedTableName} (threads_handle)`
+  );
+  await client.query(
+    `CREATE UNIQUE INDEX IF NOT EXISTS ${escapeQualifiedIdentifier(`${botUsersTableName.replaceAll(".", "_")}_threads_user_id_uidx`)}
+     ON ${escapedTableName} (threads_user_id)
+     WHERE threads_user_id IS NOT NULL`
+  );
+  await client.query(
+    `CREATE INDEX IF NOT EXISTS ${escapeQualifiedIdentifier(`${botUsersTableName.replaceAll(".", "_")}_active_handle_idx`)}
+     ON ${escapedTableName} (status, threads_handle)`
+  );
+  await client.query(
+    `CREATE INDEX IF NOT EXISTS ${escapeQualifiedIdentifier(`${botUsersTableName.replaceAll(".", "_")}_active_user_id_idx`)}
+     ON ${escapedTableName} (status, threads_user_id)`
+  );
+  ensuredPostgresBotUserStores.add(cacheKey);
+}
+async function ensurePostgresBotArchivesStore(client, tableName) {
+  const botArchivesTableName = getPostgresBotArchivesTableName(tableName);
+  const cacheKey = `${postgresPoolConnectionString ?? "unknown"}::${botArchivesTableName}`;
+  if (ensuredPostgresBotArchiveStores.has(cacheKey)) {
+    return;
+  }
+  const escapedTableName = escapeQualifiedIdentifier(botArchivesTableName);
+  await client.query(
+    `CREATE TABLE IF NOT EXISTS ${escapedTableName} (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      mention_id TEXT,
+      mention_url TEXT NOT NULL,
+      mention_author_handle TEXT NOT NULL,
+      mention_author_display_name TEXT,
+      note_text TEXT,
+      target_url TEXT NOT NULL,
+      target_author_handle TEXT,
+      target_author_display_name TEXT,
+      target_text TEXT NOT NULL,
+      target_published_at TIMESTAMPTZ,
+      media_urls JSONB NOT NULL DEFAULT '[]'::jsonb,
+      markdown_content TEXT NOT NULL,
+      raw_payload_json TEXT,
+      archived_at TIMESTAMPTZ NOT NULL,
+      updated_at TIMESTAMPTZ NOT NULL,
+      status TEXT NOT NULL
+    )`
+  );
+  await client.query(
+    `CREATE UNIQUE INDEX IF NOT EXISTS ${escapeQualifiedIdentifier(`${botArchivesTableName.replaceAll(".", "_")}_mention_id_uidx`)}
+     ON ${escapedTableName} (user_id, mention_id)
+     WHERE mention_id IS NOT NULL`
+  );
+  await client.query(
+    `CREATE UNIQUE INDEX IF NOT EXISTS ${escapeQualifiedIdentifier(`${botArchivesTableName.replaceAll(".", "_")}_mention_url_uidx`)}
+     ON ${escapedTableName} (user_id, mention_url)`
+  );
+  await client.query(
+    `CREATE INDEX IF NOT EXISTS ${escapeQualifiedIdentifier(`${botArchivesTableName.replaceAll(".", "_")}_user_updated_idx`)}
+     ON ${escapedTableName} (user_id, updated_at DESC)`
+  );
+  await client.query(
+    `CREATE INDEX IF NOT EXISTS ${escapeQualifiedIdentifier(`${botArchivesTableName.replaceAll(".", "_")}_mention_lookup_idx`)}
+     ON ${escapedTableName} (mention_id, mention_url)`
+  );
+  ensuredPostgresBotArchiveStores.add(cacheKey);
+}
+function serializeDatabaseForPostgres(data) {
+  return {
+    ...data,
+    botUsers: [],
+    botMentionJobs: [],
+    botArchives: []
+  };
+}
+function toIsoString(value) {
+  if (value instanceof Date) {
+    return value.toISOString();
+  }
+  if (typeof value === "string") {
+    return value;
+  }
+  return null;
+}
+function normalizePostgresBotMentionJob(row) {
+  return {
+    id: typeof row.id === "string" ? row.id : typeof row.mention_id === "string" ? row.mention_id : crypto.randomUUID(),
+    mentionId: typeof row.mention_id === "string" ? row.mention_id : typeof row.id === "string" ? row.id : "",
+    mentionUrl: typeof row.mention_url === "string" ? row.mention_url : null,
+    mentionAuthorHandle: typeof row.mention_author_handle === "string" ? row.mention_author_handle : null,
+    mentionAuthorUserId: typeof row.mention_author_user_id === "string" ? row.mention_author_user_id : null,
+    mentionText: typeof row.mention_text === "string" ? row.mention_text : null,
+    mentionPublishedAt: toIsoString(row.mention_published_at),
+    rawSummaryJson: row.raw_summary_json == null ? null : JSON.stringify(row.raw_summary_json),
+    attempts: typeof row.attempts === "number" ? row.attempts : Number(row.attempts ?? 0),
+    status: typeof row.status === "string" ? row.status : "queued",
+    lastError: typeof row.last_error === "string" ? row.last_error : null,
+    availableAt: toIsoString(row.available_at) ?? (/* @__PURE__ */ new Date()).toISOString(),
+    leasedAt: toIsoString(row.leased_at),
+    processedAt: toIsoString(row.processed_at),
+    createdAt: toIsoString(row.created_at) ?? (/* @__PURE__ */ new Date()).toISOString(),
+    updatedAt: toIsoString(row.updated_at) ?? (/* @__PURE__ */ new Date()).toISOString()
+  };
+}
+function normalizePostgresBotUser(row) {
+  const now = (/* @__PURE__ */ new Date()).toISOString();
+  return {
+    id: typeof row.id === "string" ? row.id : crypto.randomUUID(),
+    threadsUserId: typeof row.threads_user_id === "string" ? row.threads_user_id : null,
+    threadsHandle: typeof row.threads_handle === "string" ? normalizeThreadsHandle(row.threads_handle) : "",
+    displayName: typeof row.display_name === "string" ? row.display_name : null,
+    profilePictureUrl: typeof row.profile_picture_url === "string" ? row.profile_picture_url : null,
+    biography: typeof row.biography === "string" ? row.biography : null,
+    isVerified: row.is_verified === true,
+    accessTokenCiphertext: typeof row.access_token_ciphertext === "string" ? row.access_token_ciphertext : null,
+    tokenExpiresAt: toIsoString(row.token_expires_at),
+    email: typeof row.email === "string" ? row.email : null,
+    grantedScopes: readStringArray(row.granted_scopes),
+    scopeVersion: typeof row.scope_version === "number" ? row.scope_version : Number(row.scope_version ?? 0),
+    lastScopeUpgradeAt: toIsoString(row.last_scope_upgrade_at),
+    createdAt: toIsoString(row.created_at) ?? now,
+    updatedAt: toIsoString(row.updated_at) ?? now,
+    lastLoginAt: toIsoString(row.last_login_at),
+    status: row.status === "disabled" ? "disabled" : "active"
+  };
+}
+function normalizePostgresBotArchive(row) {
+  const now = (/* @__PURE__ */ new Date()).toISOString();
+  return {
+    id: typeof row.id === "string" ? row.id : crypto.randomUUID(),
+    userId: typeof row.user_id === "string" ? row.user_id : "",
+    mentionId: typeof row.mention_id === "string" ? row.mention_id : null,
+    mentionUrl: typeof row.mention_url === "string" ? row.mention_url : "",
+    mentionAuthorHandle: typeof row.mention_author_handle === "string" ? row.mention_author_handle : "",
+    mentionAuthorDisplayName: typeof row.mention_author_display_name === "string" ? row.mention_author_display_name : null,
+    noteText: typeof row.note_text === "string" ? row.note_text : null,
+    targetUrl: typeof row.target_url === "string" ? row.target_url : "",
+    targetAuthorHandle: typeof row.target_author_handle === "string" ? row.target_author_handle : null,
+    targetAuthorDisplayName: typeof row.target_author_display_name === "string" ? row.target_author_display_name : null,
+    targetText: typeof row.target_text === "string" ? row.target_text : "",
+    targetPublishedAt: toIsoString(row.target_published_at),
+    mediaUrls: readStringArray(row.media_urls),
+    markdownContent: typeof row.markdown_content === "string" ? row.markdown_content : "",
+    rawPayloadJson: typeof row.raw_payload_json === "string" ? row.raw_payload_json : null,
+    archivedAt: toIsoString(row.archived_at) ?? now,
+    updatedAt: toIsoString(row.updated_at) ?? now,
+    status: "saved"
+  };
+}
+function buildBotUserSyncMarker(user) {
+  return [
+    user.id,
+    user.threadsUserId ?? "",
+    user.threadsHandle,
+    user.updatedAt,
+    user.status
+  ].join("|");
+}
+function buildBotArchiveSyncMarker(archive) {
+  return [
+    archive.id,
+    archive.userId,
+    archive.mentionId ?? "",
+    archive.mentionUrl,
+    archive.updatedAt,
+    archive.status
+  ].join("|");
+}
+async function upsertPostgresBotUsers(client, tableName, users) {
+  if (users.length === 0) {
+    return;
+  }
+  await ensurePostgresBotUsersStore(client, tableName);
+  const escapedTableName = escapeQualifiedIdentifier(getPostgresBotUsersTableName(tableName));
+  const values = [];
+  const placeholders = users.map((user, index) => {
+    const offset = index * 17;
+    values.push(
+      user.id,
+      user.threadsUserId,
+      normalizeThreadsHandle(user.threadsHandle),
+      user.displayName,
+      user.profilePictureUrl,
+      user.biography,
+      user.isVerified,
+      user.accessTokenCiphertext,
+      user.tokenExpiresAt,
+      user.email,
+      JSON.stringify(user.grantedScopes),
+      user.scopeVersion,
+      user.lastScopeUpgradeAt,
+      user.createdAt,
+      user.updatedAt,
+      user.lastLoginAt,
+      user.status
+    );
+    return `($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5}, $${offset + 6}, $${offset + 7}, $${offset + 8}, $${offset + 9}::timestamptz, $${offset + 10}, $${offset + 11}::jsonb, $${offset + 12}, $${offset + 13}::timestamptz, $${offset + 14}::timestamptz, $${offset + 15}::timestamptz, $${offset + 16}::timestamptz, $${offset + 17})`;
+  }).join(", ");
+  await client.query(
+    `INSERT INTO ${escapedTableName} (
+       id,
+       threads_user_id,
+       threads_handle,
+       display_name,
+       profile_picture_url,
+       biography,
+       is_verified,
+       access_token_ciphertext,
+       token_expires_at,
+       email,
+       granted_scopes,
+       scope_version,
+       last_scope_upgrade_at,
+       created_at,
+       updated_at,
+       last_login_at,
+       status
+     )
+     VALUES ${placeholders}
+     ON CONFLICT (id) DO UPDATE SET
+       threads_user_id = EXCLUDED.threads_user_id,
+       threads_handle = EXCLUDED.threads_handle,
+       display_name = EXCLUDED.display_name,
+       profile_picture_url = EXCLUDED.profile_picture_url,
+       biography = EXCLUDED.biography,
+       is_verified = EXCLUDED.is_verified,
+       access_token_ciphertext = EXCLUDED.access_token_ciphertext,
+       token_expires_at = EXCLUDED.token_expires_at,
+       email = EXCLUDED.email,
+       granted_scopes = EXCLUDED.granted_scopes,
+       scope_version = EXCLUDED.scope_version,
+       last_scope_upgrade_at = EXCLUDED.last_scope_upgrade_at,
+       created_at = EXCLUDED.created_at,
+       updated_at = EXCLUDED.updated_at,
+       last_login_at = EXCLUDED.last_login_at,
+       status = EXCLUDED.status`,
+    values
+  );
+}
+async function deletePostgresBotUsers(client, tableName, ids) {
+  if (ids.length === 0) {
+    return;
+  }
+  await ensurePostgresBotUsersStore(client, tableName);
+  const escapedTableName = escapeQualifiedIdentifier(getPostgresBotUsersTableName(tableName));
+  await client.query(
+    `DELETE FROM ${escapedTableName}
+     WHERE id = ANY($1::text[])`,
+    [ids]
+  );
+}
+async function upsertPostgresBotArchives(client, tableName, archives) {
+  if (archives.length === 0) {
+    return;
+  }
+  await ensurePostgresBotArchivesStore(client, tableName);
+  const escapedTableName = escapeQualifiedIdentifier(getPostgresBotArchivesTableName(tableName));
+  const values = [];
+  const placeholders = archives.map((archive, index) => {
+    const offset = index * 18;
+    values.push(
+      archive.id,
+      archive.userId,
+      archive.mentionId,
+      archive.mentionUrl,
+      archive.mentionAuthorHandle,
+      archive.mentionAuthorDisplayName,
+      archive.noteText,
+      archive.targetUrl,
+      archive.targetAuthorHandle,
+      archive.targetAuthorDisplayName,
+      archive.targetText,
+      archive.targetPublishedAt,
+      JSON.stringify(archive.mediaUrls),
+      archive.markdownContent,
+      archive.rawPayloadJson,
+      archive.archivedAt,
+      archive.updatedAt,
+      archive.status
+    );
+    return `($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5}, $${offset + 6}, $${offset + 7}, $${offset + 8}, $${offset + 9}, $${offset + 10}, $${offset + 11}, $${offset + 12}::timestamptz, $${offset + 13}::jsonb, $${offset + 14}, $${offset + 15}, $${offset + 16}::timestamptz, $${offset + 17}::timestamptz, $${offset + 18})`;
+  }).join(", ");
+  await client.query(
+    `INSERT INTO ${escapedTableName} (
+       id,
+       user_id,
+       mention_id,
+       mention_url,
+       mention_author_handle,
+       mention_author_display_name,
+       note_text,
+       target_url,
+       target_author_handle,
+       target_author_display_name,
+       target_text,
+       target_published_at,
+       media_urls,
+       markdown_content,
+       raw_payload_json,
+       archived_at,
+       updated_at,
+       status
+     )
+     VALUES ${placeholders}
+     ON CONFLICT (id) DO UPDATE SET
+       user_id = EXCLUDED.user_id,
+       mention_id = EXCLUDED.mention_id,
+       mention_url = EXCLUDED.mention_url,
+       mention_author_handle = EXCLUDED.mention_author_handle,
+       mention_author_display_name = EXCLUDED.mention_author_display_name,
+       note_text = EXCLUDED.note_text,
+       target_url = EXCLUDED.target_url,
+       target_author_handle = EXCLUDED.target_author_handle,
+       target_author_display_name = EXCLUDED.target_author_display_name,
+       target_text = EXCLUDED.target_text,
+       target_published_at = EXCLUDED.target_published_at,
+       media_urls = EXCLUDED.media_urls,
+       markdown_content = EXCLUDED.markdown_content,
+       raw_payload_json = EXCLUDED.raw_payload_json,
+       archived_at = EXCLUDED.archived_at,
+       updated_at = EXCLUDED.updated_at,
+       status = EXCLUDED.status`,
+    values
+  );
+}
+async function deletePostgresBotArchives(client, tableName, ids) {
+  if (ids.length === 0) {
+    return;
+  }
+  await ensurePostgresBotArchivesStore(client, tableName);
+  const escapedTableName = escapeQualifiedIdentifier(getPostgresBotArchivesTableName(tableName));
+  await client.query(
+    `DELETE FROM ${escapedTableName}
+     WHERE id = ANY($1::text[])`,
+    [ids]
+  );
+}
+async function loadPrimaryDatabasePayload(client, backend) {
+  await ensurePostgresStore(client, backend.tableName);
+  const escapedTableName = escapeQualifiedIdentifier(backend.tableName);
+  const selected = await client.query(
+    `SELECT payload FROM ${escapedTableName} WHERE store_key = $1 LIMIT 1`,
+    [backend.storeKey]
+  );
+  if (selected.rows[0]) {
+    return normalizeDatabasePayload(selected.rows[0].payload);
+  }
+  return buildDefaultDatabase();
+}
+async function ensurePrimaryPostgresStoreRow(client, backend) {
+  await ensurePostgresStore(client, backend.tableName);
+  const escapedTableName = escapeQualifiedIdentifier(backend.tableName);
+  await client.query(
+    `INSERT INTO ${escapedTableName} (store_key, payload, updated_at)
+     VALUES ($1, $2::jsonb, NOW())
+     ON CONFLICT (store_key) DO NOTHING`,
+    [backend.storeKey, JSON.stringify(serializeDatabaseForPostgres(buildDefaultDatabase()))]
+  );
+}
+async function maybeSeedPostgresBotUsersStore(client, backend) {
+  const botUsersTableName = getPostgresBotUsersTableName(backend.tableName);
+  const cacheKey = `${postgresPoolConnectionString ?? "unknown"}::${botUsersTableName}`;
+  if (seededPostgresBotUserStores.has(cacheKey)) {
+    return;
+  }
+  await ensurePostgresBotUsersStore(client, backend.tableName);
+  const escapedTableName = escapeQualifiedIdentifier(botUsersTableName);
+  const countResult = await client.query(
+    `SELECT COUNT(*)::text AS count FROM ${escapedTableName}`
+  );
+  if ((countResult.rows[0]?.count ?? "0") === "0") {
+    const database = await loadPrimaryDatabasePayload(client, backend);
+    await upsertPostgresBotUsers(client, backend.tableName, database.botUsers);
+  }
+  seededPostgresBotUserStores.add(cacheKey);
+}
+async function maybeSeedPostgresBotArchivesStore(client, backend) {
+  const botArchivesTableName = getPostgresBotArchivesTableName(backend.tableName);
+  const cacheKey = `${postgresPoolConnectionString ?? "unknown"}::${botArchivesTableName}`;
+  if (seededPostgresBotArchiveStores.has(cacheKey)) {
+    return;
+  }
+  await ensurePostgresBotArchivesStore(client, backend.tableName);
+  const escapedTableName = escapeQualifiedIdentifier(botArchivesTableName);
+  const countResult = await client.query(
+    `SELECT COUNT(*)::text AS count FROM ${escapedTableName}`
+  );
+  if ((countResult.rows[0]?.count ?? "0") === "0") {
+    const database = await loadPrimaryDatabasePayload(client, backend);
+    await upsertPostgresBotArchives(client, backend.tableName, database.botArchives);
+  }
+  seededPostgresBotArchiveStores.add(cacheKey);
+}
+async function loadPostgresBotUsers(client, backend) {
+  await ensurePostgresBotUsersStore(client, backend.tableName);
+  await maybeSeedPostgresBotUsersStore(client, backend);
+  const escapedTableName = escapeQualifiedIdentifier(getPostgresBotUsersTableName(backend.tableName));
+  const result = await client.query(
+    `SELECT *
+     FROM ${escapedTableName}
+     ORDER BY updated_at DESC, created_at DESC`
+  );
+  return result.rows.map(normalizePostgresBotUser);
+}
+async function loadPostgresBotArchives(client, backend) {
+  await ensurePostgresBotArchivesStore(client, backend.tableName);
+  await maybeSeedPostgresBotArchivesStore(client, backend);
+  const escapedTableName = escapeQualifiedIdentifier(getPostgresBotArchivesTableName(backend.tableName));
+  const result = await client.query(
+    `SELECT *
+     FROM ${escapedTableName}
+     ORDER BY updated_at DESC, archived_at DESC`
+  );
+  return result.rows.map(normalizePostgresBotArchive);
+}
+async function syncPostgresBotUsers(client, backend, initialUsers, nextUsers) {
+  const initialMarkers = new Map(initialUsers.map((user) => [user.id, buildBotUserSyncMarker(user)]));
+  const nextIds = new Set(nextUsers.map((user) => user.id));
+  const changed = nextUsers.filter((user) => initialMarkers.get(user.id) !== buildBotUserSyncMarker(user));
+  const removed = initialUsers.filter((user) => !nextIds.has(user.id)).map((user) => user.id);
+  await upsertPostgresBotUsers(client, backend.tableName, changed);
+  await deletePostgresBotUsers(client, backend.tableName, removed);
+}
+async function syncPostgresBotArchives(client, backend, initialArchives, nextArchives) {
+  const initialMarkers = new Map(initialArchives.map((archive) => [archive.id, buildBotArchiveSyncMarker(archive)]));
+  const nextIds = new Set(nextArchives.map((archive) => archive.id));
+  const changed = nextArchives.filter(
+    (archive) => initialMarkers.get(archive.id) !== buildBotArchiveSyncMarker(archive)
+  );
+  const removed = initialArchives.filter((archive) => !nextIds.has(archive.id)).map((archive) => archive.id);
+  await upsertPostgresBotArchives(client, backend.tableName, changed);
+  await deletePostgresBotArchives(client, backend.tableName, removed);
 }
 async function ensureParentDirectory(filePath) {
   await mkdir2(path2.dirname(filePath), { recursive: true });
@@ -10666,43 +11191,39 @@ async function saveFileDatabase(data, filePath) {
 }
 async function savePostgresDatabase(data, backend) {
   const pool = await getPostgresPool(backend.connectionString);
-  await ensurePostgresStore(pool, backend.tableName);
+  const client = await pool.connect();
   const escapedTableName = escapeQualifiedIdentifier(backend.tableName);
-  await pool.query(
-    `INSERT INTO ${escapedTableName} (store_key, payload, updated_at)
-     VALUES ($1, $2::jsonb, NOW())
-     ON CONFLICT (store_key)
-     DO UPDATE SET payload = EXCLUDED.payload, updated_at = NOW()`,
-    [backend.storeKey, JSON.stringify(data)]
-  );
+  try {
+    await client.query("BEGIN");
+    await ensurePrimaryPostgresStoreRow(client, backend);
+    await ensurePostgresBotUsersStore(client, backend.tableName);
+    await ensurePostgresBotArchivesStore(client, backend.tableName);
+    const initialBotUsers = await loadPostgresBotUsers(client, backend);
+    const initialBotArchives = await loadPostgresBotArchives(client, backend);
+    await syncPostgresBotUsers(client, backend, initialBotUsers, data.botUsers);
+    await syncPostgresBotArchives(client, backend, initialBotArchives, data.botArchives);
+    await client.query(
+      `INSERT INTO ${escapedTableName} (store_key, payload, updated_at)
+       VALUES ($1, $2::jsonb, NOW())
+       ON CONFLICT (store_key)
+       DO UPDATE SET payload = EXCLUDED.payload, updated_at = NOW()`,
+      [backend.storeKey, JSON.stringify(serializeDatabaseForPostgres(data))]
+    );
+    await client.query("COMMIT");
+  } catch (error) {
+    await client.query("ROLLBACK").catch(() => void 0);
+    throw error;
+  } finally {
+    client.release();
+  }
 }
 async function loadDatabaseFromPostgres(backend) {
   const pool = await getPostgresPool(backend.connectionString);
-  await ensurePostgresStore(pool, backend.tableName);
-  const escapedTableName = escapeQualifiedIdentifier(backend.tableName);
-  const selected = await pool.query(
-    `SELECT payload FROM ${escapedTableName} WHERE store_key = $1 LIMIT 1`,
-    [backend.storeKey]
-  );
-  if (selected.rows[0]) {
-    return normalizeDatabasePayload(selected.rows[0].payload);
-  }
-  const initial = buildDefaultDatabase();
-  const inserted = await pool.query(
-    `INSERT INTO ${escapedTableName} (store_key, payload, updated_at)
-     VALUES ($1, $2::jsonb, NOW())
-     ON CONFLICT (store_key) DO NOTHING
-     RETURNING payload`,
-    [backend.storeKey, JSON.stringify(initial)]
-  );
-  if (inserted.rows[0]) {
-    return normalizeDatabasePayload(inserted.rows[0].payload);
-  }
-  const reloaded = await pool.query(
-    `SELECT payload FROM ${escapedTableName} WHERE store_key = $1 LIMIT 1`,
-    [backend.storeKey]
-  );
-  return reloaded.rows[0] ? normalizeDatabasePayload(reloaded.rows[0].payload) : initial;
+  await ensurePrimaryPostgresStoreRow(pool, backend);
+  let database = await loadPrimaryDatabasePayload(pool, backend);
+  database.botUsers = await loadPostgresBotUsers(pool, backend);
+  database.botArchives = await loadPostgresBotArchives(pool, backend);
+  return database;
 }
 async function withPostgresDatabaseTransaction(handler, backend) {
   const pool = await getPostgresPool(backend.connectionString);
@@ -10710,25 +11231,27 @@ async function withPostgresDatabaseTransaction(handler, backend) {
   const escapedTableName = escapeQualifiedIdentifier(backend.tableName);
   try {
     await client.query("BEGIN");
-    await ensurePostgresStore(client, backend.tableName);
-    await client.query(
-      `INSERT INTO ${escapedTableName} (store_key, payload, updated_at)
-       VALUES ($1, $2::jsonb, NOW())
-       ON CONFLICT (store_key) DO NOTHING`,
-      [backend.storeKey, JSON.stringify(buildDefaultDatabase())]
-    );
+    await ensurePrimaryPostgresStoreRow(client, backend);
+    await ensurePostgresBotUsersStore(client, backend.tableName);
+    await ensurePostgresBotArchivesStore(client, backend.tableName);
     const selected = await client.query(
       `SELECT payload FROM ${escapedTableName} WHERE store_key = $1 FOR UPDATE`,
       [backend.storeKey]
     );
     const database = selected.rows[0] ? normalizeDatabasePayload(selected.rows[0].payload) : buildDefaultDatabase();
+    const initialBotUsers = await loadPostgresBotUsers(client, backend);
+    const initialBotArchives = await loadPostgresBotArchives(client, backend);
+    database.botUsers = structuredClone(initialBotUsers);
+    database.botArchives = structuredClone(initialBotArchives);
     const output = await handler(database);
+    await syncPostgresBotUsers(client, backend, initialBotUsers, database.botUsers);
+    await syncPostgresBotArchives(client, backend, initialBotArchives, database.botArchives);
     await client.query(
       `UPDATE ${escapedTableName}
        SET payload = $2::jsonb,
            updated_at = NOW()
        WHERE store_key = $1`,
-      [backend.storeKey, JSON.stringify(database)]
+      [backend.storeKey, JSON.stringify(serializeDatabaseForPostgres(database))]
     );
     await client.query("COMMIT");
     return output;
@@ -10766,6 +11289,46 @@ async function loadDatabaseForConfig(config) {
   const backend = resolveDatabaseBackendFromConfig(config);
   return backend.kind === "postgres" ? loadDatabaseFromPostgres(backend) : loadDatabaseUnsafe(backend.filePath);
 }
+async function withPrimaryDatabaseTransaction(handler, filePath) {
+  return withDatabaseAccess(async () => {
+    const backend = resolveDatabaseBackend(filePath);
+    if (backend.kind === "postgres") {
+      const pool = await getPostgresPool(backend.connectionString);
+      const client = await pool.connect();
+      const escapedTableName = escapeQualifiedIdentifier(backend.tableName);
+      try {
+        await client.query("BEGIN");
+        await ensurePrimaryPostgresStoreRow(client, backend);
+        const selected = await client.query(
+          `SELECT payload FROM ${escapedTableName} WHERE store_key = $1 FOR UPDATE`,
+          [backend.storeKey]
+        );
+        const database = selected.rows[0] ? normalizeDatabasePayload(selected.rows[0].payload) : buildDefaultDatabase();
+        const output = await handler(database);
+        await client.query(
+          `UPDATE ${escapedTableName}
+           SET payload = $2::jsonb,
+               updated_at = NOW()
+           WHERE store_key = $1`,
+          [backend.storeKey, JSON.stringify(serializeDatabaseForPostgres(database))]
+        );
+        await client.query("COMMIT");
+        return output;
+      } catch (error) {
+        await client.query("ROLLBACK").catch(() => void 0);
+        throw error;
+      } finally {
+        client.release();
+      }
+    }
+    return withDatabaseLock(async () => {
+      const database = await loadDatabaseUnsafe(backend.filePath);
+      const output = await handler(database);
+      await saveFileDatabase(database, backend.filePath);
+      return output;
+    });
+  });
+}
 async function saveDatabaseForConfig(data, config) {
   const backend = resolveDatabaseBackendFromConfig(config);
   if (backend.kind === "postgres") {
@@ -10779,10 +11342,586 @@ async function testDatabaseConfig(config) {
   if (backend.kind === "postgres") {
     const pool = await getPostgresPool(backend.connectionString);
     await ensurePostgresStore(pool, backend.tableName);
+    await ensurePostgresMentionJobsStore(pool, backend.tableName);
+    await ensurePostgresBotUsersStore(pool, backend.tableName);
+    await ensurePostgresBotArchivesStore(pool, backend.tableName);
     await pool.query("SELECT 1");
     return;
   }
   await ensureParentDirectory(backend.filePath);
+}
+async function loadBotMentionJobs(filePath) {
+  return withDatabaseAccess(async () => {
+    const backend = resolveDatabaseBackend(filePath);
+    if (backend.kind === "postgres") {
+      const pool = await getPostgresPool(backend.connectionString);
+      await ensurePostgresMentionJobsStore(pool, backend.tableName);
+      const escapedTableName = escapeQualifiedIdentifier(getPostgresMentionJobsTableName(backend.tableName));
+      const result = await pool.query(
+        `SELECT *
+         FROM ${escapedTableName}
+         ORDER BY created_at DESC`
+      );
+      return result.rows.map(normalizePostgresBotMentionJob);
+    }
+    return (await loadDatabaseUnsafe(backend.filePath)).botMentionJobs.map((candidate) => ({ ...candidate }));
+  });
+}
+async function loadBotMentionReadState(filePath) {
+  return withDatabaseAccess(async () => {
+    const backend = resolveDatabaseBackend(filePath);
+    if (backend.kind === "postgres") {
+      const pool = await getPostgresPool(backend.connectionString);
+      await ensurePostgresBotUsersStore(pool, backend.tableName);
+      await ensurePostgresBotArchivesStore(pool, backend.tableName);
+      await ensurePostgresMentionJobsStore(pool, backend.tableName);
+      await maybeSeedPostgresBotUsersStore(pool, backend);
+      await maybeSeedPostgresBotArchivesStore(pool, backend);
+      const usersTableName = escapeQualifiedIdentifier(getPostgresBotUsersTableName(backend.tableName));
+      const archivesTableName = escapeQualifiedIdentifier(getPostgresBotArchivesTableName(backend.tableName));
+      const mentionJobsTableName = escapeQualifiedIdentifier(getPostgresMentionJobsTableName(backend.tableName));
+      const activeUsersResult = await pool.query(
+        `SELECT threads_user_id, threads_handle
+         FROM ${usersTableName}
+         WHERE status = 'active'`
+      );
+      const knownMentionIdsResult = await pool.query(
+        `SELECT mention_id
+         FROM ${archivesTableName}
+         WHERE mention_id IS NOT NULL
+         UNION
+         SELECT mention_id
+         FROM ${mentionJobsTableName}`
+      );
+      return {
+        activeUserIds: activeUsersResult.rows.map((row) => typeof row.threads_user_id === "string" ? row.threads_user_id : "").filter(Boolean),
+        activeUserHandles: activeUsersResult.rows.map((row) => normalizeThreadsHandle(typeof row.threads_handle === "string" ? row.threads_handle : "")).filter(Boolean),
+        knownMentionIds: knownMentionIdsResult.rows.map((row) => typeof row.mention_id === "string" ? row.mention_id.trim() : "").filter(Boolean)
+      };
+    }
+    const database = await loadDatabaseUnsafe(backend.filePath);
+    return {
+      activeUserIds: database.botUsers.filter((candidate) => candidate.status === "active").map((candidate) => candidate.threadsUserId ?? "").filter(Boolean),
+      activeUserHandles: database.botUsers.filter((candidate) => candidate.status === "active").map((candidate) => normalizeThreadsHandle(candidate.threadsHandle)).filter(Boolean),
+      knownMentionIds: [
+        ...database.botArchives.map((candidate) => candidate.mentionId ?? ""),
+        ...database.botMentionJobs.map((candidate) => candidate.mentionId)
+      ].filter(Boolean)
+    };
+  });
+}
+async function findBotUserByThreadsUserId(rawThreadsUserId, filePath) {
+  const threadsUserId = typeof rawThreadsUserId === "string" ? rawThreadsUserId.trim() : "";
+  if (!threadsUserId) {
+    return null;
+  }
+  return withDatabaseAccess(async () => {
+    const backend = resolveDatabaseBackend(filePath);
+    if (backend.kind === "postgres") {
+      const pool = await getPostgresPool(backend.connectionString);
+      await ensurePostgresBotUsersStore(pool, backend.tableName);
+      await maybeSeedPostgresBotUsersStore(pool, backend);
+      const escapedTableName = escapeQualifiedIdentifier(getPostgresBotUsersTableName(backend.tableName));
+      const result = await pool.query(
+        `SELECT *
+         FROM ${escapedTableName}
+         WHERE threads_user_id = $1
+           AND status = 'active'
+         LIMIT 1`,
+        [threadsUserId]
+      );
+      return result.rows[0] ? normalizePostgresBotUser(result.rows[0]) : null;
+    }
+    return (await loadDatabaseUnsafe(backend.filePath)).botUsers.find(
+      (candidate) => candidate.threadsUserId === threadsUserId && candidate.status === "active"
+    ) ?? null;
+  });
+}
+async function findBotUserByHandle(rawHandle, filePath) {
+  const handle = normalizeThreadsHandle(rawHandle);
+  if (!handle) {
+    return null;
+  }
+  return withDatabaseAccess(async () => {
+    const backend = resolveDatabaseBackend(filePath);
+    if (backend.kind === "postgres") {
+      const pool = await getPostgresPool(backend.connectionString);
+      await ensurePostgresBotUsersStore(pool, backend.tableName);
+      await maybeSeedPostgresBotUsersStore(pool, backend);
+      const escapedTableName = escapeQualifiedIdentifier(getPostgresBotUsersTableName(backend.tableName));
+      const result = await pool.query(
+        `SELECT *
+         FROM ${escapedTableName}
+         WHERE threads_handle = $1
+           AND status = 'active'
+         LIMIT 1`,
+        [handle]
+      );
+      return result.rows[0] ? normalizePostgresBotUser(result.rows[0]) : null;
+    }
+    return (await loadDatabaseUnsafe(backend.filePath)).botUsers.find(
+      (candidate) => normalizeThreadsHandle(candidate.threadsHandle) === handle && candidate.status === "active"
+    ) ?? null;
+  });
+}
+async function findBotUserById(userId, filePath) {
+  const normalizedUserId = typeof userId === "string" ? userId.trim() : "";
+  if (!normalizedUserId) {
+    return null;
+  }
+  return withDatabaseAccess(async () => {
+    const backend = resolveDatabaseBackend(filePath);
+    if (backend.kind === "postgres") {
+      const pool = await getPostgresPool(backend.connectionString);
+      await ensurePostgresBotUsersStore(pool, backend.tableName);
+      await maybeSeedPostgresBotUsersStore(pool, backend);
+      const escapedTableName = escapeQualifiedIdentifier(getPostgresBotUsersTableName(backend.tableName));
+      const result = await pool.query(
+        `SELECT *
+         FROM ${escapedTableName}
+         WHERE id = $1
+           AND status = 'active'
+         LIMIT 1`,
+        [normalizedUserId]
+      );
+      return result.rows[0] ? normalizePostgresBotUser(result.rows[0]) : null;
+    }
+    return (await loadDatabaseUnsafe(backend.filePath)).botUsers.find(
+      (candidate) => candidate.id === normalizedUserId && candidate.status === "active"
+    ) ?? null;
+  });
+}
+async function saveBotUserRecord(user, filePath) {
+  await withDatabaseAccess(async () => {
+    const backend = resolveDatabaseBackend(filePath);
+    if (backend.kind === "postgres") {
+      const pool = await getPostgresPool(backend.connectionString);
+      await upsertPostgresBotUsers(pool, backend.tableName, [user]);
+      return;
+    }
+    await withDatabaseLock(async () => {
+      const database = await loadDatabaseUnsafe(backend.filePath);
+      upsertBotUser(database, user);
+      await saveFileDatabase(database, backend.filePath);
+    });
+  });
+}
+async function findBotArchiveByMention(userId, mentionId, mentionUrl, filePath) {
+  const normalizedUserId = userId.trim();
+  const normalizedMentionId = typeof mentionId === "string" ? mentionId.trim() : "";
+  const normalizedMentionUrl = mentionUrl.trim();
+  if (!normalizedUserId || !normalizedMentionUrl) {
+    return null;
+  }
+  return withDatabaseAccess(async () => {
+    const backend = resolveDatabaseBackend(filePath);
+    if (backend.kind === "postgres") {
+      const pool = await getPostgresPool(backend.connectionString);
+      await ensurePostgresBotArchivesStore(pool, backend.tableName);
+      await maybeSeedPostgresBotArchivesStore(pool, backend);
+      const escapedTableName = escapeQualifiedIdentifier(getPostgresBotArchivesTableName(backend.tableName));
+      const result = await pool.query(
+        `SELECT *
+         FROM ${escapedTableName}
+         WHERE user_id = $1
+           AND (
+             ($2::text <> '' AND mention_id = $2)
+             OR mention_url = $3
+           )
+         ORDER BY CASE WHEN $2::text <> '' AND mention_id = $2 THEN 0 ELSE 1 END, updated_at DESC
+         LIMIT 1`,
+        [normalizedUserId, normalizedMentionId, normalizedMentionUrl]
+      );
+      return result.rows[0] ? normalizePostgresBotArchive(result.rows[0]) : null;
+    }
+    return (await loadDatabaseUnsafe(backend.filePath)).botArchives.find((candidate) => {
+      if (candidate.userId !== normalizedUserId) {
+        return false;
+      }
+      if (normalizedMentionId && candidate.mentionId) {
+        return candidate.mentionId === normalizedMentionId;
+      }
+      return candidate.mentionUrl === normalizedMentionUrl;
+    }) ?? null;
+  });
+}
+async function findBotArchiveById(userId, archiveId, filePath) {
+  const normalizedUserId = userId.trim();
+  const normalizedArchiveId = typeof archiveId === "string" ? archiveId.trim() : "";
+  if (!normalizedUserId || !normalizedArchiveId) {
+    return null;
+  }
+  return withDatabaseAccess(async () => {
+    const backend = resolveDatabaseBackend(filePath);
+    if (backend.kind === "postgres") {
+      const pool = await getPostgresPool(backend.connectionString);
+      await ensurePostgresBotArchivesStore(pool, backend.tableName);
+      await maybeSeedPostgresBotArchivesStore(pool, backend);
+      const escapedTableName = escapeQualifiedIdentifier(getPostgresBotArchivesTableName(backend.tableName));
+      const result = await pool.query(
+        `SELECT *
+         FROM ${escapedTableName}
+         WHERE user_id = $1
+           AND id = $2
+         LIMIT 1`,
+        [normalizedUserId, normalizedArchiveId]
+      );
+      return result.rows[0] ? normalizePostgresBotArchive(result.rows[0]) : null;
+    }
+    return (await loadDatabaseUnsafe(backend.filePath)).botArchives.find(
+      (candidate) => candidate.userId === normalizedUserId && candidate.id === normalizedArchiveId
+    ) ?? null;
+  });
+}
+async function listBotArchivesForUser(userId, filePath) {
+  const normalizedUserId = userId.trim();
+  if (!normalizedUserId) {
+    return [];
+  }
+  return withDatabaseAccess(async () => {
+    const backend = resolveDatabaseBackend(filePath);
+    if (backend.kind === "postgres") {
+      const pool = await getPostgresPool(backend.connectionString);
+      await ensurePostgresBotArchivesStore(pool, backend.tableName);
+      await maybeSeedPostgresBotArchivesStore(pool, backend);
+      const escapedTableName = escapeQualifiedIdentifier(getPostgresBotArchivesTableName(backend.tableName));
+      const result = await pool.query(
+        `SELECT *
+         FROM ${escapedTableName}
+         WHERE user_id = $1
+         ORDER BY updated_at DESC, archived_at DESC`,
+        [normalizedUserId]
+      );
+      return result.rows.map(normalizePostgresBotArchive);
+    }
+    return (await loadDatabaseUnsafe(backend.filePath)).botArchives.filter((candidate) => candidate.userId === normalizedUserId).map((candidate) => ({ ...candidate, mediaUrls: [...candidate.mediaUrls] }));
+  });
+}
+async function findBotArchivesByIds(userId, archiveIds, filePath) {
+  const normalizedUserId = userId.trim();
+  const ids = [...new Set(archiveIds.map((value) => value.trim()).filter(Boolean))];
+  if (!normalizedUserId || ids.length === 0) {
+    return [];
+  }
+  return withDatabaseAccess(async () => {
+    const backend = resolveDatabaseBackend(filePath);
+    if (backend.kind === "postgres") {
+      const pool = await getPostgresPool(backend.connectionString);
+      await ensurePostgresBotArchivesStore(pool, backend.tableName);
+      await maybeSeedPostgresBotArchivesStore(pool, backend);
+      const escapedTableName = escapeQualifiedIdentifier(getPostgresBotArchivesTableName(backend.tableName));
+      const result = await pool.query(
+        `SELECT *
+         FROM ${escapedTableName}
+         WHERE user_id = $1
+           AND id = ANY($2::text[])`,
+        [normalizedUserId, ids]
+      );
+      return result.rows.map(normalizePostgresBotArchive);
+    }
+    const byId = new Set(ids);
+    return (await loadDatabaseUnsafe(backend.filePath)).botArchives.filter((candidate) => candidate.userId === normalizedUserId && byId.has(candidate.id)).map((candidate) => ({ ...candidate, mediaUrls: [...candidate.mediaUrls] }));
+  });
+}
+async function saveBotArchiveRecord(archive, filePath) {
+  await withDatabaseAccess(async () => {
+    const backend = resolveDatabaseBackend(filePath);
+    if (backend.kind === "postgres") {
+      const pool = await getPostgresPool(backend.connectionString);
+      await upsertPostgresBotArchives(pool, backend.tableName, [archive]);
+      return;
+    }
+    await withDatabaseLock(async () => {
+      const database = await loadDatabaseUnsafe(backend.filePath);
+      upsertBotArchive(database, archive);
+      await saveFileDatabase(database, backend.filePath);
+    });
+  });
+}
+async function deleteBotArchiveRecord(userId, archiveId, filePath) {
+  const normalizedUserId = userId.trim();
+  const normalizedArchiveId = archiveId.trim();
+  if (!normalizedUserId || !normalizedArchiveId) {
+    return false;
+  }
+  return withDatabaseAccess(async () => {
+    const backend = resolveDatabaseBackend(filePath);
+    if (backend.kind === "postgres") {
+      const pool = await getPostgresPool(backend.connectionString);
+      await ensurePostgresBotArchivesStore(pool, backend.tableName);
+      const escapedTableName = escapeQualifiedIdentifier(getPostgresBotArchivesTableName(backend.tableName));
+      const result = await pool.query(
+        `DELETE FROM ${escapedTableName}
+         WHERE user_id = $1
+           AND id = $2`,
+        [normalizedUserId, normalizedArchiveId]
+      );
+      return (result.rowCount ?? 0) > 0;
+    }
+    return withDatabaseLock(async () => {
+      const database = await loadDatabaseUnsafe(backend.filePath);
+      const index = database.botArchives.findIndex(
+        (candidate) => candidate.userId === normalizedUserId && candidate.id === normalizedArchiveId
+      );
+      if (index < 0) {
+        return false;
+      }
+      database.botArchives.splice(index, 1);
+      await saveFileDatabase(database, backend.filePath);
+      return true;
+    });
+  });
+}
+async function enqueueBotMentionJobs(jobs, options) {
+  const forceRequeue = options?.forceRequeue === true;
+  return withDatabaseAccess(async () => {
+    const backend = resolveDatabaseBackend(options?.filePath);
+    if (backend.kind === "postgres") {
+      if (jobs.length === 0) {
+        return 0;
+      }
+      const pool = await getPostgresPool(backend.connectionString);
+      await ensurePostgresMentionJobsStore(pool, backend.tableName);
+      const escapedTableName = escapeQualifiedIdentifier(getPostgresMentionJobsTableName(backend.tableName));
+      const values = [];
+      const placeholders = jobs.map((job, index) => {
+        const offset = index * 14;
+        values.push(
+          job.id,
+          job.mentionId,
+          job.mentionUrl,
+          job.mentionAuthorHandle,
+          job.mentionAuthorUserId,
+          job.mentionText,
+          job.mentionPublishedAt,
+          job.rawSummaryJson ? JSON.parse(job.rawSummaryJson) : null,
+          job.attempts,
+          job.status,
+          job.lastError,
+          job.availableAt,
+          job.createdAt,
+          job.updatedAt
+        );
+        return `($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5}, $${offset + 6}, $${offset + 7}, $${offset + 8}::jsonb, $${offset + 9}, $${offset + 10}, $${offset + 11}, $${offset + 12}, $${offset + 13}, $${offset + 14})`;
+      }).join(", ");
+      const query = forceRequeue ? `INSERT INTO ${escapedTableName} (
+             id,
+             mention_id,
+             mention_url,
+             mention_author_handle,
+             mention_author_user_id,
+             mention_text,
+             mention_published_at,
+             raw_summary_json,
+             attempts,
+             status,
+             last_error,
+             available_at,
+             created_at,
+             updated_at
+           )
+           VALUES ${placeholders}
+           ON CONFLICT (mention_id) DO UPDATE SET
+             mention_url = EXCLUDED.mention_url,
+             mention_author_handle = EXCLUDED.mention_author_handle,
+             mention_author_user_id = EXCLUDED.mention_author_user_id,
+             mention_text = EXCLUDED.mention_text,
+             mention_published_at = EXCLUDED.mention_published_at,
+             raw_summary_json = EXCLUDED.raw_summary_json,
+             status = 'queued',
+             last_error = NULL,
+             available_at = EXCLUDED.available_at,
+             leased_at = NULL,
+             processed_at = NULL,
+             updated_at = EXCLUDED.updated_at` : `INSERT INTO ${escapedTableName} (
+             id,
+             mention_id,
+             mention_url,
+             mention_author_handle,
+             mention_author_user_id,
+             mention_text,
+             mention_published_at,
+             raw_summary_json,
+             attempts,
+             status,
+             last_error,
+             available_at,
+             created_at,
+             updated_at
+           )
+           VALUES ${placeholders}
+           ON CONFLICT (mention_id) DO NOTHING`;
+      const result = await pool.query(query, values);
+      return result.rowCount ?? 0;
+    }
+    return withDatabaseLock(async () => {
+      const database = await loadDatabaseUnsafe(backend.filePath);
+      let enqueued = 0;
+      for (const job of jobs) {
+        const existingJob = database.botMentionJobs.find((candidate) => candidate.mentionId === job.mentionId);
+        if (existingJob) {
+          if (!forceRequeue) {
+            continue;
+          }
+          Object.assign(existingJob, {
+            ...job,
+            status: "queued",
+            lastError: null,
+            leasedAt: null,
+            processedAt: null
+          });
+          upsertBotMentionJob(database, existingJob);
+          enqueued += 1;
+          continue;
+        }
+        upsertBotMentionJob(database, job);
+        enqueued += 1;
+      }
+      await saveFileDatabase(database, backend.filePath);
+      return enqueued;
+    });
+  });
+}
+async function claimBotMentionJobs(now, batchSize, leaseMs, filePath) {
+  return withDatabaseAccess(async () => {
+    const backend = resolveDatabaseBackend(filePath);
+    if (backend.kind === "postgres") {
+      const pool = await getPostgresPool(backend.connectionString);
+      const client = await pool.connect();
+      const escapedTableName = escapeQualifiedIdentifier(getPostgresMentionJobsTableName(backend.tableName));
+      try {
+        await client.query("BEGIN");
+        await ensurePostgresMentionJobsStore(client, backend.tableName);
+        const result = await client.query(
+          `WITH claimable AS (
+             SELECT id
+             FROM ${escapedTableName}
+             WHERE available_at <= $1::timestamptz
+               AND (
+                 status IN ('queued', 'failed')
+                 OR (
+                   status = 'processing'
+                   AND COALESCE(leased_at, available_at) <= $2::timestamptz
+                 )
+               )
+             ORDER BY available_at ASC, created_at ASC
+             FOR UPDATE SKIP LOCKED
+             LIMIT $3
+           )
+           UPDATE ${escapedTableName} AS jobs
+           SET status = 'processing',
+               attempts = jobs.attempts + 1,
+               leased_at = $1::timestamptz,
+               updated_at = $1::timestamptz
+           FROM claimable
+           WHERE jobs.id = claimable.id
+           RETURNING jobs.*`,
+          [now, new Date(Date.parse(now) - leaseMs).toISOString(), batchSize]
+        );
+        await client.query("COMMIT");
+        return result.rows.map(normalizePostgresBotMentionJob);
+      } catch (error) {
+        await client.query("ROLLBACK").catch(() => void 0);
+        throw error;
+      } finally {
+        client.release();
+      }
+    }
+    return withDatabaseLock(async () => {
+      const database = await loadDatabaseUnsafe(backend.filePath);
+      const nowMs = Date.parse(now);
+      const claimed = database.botMentionJobs.filter((candidate) => {
+        if (Date.parse(candidate.availableAt) > nowMs) {
+          return false;
+        }
+        if (candidate.status === "queued" || candidate.status === "failed") {
+          return true;
+        }
+        if (candidate.status !== "processing") {
+          return false;
+        }
+        const leasedAt = candidate.leasedAt ? Date.parse(candidate.leasedAt) : 0;
+        return leasedAt + leaseMs <= nowMs;
+      }).sort((left, right) => Date.parse(left.availableAt) - Date.parse(right.availableAt) || Date.parse(left.createdAt) - Date.parse(right.createdAt)).slice(0, batchSize).map((candidate) => {
+        candidate.status = "processing";
+        candidate.attempts = Math.max(0, candidate.attempts) + 1;
+        candidate.leasedAt = now;
+        candidate.updatedAt = now;
+        upsertBotMentionJob(database, candidate);
+        return { ...candidate };
+      });
+      await saveFileDatabase(database, backend.filePath);
+      return claimed;
+    });
+  });
+}
+async function finalizeBotMentionJob(mentionId, update, filePath) {
+  await withDatabaseAccess(async () => {
+    const backend = resolveDatabaseBackend(filePath);
+    if (backend.kind === "postgres") {
+      const pool = await getPostgresPool(backend.connectionString);
+      await ensurePostgresMentionJobsStore(pool, backend.tableName);
+      const escapedTableName = escapeQualifiedIdentifier(getPostgresMentionJobsTableName(backend.tableName));
+      await pool.query(
+        `UPDATE ${escapedTableName}
+         SET status = $2,
+             last_error = $3,
+             available_at = $4::timestamptz,
+             leased_at = $5::timestamptz,
+             processed_at = $6::timestamptz,
+             updated_at = $7::timestamptz
+         WHERE mention_id = $1`,
+        [
+          mentionId,
+          update.status,
+          update.lastError,
+          update.availableAt,
+          update.leasedAt,
+          update.processedAt,
+          update.updatedAt
+        ]
+      );
+      return;
+    }
+    await withDatabaseLock(async () => {
+      const database = await loadDatabaseUnsafe(backend.filePath);
+      const job = database.botMentionJobs.find((candidate) => candidate.mentionId === mentionId);
+      if (!job) {
+        return;
+      }
+      Object.assign(job, update);
+      upsertBotMentionJob(database, job);
+      await saveFileDatabase(database, backend.filePath);
+    });
+  });
+}
+async function pruneBotMentionJobs(cutoffIso, filePath) {
+  await withDatabaseAccess(async () => {
+    const backend = resolveDatabaseBackend(filePath);
+    if (backend.kind === "postgres") {
+      const pool = await getPostgresPool(backend.connectionString);
+      await ensurePostgresMentionJobsStore(pool, backend.tableName);
+      const escapedTableName = escapeQualifiedIdentifier(getPostgresMentionJobsTableName(backend.tableName));
+      await pool.query(
+        `DELETE FROM ${escapedTableName}
+         WHERE status IN ('completed', 'invalid', 'unmatched')
+           AND updated_at < $1::timestamptz`,
+        [cutoffIso]
+      );
+      return;
+    }
+    await withDatabaseLock(async () => {
+      const database = await loadDatabaseUnsafe(backend.filePath);
+      const cutoff = Date.parse(cutoffIso);
+      database.botMentionJobs = database.botMentionJobs.filter((candidate) => {
+        if (candidate.status === "queued" || candidate.status === "processing" || candidate.status === "failed") {
+          return true;
+        }
+        return Date.parse(candidate.updatedAt) >= cutoff;
+      });
+      await saveFileDatabase(database, backend.filePath);
+    });
+  });
 }
 function buildDashboardSummary(data) {
   const webhookIgnored = data.history.filter((event) => event.kind === "webhook_ignored");
@@ -10947,6 +12086,14 @@ function upsertBotExtensionAccessToken(data, token) {
     return;
   }
   data.botExtensionAccessTokens.unshift(token);
+}
+function upsertBotMentionJob(data, job) {
+  const index = data.botMentionJobs.findIndex((candidate) => candidate.id === job.id);
+  if (index >= 0) {
+    data.botMentionJobs[index] = job;
+    return;
+  }
+  data.botMentionJobs.unshift(job);
 }
 function upsertBotArchive(data, archive) {
   const index = data.botArchives.findIndex((candidate) => candidate.id === archive.id);
@@ -14330,7 +15477,7 @@ async function fetchArchiveAsset(mediaUrl) {
   }
   return response;
 }
-function normalizeThreadsHandle(value) {
+function normalizeThreadsHandle2(value) {
   return value.trim().replace(/^@+/, "").toLowerCase();
 }
 function safeText(value) {
@@ -14349,7 +15496,7 @@ function readString(value) {
   const normalized = value.trim();
   return normalized ? normalized : null;
 }
-function readStringArray(value) {
+function readStringArray2(value) {
   if (!Array.isArray(value)) {
     return [];
   }
@@ -14392,7 +15539,7 @@ function parseAiOrganizationResult(value) {
     }
   }
   const summary = readString(record.summary);
-  const tags = dedupeStrings(readStringArray(record.tags));
+  const tags = dedupeStrings(readStringArray2(record.tags));
   if (!summary && tags.length === 0 && Object.keys(frontmatter).length === 0) {
     return null;
   }
@@ -14422,7 +15569,7 @@ function parseAuthorReply(value) {
     text,
     publishedAt: readString(record.publishedAt),
     sourceType,
-    imageUrls: readStringArray(record.imageUrls),
+    imageUrls: readStringArray2(record.imageUrls),
     videoUrl: readString(record.videoUrl),
     externalUrl: readString(record.externalUrl),
     thumbnailUrl: readString(record.thumbnailUrl)
@@ -14455,7 +15602,7 @@ function parseExtractedPost(value) {
     publishedAt: readString(record.publishedAt),
     capturedAt,
     sourceType,
-    imageUrls: readStringArray(record.imageUrls),
+    imageUrls: readStringArray2(record.imageUrls),
     videoUrl: readString(record.videoUrl),
     externalUrl: readString(record.externalUrl),
     quotedPostUrl: readString(record.quotedPostUrl),
@@ -14573,7 +15720,7 @@ function createOpaqueToken() {
   return randomBytes2(32).toString("base64url");
 }
 function readBotHandle() {
-  return normalizeThreadsHandle(
+  return normalizeThreadsHandle2(
     getRuntimeConfigSnapshot().collector.botHandle || process.env.THREADS_BOT_HANDLE?.trim() || ""
   );
 }
@@ -15069,6 +16216,38 @@ function toCloudArchiveView(item) {
     updatedAt: item.updatedAt
   };
 }
+function buildFallbackExtractedPostFromCloudArchive(item) {
+  return {
+    canonicalUrl: item.canonicalUrl,
+    shortcode: item.shortcode,
+    author: item.targetAuthorHandle ?? "",
+    title: item.targetTitle,
+    text: item.targetText,
+    publishedAt: item.targetPublishedAt,
+    capturedAt: item.updatedAt,
+    sourceType: "text",
+    imageUrls: [],
+    videoUrl: null,
+    externalUrl: null,
+    quotedPostUrl: null,
+    repliedToUrl: null,
+    thumbnailUrl: null,
+    authorReplies: [],
+    extractorVersion: "server-cloud-cache",
+    contentHash: item.contentHash
+  };
+}
+function toCloudArchiveRecentRecord(item, publicOrigin) {
+  const payload = readCloudArchivePayload(item.rawPayloadJson);
+  return {
+    archiveId: item.id,
+    archiveUrl: buildCloudArchiveUrl(publicOrigin, item.id),
+    title: item.targetTitle,
+    updatedAt: item.updatedAt,
+    warning: payload.aiWarning,
+    post: payload.extractedPost ?? buildFallbackExtractedPostFromCloudArchive(item)
+  };
+}
 function getBotUserByThreadsUserId(data, threadsUserId) {
   return data.botUsers.find(
     (candidate) => candidate.threadsUserId === threadsUserId && candidate.status === "active"
@@ -15240,7 +16419,7 @@ async function refreshThreadsAccessToken(accessToken) {
 }
 function upsertBotUserFromThreadsProfile(data, profile, accessToken, expiresAt) {
   const threadsUserId = safeText(profile.id);
-  const threadsHandle = normalizeThreadsHandle(safeText(profile.username));
+  const threadsHandle = normalizeThreadsHandle2(safeText(profile.username));
   if (!threadsUserId || !threadsHandle) {
     throw new Error("Threads OAuth did not return a valid user profile.");
   }
@@ -15555,33 +16734,51 @@ function revokeExtensionCloudConnection(data, rawToken) {
   }
   return buildCloudConnectionStatusFromTokenRecord(data, tokenRecord);
 }
-function getBotSessionState(data, rawSession) {
-  const session = getBotSessionRecord(data, rawSession);
-  if (!session) {
+function buildUnauthenticatedSessionState() {
+  return {
+    authenticated: false,
+    botHandle: readBotHandle(),
+    oauthConfigured: isThreadsOauthConfigured(),
+    user: null,
+    archives: []
+  };
+}
+async function getBotSessionStateFromStore(rawSession) {
+  const snapshot = await withPrimaryDatabaseTransaction((data) => {
+    const session = getBotSessionRecord(data, rawSession);
+    if (!session) {
+      return {
+        session: null,
+        userId: null,
+        cloudArchives: []
+      };
+    }
     return {
-      authenticated: false,
-      botHandle: readBotHandle(),
-      oauthConfigured: isThreadsOauthConfigured(),
-      user: null,
-      archives: []
+      session: { ...session },
+      userId: session.userId,
+      cloudArchives: data.cloudArchives.filter((candidate) => candidate.userId === session.userId).map((candidate) => ({ ...candidate, mediaUrls: [...candidate.mediaUrls] }))
     };
+  });
+  if (!snapshot.session || !snapshot.userId) {
+    return buildUnauthenticatedSessionState();
   }
-  const user = data.botUsers.find((candidate) => candidate.id === session.userId && candidate.status === "active");
+  const user = await findBotUserById(snapshot.userId);
   if (!user) {
-    session.status = "revoked";
-    session.revokedAt = (/* @__PURE__ */ new Date()).toISOString();
-    upsertBotSession(data, session);
-    return {
-      authenticated: false,
-      botHandle: readBotHandle(),
-      oauthConfigured: isThreadsOauthConfigured(),
-      user: null,
-      archives: []
-    };
+    await withPrimaryDatabaseTransaction((data) => {
+      const session = getBotSessionRecord(data, rawSession);
+      if (!session) {
+        return;
+      }
+      session.status = "revoked";
+      session.revokedAt = (/* @__PURE__ */ new Date()).toISOString();
+      upsertBotSession(data, session);
+    });
+    return buildUnauthenticatedSessionState();
   }
+  const mentionArchives = await listBotArchivesForUser(user.id);
   const archives = [
-    ...data.botArchives.filter((candidate) => candidate.userId === user.id).map(toBotArchiveView),
-    ...data.cloudArchives.filter((candidate) => candidate.userId === user.id).map(toCloudArchiveView)
+    ...mentionArchives.map(toBotArchiveView),
+    ...snapshot.cloudArchives.map(toCloudArchiveView)
   ].sort((left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt));
   return {
     authenticated: true,
@@ -15600,12 +16797,21 @@ function revokeBotSession(data, rawSession) {
   session.revokedAt = (/* @__PURE__ */ new Date()).toISOString();
   upsertBotSession(data, session);
 }
-function readBotArchiveMarkdown(data, rawSession, archiveId) {
-  const session = getBotSessionRecord(data, rawSession);
-  if (!session) {
+async function readBotArchiveMarkdownFromStore(rawSession, archiveId) {
+  const snapshot = await withPrimaryDatabaseTransaction((data) => {
+    const session = getBotSessionRecord(data, rawSession);
+    if (!session) {
+      return { userId: null, cloudArchive: null };
+    }
+    return {
+      userId: session.userId,
+      cloudArchive: data.cloudArchives.find((candidate) => candidate.id === archiveId && candidate.userId === session.userId) ?? null
+    };
+  });
+  if (!snapshot.userId) {
     throw new Error("You need to sign in first.");
   }
-  const mentionArchive = data.botArchives.find((candidate) => candidate.id === archiveId && candidate.userId === session.userId) ?? null;
+  const mentionArchive = await findBotArchiveById(snapshot.userId, archiveId);
   if (mentionArchive) {
     const extractedPost = readArchiveExtractedPost(mentionArchive.rawPayloadJson);
     const titleText2 = extractedPost?.text ?? mentionArchive.targetText;
@@ -15615,31 +16821,49 @@ function readBotArchiveMarkdown(data, rawSession, archiveId) {
       markdownContent: buildArchiveMarkdownFromRecord(mentionArchive, mentionArchive.mediaUrls)
     };
   }
-  const cloudArchive = data.cloudArchives.find((candidate) => candidate.id === archiveId && candidate.userId === session.userId) ?? null;
-  if (!cloudArchive) {
+  if (!snapshot.cloudArchive) {
     throw new Error("The requested archive could not be found.");
   }
-  const payload = readCloudArchivePayload(cloudArchive.rawPayloadJson);
-  const titleText = payload.extractedPost?.text ?? cloudArchive.targetText;
-  const titleAuthor = cloudArchive.targetAuthorHandle ?? payload.extractedPost?.author ?? null;
+  const payload = readCloudArchivePayload(snapshot.cloudArchive.rawPayloadJson);
+  const titleText = payload.extractedPost?.text ?? snapshot.cloudArchive.targetText;
+  const titleAuthor = snapshot.cloudArchive.targetAuthorHandle ?? payload.extractedPost?.author ?? null;
   return {
     filename: `${buildArchiveFilenameBase(titleAuthor, titleText)}.md`,
-    markdownContent: safeText(cloudArchive.markdownContent) || `# ${buildArchiveTitle(titleAuthor, titleText)}
+    markdownContent: safeText(snapshot.cloudArchive.markdownContent) || `# ${buildArchiveTitle(titleAuthor, titleText)}
 `
   };
 }
-async function readBotArchiveZip(data, rawSession, archiveIds) {
-  const session = getBotSessionRecord(data, rawSession);
-  if (!session) {
-    throw new Error("You need to sign in first.");
-  }
+async function readBotArchiveZipFromStore(rawSession, archiveIds) {
   const requestedIds = [...new Set(archiveIds.map((value) => safeText(value)).filter(Boolean))];
   if (requestedIds.length === 0) {
     throw new Error("Select at least one archive to export.");
   }
-  const archives = requestedIds.map(
-    (archiveId) => data.botArchives.find((candidate) => candidate.id === archiveId && candidate.userId === session.userId) ?? data.cloudArchives.find((candidate) => candidate.id === archiveId && candidate.userId === session.userId) ?? null
-  ).filter((candidate) => Boolean(candidate));
+  const snapshot = await withPrimaryDatabaseTransaction((data) => {
+    const session = getBotSessionRecord(data, rawSession);
+    if (!session) {
+      return {
+        userId: null,
+        cloudArchives: []
+      };
+    }
+    const requestedIdSet = new Set(requestedIds);
+    return {
+      userId: session.userId,
+      cloudArchives: data.cloudArchives.filter((candidate) => candidate.userId === session.userId && requestedIdSet.has(candidate.id)).map((candidate) => ({ ...candidate, mediaUrls: [...candidate.mediaUrls] }))
+    };
+  });
+  if (!snapshot.userId) {
+    throw new Error("You need to sign in first.");
+  }
+  const mentionArchives = await findBotArchivesByIds(snapshot.userId, requestedIds);
+  const archiveMap = /* @__PURE__ */ new Map();
+  for (const archive of mentionArchives) {
+    archiveMap.set(archive.id, archive);
+  }
+  for (const archive of snapshot.cloudArchives) {
+    archiveMap.set(archive.id, archive);
+  }
+  const archives = requestedIds.map((archiveId) => archiveMap.get(archiveId) ?? null).filter((candidate) => Boolean(candidate));
   if (archives.length === 0) {
     throw new Error("The requested archives could not be found.");
   }
@@ -15656,30 +16880,26 @@ function buildArchiveRawPayload(payload) {
   } : payload.rawPayload;
   return JSON.stringify(value);
 }
-function validateBotIngestRequest(authHeader) {
-  const expected = requireBotIngestToken();
-  if (safeText(authHeader) !== `Bearer ${expected}`) {
-    throw new Error("Unauthorized bot ingest request.");
-  }
-}
-function ingestBotMention(data, payload) {
+function materializeBotMentionArchive(user, existingArchive, payload) {
   const mentionUrl = safeText(payload.mentionUrl);
   const mentionAuthorUserId = safeText(payload.mentionAuthorUserId) || null;
-  const mentionAuthorHandle = normalizeThreadsHandle(payload.mentionAuthorHandle ?? "");
+  const mentionAuthorHandle = normalizeThreadsHandle2(payload.mentionAuthorHandle ?? "");
   const extractedPost = payload.extractedPost ?? null;
   const targetUrl = safeText(extractedPost?.canonicalUrl ?? payload.targetUrl);
   const targetText = safeText(extractedPost?.text ?? payload.targetText);
   if (!mentionUrl || !mentionAuthorUserId && !mentionAuthorHandle || !targetUrl) {
     throw new Error("mentionUrl, mentionAuthor identity, and targetUrl are required.");
   }
-  const user = (mentionAuthorUserId ? getBotUserByThreadsUserId(data, mentionAuthorUserId) : null) ?? (mentionAuthorHandle ? getBotUserByHandle(data, mentionAuthorHandle) : null);
   if (!user) {
     return {
-      ok: true,
-      matched: false,
-      created: false,
-      archiveId: null,
-      reason: "user_not_found"
+      result: {
+        ok: true,
+        matched: false,
+        created: false,
+        archiveId: null,
+        reason: "user_not_found"
+      },
+      archive: null
     };
   }
   const now = (/* @__PURE__ */ new Date()).toISOString();
@@ -15700,35 +16920,30 @@ function ingestBotMention(data, payload) {
     archivedAt: now
   };
   const markdownContent = buildArchiveMarkdownFromRecord(archiveDraft, mediaUrls);
-  const existing = data.botArchives.find((candidate) => {
-    if (candidate.userId !== user.id) {
-      return false;
-    }
-    if (payload.mentionId && candidate.mentionId) {
-      return candidate.mentionId === safeText(payload.mentionId);
-    }
-    return candidate.mentionUrl === mentionUrl;
-  });
-  if (existing) {
-    existing.mentionAuthorHandle = mentionAuthorHandle || existing.mentionAuthorHandle;
-    existing.mentionAuthorDisplayName = safeText(payload.mentionAuthorDisplayName) || existing.mentionAuthorDisplayName;
-    existing.noteText = noteText ?? existing.noteText;
-    existing.targetUrl = targetUrl;
-    existing.targetAuthorHandle = safeText(payload.targetAuthorHandle) || extractedPost?.author || null;
-    existing.targetAuthorDisplayName = safeText(payload.targetAuthorDisplayName) || null;
-    existing.targetText = targetText;
-    existing.targetPublishedAt = safeText(extractedPost?.publishedAt ?? payload.targetPublishedAt) || null;
-    existing.mediaUrls = mediaUrls;
-    existing.markdownContent = markdownContent;
-    existing.rawPayloadJson = rawPayloadJson ?? existing.rawPayloadJson;
-    existing.updatedAt = now;
-    upsertBotArchive(data, existing);
+  if (existingArchive) {
     return {
-      ok: true,
-      matched: true,
-      created: false,
-      archiveId: existing.id,
-      reason: null
+      result: {
+        ok: true,
+        matched: true,
+        created: false,
+        archiveId: existingArchive.id,
+        reason: null
+      },
+      archive: {
+        ...existingArchive,
+        mentionAuthorHandle: mentionAuthorHandle || existingArchive.mentionAuthorHandle,
+        mentionAuthorDisplayName: safeText(payload.mentionAuthorDisplayName) || existingArchive.mentionAuthorDisplayName,
+        noteText: noteText ?? existingArchive.noteText,
+        targetUrl,
+        targetAuthorHandle: safeText(payload.targetAuthorHandle) || extractedPost?.author || null,
+        targetAuthorDisplayName: safeText(payload.targetAuthorDisplayName) || null,
+        targetText,
+        targetPublishedAt: safeText(extractedPost?.publishedAt ?? payload.targetPublishedAt) || null,
+        mediaUrls,
+        markdownContent,
+        rawPayloadJson: rawPayloadJson ?? existingArchive.rawPayloadJson,
+        updatedAt: now
+      }
     };
   }
   const archive = {
@@ -15751,14 +16966,42 @@ function ingestBotMention(data, payload) {
     updatedAt: now,
     status: "saved"
   };
-  upsertBotArchive(data, archive);
   return {
-    ok: true,
-    matched: true,
-    created: true,
-    archiveId: archive.id,
-    reason: null
+    result: {
+      ok: true,
+      matched: true,
+      created: true,
+      archiveId: archive.id,
+      reason: null
+    },
+    archive
   };
+}
+function validateBotIngestRequest(authHeader) {
+  const expected = requireBotIngestToken();
+  if (safeText(authHeader) !== `Bearer ${expected}`) {
+    throw new Error("Unauthorized bot ingest request.");
+  }
+}
+function ingestBotMention(data, payload) {
+  const mentionUrl = safeText(payload.mentionUrl);
+  const mentionAuthorUserId = safeText(payload.mentionAuthorUserId) || null;
+  const mentionAuthorHandle = normalizeThreadsHandle2(payload.mentionAuthorHandle ?? "");
+  const user = (mentionAuthorUserId ? getBotUserByThreadsUserId(data, mentionAuthorUserId) : null) ?? (mentionAuthorHandle ? getBotUserByHandle(data, mentionAuthorHandle) : null);
+  const existing = data.botArchives.find((candidate) => {
+    if (!user || candidate.userId !== user.id) {
+      return false;
+    }
+    if (payload.mentionId && candidate.mentionId) {
+      return candidate.mentionId === safeText(payload.mentionId);
+    }
+    return candidate.mentionUrl === mentionUrl;
+  });
+  const materialized = materializeBotMentionArchive(user, existing ?? null, payload);
+  if (materialized.archive) {
+    upsertBotArchive(data, materialized.archive);
+  }
+  return materialized.result;
 }
 async function saveCloudArchiveForUser(data, user, input, publicOrigin) {
   const post = input.post;
@@ -15839,6 +17082,26 @@ async function saveCloudArchiveWithExtensionToken(data, rawToken, input, publicO
   const { user } = requireExtensionLinkUser(data, rawToken);
   return saveCloudArchiveForUser(data, user, input, publicOrigin);
 }
+function listExtensionCloudArchives(data, rawToken, publicOrigin, limit = 10) {
+  const { user } = requireExtensionLinkUser(data, rawToken);
+  const normalizedLimit = Number.isFinite(limit) ? Math.max(1, Math.min(50, Math.trunc(limit))) : 10;
+  return data.cloudArchives.filter((candidate) => candidate.userId === user.id).sort((left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt)).slice(0, normalizedLimit).map((item) => toCloudArchiveRecentRecord(item, publicOrigin));
+}
+function deleteExtensionCloudArchive(data, rawToken, archiveId) {
+  const { user } = requireExtensionLinkUser(data, rawToken);
+  const normalizedId = safeText(archiveId);
+  if (!normalizedId) {
+    throw new Error("Select an archive to delete.");
+  }
+  const cloudIndex = data.cloudArchives.findIndex(
+    (candidate) => candidate.id === normalizedId && candidate.userId === user.id
+  );
+  if (cloudIndex < 0) {
+    throw new Error("The requested archive could not be found.");
+  }
+  data.cloudArchives.splice(cloudIndex, 1);
+  clearArchiveReferences(data, user.id, normalizedId);
+}
 function clearArchiveReferences(data, userId, archiveId) {
   for (const result of data.searchResults) {
     if (result.userId !== userId || result.archiveId !== archiveId) {
@@ -15858,30 +17121,49 @@ function clearArchiveReferences(data, userId, archiveId) {
     tracked.archivedAt = null;
   }
 }
-function deleteArchive(data, rawSession, archiveId) {
-  const session = getBotSessionRecord(data, rawSession);
-  if (!session) {
-    throw new Error("You need to sign in first.");
-  }
+async function deleteArchiveFromStore(rawSession, archiveId) {
   const normalizedId = safeText(archiveId);
   if (!normalizedId) {
     throw new Error("Select an archive to delete.");
   }
-  const mentionIndex = data.botArchives.findIndex(
-    (candidate) => candidate.id === normalizedId && candidate.userId === session.userId
-  );
-  if (mentionIndex >= 0) {
-    data.botArchives.splice(mentionIndex, 1);
-    clearArchiveReferences(data, session.userId, normalizedId);
-    return getBotSessionState(data, rawSession);
+  const snapshot = await withPrimaryDatabaseTransaction((data) => {
+    const session = getBotSessionRecord(data, rawSession);
+    if (!session) {
+      return {
+        sessionUserId: null,
+        hasCloudArchive: false
+      };
+    }
+    return {
+      sessionUserId: session.userId,
+      hasCloudArchive: data.cloudArchives.some(
+        (candidate) => candidate.id === normalizedId && candidate.userId === session.userId
+      )
+    };
+  });
+  if (!snapshot.sessionUserId) {
+    throw new Error("You need to sign in first.");
   }
-  const cloudIndex = data.cloudArchives.findIndex(
-    (candidate) => candidate.id === normalizedId && candidate.userId === session.userId
-  );
-  if (cloudIndex >= 0) {
-    data.cloudArchives.splice(cloudIndex, 1);
-    clearArchiveReferences(data, session.userId, normalizedId);
-    return getBotSessionState(data, rawSession);
+  const mentionArchive = await findBotArchiveById(snapshot.sessionUserId, normalizedId);
+  if (mentionArchive) {
+    await deleteBotArchiveRecord(snapshot.sessionUserId, normalizedId);
+    await withPrimaryDatabaseTransaction((data) => {
+      clearArchiveReferences(data, snapshot.sessionUserId, normalizedId);
+    });
+    return getBotSessionStateFromStore(rawSession);
+  }
+  if (snapshot.hasCloudArchive) {
+    await withPrimaryDatabaseTransaction((data) => {
+      const index = data.cloudArchives.findIndex(
+        (candidate) => candidate.id === normalizedId && candidate.userId === snapshot.sessionUserId
+      );
+      if (index < 0) {
+        throw new Error("The requested archive could not be found.");
+      }
+      data.cloudArchives.splice(index, 1);
+      clearArchiveReferences(data, snapshot.sessionUserId, normalizedId);
+    });
+    return getBotSessionStateFromStore(rawSession);
   }
   throw new Error("The requested archive could not be found.");
 }
@@ -15898,7 +17180,7 @@ function getBotRequiredScopes() {
 function getBotScopeVersion() {
   return BOT_SCOPE_VERSION;
 }
-async function getFreshAccessTokenForUser(data, user) {
+async function getFreshAccessTokenForUserRecord(user, persistUser) {
   if (!user.accessTokenCiphertext) {
     return null;
   }
@@ -15913,7 +17195,7 @@ async function getFreshAccessTokenForUser(data, user) {
     user.accessTokenCiphertext = encryptSecret2(nextToken);
     user.tokenExpiresAt = buildBotAccessTokenExpiry(refreshed.expires_in);
     user.updatedAt = (/* @__PURE__ */ new Date()).toISOString();
-    upsertBotUser(data, user);
+    await persistUser(user);
     return nextToken;
   } catch {
     if (expiry > Date.now()) {
@@ -15922,8 +17204,13 @@ async function getFreshAccessTokenForUser(data, user) {
     throw new Error("The stored Threads access token expired. Sign in with Threads again.");
   }
 }
+async function getFreshAccessTokenForUser(data, user) {
+  return getFreshAccessTokenForUserRecord(user, (nextUser) => {
+    upsertBotUser(data, nextUser);
+  });
+}
 async function getBotAccessTokenForHandle(data, rawHandle) {
-  const handle = normalizeThreadsHandle(rawHandle ?? "");
+  const handle = normalizeThreadsHandle2(rawHandle ?? "");
   if (!handle) {
     return null;
   }
@@ -17394,6 +18681,15 @@ var DEFAULT_POLL_INTERVAL_MS = 6e4;
 var DEFAULT_FETCH_LIMIT = 25;
 var DEFAULT_MAX_PAGES = 5;
 var MAX_FETCH_LIMIT = 100;
+var DEFAULT_PROCESSING_CONCURRENCY = 4;
+var MAX_PROCESSING_CONCURRENCY = 32;
+var DEFAULT_WORKER_INTERVAL_MS = 1e3;
+var DEFAULT_JOB_BATCH_SIZE = 25;
+var MAX_JOB_BATCH_SIZE = 100;
+var DEFAULT_JOB_LEASE_MS = 2 * 6e4;
+var DEFAULT_JOB_RETRY_BASE_MS = 15e3;
+var MAX_JOB_RETRY_DELAY_MS = 15 * 6e4;
+var DEFAULT_JOB_RETENTION_MS = 7 * 24 * 60 * 6e4;
 var THREAD_FIELDS = [
   "id",
   "text",
@@ -17422,11 +18718,38 @@ function parsePositiveInt(raw, fallback, minimum = 1, maximum = Number.MAX_SAFE_
   }
   return parsed;
 }
+function trimEnv2(name) {
+  const value = process.env[name]?.trim();
+  return value ? value : null;
+}
+function parsePositiveIntEnv(name, fallback, minimum = 1, maximum = Number.MAX_SAFE_INTEGER) {
+  const raw = trimEnv2(name);
+  if (!raw) {
+    return fallback;
+  }
+  return parsePositiveInt(raw, fallback, minimum, maximum);
+}
 function normalizeHandle2(value) {
   return (value ?? "").trim().replace(/^@+/, "").toLowerCase();
 }
 function safeText4(value) {
   return (value ?? "").trim();
+}
+function createSummary(mode, overrides) {
+  return {
+    ok: true,
+    reason: null,
+    mode,
+    fetchedPages: 0,
+    fetchedMentions: 0,
+    processedMentions: 0,
+    createdArchives: 0,
+    updatedArchives: 0,
+    unmatchedMentions: 0,
+    skippedExisting: 0,
+    skippedInvalid: 0,
+    ...overrides
+  };
 }
 function toCollectorStatusError(error) {
   if (error instanceof Error) {
@@ -17547,6 +18870,251 @@ function readCollectorConfig() {
     fetchLimit: parsePositiveInt(runtime.fetchLimit, DEFAULT_FETCH_LIMIT, 1, MAX_FETCH_LIMIT),
     maxPages: parsePositiveInt(runtime.maxPages, DEFAULT_MAX_PAGES, 1, 20)
   };
+}
+function readProcessingConcurrency() {
+  return parsePositiveIntEnv(
+    "THREADS_BOT_MENTION_PROCESSING_CONCURRENCY",
+    DEFAULT_PROCESSING_CONCURRENCY,
+    1,
+    MAX_PROCESSING_CONCURRENCY
+  );
+}
+function readWorkerIntervalMs() {
+  return parsePositiveIntEnv(
+    "THREADS_BOT_MENTION_WORKER_INTERVAL_MS",
+    DEFAULT_WORKER_INTERVAL_MS,
+    250,
+    6e4
+  );
+}
+function useExternalizedMentionJobs() {
+  const database = getRuntimeConfigSnapshot().database;
+  return database.backend === "postgres" && Boolean(database.postgresUrl.trim());
+}
+function readJobBatchSize() {
+  return parsePositiveIntEnv(
+    "THREADS_BOT_MENTION_JOB_BATCH_SIZE",
+    DEFAULT_JOB_BATCH_SIZE,
+    1,
+    MAX_JOB_BATCH_SIZE
+  );
+}
+function readJobLeaseMs() {
+  return parsePositiveIntEnv(
+    "THREADS_BOT_MENTION_JOB_LEASE_MS",
+    DEFAULT_JOB_LEASE_MS,
+    5e3,
+    15 * 6e4
+  );
+}
+function safeTime(value, fallback = 0) {
+  if (!value) {
+    return fallback;
+  }
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+function safeJsonStringify(value) {
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return null;
+  }
+}
+function parseMentionSummaryJobPayload(job) {
+  if (job.rawSummaryJson) {
+    try {
+      return toRecord2(JSON.parse(job.rawSummaryJson));
+    } catch {
+    }
+  }
+  return toRecord2({
+    id: job.mentionId,
+    permalink: job.mentionUrl,
+    username: job.mentionAuthorHandle,
+    text: job.mentionText,
+    timestamp: job.mentionPublishedAt
+  });
+}
+function buildMentionJobRecord(mentionSummary, now) {
+  const mentionId = safeText4(readNestedString(mentionSummary, ["id"]) || "");
+  if (!mentionId) {
+    return null;
+  }
+  return {
+    id: mentionId,
+    mentionId,
+    mentionUrl: buildThreadPermalink(mentionSummary),
+    mentionAuthorHandle: extractThreadHandle(mentionSummary),
+    mentionAuthorUserId: extractThreadUserId(mentionSummary),
+    mentionText: safeText4(extractThreadText(mentionSummary) || "") || null,
+    mentionPublishedAt: extractThreadTimestamp(mentionSummary),
+    rawSummaryJson: safeJsonStringify(mentionSummary),
+    attempts: 0,
+    status: "queued",
+    lastError: null,
+    availableAt: now,
+    leasedAt: null,
+    processedAt: null,
+    createdAt: now,
+    updatedAt: now
+  };
+}
+function pruneMentionJobs(data, now) {
+  const cutoff = safeTime(now) - DEFAULT_JOB_RETENTION_MS;
+  if (!Number.isFinite(cutoff)) {
+    return;
+  }
+  data.botMentionJobs = data.botMentionJobs.filter((job) => {
+    if (job.status === "queued" || job.status === "processing" || job.status === "failed") {
+      return true;
+    }
+    return safeTime(job.updatedAt, 0) >= cutoff;
+  });
+}
+function enqueueMentionJobs(data, mentionSummaries, now, forceRequeue) {
+  let enqueued = 0;
+  let invalid = 0;
+  for (const mentionSummary of mentionSummaries) {
+    const job = buildMentionJobRecord(mentionSummary, now);
+    if (!job) {
+      invalid += 1;
+      continue;
+    }
+    const existingJob = data.botMentionJobs.find((candidate) => candidate.mentionId === job.mentionId);
+    const existingArchive = data.botArchives.some((candidate) => safeText4(candidate.mentionId) === job.mentionId);
+    if (!forceRequeue && (existingJob || existingArchive)) {
+      continue;
+    }
+    if (existingJob) {
+      existingJob.mentionUrl = job.mentionUrl;
+      existingJob.mentionAuthorHandle = job.mentionAuthorHandle;
+      existingJob.mentionAuthorUserId = job.mentionAuthorUserId;
+      existingJob.mentionText = job.mentionText;
+      existingJob.mentionPublishedAt = job.mentionPublishedAt;
+      existingJob.rawSummaryJson = job.rawSummaryJson;
+      existingJob.status = "queued";
+      existingJob.lastError = null;
+      existingJob.availableAt = now;
+      existingJob.leasedAt = null;
+      existingJob.processedAt = null;
+      existingJob.updatedAt = now;
+      upsertBotMentionJob(data, existingJob);
+      enqueued += 1;
+      continue;
+    }
+    upsertBotMentionJob(data, job);
+    enqueued += 1;
+  }
+  pruneMentionJobs(data, now);
+  return { enqueued, invalid };
+}
+function isClaimableJob(job, now, leaseMs) {
+  if (safeTime(job.availableAt, 0) > now) {
+    return false;
+  }
+  if (job.status === "queued" || job.status === "failed") {
+    return true;
+  }
+  if (job.status !== "processing") {
+    return false;
+  }
+  return safeTime(job.leasedAt, 0) + leaseMs <= now;
+}
+function claimMentionJobs(data, now, batchSize, leaseMs) {
+  const nowMs = safeTime(now);
+  const claimed = data.botMentionJobs.filter((candidate) => isClaimableJob(candidate, nowMs, leaseMs)).sort((left, right) => safeTime(left.availableAt) - safeTime(right.availableAt) || safeTime(left.createdAt) - safeTime(right.createdAt)).slice(0, batchSize);
+  for (const job of claimed) {
+    job.status = "processing";
+    job.attempts = Math.max(0, job.attempts) + 1;
+    job.leasedAt = now;
+    job.updatedAt = now;
+    upsertBotMentionJob(data, job);
+  }
+  return claimed.map((candidate) => structuredClone(candidate));
+}
+function retryDelayMs(attempts) {
+  const exponent = Math.max(0, attempts - 1);
+  return Math.min(DEFAULT_JOB_RETRY_BASE_MS * 2 ** exponent, MAX_JOB_RETRY_DELAY_MS);
+}
+function completeMentionJob(data, mentionId, input) {
+  const job = data.botMentionJobs.find((candidate) => candidate.mentionId === mentionId);
+  if (!job) {
+    return;
+  }
+  job.status = input.status;
+  job.lastError = input.lastError ?? null;
+  job.leasedAt = null;
+  job.updatedAt = input.now;
+  if (input.status === "failed") {
+    job.availableAt = new Date(safeTime(input.now) + retryDelayMs(input.attempts ?? job.attempts)).toISOString();
+    job.processedAt = null;
+  } else {
+    job.availableAt = input.now;
+    job.processedAt = input.now;
+  }
+  upsertBotMentionJob(data, job);
+  pruneMentionJobs(data, input.now);
+}
+function buildMentionSyncReadState(input) {
+  return {
+    activeUserIds: new Set([...input.activeUserIds].map((value) => safeText4(value)).filter(Boolean)),
+    activeUserHandles: new Set([...input.activeUserHandles].map((value) => normalizeHandle2(value)).filter(Boolean)),
+    knownMentionIds: new Set([...input.knownMentionIds].map((value) => safeText4(value)).filter(Boolean))
+  };
+}
+function createMentionSyncReadState(data) {
+  const activeUserIds = [];
+  const activeUserHandles = [];
+  for (const candidate of data.botUsers) {
+    if (candidate.status !== "active") {
+      continue;
+    }
+    const threadsUserId = safeText4(candidate.threadsUserId);
+    if (threadsUserId) {
+      activeUserIds.push(threadsUserId);
+    }
+    const threadsHandle = normalizeHandle2(candidate.threadsHandle);
+    if (threadsHandle) {
+      activeUserHandles.push(threadsHandle);
+    }
+  }
+  return buildMentionSyncReadState({
+    activeUserIds,
+    activeUserHandles,
+    knownMentionIds: [
+      ...data.botArchives.map((candidate) => safeText4(candidate.mentionId)),
+      ...data.botMentionJobs.map((candidate) => safeText4(candidate.mentionId))
+    ]
+  });
+}
+function hasMatchedUser(readState, rawThreadsUserId, rawHandle) {
+  const threadsUserId = safeText4(rawThreadsUserId);
+  if (threadsUserId && readState.activeUserIds.has(threadsUserId)) {
+    return true;
+  }
+  const handle = normalizeHandle2(rawHandle);
+  return Boolean(handle && readState.activeUserHandles.has(handle));
+}
+async function mapWithConcurrency(items, concurrency, worker) {
+  if (items.length === 0) {
+    return [];
+  }
+  const results = new Array(items.length);
+  let cursor = 0;
+  const workerCount = Math.min(Math.max(concurrency, 1), items.length);
+  const runWorker = async () => {
+    while (true) {
+      const index = cursor;
+      cursor += 1;
+      if (index >= items.length) {
+        return;
+      }
+      results[index] = await worker(items[index]);
+    }
+  };
+  await Promise.all(Array.from({ length: workerCount }, () => runWorker()));
+  return results;
 }
 function createInitialStatus(config) {
   return {
@@ -17714,8 +19282,13 @@ function isSameThread(left, rightId, rightPermalink) {
   const leftPermalink = buildThreadPermalink(left);
   return Boolean(leftPermalink && rightPermalink && leftPermalink === rightPermalink);
 }
-async function resolveTargetFromRepliesFeed(data, config, mentionId, mentionUrl, mentionAuthorUserId, mentionAuthorHandle) {
-  const ownerAccessToken = (mentionAuthorUserId ? await getBotAccessTokenForThreadsUserId(data, mentionAuthorUserId) : null) ?? (mentionAuthorHandle ? await getBotAccessTokenForHandle(data, mentionAuthorHandle) : null);
+async function resolveTargetFromRepliesFeed(config, resolveAccessToken, mentionId, mentionUrl, mentionAuthorUserId, mentionAuthorHandle) {
+  let ownerAccessToken;
+  try {
+    ownerAccessToken = await resolveAccessToken(mentionAuthorUserId, mentionAuthorHandle);
+  } catch {
+    return null;
+  }
   if (!ownerAccessToken) {
     return null;
   }
@@ -17744,17 +19317,20 @@ function buildFallbackTargetText(node) {
   const handle = extractThreadHandle(node);
   return handle ? `Threads post by @${handle} (no text returned by the API).` : "Threads post (no text returned by the API).";
 }
-async function buildIngestPayload(data, config, accessToken, mentionSummary) {
+async function buildIngestPayload(readState, config, accessToken, mentionSummary, resolveRepliesAccessToken) {
   const mentionId = readNestedString(mentionSummary, ["id"]);
   if (!mentionId) {
-    return null;
+    return { kind: "invalid" };
   }
   const mentionDetail = await fetchThreadNode(config, accessToken, mentionId, true);
   const mentionUrl = buildThreadPermalink(mentionDetail) || buildThreadPermalink(mentionSummary);
   const mentionAuthorHandle = extractThreadHandle(mentionDetail) || extractThreadHandle(mentionSummary);
   const mentionAuthorUserId = extractThreadUserId(mentionDetail) || extractThreadUserId(mentionSummary);
   if (!mentionUrl || !mentionAuthorHandle) {
-    return null;
+    return { kind: "invalid" };
+  }
+  if (!hasMatchedUser(readState, mentionAuthorUserId, mentionAuthorHandle)) {
+    return { kind: "unmatched" };
   }
   const relatedThreadId = extractRelatedThreadId(mentionDetail);
   const relatedThreadNode = await hydrateRelatedThreadNode(
@@ -17763,8 +19339,8 @@ async function buildIngestPayload(data, config, accessToken, mentionSummary) {
     extractRelatedThreadNode(mentionDetail)
   );
   const replyResolvedTarget = relatedThreadNode ?? (relatedThreadId ? await fetchThreadNode(config, accessToken, relatedThreadId, false) : null) ?? await resolveTargetFromRepliesFeed(
-    data,
     config,
+    resolveRepliesAccessToken,
     mentionId,
     mentionUrl,
     mentionAuthorUserId,
@@ -17778,23 +19354,26 @@ async function buildIngestPayload(data, config, accessToken, mentionSummary) {
   const targetText = safeText4(extractedTargetPost?.text) || safeText4(extractThreadText(targetNode) || "") || buildFallbackTargetText(targetNode);
   const targetIsSeparate = targetUrl !== mentionUrl || targetText !== mentionText;
   return {
-    mentionId,
-    mentionUrl,
-    mentionAuthorUserId,
-    mentionAuthorHandle,
-    mentionAuthorDisplayName: extractThreadDisplayName(mentionDetail) || extractThreadDisplayName(mentionSummary),
-    noteText: targetIsSeparate ? mentionText || null : null,
-    targetUrl,
-    targetAuthorHandle: safeText4(extractedTargetPost?.author) || extractThreadHandle(targetNode),
-    targetAuthorDisplayName: extractThreadDisplayName(targetNode),
-    targetText,
-    targetPublishedAt: safeText4(extractedTargetPost?.publishedAt) || extractThreadTimestamp(targetNode),
-    mediaUrls: extractedTargetPost ? summarizeExtractedPostPreviewMediaUrls2(extractedTargetPost) : extractMediaUrls(targetNode),
-    extractedPost: extractedTargetPost,
-    rawPayload: {
-      mention: mentionDetail ?? mentionSummary,
-      target: targetNode,
-      extractedPost: extractedTargetPost
+    kind: "payload",
+    payload: {
+      mentionId,
+      mentionUrl,
+      mentionAuthorUserId,
+      mentionAuthorHandle,
+      mentionAuthorDisplayName: extractThreadDisplayName(mentionDetail) || extractThreadDisplayName(mentionSummary),
+      noteText: targetIsSeparate ? mentionText || null : null,
+      targetUrl,
+      targetAuthorHandle: safeText4(extractedTargetPost?.author) || extractThreadHandle(targetNode),
+      targetAuthorDisplayName: extractThreadDisplayName(targetNode),
+      targetText,
+      targetPublishedAt: safeText4(extractedTargetPost?.publishedAt) || extractThreadTimestamp(targetNode),
+      mediaUrls: extractedTargetPost ? summarizeExtractedPostPreviewMediaUrls2(extractedTargetPost) : extractMediaUrls(targetNode),
+      extractedPost: extractedTargetPost,
+      rawPayload: {
+        mention: mentionDetail ?? mentionSummary,
+        target: targetNode,
+        extractedPost: extractedTargetPost
+      }
     }
   };
 }
@@ -17804,47 +19383,48 @@ async function resolveCollectorAccessToken(config, data) {
   }
   return getBotAccessTokenForHandle(data, config.botHandle);
 }
-async function syncMentions(data, config, mode) {
-  if (!config.botHandle) {
-    return {
-      ok: false,
-      reason: "bot_handle_missing",
-      mode,
-      fetchedPages: 0,
-      fetchedMentions: 0,
-      processedMentions: 0,
-      createdArchives: 0,
-      updatedArchives: 0,
-      unmatchedMentions: 0,
-      skippedExisting: 0,
-      skippedInvalid: 0
-    };
+async function resolveStoredAccessToken(rawThreadsUserId, rawHandle) {
+  const user = (rawThreadsUserId ? await findBotUserByThreadsUserId(rawThreadsUserId) : null) ?? (rawHandle ? await findBotUserByHandle(rawHandle) : null);
+  if (!user) {
+    return null;
   }
-  const accessToken = await resolveCollectorAccessToken(config, data);
-  if (!accessToken) {
-    return {
-      ok: false,
-      reason: "access_token_missing",
-      mode,
-      fetchedPages: 0,
-      fetchedMentions: 0,
-      processedMentions: 0,
-      createdArchives: 0,
-      updatedArchives: 0,
-      unmatchedMentions: 0,
-      skippedExisting: 0,
-      skippedInvalid: 0
-    };
+  return getFreshAccessTokenForUserRecord(user, async (nextUser) => {
+    await saveBotUserRecord(nextUser);
+  });
+}
+async function ingestMentionPayload(payload, runTransaction) {
+  if (!useExternalizedMentionJobs()) {
+    return runTransaction((data) => ingestBotMention(data, payload));
   }
-  const knownMentionIds = new Set(
-    data.botArchives.map((candidate) => safeText4(candidate.mentionId)).filter(Boolean)
+  const user = (payload.mentionAuthorUserId ? await findBotUserByThreadsUserId(payload.mentionAuthorUserId) : null) ?? (payload.mentionAuthorHandle ? await findBotUserByHandle(payload.mentionAuthorHandle) : null);
+  const existingArchive = user && payload.mentionUrl ? await findBotArchiveByMention(user.id, payload.mentionId ?? null, safeText4(payload.mentionUrl)) : null;
+  const materialized = materializeBotMentionArchive(user, existingArchive, payload);
+  if (materialized.archive) {
+    await saveBotArchiveRecord(materialized.archive);
+  }
+  return materialized.result;
+}
+function mergeSummaries(mode, ...summaries) {
+  return summaries.reduce(
+    (accumulator, summary) => createSummary(mode, {
+      ok: accumulator.ok && summary.ok,
+      reason: accumulator.reason ?? summary.reason,
+      fetchedPages: accumulator.fetchedPages + summary.fetchedPages,
+      fetchedMentions: accumulator.fetchedMentions + summary.fetchedMentions,
+      processedMentions: accumulator.processedMentions + summary.processedMentions,
+      createdArchives: accumulator.createdArchives + summary.createdArchives,
+      updatedArchives: accumulator.updatedArchives + summary.updatedArchives,
+      unmatchedMentions: accumulator.unmatchedMentions + summary.unmatchedMentions,
+      skippedExisting: accumulator.skippedExisting + summary.skippedExisting,
+      skippedInvalid: accumulator.skippedInvalid + summary.skippedInvalid
+    }),
+    createSummary(mode, {})
   );
+}
+async function enqueueMentionSyncJobs(readState, config, mode, accessToken, runTransaction) {
+  const knownMentionIds = new Set(readState.knownMentionIds);
   let fetchedPages = 0;
   let fetchedMentions = 0;
-  let processedMentions = 0;
-  let createdArchives = 0;
-  let updatedArchives = 0;
-  let unmatchedMentions = 0;
   let skippedExisting = 0;
   let skippedInvalid = 0;
   let afterCursor = null;
@@ -17853,6 +19433,7 @@ async function syncMentions(data, config, mode) {
     fetchedPages += 1;
     fetchedMentions += pageResult.items.length;
     let sawOnlyExisting = true;
+    const queuedMentions = [];
     for (const mentionSummary of pageResult.items) {
       const mentionId = safeText4(readNestedString(mentionSummary, ["id"]) || "");
       if (mode === "interval" && mentionId && knownMentionIds.has(mentionId)) {
@@ -17860,24 +19441,25 @@ async function syncMentions(data, config, mode) {
         continue;
       }
       sawOnlyExisting = false;
-      const payload = await buildIngestPayload(data, config, accessToken, mentionSummary);
-      if (!payload) {
-        skippedInvalid += 1;
-        continue;
+      if (mentionId) {
+        knownMentionIds.add(mentionId);
       }
-      processedMentions += 1;
-      const ingest = ingestBotMention(data, payload);
-      if (payload.mentionId) {
-        knownMentionIds.add(payload.mentionId);
-      }
-      if (!ingest.matched) {
-        unmatchedMentions += 1;
-        continue;
-      }
-      if (ingest.created) {
-        createdArchives += 1;
+      queuedMentions.push(mentionSummary);
+    }
+    if (queuedMentions.length > 0) {
+      const now = (/* @__PURE__ */ new Date()).toISOString();
+      if (useExternalizedMentionJobs()) {
+        const jobs = queuedMentions.map((mentionSummary) => buildMentionJobRecord(mentionSummary, now)).filter((job) => Boolean(job));
+        skippedInvalid += queuedMentions.length - jobs.length;
+        await enqueueBotMentionJobs(jobs, {
+          forceRequeue: mode !== "interval"
+        });
+        await pruneBotMentionJobs(new Date(Date.now() - DEFAULT_JOB_RETENTION_MS).toISOString());
       } else {
-        updatedArchives += 1;
+        const enqueueResult = await runTransaction(
+          (data) => enqueueMentionJobs(data, queuedMentions, now, mode !== "interval")
+        );
+        skippedInvalid += enqueueResult.invalid;
       }
     }
     afterCursor = pageResult.nextCursor;
@@ -17885,27 +19467,244 @@ async function syncMentions(data, config, mode) {
       break;
     }
   }
-  return {
-    ok: true,
-    reason: null,
-    mode,
+  return createSummary(mode, {
     fetchedPages,
     fetchedMentions,
-    processedMentions,
-    createdArchives,
-    updatedArchives,
-    unmatchedMentions,
     skippedExisting,
     skippedInvalid
-  };
+  });
+}
+async function processMentionJob(job, readState, config, accessToken, resolveRepliesAccessToken, runTransaction) {
+  const mentionSummary = parseMentionSummaryJobPayload(job);
+  if (!mentionSummary) {
+    return { kind: "invalid" };
+  }
+  try {
+    const prepared = await buildIngestPayload(
+      readState,
+      config,
+      accessToken,
+      mentionSummary,
+      resolveRepliesAccessToken
+    );
+    if (prepared.kind === "invalid") {
+      return { kind: "invalid" };
+    }
+    if (prepared.kind === "unmatched") {
+      return { kind: "unmatched" };
+    }
+    const ingest = await ingestMentionPayload(prepared.payload, runTransaction);
+    return {
+      kind: "ingested",
+      ingest
+    };
+  } catch (error) {
+    return {
+      kind: "failed",
+      error
+    };
+  }
+}
+async function drainMentionSyncJobs(config, mode, options) {
+  if (!config.botHandle) {
+    return createSummary(mode, {
+      ok: false,
+      reason: "bot_handle_missing"
+    });
+  }
+  const accessToken = await options.resolveCollectorAccessToken();
+  if (!accessToken) {
+    return createSummary(mode, {
+      ok: false,
+      reason: "access_token_missing"
+    });
+  }
+  const summary = createSummary(mode, {});
+  while (true) {
+    const claimedJobs = useExternalizedMentionJobs() ? await claimBotMentionJobs(
+      (/* @__PURE__ */ new Date()).toISOString(),
+      options.jobBatchSize,
+      options.jobLeaseMs
+    ) : await options.runTransaction(
+      (data) => claimMentionJobs(data, (/* @__PURE__ */ new Date()).toISOString(), options.jobBatchSize, options.jobLeaseMs)
+    );
+    if (claimedJobs.length === 0) {
+      break;
+    }
+    const readState = await options.loadReadState();
+    const results = await mapWithConcurrency(
+      claimedJobs,
+      options.processingConcurrency,
+      async (job) => processMentionJob(
+        job,
+        readState,
+        config,
+        accessToken,
+        options.resolveRepliesAccessToken,
+        options.runTransaction
+      )
+    );
+    for (let index = 0; index < claimedJobs.length; index += 1) {
+      const job = claimedJobs[index];
+      const result = results[index];
+      if (result.kind === "invalid") {
+        summary.skippedInvalid += 1;
+        if (useExternalizedMentionJobs()) {
+          await finalizeBotMentionJob(job.mentionId, {
+            status: "invalid",
+            lastError: null,
+            availableAt: (/* @__PURE__ */ new Date()).toISOString(),
+            leasedAt: null,
+            processedAt: (/* @__PURE__ */ new Date()).toISOString(),
+            updatedAt: (/* @__PURE__ */ new Date()).toISOString()
+          });
+        } else {
+          await options.runTransaction((data) => {
+            completeMentionJob(data, job.mentionId, {
+              now: (/* @__PURE__ */ new Date()).toISOString(),
+              status: "invalid"
+            });
+          });
+        }
+        continue;
+      }
+      summary.processedMentions += 1;
+      if (result.kind === "failed") {
+        summary.ok = false;
+        summary.reason = summary.reason ?? toCollectorStatusError(result.error);
+        const now = (/* @__PURE__ */ new Date()).toISOString();
+        if (useExternalizedMentionJobs()) {
+          await finalizeBotMentionJob(job.mentionId, {
+            status: "failed",
+            lastError: toCollectorStatusError(result.error),
+            availableAt: new Date(safeTime(now) + retryDelayMs(job.attempts)).toISOString(),
+            leasedAt: null,
+            processedAt: null,
+            updatedAt: now
+          });
+        } else {
+          await options.runTransaction((data) => {
+            completeMentionJob(data, job.mentionId, {
+              now,
+              status: "failed",
+              lastError: toCollectorStatusError(result.error),
+              attempts: job.attempts
+            });
+          });
+        }
+        continue;
+      }
+      if (result.kind === "unmatched") {
+        summary.unmatchedMentions += 1;
+        if (useExternalizedMentionJobs()) {
+          await finalizeBotMentionJob(job.mentionId, {
+            status: "unmatched",
+            lastError: null,
+            availableAt: (/* @__PURE__ */ new Date()).toISOString(),
+            leasedAt: null,
+            processedAt: (/* @__PURE__ */ new Date()).toISOString(),
+            updatedAt: (/* @__PURE__ */ new Date()).toISOString()
+          });
+        } else {
+          await options.runTransaction((data) => {
+            completeMentionJob(data, job.mentionId, {
+              now: (/* @__PURE__ */ new Date()).toISOString(),
+              status: "unmatched"
+            });
+          });
+        }
+        continue;
+      }
+      if (!result.ingest.matched) {
+        summary.unmatchedMentions += 1;
+        if (useExternalizedMentionJobs()) {
+          await finalizeBotMentionJob(job.mentionId, {
+            status: "unmatched",
+            lastError: null,
+            availableAt: (/* @__PURE__ */ new Date()).toISOString(),
+            leasedAt: null,
+            processedAt: (/* @__PURE__ */ new Date()).toISOString(),
+            updatedAt: (/* @__PURE__ */ new Date()).toISOString()
+          });
+        } else {
+          await options.runTransaction((data) => {
+            completeMentionJob(data, job.mentionId, {
+              now: (/* @__PURE__ */ new Date()).toISOString(),
+              status: "unmatched"
+            });
+          });
+        }
+        continue;
+      }
+      if (result.ingest.created) {
+        summary.createdArchives += 1;
+      } else {
+        summary.updatedArchives += 1;
+      }
+      if (useExternalizedMentionJobs()) {
+        await finalizeBotMentionJob(job.mentionId, {
+          status: "completed",
+          lastError: null,
+          availableAt: (/* @__PURE__ */ new Date()).toISOString(),
+          leasedAt: null,
+          processedAt: (/* @__PURE__ */ new Date()).toISOString(),
+          updatedAt: (/* @__PURE__ */ new Date()).toISOString()
+        });
+      } else {
+        await options.runTransaction((data) => {
+          completeMentionJob(data, job.mentionId, {
+            now: (/* @__PURE__ */ new Date()).toISOString(),
+            status: "completed"
+          });
+        });
+      }
+    }
+  }
+  return summary;
 }
 function createBotMentionCollector(deps) {
   let config = readCollectorConfig();
   const logger = deps.logger ?? console;
   const status = createInitialStatus(config);
-  let timer = null;
-  let inFlight = null;
+  const loadBaseDatabaseSnapshot = deps.loadDatabase ?? (() => deps.runTransaction((data) => structuredClone(data)));
+  const loadDatabaseSnapshot = async () => {
+    const database = await loadBaseDatabaseSnapshot();
+    if (useExternalizedMentionJobs()) {
+      database.botMentionJobs = await loadBotMentionJobs();
+    }
+    return database;
+  };
+  const loadReadState = async () => {
+    if (useExternalizedMentionJobs()) {
+      return buildMentionSyncReadState(await loadBotMentionReadState());
+    }
+    return createMentionSyncReadState(await loadDatabaseSnapshot());
+  };
+  let pollTimer = null;
+  let workerTimer = null;
+  let pollInFlight = null;
+  let drainInFlight = null;
+  let syncInFlight = null;
   let started = false;
+  const workerIntervalMs = readWorkerIntervalMs();
+  const jobBatchSize = readJobBatchSize();
+  const jobLeaseMs = readJobLeaseMs();
+  const resolveCollectorToken = async () => {
+    if (config.accessTokenOverride.trim()) {
+      return config.accessTokenOverride;
+    }
+    if (useExternalizedMentionJobs()) {
+      return resolveStoredAccessToken(null, config.botHandle);
+    }
+    return deps.runTransaction((data) => resolveCollectorAccessToken(config, data));
+  };
+  const resolveRepliesAccessToken = (rawThreadsUserId, rawHandle) => useExternalizedMentionJobs() ? resolveStoredAccessToken(rawThreadsUserId, rawHandle) : deps.runTransaction(async (data) => {
+    const tokenByUserId = rawThreadsUserId ? await getBotAccessTokenForThreadsUserId(data, rawThreadsUserId) : null;
+    if (tokenByUserId) {
+      return tokenByUserId;
+    }
+    return rawHandle ? getBotAccessTokenForHandle(data, rawHandle) : null;
+  });
   const applyStatusConfig = () => {
     status.enabled = Boolean(config.botHandle) && config.intervalMs > 0;
     status.botHandle = config.botHandle;
@@ -17913,68 +19712,172 @@ function createBotMentionCollector(deps) {
     status.fetchLimit = config.fetchLimit;
     status.maxPages = config.maxPages;
   };
-  const scheduleTimer = () => {
-    if (!started || !status.enabled || timer) {
+  const updateRunningState = () => {
+    status.running = Boolean(syncInFlight || pollInFlight || drainInFlight);
+  };
+  const commitSummary = (summary) => {
+    status.lastSummary = summary;
+    status.lastCompletedAt = (/* @__PURE__ */ new Date()).toISOString();
+    if (summary.ok) {
+      status.lastSucceededAt = status.lastCompletedAt;
+      status.lastError = null;
+    } else {
+      status.lastError = summary.reason;
+    }
+    return summary;
+  };
+  const commitUnexpectedError = (error) => {
+    status.lastCompletedAt = (/* @__PURE__ */ new Date()).toISOString();
+    status.lastError = toCollectorStatusError(error);
+    throw error;
+  };
+  const enqueueNow = async (mode) => {
+    if (!config.botHandle) {
+      return createSummary(mode, {
+        ok: false,
+        reason: "bot_handle_missing"
+      });
+    }
+    const accessToken = await resolveCollectorToken();
+    if (!accessToken) {
+      return createSummary(mode, {
+        ok: false,
+        reason: "access_token_missing"
+      });
+    }
+    const readState = await loadReadState();
+    return enqueueMentionSyncJobs(readState, config, mode, accessToken, deps.runTransaction);
+  };
+  const drainNow = async (mode) => drainMentionSyncJobs(config, mode, {
+    loadReadState,
+    processingConcurrency: readProcessingConcurrency(),
+    resolveRepliesAccessToken,
+    runTransaction: deps.runTransaction,
+    resolveCollectorAccessToken: resolveCollectorToken,
+    jobBatchSize,
+    jobLeaseMs
+  });
+  const schedulePollTimer = () => {
+    if (!started || !status.enabled || pollTimer) {
       return;
     }
-    timer = setInterval(() => {
-      void runSync("interval").catch((error) => {
+    pollTimer = setInterval(() => {
+      if (syncInFlight) {
+        return;
+      }
+      void runPollCycle("interval").catch((error) => {
         logger.error("[threads-bot] mention sync failed:", error);
       });
     }, config.intervalMs);
   };
-  const restartTimer = () => {
-    if (timer) {
-      clearInterval(timer);
-      timer = null;
+  const scheduleWorkerTimer = () => {
+    if (!started || !status.enabled || workerTimer) {
+      return;
     }
-    scheduleTimer();
+    workerTimer = setInterval(() => {
+      if (syncInFlight) {
+        return;
+      }
+      void runDrainCycle("worker").catch((error) => {
+        logger.error("[threads-bot] mention worker failed:", error);
+      });
+    }, workerIntervalMs);
   };
-  const runSync = async (mode = "manual") => {
-    if (inFlight) {
-      return inFlight;
+  const restartTimers = () => {
+    if (pollTimer) {
+      clearInterval(pollTimer);
+      pollTimer = null;
     }
-    status.running = true;
+    if (workerTimer) {
+      clearInterval(workerTimer);
+      workerTimer = null;
+    }
+    schedulePollTimer();
+    scheduleWorkerTimer();
+  };
+  const runPollCycle = async (mode) => {
+    if (pollInFlight) {
+      return pollInFlight;
+    }
     status.lastStartedAt = (/* @__PURE__ */ new Date()).toISOString();
     status.lastError = null;
-    inFlight = deps.runTransaction((data) => syncMentions(data, config, mode)).then((summary) => {
-      status.lastSummary = summary;
-      status.lastCompletedAt = (/* @__PURE__ */ new Date()).toISOString();
-      if (summary.ok) {
-        status.lastSucceededAt = status.lastCompletedAt;
-      } else {
-        status.lastError = summary.reason;
+    updateRunningState();
+    pollInFlight = enqueueNow(mode).then((summary) => {
+      commitSummary(summary);
+      return summary;
+    }).catch(commitUnexpectedError).finally(() => {
+      pollInFlight = null;
+      updateRunningState();
+      if (started && status.enabled && !syncInFlight) {
+        void runDrainCycle(`${mode}_drain`).catch((error) => {
+          logger.error("[threads-bot] mention drain failed:", error);
+        });
+      }
+    });
+    updateRunningState();
+    return pollInFlight;
+  };
+  const runDrainCycle = async (mode) => {
+    if (drainInFlight) {
+      return drainInFlight;
+    }
+    status.lastStartedAt = (/* @__PURE__ */ new Date()).toISOString();
+    status.lastError = null;
+    updateRunningState();
+    drainInFlight = drainNow(mode).then((summary) => {
+      if (summary.processedMentions > 0 || summary.skippedInvalid > 0 || !summary.ok) {
+        commitSummary(summary);
       }
       return summary;
-    }).catch((error) => {
-      status.lastCompletedAt = (/* @__PURE__ */ new Date()).toISOString();
-      status.lastError = toCollectorStatusError(error);
-      throw error;
-    }).finally(() => {
-      status.running = false;
-      inFlight = null;
+    }).catch(commitUnexpectedError).finally(() => {
+      drainInFlight = null;
+      updateRunningState();
     });
-    return inFlight;
+    updateRunningState();
+    return drainInFlight;
+  };
+  const runSync = async (mode = "manual") => {
+    if (syncInFlight) {
+      return syncInFlight;
+    }
+    status.lastStartedAt = (/* @__PURE__ */ new Date()).toISOString();
+    status.lastError = null;
+    updateRunningState();
+    syncInFlight = (async () => {
+      const enqueueSummary = pollInFlight ? await pollInFlight : await enqueueNow(mode);
+      const priorDrainSummary = drainInFlight ? await drainInFlight : createSummary(mode, {});
+      const drainSummary = await drainNow(mode);
+      return commitSummary(mergeSummaries(mode, enqueueSummary, priorDrainSummary, drainSummary));
+    })().catch(commitUnexpectedError).finally(() => {
+      syncInFlight = null;
+      updateRunningState();
+    });
+    updateRunningState();
+    return syncInFlight;
   };
   return {
     start() {
       started = true;
       applyStatusConfig();
-      if (!status.enabled || timer) {
+      if (!status.enabled) {
         return;
       }
-      void runSync("startup").catch((error) => {
+      void runPollCycle("startup").catch((error) => {
         logger.error("[threads-bot] initial mention sync failed:", error);
       });
-      scheduleTimer();
+      schedulePollTimer();
+      scheduleWorkerTimer();
     },
     stop() {
       started = false;
-      if (!timer) {
-        return;
+      if (pollTimer) {
+        clearInterval(pollTimer);
+        pollTimer = null;
       }
-      clearInterval(timer);
-      timer = null;
+      if (workerTimer) {
+        clearInterval(workerTimer);
+        workerTimer = null;
+      }
     },
     syncNow(mode = "manual") {
       return runSync(mode);
@@ -17987,9 +19890,9 @@ function createBotMentionCollector(deps) {
     reloadConfig() {
       config = readCollectorConfig();
       applyStatusConfig();
-      restartTimer();
+      restartTimers();
       if (started && status.enabled) {
-        void runSync("config_reload").catch((error) => {
+        void runPollCycle("config_reload").catch((error) => {
           logger.error("[threads-bot] collector reload sync failed:", error);
         });
       }
@@ -18324,7 +20227,7 @@ var PROVIDER_ACTION_URL_PATTERNS = {
 var DEFAULT_PUBLIC_ORIGIN2 = "https://ss-threads.dahanda.dev";
 var LEGACY_PUBLIC_HOSTS = /* @__PURE__ */ new Set(["threads-obsidian.dahanda.dev"]);
 var LEGACY_PUBLIC_PAGE_PATHS = /* @__PURE__ */ new Set(["/", "/landing", "/landing/", "/scrapbook", "/scrapbook/", "/checkout", "/checkout/"]);
-function trimEnv2(name) {
+function trimEnv3(name) {
   return process.env[name]?.trim();
 }
 function parsePort(raw, fallback) {
@@ -18360,14 +20263,14 @@ function parseMaxBodyBytes(raw) {
   return parsed;
 }
 function resolveConfig(portOverride) {
-  const adminToken = trimEnv2("THREADS_WEB_ADMIN_TOKEN");
+  const adminToken = trimEnv3("THREADS_WEB_ADMIN_TOKEN");
   if (!adminToken) {
     throw new RequestError(500, "THREADS_WEB_ADMIN_TOKEN is required for web server startup.");
   }
   return {
     adminToken,
-    maxBodyBytes: parseMaxBodyBytes(trimEnv2("THREADS_WEB_MAX_BODY_BYTES")),
-    port: parsePortFromArg(portOverride, trimEnv2("THREADS_WEB_PORT"))
+    maxBodyBytes: parseMaxBodyBytes(trimEnv3("THREADS_WEB_MAX_BODY_BYTES")),
+    port: parsePortFromArg(portOverride, trimEnv3("THREADS_WEB_PORT"))
   };
 }
 function json(response, statusCode, payload) {
@@ -18709,14 +20612,22 @@ var serverPageCopy = {
   ko: {
     oauthTitle: "Threads \uB85C\uADF8\uC778",
     oauthEyebrow: "Threads OAuth",
-    oauthHeading: "Threads \uC571\uC73C\uB85C \uB85C\uADF8\uC778",
-    oauthLead: "{handle} scrapbook \uC5F0\uACB0\uC744 \uC704\uD574 Threads \uACC4\uC815\uC744 \uC5F0\uACB0\uD558\uC138\uC694. \uC571\uC774 \uC124\uCE58\uB418\uC5B4 \uC788\uC73C\uBA74 \uBE44\uBC00\uBC88\uD638 \uC785\uB825 \uC5C6\uC774 \uBC14\uB85C \uC778\uC99D\uB429\uB2C8\uB2E4.",
-    oauthAuthorizeButton: "Threads\uB85C \uB85C\uADF8\uC778",
-    oauthWaitingStatus: "Threads \uC571\uC5D0\uC11C \uC778\uC99D\uC744 \uC644\uB8CC\uD574 \uC8FC\uC138\uC694...",
+    oauthHeading: "\uBE0C\uB77C\uC6B0\uC800\uC5D0\uC11C \uB85C\uADF8\uC778 \uACC4\uC18D",
+    oauthLead: "\uBAA8\uBC14\uC77C\uC5D0\uC11C\uB294 \uB85C\uADF8\uC778 \uB9C1\uD06C\uB97C \uBCF5\uC0AC\uD574 \uC0C8 \uBE0C\uB77C\uC6B0\uC800 \uD0ED \uC8FC\uC18C\uCC3D\uC5D0 \uBD99\uC5EC\uB123\uB294 \uBC29\uC2DD\uC774 \uAC00\uC7A5 \uC548\uC815\uC801\uC785\uB2C8\uB2E4. {handle} scrapbook \uC5F0\uACB0\uC744 \uC704\uD574 \uC544\uB798 \uC21C\uC11C\uB300\uB85C \uC9C4\uD589\uD574 \uC8FC\uC138\uC694.",
+    oauthAuthorizeButton: "\uB85C\uADF8\uC778 \uB9C1\uD06C \uC9C1\uC811 \uC5F4\uAE30",
+    oauthStep1: "\uB85C\uADF8\uC778 \uB9C1\uD06C \uBCF5\uC0AC\uB97C \uB204\uB985\uB2C8\uB2E4.",
+    oauthStep2: "\uBE0C\uB77C\uC6B0\uC800\uC5D0\uC11C \uC0C8 \uD0ED\uC744 \uC5F4\uACE0 \uC8FC\uC18C\uCC3D\uC5D0 \uBD99\uC5EC\uB123\uC2B5\uB2C8\uB2E4.",
+    oauthStep3: "\uBD99\uC5EC\uB123\uC740 URL\uC744 \uC5F4\uC5B4 Threads \uB85C\uADF8\uC778\uC744 \uC644\uB8CC\uD569\uB2C8\uB2E4.",
+    oauthCopyButton: "\uB85C\uADF8\uC778 \uB9C1\uD06C \uBCF5\uC0AC",
+    oauthCopiedButton: "\uBCF5\uC0AC \uC644\uB8CC",
+    oauthCopiedStatus: "\uB85C\uADF8\uC778 \uB9C1\uD06C\uB97C \uBCF5\uC0AC\uD588\uC2B5\uB2C8\uB2E4. \uC0C8 \uBE0C\uB77C\uC6B0\uC800 \uD0ED \uC8FC\uC18C\uCC3D\uC5D0 \uBD99\uC5EC\uB123\uC5B4 \uC9C4\uD589\uD574 \uC8FC\uC138\uC694.",
+    oauthCopyFailedStatus: "\uC790\uB3D9 \uBCF5\uC0AC\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4. \uC544\uB798 \uB9C1\uD06C\uAC00 \uC120\uD0DD\uB418\uC5C8\uC73C\uB2C8 \uAE38\uAC8C \uB20C\uB7EC \uC9C1\uC811 \uBCF5\uC0AC\uD574 \uC8FC\uC138\uC694.",
+    oauthHint: "\uC790\uB3D9 \uBCF5\uC0AC\uAC00 \uB9C9\uD788\uBA74 \uC544\uB798 \uB9C1\uD06C\uB97C \uAE38\uAC8C \uB20C\uB7EC \uBCF5\uC0AC\uD55C \uB4A4, \uC0C8 \uBE0C\uB77C\uC6B0\uC800 \uD0ED\uC5D0\uC11C \uC5F4 \uC218 \uC788\uC2B5\uB2C8\uB2E4.",
+    oauthWaitingStatus: "\uBE0C\uB77C\uC6B0\uC800\uC5D0\uC11C \uC778\uC99D\uC774 \uB05D\uB098\uBA74 \uC5F0\uACB0\uC744 \uD655\uC778\uD569\uB2C8\uB2E4...",
     oauthAuthorizedStatus: "\uC778\uC99D \uC644\uB8CC! \uC7A0\uC2DC \uD6C4 \uC774\uB3D9\uD569\uB2C8\uB2E4...",
     oauthExpiredStatus: "\uB85C\uADF8\uC778 \uC138\uC158\uC774 \uB9CC\uB8CC\uB418\uC5C8\uC2B5\uB2C8\uB2E4. \uD398\uC774\uC9C0\uB97C \uC0C8\uB85C\uACE0\uCE68\uD574 \uC8FC\uC138\uC694.",
     oauthTimeoutStatus: "\uC751\uB2F5\uC774 \uC5C6\uC2B5\uB2C8\uB2E4. \uC778\uC99D\uC744 \uCDE8\uC18C\uD588\uAC70\uB098 \uC2DC\uAC04\uC774 \uCD08\uACFC\uB410\uC744 \uC218 \uC788\uC2B5\uB2C8\uB2E4.",
-    oauthFallbackHint: "Threads \uC571\uC774 \uC5C6\uB2E4\uBA74 \uBC84\uD2BC\uC744 \uB20C\uB7EC \uBE0C\uB77C\uC6B0\uC800\uC5D0\uC11C \uB85C\uADF8\uC778\uD558\uC138\uC694.",
+    oauthFallbackHint: "Threads \uC571\uC73C\uB85C \uBC14\uB85C \uC5EC\uB294 \uBC29\uC2DD\uBCF4\uB2E4 \uBE0C\uB77C\uC6B0\uC800\uC5D0\uC11C \uB9C1\uD06C\uB97C \uBD99\uC5EC\uB123\uB294 \uD3B8\uC774 \uB354 \uC548\uC815\uC801\uC785\uB2C8\uB2E4.",
     privacyTitle: "Threads Archive \uAC1C\uC778\uC815\uBCF4 \uCC98\uB9AC\uBC29\uCE68",
     privacyDescription: "Threads Archive OAuth \uBC0F scrapbook \uC800\uC7A5\uC18C\uC5D0 \uB300\uD55C \uAC1C\uC778\uC815\uBCF4 \uC548\uB0B4\uC785\uB2C8\uB2E4.",
     privacyHeading: "Threads Archive \uAC1C\uC778\uC815\uBCF4 \uCC98\uB9AC\uBC29\uCE68",
@@ -18751,14 +20662,22 @@ var serverPageCopy = {
   en: {
     oauthTitle: "Sign In with Threads",
     oauthEyebrow: "Threads OAuth",
-    oauthHeading: "Sign in with Threads",
-    oauthLead: "Connect your Threads account to the {handle} scrapbook. If you have the Threads app installed, you can authorize without entering your password.",
-    oauthAuthorizeButton: "Sign in with Threads",
-    oauthWaitingStatus: "Complete authorization in the Threads app...",
+    oauthHeading: "Continue sign-in in your browser",
+    oauthLead: "On mobile, the most reliable flow is to copy the sign-in link, paste it into a new browser tab, and complete the Threads OAuth flow there for the {handle} scrapbook.",
+    oauthAuthorizeButton: "Open sign-in link directly",
+    oauthStep1: "Tap Copy sign-in link.",
+    oauthStep2: "Open a new browser tab and paste the link into the address bar.",
+    oauthStep3: "Open the pasted URL and complete the Threads sign-in flow.",
+    oauthCopyButton: "Copy sign-in link",
+    oauthCopiedButton: "Copied",
+    oauthCopiedStatus: "The sign-in link is copied. Paste it into a new browser tab to continue.",
+    oauthCopyFailedStatus: "Automatic copy failed. The link below is selected so you can copy it manually.",
+    oauthHint: "If clipboard access is blocked, long-press the link below and copy it manually.",
+    oauthWaitingStatus: "Waiting for browser sign-in to complete...",
     oauthAuthorizedStatus: "Authorized! Redirecting...",
     oauthExpiredStatus: "Sign-in session expired. Please refresh the page.",
     oauthTimeoutStatus: "No response. You may have cancelled, or the request timed out.",
-    oauthFallbackHint: "If you don't have the Threads app, tap the button to sign in through your browser.",
+    oauthFallbackHint: "This browser flow is more reliable on mobile than jumping straight into the Threads app.",
     privacyTitle: "Threads Archive Privacy Policy",
     privacyDescription: "Privacy details for Threads Archive OAuth and scrapbook storage.",
     privacyHeading: "Threads Archive Privacy Policy",
@@ -19082,6 +21001,8 @@ function renderOauthBridgePage(authorizeUrl, botHandle, pollToken, publicOrigin,
   const safePollUrlJson = JSON.stringify(`${publicOrigin}/api/public/bot/oauth/poll`).replace(/</g, "\\u003c");
   const safeActivateUrlJson = JSON.stringify(`${publicOrigin}/api/public/bot/oauth/activate`).replace(/</g, "\\u003c");
   const safePollTokenJson = JSON.stringify(pollToken).replace(/</g, "\\u003c");
+  const steps = [msg.oauthStep1, msg.oauthStep2, msg.oauthStep3].filter((value) => Boolean(value));
+  const stepsMarkup = steps.length > 0 ? `<ol class="steps">${steps.map((step) => `<li>${escapeHtml(step)}</li>`).join("")}</ol>` : "";
   return `<!doctype html>
 <html lang="${escapeHtml(locale)}">
   <head>
@@ -19153,6 +21074,15 @@ function renderOauthBridgePage(authorizeUrl, botHandle, pollToken, publicOrigin,
         gap: 10px;
         margin-top: 24px;
       }
+      .steps {
+        margin: 18px 0 0;
+        padding-left: 18px;
+        color: var(--muted);
+        line-height: 1.6;
+      }
+      .steps li + li {
+        margin-top: 8px;
+      }
       .cta {
         display: inline-flex;
         align-items: center;
@@ -19172,6 +21102,42 @@ function renderOauthBridgePage(authorizeUrl, botHandle, pollToken, publicOrigin,
       .cta:disabled {
         opacity: 0.5;
         cursor: not-allowed;
+      }
+      .secondary-link {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 48px;
+        border-radius: 14px;
+        text-decoration: none;
+        font-weight: 700;
+        font-size: 0.95rem;
+        border: 1px solid var(--line);
+        color: var(--ink);
+        background: #fff;
+      }
+      .link-box {
+        margin-top: 16px;
+      }
+      .link-box label {
+        display: block;
+        margin-bottom: 8px;
+        font-size: 12px;
+        font-weight: 700;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+      .link-box textarea {
+        width: 100%;
+        min-height: 104px;
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 12px 14px;
+        font: inherit;
+        color: var(--ink);
+        background: #f8fafc;
+        resize: none;
       }
       .spinner {
         display: inline-block;
@@ -19211,13 +21177,19 @@ function renderOauthBridgePage(authorizeUrl, botHandle, pollToken, publicOrigin,
       <p class="eyebrow">${escapeHtml(msg.oauthEyebrow)}</p>
       <h1>${escapeHtml(msg.oauthHeading)}</h1>
       <p>${escapeHtml(interpolateServerText(msg.oauthLead, { handle: `@${escapeHtml(botHandle)}` }))}</p>
+      ${stepsMarkup}
       <div class="actions">
-        <a id="auth-button" class="cta" href="${escapeHtml(authorizeUrl)}" target="_blank" rel="noopener">
-          ${escapeHtml(String(msg.oauthAuthorizeButton ?? "Sign in with Threads"))}
-        </a>
+        <button id="copy-button" class="cta" type="button">
+          ${escapeHtml(String(msg.oauthCopyButton ?? "Copy sign-in link"))}
+        </button>
       </div>
       <p id="auth-status" class="status" aria-live="polite" aria-atomic="true"></p>
+      <div class="link-box">
+        <label for="login-link">Login link</label>
+        <textarea id="login-link" readonly spellcheck="false">${escapeHtml(authorizeUrl)}</textarea>
+      </div>
       <p class="hint">${escapeHtml(String(msg.oauthFallbackHint ?? "Open the sign-in flow in your browser if the Threads app is unavailable."))}</p>
+      <p class="hint">${escapeHtml(String(msg.oauthHint ?? ""))}</p>
     </main>
     <script>
       (() => {
@@ -19225,13 +21197,18 @@ function renderOauthBridgePage(authorizeUrl, botHandle, pollToken, publicOrigin,
         const activateUrl = ${safeActivateUrlJson};
         const pollToken = ${safePollTokenJson};
         const authorizeUrl = ${safeAuthorizeUrlJson};
+        const copiedText = ${JSON.stringify(msg.oauthCopiedStatus ?? "Copied the sign-in link. Paste it into a new browser tab to continue.").replace(/</g, "\\u003c")};
+        const copyFailedText = ${JSON.stringify(msg.oauthCopyFailedStatus ?? "Automatic copy failed. Copy the selected link manually.").replace(/</g, "\\u003c")};
         const waitingText = ${JSON.stringify(msg.oauthWaitingStatus ?? "Complete authorization in the Threads app...").replace(/</g, "\\u003c")};
         const authorizedText = ${JSON.stringify(msg.oauthAuthorizedStatus ?? "Authorized! Redirecting...").replace(/</g, "\\u003c")};
         const expiredText = ${JSON.stringify(msg.oauthExpiredStatus ?? "Sign-in session expired. Please refresh the page.").replace(/</g, "\\u003c")};
         const timeoutText = ${JSON.stringify(msg.oauthTimeoutStatus ?? "No response. You may have cancelled, or the request timed out.").replace(/</g, "\\u003c")};
+        const copyButtonText = ${JSON.stringify(msg.oauthCopyButton ?? "Copy sign-in link").replace(/</g, "\\u003c")};
+        const copiedButtonText = ${JSON.stringify(msg.oauthCopiedButton ?? "Copied").replace(/</g, "\\u003c")};
         const POLL_TIMEOUT_MS = 3 * 60 * 1000;
 
-        const authButton = document.getElementById("auth-button");
+        const copyButton = document.getElementById("copy-button");
+        const loginLinkEl = document.getElementById("login-link");
         const statusEl = document.getElementById("auth-status");
 
         let polling = false;
@@ -19247,11 +21224,17 @@ function renderOauthBridgePage(authorizeUrl, botHandle, pollToken, publicOrigin,
         }
 
         function setButtonEnabled(enabled) {
-          if (authButton instanceof HTMLElement) {
-            authButton.style.opacity = enabled ? "" : "0.5";
-            authButton.style.pointerEvents = enabled ? "" : "none";
-            authButton.setAttribute("aria-disabled", enabled ? "false" : "true");
+          if (copyButton instanceof HTMLButtonElement) {
+            copyButton.disabled = !enabled;
+            copyButton.textContent = enabled ? copyButtonText : copiedButtonText;
           }
+        }
+
+        function selectLink() {
+          if (!(loginLinkEl instanceof HTMLTextAreaElement)) return;
+          loginLinkEl.focus();
+          loginLinkEl.select();
+          loginLinkEl.setSelectionRange(0, loginLinkEl.value.length);
         }
 
         function stopPolling(statusText, cls) {
@@ -19262,12 +21245,12 @@ function renderOauthBridgePage(authorizeUrl, botHandle, pollToken, publicOrigin,
           setButtonEnabled(true);
         }
 
-        function startPolling() {
+        function startPolling(initialText) {
           if (polling) return;
           polling = true;
           everPolled = true;
           setButtonEnabled(false);
-          setStatus(waitingText);
+          setStatus(initialText || waitingText);
           pollTimeoutId = setTimeout(() => stopPolling(timeoutText, "error"), POLL_TIMEOUT_MS);
           pollInterval = setInterval(async () => {
             try {
@@ -19282,26 +21265,36 @@ function renderOauthBridgePage(authorizeUrl, botHandle, pollToken, publicOrigin,
                 window.location.href = activateUrl + "?code=" + encodeURIComponent(data.activationCode);
               } else if (data.status === "expired") {
                 stopPolling(expiredText, "error");
+              } else if (statusEl && !statusEl.textContent) {
+                setStatus(waitingText);
               }
             } catch (_) {}
           }, 2000);
         }
 
-        if (authButton) {
-          authButton.addEventListener("click", (e) => {
-            if (polling) {
-              e.preventDefault();
-              return;
-            }
+        if (copyButton instanceof HTMLButtonElement) {
+          copyButton.addEventListener("click", async () => {
+            if (polling) return;
             if (everPolled) {
-              // \uC774\uC804 \uC2DC\uB3C4\uAC00 \uB9CC\uB8CC/\uD0C0\uC784\uC544\uC6C3\uC73C\uB85C \uC885\uB8CC \u2192 \uC0C8 \uC138\uC158\uC774 \uD544\uC694\uD558\uBBC0\uB85C \uD398\uC774\uC9C0 \uB9AC\uB85C\uB4DC
-              e.preventDefault();
               window.location.reload();
               return;
             }
-            // \uCCAB \uD074\uB9AD: \uB9C1\uD06C\uAC00 Threads \uC571\uC744 \uC5F4\uACE0, polling \uC2DC\uC791
-            setTimeout(startPolling, 500);
+
+            try {
+              await navigator.clipboard.writeText(authorizeUrl);
+              setStatus(copiedText);
+            } catch (_) {
+              selectLink();
+              setStatus(copyFailedText);
+            }
+
+            startPolling(statusEl && statusEl.textContent ? statusEl.textContent : waitingText);
           });
+        }
+
+        if (loginLinkEl instanceof HTMLTextAreaElement) {
+          loginLinkEl.addEventListener("focus", selectLink);
+          loginLinkEl.addEventListener("click", selectLink);
         }
       })();
     </script>
@@ -19444,7 +21437,7 @@ function resolveRequestOrigin(request, requestUrl) {
   return `${protocol}://${host}`;
 }
 function readConfiguredPublicOrigin() {
-  const configuredOrigin = getRuntimeConfigSnapshot().publicOrigin || trimEnv2("THREADS_WEB_PUBLIC_ORIGIN");
+  const configuredOrigin = getRuntimeConfigSnapshot().publicOrigin || trimEnv3("THREADS_WEB_PUBLIC_ORIGIN");
   if (!configuredOrigin) {
     return null;
   }
@@ -19546,7 +21539,7 @@ function normalizeIpAddress(value) {
   return normalized.startsWith("::ffff:") ? normalized.slice("::ffff:".length) : normalized;
 }
 function readTrustedProxyAllowlist() {
-  const raw = trimEnv2("THREADS_WEB_TRUST_PROXY_ALLOWLIST");
+  const raw = trimEnv3("THREADS_WEB_TRUST_PROXY_ALLOWLIST");
   if (!raw) {
     return /* @__PURE__ */ new Set();
   }
@@ -19569,7 +21562,7 @@ function readClientIp(request) {
   return peerIp;
 }
 function readAdminAllowlist() {
-  const raw = trimEnv2("THREADS_WEB_ADMIN_ALLOWLIST");
+  const raw = trimEnv3("THREADS_WEB_ADMIN_ALLOWLIST");
   if (!raw) {
     return new Set(DEFAULT_ADMIN_ALLOWLIST);
   }
@@ -19587,7 +21580,7 @@ function assertAdminIpAllowed(request) {
   }
 }
 function readConfiguredAdminOrigin() {
-  const raw = trimEnv2("THREADS_WEB_ADMIN_ORIGIN");
+  const raw = trimEnv3("THREADS_WEB_ADMIN_ORIGIN");
   if (!raw) {
     return null;
   }
@@ -19772,7 +21765,7 @@ function secretsMatch(signature, secret) {
   return signatureBytes.length === secretBytes.length && timingSafeEqual(signatureBytes, secretBytes);
 }
 function verifyWebhookAuth(provider, headers) {
-  const secret = trimEnv2(PROVIDER_WEBHOOK_SECRETS[provider]);
+  const secret = trimEnv3(PROVIDER_WEBHOOK_SECRETS[provider]);
   if (!secret) {
     throw new RequestError(503, `Webhook secret is not configured for provider "${provider}".`);
   }
@@ -20630,8 +22623,9 @@ async function handlePublicBotRoute(request, response, pathname, config, collect
     }
     try {
       const rawSession = readCookie(request.headers, BOT_SESSION_COOKIE);
-      const { filename, markdownContent } = await withDatabaseTransaction(
-        (data) => readBotArchiveMarkdown(data, rawSession, archiveMatch[1] ?? "")
+      const { filename, markdownContent } = await readBotArchiveMarkdownFromStore(
+        rawSession,
+        archiveMatch[1] ?? ""
       );
       response.writeHead(200, {
         "content-type": "text/markdown; charset=utf-8",
@@ -20654,9 +22648,9 @@ async function handlePublicBotRoute(request, response, pathname, config, collect
     }
     try {
       const rawSession = readCookie(request.headers, BOT_SESSION_COOKIE);
-      const { filename, content } = await withDatabaseTransaction(
-        (data) => readBotArchiveZip(data, rawSession, [archiveZipMatch[1] ?? ""])
-      );
+      const { filename, content } = await readBotArchiveZipFromStore(rawSession, [
+        archiveZipMatch[1] ?? ""
+      ]);
       response.writeHead(200, {
         "content-type": "application/zip",
         "content-disposition": `attachment; filename="${filename.replace(/"/g, "")}"`,
@@ -20677,7 +22671,7 @@ async function handlePublicBotRoute(request, response, pathname, config, collect
       return;
     }
     const rawSession = readCookie(request.headers, BOT_SESSION_COOKIE);
-    const state = getBotSessionState(await loadDatabase(), rawSession);
+    const state = await getBotSessionStateFromStore(rawSession);
     json(response, 200, state);
     return;
   }
@@ -20707,8 +22701,9 @@ async function handlePublicBotRoute(request, response, pathname, config, collect
     if ((request.method ?? "GET") === "DELETE" && archiveDeleteMatch) {
       const rawSession = readCookie(request.headers, BOT_SESSION_COOKIE);
       try {
-        const state = await withDatabaseTransaction(
-          (data) => deleteArchive(data, rawSession, decodeURIComponent(archiveDeleteMatch[1] ?? ""))
+        const state = await deleteArchiveFromStore(
+          rawSession,
+          decodeURIComponent(archiveDeleteMatch[1] ?? "")
         );
         json(response, 200, state);
       } catch (error) {
@@ -20753,14 +22748,14 @@ async function handlePublicBotRoute(request, response, pathname, config, collect
   }
   if (pathname === "/api/public/bot/sync") {
     const rawSession = readCookie(request.headers, BOT_SESSION_COOKIE);
-    const state = getBotSessionState(await loadDatabase(), rawSession);
+    const state = await getBotSessionStateFromStore(rawSession);
     if (!state.authenticated || !state.user) {
       unauthorized(response);
       return;
     }
     try {
       await collector.syncNow("user_sync");
-      const nextState = getBotSessionState(await loadDatabase(), rawSession);
+      const nextState = await getBotSessionStateFromStore(rawSession);
       json(response, 200, nextState);
     } catch (error) {
       json(response, 502, {
@@ -20928,8 +22923,9 @@ async function handlePublicBotRoute(request, response, pathname, config, collect
     const rawSession = readCookie(request.headers, BOT_SESSION_COOKIE);
     const body = await parseJsonBody(request, config.maxBodyBytes);
     try {
-      const { filename, content } = await withDatabaseTransaction(
-        (data) => readBotArchiveZip(data, rawSession, Array.isArray(body?.ids) ? body.ids : [])
+      const { filename, content } = await readBotArchiveZipFromStore(
+        rawSession,
+        Array.isArray(body?.ids) ? body.ids : []
       );
       response.writeHead(200, {
         "content-type": "application/zip",
@@ -21175,6 +23171,53 @@ async function handleExtensionRoutes(request, response, pathname, config) {
       (data) => Promise.resolve(revokeExtensionCloudConnection(data, bearerToken))
     );
     json(response, 200, status);
+    return;
+  }
+  if (pathname === "/api/extension/cloud/archives") {
+    if ((request.method ?? "GET") !== "GET") {
+      methodNotAllowed(response);
+      return;
+    }
+    if (!bearerToken) {
+      json(response, 401, {
+        error: "Connect the extension to Threads Archive scrapbook first."
+      });
+      return;
+    }
+    try {
+      const rawLimit = requestUrl.searchParams.get("limit");
+      const limit = rawLimit ? Number.parseInt(rawLimit, 10) : 10;
+      const archives = listExtensionCloudArchives(await loadDatabase(), bearerToken, publicOrigin, limit);
+      json(response, 200, { archives });
+    } catch (error) {
+      json(response, 401, {
+        error: toPublicErrorMessage(error, "Could not load cloud archives.")
+      });
+    }
+    return;
+  }
+  const cloudArchiveDeleteMatch = pathname.match(/^\/api\/extension\/cloud\/archive\/([^/]+)$/);
+  if (cloudArchiveDeleteMatch) {
+    if ((request.method ?? "GET") !== "DELETE") {
+      methodNotAllowed(response);
+      return;
+    }
+    if (!bearerToken) {
+      json(response, 401, {
+        error: "Connect the extension to Threads Archive scrapbook first."
+      });
+      return;
+    }
+    try {
+      await withDatabaseTransaction(
+        (data) => Promise.resolve(deleteExtensionCloudArchive(data, bearerToken, decodeURIComponent(cloudArchiveDeleteMatch[1] ?? "")))
+      );
+      json(response, 200, { ok: true });
+    } catch (error) {
+      json(response, 401, {
+        error: toPublicErrorMessage(error, "Could not delete the cloud archive.")
+      });
+    }
     return;
   }
   if (pathname === "/api/extension/cloud/save") {
@@ -21793,7 +23836,8 @@ async function handleRequest(request, response, config, collector) {
 function createWebRuntime(port) {
   const config = resolveConfig(port);
   const collector = createBotMentionCollector({
-    runTransaction: withDatabaseTransaction
+    runTransaction: withDatabaseTransaction,
+    loadDatabase
   });
   configureMonitoringService({
     getCollectorStatus: () => collector.getStatus()

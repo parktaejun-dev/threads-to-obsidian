@@ -4,6 +4,7 @@ import test from "node:test";
 import { buildDefaultDatabase } from "@threads/web-schema";
 import { completeBotOauth, startBotOauth } from "../packages/web-server/src/server/bot-service";
 import { createBotMentionCollector } from "../packages/web-server/src/server/bot-mention-service";
+import { replaceRuntimeConfigForTests } from "../packages/web-server/src/server/runtime-config";
 
 const extractedThreadFixture = `
 <!doctype html>
@@ -60,6 +61,7 @@ test("mention collector fetches mentions and ingests them idempotently", async (
   process.env.THREADS_BOT_MENTION_POLL_INTERVAL_MS = "30000";
   process.env.THREADS_BOT_MENTION_FETCH_LIMIT = "10";
   process.env.THREADS_BOT_MENTION_MAX_PAGES = "2";
+  replaceRuntimeConfigForTests(null);
 
   let mentionListCalls = 0;
 
@@ -155,7 +157,8 @@ test("mention collector fetches mentions and ingests them idempotently", async (
     );
 
     const collector = createBotMentionCollector({
-      runTransaction: async (operation) => operation(data)
+      runTransaction: async (operation) => operation(data),
+      loadDatabase: async () => structuredClone(data)
     });
 
     const firstSync = await collector.syncNow("test");
@@ -164,6 +167,8 @@ test("mention collector fetches mentions and ingests them idempotently", async (
     assert.equal(firstSync.updatedArchives, 0);
     assert.equal(firstSync.unmatchedMentions, 0);
     assert.equal(data.botArchives.length, 1);
+    assert.equal(data.botMentionJobs.length, 1);
+    assert.equal(data.botMentionJobs[0]?.status, "completed");
     assert.equal(data.botArchives[0]?.mentionId, "mention-1");
     assert.equal(data.botArchives[0]?.targetUrl, "https://www.threads.com/@source/post/TARGET1");
     assert.equal(data.botArchives[0]?.targetText, "Target post body from the original thread.");
@@ -221,6 +226,8 @@ test("mention collector fetches mentions and ingests them idempotently", async (
     } else {
       delete process.env.THREADS_BOT_MENTION_MAX_PAGES;
     }
+
+    replaceRuntimeConfigForTests(null);
   }
 });
 
@@ -241,6 +248,7 @@ test("mention collector refreshes existing archives with the original replied po
   process.env.THREADS_BOT_MENTION_POLL_INTERVAL_MS = "30000";
   process.env.THREADS_BOT_MENTION_FETCH_LIMIT = "10";
   process.env.THREADS_BOT_MENTION_MAX_PAGES = "2";
+  replaceRuntimeConfigForTests(null);
 
   let replyResolutionEnabled = false;
 
@@ -382,12 +390,14 @@ test("mention collector refreshes existing archives with the original replied po
     process.env.THREADS_BOT_HANDLE = "ss_savebot";
 
     const collector = createBotMentionCollector({
-      runTransaction: async (operation) => operation(data)
+      runTransaction: async (operation) => operation(data),
+      loadDatabase: async () => structuredClone(data)
     });
 
     const firstSync = await collector.syncNow("interval");
     assert.equal(firstSync.ok, true);
     assert.equal(firstSync.createdArchives, 1);
+    assert.equal(data.botMentionJobs[0]?.status, "completed");
     assert.equal(data.botArchives[0]?.targetUrl, "https://www.threads.com/@parktaejun/post/MENTION1");
     assert.equal(data.botArchives[0]?.targetText, "@ss_savebot");
 
@@ -444,5 +454,176 @@ test("mention collector refreshes existing archives with the original replied po
     } else {
       delete process.env.THREADS_BOT_MENTION_MAX_PAGES;
     }
+
+    replaceRuntimeConfigForTests(null);
+  }
+});
+
+test("mention collector skips target hydration for unmatched users", async () => {
+  const previousHandle = process.env.THREADS_BOT_HANDLE;
+  const previousAppId = process.env.THREADS_BOT_APP_ID;
+  const previousAppSecret = process.env.THREADS_BOT_APP_SECRET;
+  const previousAdminToken = process.env.THREADS_WEB_ADMIN_TOKEN;
+  const previousInterval = process.env.THREADS_BOT_MENTION_POLL_INTERVAL_MS;
+  const previousFetchLimit = process.env.THREADS_BOT_MENTION_FETCH_LIMIT;
+  const previousMaxPages = process.env.THREADS_BOT_MENTION_MAX_PAGES;
+  const previousFetch = globalThis.fetch;
+
+  process.env.THREADS_BOT_HANDLE = "ss_savebot";
+  process.env.THREADS_BOT_APP_ID = "threads-app-id";
+  process.env.THREADS_BOT_APP_SECRET = "threads-app-secret";
+  process.env.THREADS_WEB_ADMIN_TOKEN = "bot-test-admin-secret";
+  process.env.THREADS_BOT_MENTION_POLL_INTERVAL_MS = "30000";
+  process.env.THREADS_BOT_MENTION_FETCH_LIMIT = "10";
+  process.env.THREADS_BOT_MENTION_MAX_PAGES = "2";
+  replaceRuntimeConfigForTests(null);
+
+  let mentionDetailCalls = 0;
+  let targetHydrationCalls = 0;
+  let htmlHydrationCalls = 0;
+
+  globalThis.fetch = (async (input: RequestInfo | URL) => {
+    const url = typeof input === "string" ? input : input.toString();
+
+    if (url.includes("/oauth/access_token")) {
+      return createJsonResponse({
+        access_token: "short-lived-token",
+        user_id: "bot-user-1",
+        expires_in: 3600
+      });
+    }
+
+    if (url.includes("/access_token?grant_type=th_exchange_token")) {
+      return createJsonResponse({
+        access_token: "long-lived-token",
+        expires_in: 5_184_000
+      });
+    }
+
+    if (url.includes("/me?fields=")) {
+      return createJsonResponse({
+        id: "bot-user-1",
+        username: "ss_savebot",
+        name: "SS Savebot",
+        is_verified: false
+      });
+    }
+
+    if (url.includes("/me/mentions?")) {
+      return createJsonResponse({
+        data: [
+          {
+            id: "mention-1",
+            username: "stranger",
+            text: "@ss_savebot",
+            timestamp: "2026-03-25T12:00:00.000Z",
+            permalink: "https://www.threads.com/@stranger/post/MENTION1"
+          }
+        ]
+      });
+    }
+
+    if (url.includes("/mention-1?")) {
+      mentionDetailCalls += 1;
+      return createJsonResponse({
+        id: "mention-1",
+        username: "stranger",
+        text: "@ss_savebot save this",
+        timestamp: "2026-03-25T12:00:00.000Z",
+        permalink: "https://www.threads.com/@stranger/post/MENTION1",
+        replied_to: {
+          id: "target-1"
+        }
+      });
+    }
+
+    if (url.includes("/target-1?")) {
+      targetHydrationCalls += 1;
+      throw new Error("Unexpected target hydration for unmatched mention.");
+    }
+
+    if (url === "https://www.threads.com/@source/post/TARGET1") {
+      htmlHydrationCalls += 1;
+      throw new Error("Unexpected HTML hydration for unmatched mention.");
+    }
+
+    throw new Error(`Unexpected fetch URL in unmatched collector test: ${url}`);
+  }) as typeof fetch;
+
+  try {
+    const data = buildDefaultDatabase("2026-03-25T00:00:00.000Z");
+    const oauthStart = startBotOauth(data, "https://ss-threads.dahanda.dev");
+    const state = new URL(oauthStart.authorizeUrl).searchParams.get("state");
+    assert.ok(state);
+
+    await completeBotOauth(
+      data,
+      state as string,
+      "oauth-code-1",
+      "https://ss-threads.dahanda.dev"
+    );
+
+    const collector = createBotMentionCollector({
+      runTransaction: async (operation) => operation(data),
+      loadDatabase: async () => structuredClone(data)
+    });
+
+    const sync = await collector.syncNow("interval");
+    assert.equal(sync.ok, true);
+    assert.equal(sync.processedMentions, 1);
+    assert.equal(sync.unmatchedMentions, 1);
+    assert.equal(sync.createdArchives, 0);
+    assert.equal(data.botArchives.length, 0);
+    assert.equal(data.botMentionJobs.length, 1);
+    assert.equal(data.botMentionJobs[0]?.status, "unmatched");
+    assert.equal(mentionDetailCalls, 1);
+    assert.equal(targetHydrationCalls, 0);
+    assert.equal(htmlHydrationCalls, 0);
+  } finally {
+    globalThis.fetch = previousFetch;
+
+    if (typeof previousHandle === "string") {
+      process.env.THREADS_BOT_HANDLE = previousHandle;
+    } else {
+      delete process.env.THREADS_BOT_HANDLE;
+    }
+
+    if (typeof previousAppId === "string") {
+      process.env.THREADS_BOT_APP_ID = previousAppId;
+    } else {
+      delete process.env.THREADS_BOT_APP_ID;
+    }
+
+    if (typeof previousAppSecret === "string") {
+      process.env.THREADS_BOT_APP_SECRET = previousAppSecret;
+    } else {
+      delete process.env.THREADS_BOT_APP_SECRET;
+    }
+
+    if (typeof previousAdminToken === "string") {
+      process.env.THREADS_WEB_ADMIN_TOKEN = previousAdminToken;
+    } else {
+      delete process.env.THREADS_WEB_ADMIN_TOKEN;
+    }
+
+    if (typeof previousInterval === "string") {
+      process.env.THREADS_BOT_MENTION_POLL_INTERVAL_MS = previousInterval;
+    } else {
+      delete process.env.THREADS_BOT_MENTION_POLL_INTERVAL_MS;
+    }
+
+    if (typeof previousFetchLimit === "string") {
+      process.env.THREADS_BOT_MENTION_FETCH_LIMIT = previousFetchLimit;
+    } else {
+      delete process.env.THREADS_BOT_MENTION_FETCH_LIMIT;
+    }
+
+    if (typeof previousMaxPages === "string") {
+      process.env.THREADS_BOT_MENTION_MAX_PAGES = previousMaxPages;
+    } else {
+      delete process.env.THREADS_BOT_MENTION_MAX_PAGES;
+    }
+
+    replaceRuntimeConfigForTests(null);
   }
 });

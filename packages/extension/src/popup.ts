@@ -1,3 +1,4 @@
+import { buildCloudScrapbookUrl } from "./lib/cloud-server";
 import { queryDirectoryPermission, requestDirectoryPermission, supportsFileSystemAccess, writePostToDirectory } from "./lib/direct-save";
 import { getObsidianDirectoryHandle } from "./lib/fs-handle-store";
 import { type Locale, type Messages, getLocale, setLocale, t } from "./lib/i18n";
@@ -16,8 +17,11 @@ const retryButton = document.querySelector<HTMLButtonElement>("#retry-button");
 const recentList = document.querySelector<HTMLUListElement>("#recent-list");
 const openOptionsButton = document.querySelector<HTMLButtonElement>("#open-options");
 const clearRecentsButton = document.querySelector<HTMLButtonElement>("#clear-recents");
+const openCloudButton = document.querySelector<HTMLButtonElement>("#open-cloud-button");
 const languageSwitch = document.querySelector<HTMLElement>("#language-switch");
 const languageSelect = document.querySelector<HTMLSelectElement>("#language-select");
+const modeLabel = document.querySelector<HTMLElement>("#mode-label");
+const modeBadge = document.querySelector<HTMLElement>("#mode-badge");
 
 let latestStatus: SaveStatus | null = null;
 let cachedDirectoryHandle: FileSystemDirectoryHandle | null = null;
@@ -102,6 +106,34 @@ function setStatus(status: SaveStatus): void {
   statusLabel.textContent = status.message;
   retryButton.classList.toggle("hidden", !status.canRetry);
   retryButton.textContent = status.kind === "error" ? msg.statusRetry : msg.statusResaveButton;
+}
+
+function getCurrentSaveTargetLabel(): string {
+  if (cachedSaveTarget === "cloud") {
+    return msg.optionsSaveTargetCloud;
+  }
+
+  if (cachedSaveTarget === "notion") {
+    return msg.optionsSaveTargetNotion;
+  }
+
+  return msg.optionsSaveTargetObsidian;
+}
+
+function updateModeBadge(): void {
+  if (modeLabel) {
+    modeLabel.textContent = msg.optionsSaveTarget;
+  }
+
+  if (!modeBadge) {
+    return;
+  }
+
+  modeBadge.textContent = getCurrentSaveTargetLabel();
+  modeBadge.classList.remove("mode-cloud", "mode-local", "mode-notion");
+  modeBadge.classList.add(
+    cachedSaveTarget === "cloud" ? "mode-cloud" : cachedSaveTarget === "notion" ? "mode-notion" : "mode-local"
+  );
 }
 
 function applyLanguageSwitch(locale: Locale): void {
@@ -191,13 +223,17 @@ function truncateText(value: string, maxLength: number): string {
   return `${value.slice(0, maxLength).trimEnd()}…`;
 }
 
+function filterRecentSavesForCurrentTarget(items: RecentSave[]): RecentSave[] {
+  return items.filter((item) => item.saveTarget === cachedSaveTarget);
+}
+
 function renderRecentSaves(items: RecentSave[]): void {
   if (!recentList) {
     return;
   }
 
   activeRecentSaves = items;
-  clearRecentsButton?.classList.toggle("hidden", items.length === 0);
+  clearRecentsButton?.classList.toggle("hidden", items.length === 0 || cachedSaveTarget === "cloud");
 
   if (items.length === 0) {
     recentList.innerHTML = `<li class="empty">${escapeHtml(msg.popupEmpty)}</li>`;
@@ -289,6 +325,7 @@ function renderRecentSaves(items: RecentSave[]): void {
 async function refreshSaveTargetState(): Promise<void> {
   const options = await getEffectiveOptions();
   cachedSaveTarget = options.saveTarget;
+  updateModeBadge();
 
   if (cachedSaveTarget === "notion") {
     cachedDirectoryHandle = null;
@@ -347,7 +384,8 @@ async function refreshPopupState(useIdleStatus = false, overrideStatus?: SaveSta
   const state = (await chrome.runtime.sendMessage({ type: "get-popup-state" })) as PopupState;
   cachedCloudConnection = state.cloudConnection;
   await refreshSaveTargetState();
-  const renderedRecentSaves = await repairVisibleRecentSaves(state);
+  const repairedRecentSaves = await repairVisibleRecentSaves(state);
+  const renderedRecentSaves = filterRecentSavesForCurrentTarget(repairedRecentSaves);
   setStatus(overrideStatus ?? (useIdleStatus ? getIdleStatus(state.supported) : state.status));
   renderRecentSaves(renderedRecentSaves);
   if (saveButton) {
@@ -363,6 +401,10 @@ async function refreshPopupState(useIdleStatus = false, overrideStatus?: SaveSta
       const connected = cachedCloudConnection?.state === "linked" || cachedCloudConnection?.state === "offline";
       cloudLinkButton.textContent = connected ? msg.popupCloudDisconnect : msg.popupCloudConnect;
     }
+  }
+  if (openCloudButton) {
+    openCloudButton.classList.toggle("hidden", cachedSaveTarget !== "cloud");
+    openCloudButton.textContent = msg.popupOpenRemote;
   }
 
   return {
@@ -708,6 +750,23 @@ async function openLocalizedOptionsPage(): Promise<void> {
   await chrome.tabs.create({ url: optionsUrl });
 }
 
+async function openCloudScrapbookPage(): Promise<void> {
+  const url = buildCloudScrapbookUrl();
+  const [existingTab] = await chrome.tabs.query({
+    url: [url, `${url}?*`, `${url}#*`]
+  });
+
+  if (existingTab?.id) {
+    await chrome.tabs.update(existingTab.id, { active: true, url });
+    if (typeof existingTab.windowId === "number") {
+      await chrome.windows.update(existingTab.windowId, { focused: true });
+    }
+    return;
+  }
+
+  await chrome.tabs.create({ url });
+}
+
 saveButton?.addEventListener("click", async () => {
   await saveCurrent();
 });
@@ -726,6 +785,10 @@ retryButton?.addEventListener("click", async () => {
 
 openOptionsButton?.addEventListener("click", async () => {
   await openLocalizedOptionsPage();
+});
+
+openCloudButton?.addEventListener("click", async () => {
+  await openCloudScrapbookPage();
 });
 
 cloudLinkButton?.addEventListener("click", async () => {
@@ -796,8 +859,11 @@ void (async () => {
   const recentTitle = document.querySelector("#recent-title");
   if (recentTitle) { recentTitle.textContent = msg.popupRecentSaves; }
   if (clearRecentsButton) { clearRecentsButton.textContent = msg.popupClearAll; }
+  if (modeLabel) { modeLabel.textContent = msg.optionsSaveTarget; }
+  if (modeBadge) { modeBadge.textContent = msg.optionsSaveTargetObsidian; }
   if (openOptionsButton) { openOptionsButton.textContent = msg.popupSettings; }
   if (cloudLinkButton) { cloudLinkButton.textContent = msg.popupCloudConnect; }
+  if (openCloudButton) { openCloudButton.textContent = msg.popupOpenRemote; }
   const promoTitle = document.querySelector("#promo-slot-title");
   if (promoTitle) { promoTitle.textContent = msg.popupPromoTitle; }
   const promoDescription = document.querySelector("#promo-slot-description");

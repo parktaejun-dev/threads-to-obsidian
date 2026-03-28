@@ -88,6 +88,15 @@ export interface CloudConnectionStatus {
   linkedAt: string | null;
 }
 
+export interface CloudArchiveRecentRecord {
+  archiveId: string;
+  archiveUrl: string;
+  title: string;
+  updatedAt: string;
+  warning: string | null;
+  post: ExtractedPost;
+}
+
 export type PlanTier = "free" | "pro";
 
 export type LicenseState = "none" | "valid" | "invalid" | "expired";

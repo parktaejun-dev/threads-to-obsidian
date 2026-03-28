@@ -1,13 +1,34 @@
 import { BUNDLED_EXTRACTOR_CONFIG, DEFAULT_OPTIONS } from "./lib/config";
-import { buildCloudLinkStartUrl, completeCloudLink, disconnectCloudConnection, fetchCloudConnectionStatus, savePostToCloudWithServer } from "./lib/cloud-server";
+import {
+  buildCloudLinkStartUrl,
+  completeCloudLink,
+  deleteCloudArchiveWithServer,
+  disconnectCloudConnection,
+  fetchCloudArchivesWithServer,
+  fetchCloudConnectionStatus,
+  savePostToCloudWithServer
+} from "./lib/cloud-server";
 import { t } from "./lib/i18n";
 import { organizePostWithAi } from "./lib/llm";
 import { resolveImageDownloadPolicy } from "./lib/media-permissions";
 import { savePostToNotionWithServer } from "./lib/notion-server";
 import { buildZipPackage } from "./lib/package";
 import { PRIMARY_BACKEND_ORIGIN } from "./lib/pro-activation";
-import { clearRecentSaves, findDuplicateSave, findRecentSaveById, getEffectiveOptions, getOptions, getPendingCloudLinkRecord, getRecentSaves, removeRecentSaveById, setOptions, setPendingCloudLinkRecord, upsertRecentSave } from "./lib/storage";
-import type { ExtractPostRequest, PopupRequest, PopupState, RecentSave, SaveStatus } from "./lib/types";
+import {
+  clearRecentSaves,
+  findDuplicateSave,
+  findRecentSaveById,
+  getEffectiveOptions,
+  getOptions,
+  getPendingCloudLinkRecord,
+  getRecentSaves,
+  removeRecentSaveById,
+  setOptions,
+  setPendingCloudLinkRecord,
+  syncCloudRecentSaves,
+  upsertRecentSave
+} from "./lib/storage";
+import type { CloudConnectionStatus, ExtractPostRequest, PopupRequest, PopupState, RecentSave, SaveStatus, SaveTarget } from "./lib/types";
 import { isSupportedPermalink } from "./lib/utils";
 
 let currentStatus: SaveStatus = {
@@ -155,7 +176,7 @@ async function createCloudRecentSave(
   warning: string | null
 ): Promise<RecentSave> {
   return {
-    id: crypto.randomUUID(),
+    id: archiveId,
     saveTarget: "cloud",
     canonicalUrl: post.canonicalUrl,
     shortcode: post.shortcode,
@@ -204,6 +225,19 @@ async function requestExtraction(tabId: number, message: ExtractPostRequest): Pr
 
     await ensureContentScript(tabId);
     return (await chrome.tabs.sendMessage(tabId, message)) as RecentSave["post"] | { __error: string };
+  }
+}
+
+async function resolvePopupRecentSaves(saveTarget: SaveTarget, cloudConnection: CloudConnectionStatus): Promise<RecentSave[]> {
+  if (saveTarget !== "cloud" || cloudConnection.state !== "linked") {
+    return await getRecentSaves();
+  }
+
+  try {
+    const cloudArchives = await fetchCloudArchivesWithServer();
+    return await syncCloudRecentSaves(cloudArchives);
+  } catch {
+    return await getRecentSaves();
   }
 }
 
@@ -273,6 +307,7 @@ async function saveCurrentPost(
       const recent = duplicate && allowDuplicate
         ? {
             ...duplicate,
+            id: cloudResult.archiveId,
             saveTarget: "cloud" as const,
             canonicalUrl: post.canonicalUrl,
             shortcode: post.shortcode,
@@ -444,6 +479,7 @@ async function redownloadSave(
       );
       const updatedSave: RecentSave = {
         ...recentSave,
+        id: cloudResult.archiveId,
         saveTarget: "cloud",
         downloadedAt: new Date().toISOString(),
         archiveName: cloudResult.title,
@@ -567,9 +603,10 @@ chrome.runtime.onMessage.addListener((request: PopupRequest, _sender, sendRespon
     switch (request.type) {
       case "get-popup-state": {
         const tab = await getActiveTab();
-        const recentSaves = await getRecentSaves();
+        const options = await getEffectiveOptions();
         const supported = Boolean(tab?.url && isSupportedPermalink(tab.url));
         const cloudConnection = await fetchCloudConnectionStatus();
+        const recentSaves = await resolvePopupRecentSaves(options.saveTarget, cloudConnection);
         const response: PopupState = {
           supported,
           currentUrl: tab?.url ?? null,
@@ -625,10 +662,37 @@ chrome.runtime.onMessage.addListener((request: PopupRequest, _sender, sendRespon
         break;
       }
       case "delete-recent-save": {
-        const recentSaves = await removeRecentSaveById(request.saveId);
+        const recentSave = await findRecentSaveById(request.saveId);
+        if (recentSave?.saveTarget === "cloud" && recentSave.remotePageId) {
+          try {
+            await deleteCloudArchiveWithServer(recentSave.remotePageId);
+          } catch (error) {
+            const tab = await getActiveTab();
+            const cloudConnection = await fetchCloudConnectionStatus();
+            const options = await getEffectiveOptions();
+            const response: PopupState = {
+              supported: Boolean(tab?.url && isSupportedPermalink(tab.url)),
+              currentUrl: tab?.url ?? null,
+              status: {
+                kind: "error",
+                message: error instanceof Error ? error.message : (await t()).statusError,
+                canRetry: false
+              },
+              recentSaves: await resolvePopupRecentSaves(options.saveTarget, cloudConnection),
+              cloudConnection
+            };
+            broadcastStatus(response.status);
+            sendResponse(response);
+            return;
+          }
+        }
+
+        await removeRecentSaveById(request.saveId);
         const tab = await getActiveTab();
         const msg = await t();
+        const options = await getEffectiveOptions();
         const cloudConnection = await fetchCloudConnectionStatus();
+        const recentSaves = await resolvePopupRecentSaves(options.saveTarget, cloudConnection);
         const response: PopupState = {
           supported: Boolean(tab?.url && isSupportedPermalink(tab.url)),
           currentUrl: tab?.url ?? null,
@@ -648,6 +712,7 @@ chrome.runtime.onMessage.addListener((request: PopupRequest, _sender, sendRespon
         await clearRecentSaves();
         const tab = await getActiveTab();
         const msg = await t();
+        const options = await getEffectiveOptions();
         const cloudConnection = await fetchCloudConnectionStatus();
         const response: PopupState = {
           supported: Boolean(tab?.url && isSupportedPermalink(tab.url)),
@@ -657,7 +722,7 @@ chrome.runtime.onMessage.addListener((request: PopupRequest, _sender, sendRespon
             message: msg.statusClearedRecents,
             canRetry: false
           },
-          recentSaves: [],
+          recentSaves: await resolvePopupRecentSaves(options.saveTarget, cloudConnection),
           cloudConnection
         };
         broadcastStatus(response.status);
