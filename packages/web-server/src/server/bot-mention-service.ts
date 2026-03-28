@@ -27,6 +27,7 @@ import {
   findBotUserByHandle,
   findBotUserByThreadsUserId,
   finalizeBotMentionJob as finalizeStoredBotMentionJob,
+  loadDatabase,
   loadBotMentionReadState,
   loadBotMentionJobs,
   pruneBotMentionJobs,
@@ -34,6 +35,7 @@ import {
   saveBotUserRecord,
   upsertBotMentionJob
 } from "./store";
+import { canCreateScrapbookArchive } from "./scrapbook-plan-service";
 
 const THREADS_GRAPH_BASE_URL = "https://graph.threads.net";
 const DEFAULT_POLL_INTERVAL_MS = 60_000;
@@ -1049,7 +1051,16 @@ async function ingestMentionPayload(
     user && payload.mentionUrl
       ? await findBotArchiveByMention(user.id, payload.mentionId ?? null, safeText(payload.mentionUrl))
       : null;
-  const materialized = materializeBotMentionArchive(user, existingArchive, payload);
+  const resolvedAllowance = user
+    ? await loadDatabase().then((database) => {
+        const permission = canCreateScrapbookArchive(database, user, existingArchive);
+        return {
+          allowed: permission.allowed,
+          reason: permission.allowed ? null : "limit_reached"
+        };
+      })
+    : { allowed: true, reason: null };
+  const materialized = materializeBotMentionArchive(user, existingArchive, payload, resolvedAllowance);
   if (materialized.archive) {
     await saveBotArchiveRecord(materialized.archive);
   }

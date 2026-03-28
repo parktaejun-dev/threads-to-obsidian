@@ -93,8 +93,8 @@ function renderLocalizedStorefront(locale: WebLocale): void {
   if (subheadline) {
     subheadline.textContent = copy.subheadline;
   }
-  if (priceValue && storefront) {
-    priceValue.textContent = storefront.settings.priceValue;
+  if (priceValue) {
+    priceValue.textContent = "US$19.99";
   }
   if (includedUpdates) {
     includedUpdates.textContent = copy.includedUpdates;

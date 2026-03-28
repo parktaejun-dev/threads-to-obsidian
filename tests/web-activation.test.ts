@@ -9,8 +9,8 @@ import { signProLicenseToken } from "../packages/web-server/src/server/license-s
 const privateKeyFile = path.resolve(process.cwd(), "output", "dev-pro-license-private.jwk");
 
 test("seat activation allows up to 3 devices and blocks the 4th", async () => {
-  const previous = process.env.THREADS_TO_OBSIDIAN_PRO_PRIVATE_JWK_FILE;
-  process.env.THREADS_TO_OBSIDIAN_PRO_PRIVATE_JWK_FILE = privateKeyFile;
+  const previous = process.env.SS_THREADS_PRO_PRIVATE_JWK_FILE;
+  process.env.SS_THREADS_PRO_PRIVATE_JWK_FILE = privateKeyFile;
 
   try {
     const data = buildDefaultDatabase("2026-03-22T00:00:00.000Z");
@@ -38,16 +38,16 @@ test("seat activation allows up to 3 devices and blocks the 4th", async () => {
     assert.equal(retry.ok && retry.seatsUsed, 3);
   } finally {
     if (previous === undefined) {
-      delete process.env.THREADS_TO_OBSIDIAN_PRO_PRIVATE_JWK_FILE;
+      delete process.env.SS_THREADS_PRO_PRIVATE_JWK_FILE;
     } else {
-      process.env.THREADS_TO_OBSIDIAN_PRO_PRIVATE_JWK_FILE = previous;
+      process.env.SS_THREADS_PRO_PRIVATE_JWK_FILE = previous;
     }
   }
 });
 
 test("status returns activation_required until this device is activated", async () => {
-  const previous = process.env.THREADS_TO_OBSIDIAN_PRO_PRIVATE_JWK_FILE;
-  process.env.THREADS_TO_OBSIDIAN_PRO_PRIVATE_JWK_FILE = privateKeyFile;
+  const previous = process.env.SS_THREADS_PRO_PRIVATE_JWK_FILE;
+  process.env.SS_THREADS_PRO_PRIVATE_JWK_FILE = privateKeyFile;
 
   try {
     const data = buildDefaultDatabase("2026-03-22T00:00:00.000Z");
@@ -63,9 +63,9 @@ test("status returns activation_required until this device is activated", async 
     assert.equal(statusAfter.ok && statusAfter.deviceLabel, "Chrome on macOS");
   } finally {
     if (previous === undefined) {
-      delete process.env.THREADS_TO_OBSIDIAN_PRO_PRIVATE_JWK_FILE;
+      delete process.env.SS_THREADS_PRO_PRIVATE_JWK_FILE;
     } else {
-      process.env.THREADS_TO_OBSIDIAN_PRO_PRIVATE_JWK_FILE = previous;
+      process.env.SS_THREADS_PRO_PRIVATE_JWK_FILE = previous;
     }
   }
 });

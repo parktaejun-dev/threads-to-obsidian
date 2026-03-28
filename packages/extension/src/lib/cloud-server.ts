@@ -107,8 +107,20 @@ export function buildCloudLinkStartUrl(state: string): string {
   return url.toString();
 }
 
-export function buildCloudScrapbookUrl(): string {
-  return new URL("/scrapbook", PRIMARY_BACKEND_ORIGIN).toString();
+function normalizeScrapbookHandle(value: string | null | undefined): string | null {
+  const normalized = `${value ?? ""}`.trim().replace(/^@+/, "").toLowerCase();
+  return normalized || null;
+}
+
+export function buildCloudScrapbookUrl(userHandle?: string | null): string {
+  const normalizedHandle = normalizeScrapbookHandle(userHandle);
+  if (!normalizedHandle) {
+    return new URL("/scrapbook", PRIMARY_BACKEND_ORIGIN).toString();
+  }
+
+  const url = new URL(PRIMARY_BACKEND_ORIGIN);
+  url.pathname = `/scrapbook/@${normalizedHandle}`;
+  return url.toString();
 }
 
 export async function completeCloudLink(code: string, state: string): Promise<CloudConnectionStatus> {

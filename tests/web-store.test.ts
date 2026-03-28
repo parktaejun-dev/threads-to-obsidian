@@ -107,7 +107,7 @@ test("email delivery draft includes token and activation steps", () => {
   );
 
   assert.equal(draft.to, "alice@example.com");
-  assert.match(draft.subject, /Pro key/i);
+  assert.match(draft.subject, /Plus key/i);
   assert.match(draft.body, /signed\.token\.value/);
   assert.match(draft.body, /Activation steps/i);
 });

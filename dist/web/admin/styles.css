@@ -37,6 +37,10 @@ a {
   -webkit-tap-highlight-color: transparent;
 }
 
+button {
+  white-space: nowrap;
+}
+
 button:focus-visible,
 input:focus-visible,
 textarea:focus-visible,
@@ -86,10 +90,14 @@ a:focus-visible {
   font-size: clamp(32px, 4vw, 40px);
 }
 
+.admin-hero-copy {
+  min-width: 0;
+}
+
 .lead {
   margin: 0;
   color: var(--muted);
-  max-width: 560px;
+  max-width: none;
 }
 
 .admin-jumpnav {
@@ -198,7 +206,7 @@ a:focus-visible {
 .auth-banner {
   display: flex;
   gap: 16px;
-  padding: 24px 28px;
+  padding: 18px 22px;
   border-radius: 20px;
   background:
     linear-gradient(135deg, rgba(118, 229, 255, 0.12), rgba(80, 176, 255, 0.04)),
@@ -208,8 +216,8 @@ a:focus-visible {
 }
 
 .auth-banner h2 {
-  margin: 6px 0 10px;
-  font-size: clamp(22px, 3vw, 28px);
+  margin: 4px 0 6px;
+  font-size: clamp(18px, 2.6vw, 22px);
 }
 
 .auth-banner[hidden] {
@@ -219,19 +227,49 @@ a:focus-visible {
 .token-widget {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
   width: min(360px, 100%);
+  align-items: flex-start;
+}
+
+.auth-session {
+  display: grid;
+  gap: 6px;
+}
+
+.auth-state-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 12px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text);
+}
+
+.auth-state-pill[data-state="success"] {
+  background: var(--success-bg);
+  color: var(--success);
+}
+
+.auth-state-pill[data-state="warning"] {
+  background: var(--warning-bg);
+  color: var(--warning);
 }
 
 .token-input {
   display: flex;
   gap: 10px;
   flex-wrap: wrap;
+  width: 100%;
 }
 
 .token-input input {
-  flex: 1;
-  min-width: 0;
+  flex: 1 1 220px;
+  min-width: 220px;
   background: var(--panel-soft);
   border: 1px solid var(--border);
   color: var(--text);
@@ -250,6 +288,7 @@ a:focus-visible {
   cursor: pointer;
   transition: transform 0.2s ease;
   min-height: 44px;
+  flex: 0 0 auto;
 }
 
 .token-input button:active {
@@ -419,6 +458,7 @@ a:focus-visible {
 .section-copy {
   margin: 4px 0 0;
   color: var(--muted);
+  line-height: 1.4;
 }
 
 .panel-orders .section-copy,
@@ -438,6 +478,7 @@ a:focus-visible {
   border-radius: 999px;
   cursor: pointer;
   min-height: 44px;
+  flex-shrink: 0;
 }
 
 .ghost.small {
@@ -590,6 +631,10 @@ a:focus-visible {
   grid-template-columns: minmax(0, 1.15fr) minmax(280px, 0.85fr);
   gap: 18px;
   align-items: start;
+}
+
+.panel-methods .panel-content--split {
+  grid-template-columns: 1fr;
 }
 
 .panel-content--split form {
@@ -749,6 +794,20 @@ td span.status-pill {
   min-height: 44px;
 }
 
+button[data-busy="true"] {
+  cursor: progress;
+  opacity: 0.82;
+  transform: translateY(1px);
+}
+
+button:disabled,
+input:disabled,
+textarea:disabled,
+select:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
 .stack-form button.ghost {
   background: transparent;
   color: var(--text);
@@ -760,6 +819,10 @@ td span.status-pill {
   flex-wrap: wrap;
   align-items: center;
   gap: 10px;
+}
+
+.inline-actions > button {
+  flex: 0 0 auto;
 }
 
 .inline-actions .token-status {
@@ -780,6 +843,47 @@ td span.status-pill {
 
 .responsive-table table {
   table-layout: fixed;
+}
+
+.methods-table {
+  table-layout: auto;
+  min-width: 760px;
+}
+
+.methods-table th,
+.methods-table td {
+  white-space: normal;
+  overflow-wrap: normal;
+  word-break: keep-all;
+}
+
+.methods-table th:nth-child(1),
+.methods-table td:nth-child(1) {
+  min-width: 170px;
+}
+
+.methods-table th:nth-child(2),
+.methods-table td:nth-child(2) {
+  min-width: 260px;
+}
+
+.methods-table th:nth-child(3),
+.methods-table td:nth-child(3) {
+  min-width: 150px;
+}
+
+.methods-table th:nth-child(4),
+.methods-table td:nth-child(4) {
+  min-width: 96px;
+}
+
+.methods-table th:nth-child(5),
+.methods-table td:nth-child(5) {
+  min-width: 170px;
+}
+
+.methods-table .action-cell {
+  min-width: 170px;
 }
 
 .table-empty-cell {

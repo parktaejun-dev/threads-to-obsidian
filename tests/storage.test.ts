@@ -87,7 +87,7 @@ test("legacy cloud recent saves infer saveTarget from savedVia", async () => {
       status: "complete",
       savedVia: "cloud",
       remotePageId: "archive-1",
-      remotePageUrl: "https://ss-threads.dahanda.dev/scrapbook?archive=archive-1",
+      remotePageUrl: "https://ss-threads.dahanda.dev/scrapbook/@writer/archive/archive-1",
       post: basePost
     }
   ]);
@@ -97,6 +97,7 @@ test("legacy cloud recent saves infer saveTarget from savedVia", async () => {
   assert.equal(recent[0]?.saveTarget, "cloud");
   assert.equal(recent[0]?.savedVia, "cloud");
   assert.equal(recent[0]?.remotePageId, "archive-1");
+  assert.equal(recent[0]?.remoteOrigin, "cloud");
 });
 
 test("legacy default filename patterns migrate to the truncated first sentence default", async () => {
@@ -142,6 +143,20 @@ test("previous shortcode default filename pattern migrates to the truncated firs
   const options = await getOptions();
 
   assert.equal(options.filenamePattern, "{author}_{first_sentence_20}");
+});
+
+test("legacy threads_cloud save target migrates to cloud", async () => {
+  storageState.clear();
+  storageState.set("options", {
+    saveTarget: "threads_cloud",
+    includeImages: true,
+    obsidianFolderLabel: null
+  });
+
+  const options = await getOptions();
+
+  assert.equal(options.saveTarget, "cloud");
+  assert.equal((storageState.get("options") as { saveTarget?: string } | undefined)?.saveTarget, "cloud");
 });
 
 test("AI provider mismatch detection flags Gemini with an OpenAI-style key", () => {
@@ -195,7 +210,8 @@ test("recent saves keep separate records for Obsidian, Cloud, and Notion targets
     savedVia: "cloud",
     savedRelativePath: null,
     remotePageId: "cloud-archive-1",
-    remotePageUrl: "https://ss-threads.dahanda.dev/scrapbook?archive=cloud-archive-1"
+    remotePageUrl: "https://ss-threads.dahanda.dev/scrapbook/@writer/archive/cloud-archive-1",
+    remoteOrigin: "cloud"
   };
 
   await upsertRecentSave(obsidianSave);

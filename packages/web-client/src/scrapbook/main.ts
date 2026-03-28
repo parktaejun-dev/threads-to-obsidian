@@ -174,8 +174,21 @@ interface ScrapbookScopeState {
   needsReconnect: boolean;
 }
 
+interface ScrapbookPlanState {
+  tier: "free" | "plus";
+  archiveLimit: number;
+  folderLimit: number;
+  archiveCount: number;
+  remainingArchiveSlots: number;
+  plusStatus: "inactive" | "active" | "expired" | "revoked" | "missing";
+  plusLicenseId: string | null;
+  plusActivatedAt: string | null;
+  plusExpiresAt: string | null;
+}
+
 interface ScrapbookPlusState {
   authenticated: boolean;
+  plan: ScrapbookPlanState;
   scopes: ScrapbookScopeState;
   watchlists: ScrapbookWatchlistView[];
   searches: ScrapbookSearchView[];
@@ -191,10 +204,12 @@ let latestState: BotSessionState | null = null;
 let latestWorkspace: ScrapbookPlusState | null = null;
 let activeTab: WorkspaceTab = "inbox";
 let activeArchiveId: string | null = null;
+let activeScrapbookHandle: string | null = null;
 const selectedArchiveIds = new Set<string>();
 const expandedMediaArchiveIds = new Set<string>();
 let connectButtonsBusy = false;
 let connectButtonsAvailable = true;
+let sessionMenuOpen = false;
 let isExportingArchives = false;
 let archiveSearchQuery = "";
 let activeFolderId: string | null = null;
@@ -248,15 +263,30 @@ const mobileOauthNotes = document.querySelectorAll<HTMLElement>("[data-mobile-oa
 const brandLink = document.querySelector<HTMLAnchorElement>(".brand-link");
 const localeSelect = document.querySelector<HTMLSelectElement>("#scrapbook-locale-select");
 const metaDescription = document.querySelector<HTMLMetaElement>("#scrapbook-meta-description");
+const topbarCurrentLink = document.querySelector<HTMLAnchorElement>("#topbar-current-link");
 const authPanel = document.querySelector<HTMLElement>("#auth-panel");
 const sessionPanel = document.querySelector<HTMLElement>("#session-panel");
+const sessionTrigger = document.querySelector<HTMLButtonElement>("#session-trigger");
+const sessionMenu = document.querySelector<HTMLElement>("#session-menu");
 const pageStatus = document.querySelector<HTMLParagraphElement>("#page-status");
+const planTitle = document.querySelector<HTMLElement>("#plan-title");
+const planCopy = document.querySelector<HTMLElement>("#plan-copy");
+const planTierBadge = document.querySelector<HTMLElement>("#plan-tier-badge");
+const planArchiveUsage = document.querySelector<HTMLElement>("#plan-archive-usage");
+const planFolderUsage = document.querySelector<HTMLElement>("#plan-folder-usage");
+const planLicenseStatus = document.querySelector<HTMLElement>("#plan-license-status");
+const planKeyForm = document.querySelector<HTMLFormElement>("#plan-key-form");
+const planKeyLabel = document.querySelector<HTMLElement>("#plan-key-label");
+const planKeyInput = document.querySelector<HTMLInputElement>("#plan-key-input");
+const planKeySubmit = document.querySelector<HTMLButtonElement>("#plan-key-submit");
+const planKeyClear = document.querySelector<HTMLButtonElement>("#plan-key-clear");
 const sessionName = document.querySelector<HTMLElement>("#session-name");
 const sessionMeta = document.querySelector<HTMLParagraphElement>("#session-meta");
 const sessionBio = document.querySelector<HTMLParagraphElement>("#session-bio");
 const sessionRouting = document.querySelector<HTMLParagraphElement>("#session-routing");
 const scopeStatus = document.querySelector<HTMLParagraphElement>("#scope-status");
 const sessionProfileLink = document.querySelector<HTMLAnchorElement>("#session-profile-link");
+const sessionScrapbookLink = document.querySelector<HTMLAnchorElement>("#session-scrapbook-link");
 const avatarImage = document.querySelector<HTMLImageElement>("#profile-avatar-image");
 const avatarFallback = document.querySelector<HTMLElement>("#profile-avatar-fallback");
 const archivesEl = document.querySelector<HTMLElement>("#archives");
@@ -317,6 +347,10 @@ function t<K extends keyof ScrapbookMsg>(key: K, params?: Record<string, string 
   return formatMessage(msg[key], params);
 }
 
+function uiText(ko: string, en: string): string {
+  return currentLocale === "ko" ? ko : en;
+}
+
 type RuntimeLocaleLabels = {
   requestFailed: string;
   sourceMention: string;
@@ -330,7 +364,7 @@ type RuntimeLocaleLabels = {
 const runtimeLocaleLabels: Record<WebLocale, RuntimeLocaleLabels> = {
   ko: {
     requestFailed: "요청에 실패했습니다 ({status}).",
-    sourceMention: "멘션 inbox",
+    sourceMention: "Inbox",
     sourceCloud: "클라우드 저장",
     searchRunNow: "지금 실행",
     searchStatusNew: "신규",
@@ -339,7 +373,7 @@ const runtimeLocaleLabels: Record<WebLocale, RuntimeLocaleLabels> = {
   },
   en: {
     requestFailed: "Request failed ({status}).",
-    sourceMention: "Mention inbox",
+    sourceMention: "Inbox",
     sourceCloud: "Cloud save",
     searchRunNow: "Run now",
     searchStatusNew: "New",
@@ -348,7 +382,7 @@ const runtimeLocaleLabels: Record<WebLocale, RuntimeLocaleLabels> = {
   },
   ja: {
     requestFailed: "リクエストに失敗しました ({status})。",
-    sourceMention: "メンション inbox",
+    sourceMention: "Inbox",
     sourceCloud: "クラウド保存",
     searchRunNow: "今すぐ実行",
     searchStatusNew: "新規",
@@ -357,7 +391,7 @@ const runtimeLocaleLabels: Record<WebLocale, RuntimeLocaleLabels> = {
   },
   "pt-BR": {
     requestFailed: "A solicitação falhou ({status}).",
-    sourceMention: "Inbox de menções",
+    sourceMention: "Inbox",
     sourceCloud: "Salvamento na nuvem",
     searchRunNow: "Executar agora",
     searchStatusNew: "Novo",
@@ -366,7 +400,7 @@ const runtimeLocaleLabels: Record<WebLocale, RuntimeLocaleLabels> = {
   },
   es: {
     requestFailed: "La solicitud falló ({status}).",
-    sourceMention: "Inbox de menciones",
+    sourceMention: "Inbox",
     sourceCloud: "Guardado en la nube",
     searchRunNow: "Ejecutar ahora",
     searchStatusNew: "Nuevo",
@@ -375,7 +409,7 @@ const runtimeLocaleLabels: Record<WebLocale, RuntimeLocaleLabels> = {
   },
   "zh-TW": {
     requestFailed: "請求失敗 ({status})。",
-    sourceMention: "提及 inbox",
+    sourceMention: "Inbox",
     sourceCloud: "雲端儲存",
     searchRunNow: "立即執行",
     searchStatusNew: "新增",
@@ -384,7 +418,7 @@ const runtimeLocaleLabels: Record<WebLocale, RuntimeLocaleLabels> = {
   },
   vi: {
     requestFailed: "Yêu cầu thất bại ({status}).",
-    sourceMention: "Inbox đề cập",
+    sourceMention: "Inbox",
     sourceCloud: "Lưu đám mây",
     searchRunNow: "Chạy ngay",
     searchStatusNew: "Mới",
@@ -395,6 +429,136 @@ const runtimeLocaleLabels: Record<WebLocale, RuntimeLocaleLabels> = {
 
 function runtimeLabel(): RuntimeLocaleLabels {
   return runtimeLocaleLabels[currentLocale];
+}
+
+function getCurrentPlanState(): ScrapbookPlanState {
+  return latestWorkspace?.plan ?? {
+    tier: "free",
+    archiveLimit: 100,
+    folderLimit: 5,
+    archiveCount: latestState?.archives.length ?? 0,
+    remainingArchiveSlots: Math.max(0, 100 - (latestState?.archives.length ?? 0)),
+    plusStatus: "inactive",
+    plusLicenseId: null,
+    plusActivatedAt: null,
+    plusExpiresAt: null
+  };
+}
+
+function getCurrentFolderLimit(): number {
+  return getCurrentPlanState().folderLimit;
+}
+
+function ensureFolderLimitAvailable(): boolean {
+  const folderLimit = getCurrentFolderLimit();
+  const folderCount = loadFolders().length;
+  if (folderCount < folderLimit) {
+    return true;
+  }
+
+  setStatus(
+    uiText(
+      `${folderLimit}개까지 폴더를 만들 수 있습니다. Plus로 올리면 50개까지 확장됩니다.`,
+      `You can create up to ${folderLimit} folders on this plan. Upgrade to Plus to raise it to 50.`
+    ),
+    true
+  );
+  return false;
+}
+
+function renderPlanPanel(): void {
+  const plan = getCurrentPlanState();
+  const isAuthenticated = Boolean(latestState?.authenticated && latestState?.user);
+  const folderCount = loadFolders().length;
+
+  if (planTitle) {
+    planTitle.textContent = plan.tier === "plus" ? "Plus 1000 / 50" : "Free 100 / 5";
+  }
+  if (planCopy) {
+    if (!isAuthenticated) {
+      planCopy.textContent = uiText(
+        "로그인하면 현재 계정의 저장글 한도와 Plus 연결 상태를 확인할 수 있습니다.",
+        "Sign in to see your current save limits and Plus status for this scrapbook account."
+      );
+    } else if (plan.tier === "plus") {
+      planCopy.textContent = uiText(
+        "이 계정은 Plus입니다. 저장글 1,000개와 폴더 50개까지 사용할 수 있습니다.",
+        "This account is on Plus. You can save up to 1,000 posts and use up to 50 folders."
+      );
+    } else {
+      planCopy.textContent = uiText(
+        "Free는 저장글 100개와 폴더 5개까지 사용할 수 있습니다.",
+        "Free includes up to 100 saved posts and 5 folders."
+      );
+    }
+  }
+  if (planTierBadge) {
+    planTierBadge.textContent = plan.tier === "plus" ? "Plus" : "Free";
+    planTierBadge.classList.toggle("is-plus", plan.tier === "plus");
+  }
+  if (planArchiveUsage) {
+    planArchiveUsage.textContent = `${plan.archiveCount} / ${plan.archiveLimit}`;
+  }
+  if (planFolderUsage) {
+    planFolderUsage.textContent = `${folderCount} / ${plan.folderLimit}`;
+  }
+  if (planKeyLabel) {
+    planKeyLabel.textContent = uiText("Plus 키", "Plus key");
+  }
+  if (planKeyInput) {
+    planKeyInput.placeholder = uiText("구매한 Plus 키를 붙여넣기", "Paste your Plus key");
+    planKeyInput.disabled = !isAuthenticated;
+  }
+  if (planKeySubmit) {
+    planKeySubmit.textContent = uiText("Plus 연결", "Activate Plus");
+    planKeySubmit.disabled = !isAuthenticated;
+  }
+  if (planKeyClear) {
+    planKeyClear.textContent = uiText("키 제거", "Remove key");
+    planKeyClear.disabled = !isAuthenticated || (!plan.plusLicenseId && plan.plusStatus === "inactive");
+  }
+  if (planLicenseStatus) {
+    let statusText = "";
+    if (!isAuthenticated) {
+      statusText = uiText(
+        "먼저 Threads로 로그인해야 이 scrapbook 계정에 Plus 키를 연결할 수 있습니다.",
+        "Sign in with Threads before linking a Plus key to this scrapbook account."
+      );
+    } else if (plan.plusStatus === "active") {
+      statusText = plan.plusExpiresAt
+        ? uiText(
+            `Plus 활성화됨. 만료일: ${formatDate(plan.plusExpiresAt)}. 같은 키를 extension에도 사용할 수 있습니다.`,
+            `Plus is active. Expires on ${formatDate(plan.plusExpiresAt)}. The same key also works in the extension.`
+          )
+        : uiText(
+            "Plus 활성화됨. 같은 키를 extension에도 사용할 수 있습니다.",
+            "Plus is active. The same key also works in the extension."
+          );
+    } else if (plan.plusStatus === "expired") {
+      statusText = uiText(
+        "이 scrapbook 계정에 연결된 Plus 키가 만료되었습니다. 새 키를 붙여넣거나 연장된 키로 다시 연결하세요.",
+        "The Plus key linked to this scrapbook account has expired. Paste a renewed key to restore higher limits."
+      );
+    } else if (plan.plusStatus === "revoked") {
+      statusText = uiText(
+        "이 scrapbook 계정에 연결된 Plus 키가 비활성화되었습니다. 다른 키로 다시 연결하세요.",
+        "The Plus key linked to this scrapbook account has been revoked. Paste another key to reconnect."
+      );
+    } else if (plan.plusStatus === "missing") {
+      statusText = uiText(
+        "이 scrapbook 계정의 Plus 연결 정보를 찾을 수 없습니다. 키를 다시 붙여넣어 주세요.",
+        "The stored Plus link could not be verified. Paste your key again to reconnect this scrapbook account."
+      );
+    } else {
+      statusText = uiText(
+        "Free 플랜입니다. Plus 키를 붙여넣으면 저장글 1,000개와 폴더 50개로 확장됩니다.",
+        "This account is on Free. Paste a Plus key to raise your limits to 1,000 saved posts and 50 folders."
+      );
+    }
+
+    planLicenseStatus.textContent = statusText;
+    planLicenseStatus.classList.toggle("hidden", statusText.length === 0);
+  }
 }
 
 function localizeMediaType(mediaType: string | null | undefined): string {
@@ -428,6 +592,61 @@ function localizeSearchStatus(status: ScrapbookSearchResultView["status"]): stri
 
 function normalizeBotHandle(value: string | null | undefined): string {
   return `${value ?? ""}`.trim().replace(/^@+/, "");
+}
+
+function normalizeScrapbookHandle(value: string | null | undefined): string | null {
+  const normalized = normalizeBotHandle(value).toLowerCase();
+  return normalized || null;
+}
+
+function buildScrapbookBasePath(handle = activeScrapbookHandle): string {
+  const normalizedHandle = normalizeScrapbookHandle(handle);
+  return normalizedHandle ? `/scrapbook/@${encodeURIComponent(normalizedHandle)}` : "/scrapbook";
+}
+
+function buildScrapbookArchivePath(archiveId: string, handle = activeScrapbookHandle): string {
+  return `${buildScrapbookBasePath(handle).replace(/\/+$/, "")}/archive/${encodeURIComponent(archiveId)}`;
+}
+
+function readScrapbookRoute(pathname = window.location.pathname): { handle: string | null; archiveId: string | null } {
+  const normalizedPath = pathname.replace(/\/+$/, "") || "/";
+  const archiveMatch = normalizedPath.match(/^\/scrapbook(?:\/@([^/]+))?\/archive\/([^/]+)$/);
+  if (archiveMatch) {
+    return {
+      handle: normalizeScrapbookHandle(decodeURIComponent(archiveMatch[1] ?? "")),
+      archiveId: decodeURIComponent(archiveMatch[2] ?? "")
+    };
+  }
+
+  const handleMatch = normalizedPath.match(/^\/scrapbook\/@([^/]+)$/);
+  if (handleMatch) {
+    return {
+      handle: normalizeScrapbookHandle(decodeURIComponent(handleMatch[1] ?? "")),
+      archiveId: null
+    };
+  }
+
+  return { handle: null, archiveId: null };
+}
+
+function syncScrapbookLinks(): void {
+  const targetPath = buildScrapbookBasePath();
+  if (topbarCurrentLink) {
+    topbarCurrentLink.href = targetPath;
+  }
+  if (sessionScrapbookLink) {
+    sessionScrapbookLink.href = targetPath;
+  }
+}
+
+function syncScrapbookHistory(): void {
+  const targetPath = activeArchiveId ? buildScrapbookArchivePath(activeArchiveId) : buildScrapbookBasePath();
+  const currentUrl = new URL(window.location.href);
+  if (currentUrl.pathname === targetPath) {
+    return;
+  }
+
+  history.replaceState({}, "", `${targetPath}${currentUrl.search}${currentUrl.hash}`);
 }
 
 function replaceLegacyBotHandle(value: string, handle = getCurrentBotHandle()): string {
@@ -477,6 +696,12 @@ function applyStaticTranslations(): void {
   workspaceTabs?.setAttribute("aria-label", t("scrapbookWorkspaceAriaLabel"));
 
   applyTranslations(msg);
+  if (archivesMoveSelected) {
+    archivesMoveSelected.textContent = uiText("폴더 이동", "Move to folder");
+  }
+  if (archivesDeleteSelected) {
+    archivesDeleteSelected.textContent = uiText("선택 삭제", "Delete selected");
+  }
 
   setLocalizedHtml(
     "[data-i18n='scrapbookHeroLead']",
@@ -532,6 +757,8 @@ function applyLocale(locale: WebLocale): void {
   if (latestWorkspace) {
     applyWorkspaceState(latestWorkspace);
   }
+
+  renderPlanPanel();
 }
 
 function escapeHtml(value: string): string {
@@ -639,6 +866,14 @@ function setStatus(message: string, isError = false): void {
   pageStatus.classList.toggle("is-error", isError);
 }
 
+function setSessionMenuOpen(open: boolean): void {
+  const shouldOpen = open && Boolean(latestState?.authenticated && latestState.user);
+  sessionMenuOpen = shouldOpen;
+  sessionPanel?.classList.toggle("is-open", shouldOpen);
+  sessionMenu?.classList.toggle("hidden", !shouldOpen);
+  sessionTrigger?.setAttribute("aria-expanded", String(shouldOpen));
+}
+
 function setConnectButtonsEnabled(enabled: boolean): void {
   connectButtonsAvailable = enabled;
   renderConnectButtons();
@@ -657,8 +892,10 @@ function renderMobileOauthNotice(): void {
 }
 
 function renderConnectButtons(): void {
+  const isAuthenticated = Boolean(latestState?.authenticated && latestState.user);
   const disabled = connectButtonsBusy || !connectButtonsAvailable;
   for (const button of connectButtons) {
+    button.classList.toggle("hidden", isAuthenticated);
     button.disabled = disabled;
     button.setAttribute("aria-disabled", String(disabled));
     button.setAttribute("aria-busy", String(connectButtonsBusy));
@@ -678,7 +915,7 @@ function setConnectButtonsIdle(): void {
   renderConnectButtons();
 }
 
-function extractArchiveTitleExcerpt(text: string, maxChars = 20): string {
+function extractArchiveTitleExcerpt(text: string, maxChars = 30): string {
   const normalized = text.replace(/\s+/g, " ").trim();
   if (!normalized) {
     return "";
@@ -689,7 +926,7 @@ function extractArchiveTitleExcerpt(text: string, maxChars = 20): string {
 }
 
 function buildArchiveTitle(item: BotArchiveView): string {
-  const excerpt = extractArchiveTitleExcerpt(item.targetText, 20);
+  const excerpt = extractArchiveTitleExcerpt(item.targetText, 30);
   if (excerpt) {
     return excerpt;
   }
@@ -697,14 +934,6 @@ function buildArchiveTitle(item: BotArchiveView): string {
     return t("scrapbookArchiveFallbackAuthorPost", { handle: item.targetAuthorHandle });
   }
   return t("scrapbookArchiveFallbackSavedItem");
-}
-
-function buildArchiveSource(item: BotArchiveView): string {
-  const originLabel = item.origin === "cloud" ? runtimeLabel().sourceCloud : runtimeLabel().sourceMention;
-  if (item.targetAuthorHandle) {
-    return `${originLabel} · @${item.targetAuthorHandle}`;
-  }
-  return originLabel;
 }
 
 function buildArchiveTagsLabel(item: BotArchiveView): string {
@@ -931,6 +1160,10 @@ function renderFolderStrip(allItems: BotArchiveView[]): void {
 }
 
 function createFolderPrompt(): void {
+  if (!ensureFolderLimitAvailable()) {
+    return;
+  }
+
   const labelPrompt = currentLocale === "ko" ? "폴더 이름을 입력하세요:" : "Enter folder name:";
   const name = window.prompt(labelPrompt);
   if (!name?.trim()) return;
@@ -947,6 +1180,7 @@ function createFolderPrompt(): void {
   if (latestState) {
     renderArchives(latestState.archives, latestState.authenticated && Boolean(latestState.user));
   }
+  renderPlanPanel();
 
   const label = currentLocale === "ko" ? `폴더 "${newFolder.name}" 생성됨` : `Folder "${newFolder.name}" created`;
   setStatus(label);
@@ -987,6 +1221,7 @@ function showFolderContextMenu(folderId: string, event: MouseEvent): void {
     if (latestState) {
       renderArchives(latestState.archives, latestState.authenticated && Boolean(latestState.user));
     }
+    renderPlanPanel();
   });
 
   menu.querySelector<HTMLButtonElement>("[data-action='delete']")?.addEventListener("click", () => {
@@ -1014,6 +1249,7 @@ function showFolderContextMenu(folderId: string, event: MouseEvent): void {
     if (latestState) {
       renderArchives(latestState.archives, latestState.authenticated && Boolean(latestState.user));
     }
+    renderPlanPanel();
   });
 }
 
@@ -1074,6 +1310,9 @@ function showMoveToFolderMenu(): void {
 
   menu.querySelector<HTMLButtonElement>("[data-move-new]")?.addEventListener("click", () => {
     dismiss();
+    if (!ensureFolderLimitAvailable()) {
+      return;
+    }
     const labelPrompt = currentLocale === "ko" ? "새 폴더 이름:" : "New folder name:";
     const name = window.prompt(labelPrompt);
     if (!name?.trim()) return;
@@ -1097,6 +1336,7 @@ function showMoveToFolderMenu(): void {
     if (latestState) {
       renderArchives(latestState.archives, latestState.authenticated && Boolean(latestState.user));
     }
+    renderPlanPanel();
     const label = currentLocale === "ko" ? `"${newFolder.name}" 폴더로 이동됨` : `Moved to "${newFolder.name}"`;
     setStatus(label);
   });
@@ -1190,7 +1430,6 @@ function renderArchiveDetailHtml(item: BotArchiveView): string {
           <h3>${escapeHtml(buildArchiveTitle(item))}</h3>
           <div class="archive-detail-meta">
             <span class="archive-chip">${escapeHtml(formatDate(item.archivedAt))}</span>
-            ${buildArchiveSource(item) ? `<span class="archive-chip">${escapeHtml(buildArchiveSource(item))}</span>` : ""}
             ${tagsLabel ? `<span class="archive-chip">${escapeHtml(tagsLabel)}</span>` : ""}
           </div>
         </div>
@@ -1233,6 +1472,7 @@ function renderArchives(items: BotArchiveView[], isAuthenticated: boolean): void
     archivesPaginationEl?.classList.add("hidden");
     updateArchivesToolbar([], isAuthenticated);
     archivesFilterBar?.classList.toggle("hidden", true);
+    syncScrapbookHistory();
     return;
   }
 
@@ -1257,9 +1497,10 @@ function renderArchives(items: BotArchiveView[], isAuthenticated: boolean): void
   archivesBoard.classList.remove("hidden");
 
   if (filtered.length === 0) {
-    archivesEl.innerHTML = `<tr><td colspan="5" class="archive-no-results">${escapeHtml(t("scrapbookNoResults"))}</td></tr>`;
+    archivesEl.innerHTML = `<tr><td colspan="4" class="archive-no-results">${escapeHtml(t("scrapbookNoResults"))}</td></tr>`;
     archivesPaginationEl?.classList.add("hidden");
     updateArchivesToolbar(filtered, isAuthenticated);
+    syncScrapbookHistory();
     return;
   }
 
@@ -1277,7 +1518,6 @@ function renderArchives(items: BotArchiveView[], isAuthenticated: boolean): void
   for (const item of paginated) {
     const isSelected = selectedArchiveIds.has(item.id);
     const isActive = activeArchiveId === item.id;
-    const source = buildArchiveSource(item);
     const tagsLabel = buildArchiveTagsLabel(item);
     html += `
         <tr class="${isActive ? "is-active" : ""}" data-open="${item.id}">
@@ -1290,12 +1530,11 @@ function renderArchives(items: BotArchiveView[], isAuthenticated: boolean): void
             <button class="archive-row-title" type="button" data-open="${item.id}">${escapeHtml(buildArchiveTitle(item))}</button>
           </td>
           <td class="archive-row-date">${escapeHtml(formatDate(item.archivedAt))}</td>
-          <td class="archive-row-source">${escapeHtml(source)}</td>
           <td class="archive-row-tags">${escapeHtml(tagsLabel)}</td>
         </tr>
       `;
     if (isActive) {
-      html += `<tr class="archive-row-detail"><td colspan="5">${renderArchiveDetailHtml(item)}</td></tr>`;
+      html += `<tr class="archive-row-detail"><td colspan="4">${renderArchiveDetailHtml(item)}</td></tr>`;
     }
   }
 
@@ -1360,6 +1599,7 @@ function renderArchives(items: BotArchiveView[], isAuthenticated: boolean): void
   }
 
   updateArchivesToolbar(filtered, isAuthenticated);
+  syncScrapbookHistory();
 }
 
 function renderUser(user: BotUserView | null): void {
@@ -1387,6 +1627,7 @@ function renderUser(user: BotUserView | null): void {
     }
     if (avatarFallback) {
       avatarFallback.textContent = "T";
+      avatarFallback.classList.remove("hidden");
     }
     return;
   }
@@ -1419,9 +1660,11 @@ function renderUser(user: BotUserView | null): void {
       avatarImage.src = user.profilePictureUrl;
       avatarImage.alt = t("scrapbookProfilePictureAlt", { name: displayName });
       avatarImage.classList.remove("hidden");
+      avatarFallback?.classList.add("hidden");
     } else {
       avatarImage.src = "";
       avatarImage.classList.add("hidden");
+      avatarFallback?.classList.remove("hidden");
     }
   }
 }
@@ -1772,9 +2015,12 @@ function applySessionState(config: BotPublicConfig, state: BotSessionState): voi
   }
 
   const isAuthenticated = state.authenticated && Boolean(state.user);
+  activeScrapbookHandle = isAuthenticated ? normalizeScrapbookHandle(state.user?.threadsHandle) : null;
   authPanel?.classList.toggle("hidden", isAuthenticated);
   sessionPanel?.classList.toggle("hidden", !isAuthenticated);
   workspaceTabs?.classList.toggle("hidden", !isAuthenticated);
+  syncScrapbookLinks();
+  setSessionMenuOpen(false);
 
   if (!config.oauthConfigured && !isAuthenticated) {
     setStatus(t("scrapbookConnectServerNotReady"), true);
@@ -1784,6 +2030,7 @@ function applySessionState(config: BotPublicConfig, state: BotSessionState): voi
   }
 
   renderUser(isAuthenticated ? state.user : null);
+  renderConnectButtons();
   if (sessionRouting) {
     if (isAuthenticated && state.user) {
       sessionRouting.textContent = t("scrapbookSessionRouting", {
@@ -1797,6 +2044,8 @@ function applySessionState(config: BotPublicConfig, state: BotSessionState): voi
     }
   }
   renderArchives(state.archives, isAuthenticated);
+  renderPlanPanel();
+  syncScrapbookHistory();
 }
 
 function applyWorkspaceState(workspace: ScrapbookPlusState): void {
@@ -1805,13 +2054,17 @@ function applyWorkspaceState(workspace: ScrapbookPlusState): void {
   renderWatchlists(workspace);
   renderSearches(workspace);
   renderInsights(workspace);
+  renderPlanPanel();
 }
 
 function applyQueryStatus(): void {
   const currentUrl = new URL(window.location.href);
+  const routeState = readScrapbookRoute(currentUrl.pathname);
+  activeScrapbookHandle = routeState.handle;
+  syncScrapbookLinks();
   const connected = currentUrl.searchParams.get("connected");
   const authError = currentUrl.searchParams.get("authError");
-  const archiveId = currentUrl.searchParams.get("archive");
+  const archiveId = routeState.archiveId ?? currentUrl.searchParams.get("archive");
   if (connected === "1") {
     setStatus(t("scrapbookStatusConnected"));
   } else if (authError) {
@@ -1848,6 +2101,77 @@ async function refreshWorkspace(): Promise<void> {
 
 async function refreshEverything(): Promise<void> {
   await Promise.all([refreshSession(), refreshWorkspace()]);
+}
+
+async function submitPlusActivation(event: SubmitEvent): Promise<void> {
+  event.preventDefault();
+  if (!planKeyInput) {
+    return;
+  }
+
+  const token = planKeyInput.value.trim();
+  if (!token) {
+    setStatus(uiText("먼저 Plus 키를 입력하세요.", "Enter a Plus key first."), true);
+    return;
+  }
+
+  if (planKeySubmit) {
+    planKeySubmit.disabled = true;
+  }
+  if (planKeyClear) {
+    planKeyClear.disabled = true;
+  }
+
+  try {
+    const workspace = await requestJson<ScrapbookPlusState>("/api/public/bot/plus/activate", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ token })
+    });
+    planKeyInput.value = "";
+    applyWorkspaceState(workspace);
+    setStatus(uiText("Plus가 이 scrapbook 계정에 연결되었습니다.", "Plus is now linked to this scrapbook account."));
+  } catch (error) {
+    setStatus(error instanceof Error ? error.message : uiText("Plus 연결에 실패했습니다.", "Could not activate Plus."), true);
+  } finally {
+    renderPlanPanel();
+  }
+}
+
+async function clearPlusActivationRequest(): Promise<void> {
+  const confirmed = window.confirm(
+    uiText(
+      "이 scrapbook 계정에서 Plus 키 연결을 제거할까요?",
+      "Remove the Plus key from this scrapbook account?"
+    )
+  );
+  if (!confirmed) {
+    return;
+  }
+
+  if (planKeySubmit) {
+    planKeySubmit.disabled = true;
+  }
+  if (planKeyClear) {
+    planKeyClear.disabled = true;
+  }
+
+  try {
+    const workspace = await requestJson<ScrapbookPlusState>("/api/public/bot/plus/clear", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: "{}"
+    });
+    if (planKeyInput) {
+      planKeyInput.value = "";
+    }
+    applyWorkspaceState(workspace);
+    setStatus(uiText("Plus 키 연결이 제거되었습니다.", "The Plus key was removed from this scrapbook account."));
+  } catch (error) {
+    setStatus(error instanceof Error ? error.message : uiText("Plus 키 제거에 실패했습니다.", "Could not remove the Plus key."), true);
+  } finally {
+    renderPlanPanel();
+  }
 }
 
 async function syncLatestMentions(): Promise<void> {
@@ -2051,6 +2375,30 @@ async function archiveInsightPostRequest(postId: string): Promise<void> {
   setStatus(t("scrapbookStatusInsightSaved"));
 }
 
+sessionTrigger?.addEventListener("click", (event) => {
+  event.stopPropagation();
+  setSessionMenuOpen(!sessionMenuOpen);
+});
+
+avatarImage?.addEventListener("error", () => {
+  avatarImage.src = "";
+  avatarImage.classList.add("hidden");
+  avatarFallback?.classList.remove("hidden");
+});
+
+document.addEventListener("click", (event) => {
+  if (!sessionPanel || !(event.target instanceof Node) || sessionPanel.contains(event.target)) {
+    return;
+  }
+  setSessionMenuOpen(false);
+});
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") {
+    setSessionMenuOpen(false);
+  }
+});
+
 for (const button of connectButtons) {
   button.addEventListener("click", () => void startOauth());
 }
@@ -2062,6 +2410,7 @@ logoutButton?.addEventListener("click", async () => {
       headers: { "content-type": "application/json" },
       body: "{}"
     });
+    setSessionMenuOpen(false);
     setStatus(t("scrapbookLogoutSuccess"));
     selectedArchiveIds.clear();
     expandedMediaArchiveIds.clear();
@@ -2091,6 +2440,14 @@ searchForm?.addEventListener("submit", (event) => {
 
 insightsRefresh?.addEventListener("click", () => {
   void refreshInsightsRequest();
+});
+
+planKeyForm?.addEventListener("submit", (event) => {
+  void submitPlusActivation(event);
+});
+
+planKeyClear?.addEventListener("click", () => {
+  void clearPlusActivationRequest();
 });
 
 archivesSelectAll?.addEventListener("change", () => {

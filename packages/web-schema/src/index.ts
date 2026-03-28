@@ -1,6 +1,7 @@
 export type OrderStatus = "pending" | "payment_confirmed" | "key_issued" | "cancelled";
 export type LicenseStatus = "active" | "revoked";
 export type DeliveryStatus = "not_sent" | "ready_to_send" | "sent";
+export type BillingCycle = "monthly" | "yearly";
 export type LicenseActivationStatus = "active" | "released";
 export type NotionConnectionStatus = "active" | "revoked";
 export type NotionAuthSessionStatus = "pending" | "completed" | "expired";
@@ -55,6 +56,7 @@ export interface PurchaseOrder {
   id: string;
   buyerName: string;
   buyerEmail: string;
+  billingCycle?: BillingCycle | null;
   paymentMethodId: string;
   paymentProvider?: string | null;
   paymentProviderEventId?: string | null;
@@ -148,6 +150,8 @@ export interface BotUserRecord {
   grantedScopes: string[];
   scopeVersion: number;
   lastScopeUpgradeAt: string | null;
+  plusLicenseId?: string | null;
+  plusActivatedAt?: string | null;
   createdAt: string;
   updatedAt: string;
   lastLoginAt: string | null;
@@ -639,38 +643,38 @@ export interface EmailDeliveryDraft {
 }
 
 export const DEFAULT_SETTINGS: StorefrontSettings = {
-  productName: "Threads Saver",
+  productName: "SS Threads",
   headline: "Threads 저장을 한 곳에서.",
-  subheadline: "29달러 1회 결제로 Chrome extension Pro와 scrapbook core를 함께 씁니다. Discovery, Search, Insights는 cloud add-on으로 확장합니다.",
-  priceLabel: "Threads Saver Pro",
-  priceValue: "$29",
+  subheadline: "Free는 저장글 100개와 폴더 5개까지. Plus는 저장글 1,000개와 폴더 50개, 그리고 기존 extension 고급 저장 기능까지 함께 엽니다.",
+  priceLabel: "SS Threads Plus",
+  priceValue: "US$19.99",
   supportEmail: "hello@oxcorp.ninja",
-  includedUpdates: "1회 결제 · 7일 환불 · extension Pro + scrapbook core",
+  includedUpdates: "US$2.99 monthly · US$19.99 yearly · scrapbook 1000/50 + extension advanced",
   heroNotes: [
-    "Free: 현재 글 저장 · 이미지 포함 · 작성자 연속 답글",
-    "Pro: 파일명 패턴 · 저장 경로 · AI 요약 · AI 태그 · scrapbook core",
-    "Cloud add-on: Watchlists · Keyword search · Insights"
+    "Free: 저장글 100개 · 폴더 5개",
+    "Plus: 저장글 1,000개 · 폴더 50개",
+    "Plus bonus: extension 파일 규칙 · Notion 고급 저장 · AI 정리"
   ],
   faqs: [
     {
       id: "faq-1",
-      question: "저장하려면 Pro가 필요한가요?",
-      answer: "아니요. 저장, 이미지 포함, 연속 답글, 중복 건너뜀 모두 Free에서 가능합니다."
+      question: "무료에서도 저장할 수 있나요?",
+      answer: "네. Free는 저장글 100개, 폴더 5개까지 사용할 수 있습니다."
     },
     {
       id: "faq-2",
-      question: "누가 Pro를 사면 좋나요?",
-      answer: "저장할 때 파일명·경로 규칙을 직접 제어하고, 자신의 LLM 키로 요약·태그·frontmatter를 붙이고 싶은 분께 맞습니다."
+      question: "누가 Plus를 쓰면 좋나요?",
+      answer: "저장글을 많이 쌓고 폴더를 촘촘히 쓰는 사용자, 그리고 extension의 규칙 저장과 AI 정리까지 함께 쓰려는 사용자에게 맞습니다."
     },
     {
       id: "faq-3",
-      question: "요약이나 태그 같은 AI 정리는 되나요?",
-      answer: "됩니다. Pro에서 OpenAI 호환 엔드포인트와 자신의 키를 넣으면 요약, 태그, 추가 frontmatter를 생성합니다."
+      question: "Plus에 extension 고급 기능도 포함되나요?",
+      answer: "네. Plus 키를 extension에 넣으면 파일명·경로 규칙, Notion 고급 저장, AI 요약과 태그 같은 기존 고급 기능도 함께 활성화됩니다."
     },
     {
       id: "faq-4",
-      question: "Pro 키는 어떻게 전달되나요?",
-      answer: "결제가 확인되면 Pro 키를 이메일로 보내드립니다."
+      question: "Plus 키는 어떻게 전달되나요?",
+      answer: "결제가 확인되면 Plus 키를 이메일로 보내드립니다."
     },
     {
       id: "faq-5",
@@ -687,7 +691,7 @@ export function buildDefaultDatabase(now = new Date().toISOString()): WebDatabas
       {
         id: "pm-stableorder",
         name: "Stableorder",
-        summary: "KRW-friendly checkout with card and transfer options",
+        summary: "Card and transfer checkout",
         instructions: "Open the Stableorder checkout page, pay using the order email, and return with the paid confirmation.",
         actionLabel: "Pay with Stableorder",
         actionUrl: "https://stableorder.com/",

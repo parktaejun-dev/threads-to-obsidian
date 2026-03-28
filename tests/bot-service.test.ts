@@ -14,6 +14,7 @@ import {
   getExtensionCloudConnectionStatus,
   getBotSessionState,
   ingestBotMention,
+  listExtensionCloudArchives,
   pollBotOauthSession,
   readBotArchiveMarkdown,
   readBotArchiveZip,
@@ -451,7 +452,7 @@ test("cloud save creates a scrapbook archive with deep link and ZIP export", asy
     );
 
     assert.equal(result.created, true);
-    assert.equal(result.archiveUrl, `https://ss-threads.dahanda.dev/scrapbook?archive=${result.archiveId}`);
+    assert.equal(result.archiveUrl, `https://ss-threads.dahanda.dev/scrapbook/@writer/archive/${result.archiveId}`);
 
     const sessionState = getBotSessionState(data, "session-token-cloud-1");
     assert.equal(sessionState.archives.length, 1);
@@ -551,6 +552,24 @@ test("extension cloud link issues a scoped token, saves archives, and can be rev
   );
   assert.equal(saveResult.created, true);
   assert.equal(data.cloudArchives.length, 1);
+
+  const mentionResult = ingestBotMention(data, {
+    mentionId: "mention-ext-1",
+    mentionUrl: "https://www.threads.com/@writer/post/MENTIONEXT1",
+    mentionAuthorUserId: "threads-user-ext-1",
+    mentionAuthorHandle: "writer",
+    targetUrl: "https://www.threads.com/@target/post/TARGETEXT1",
+    targetAuthorHandle: "target",
+    targetText: "Mention-saved archive for scrapbook sync."
+  });
+  assert.equal(mentionResult.created, true);
+
+  const syncedArchives = listExtensionCloudArchives(data, completed.token, "https://ss-threads.dahanda.dev");
+  assert.equal(syncedArchives.length, 2);
+  assert.equal(syncedArchives[0]?.origin, "mention");
+  assert.equal(syncedArchives[0]?.archiveUrl, `https://ss-threads.dahanda.dev/scrapbook/@writer/archive/${mentionResult.archiveId}`);
+  assert.equal(syncedArchives[1]?.origin, "cloud");
+  assert.equal(syncedArchives[1]?.archiveUrl, `https://ss-threads.dahanda.dev/scrapbook/@writer/archive/${saveResult.archiveId}`);
 
   const replacementLink = createExtensionLinkCode(data, "session-token-ext-1", "state-two");
   const replacement = completeExtensionLinkCode(data, replacementLink.code, "state-two");

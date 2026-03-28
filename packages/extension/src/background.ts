@@ -190,6 +190,7 @@ async function createCloudRecentSave(
     savedRelativePath: null,
     remotePageId: archiveId,
     remotePageUrl: archiveUrl,
+    remoteOrigin: "cloud",
     warning,
     post
   };
@@ -321,6 +322,7 @@ async function saveCurrentPost(
             savedRelativePath: null,
             remotePageId: cloudResult.archiveId,
             remotePageUrl: cloudResult.archiveUrl,
+            remoteOrigin: "cloud" as const,
             warning: cloudResult.warning,
             post
           }
@@ -487,6 +489,7 @@ async function redownloadSave(
         savedRelativePath: null,
         remotePageId: cloudResult.archiveId,
         remotePageUrl: cloudResult.archiveUrl,
+        remoteOrigin: "cloud",
         warning: cloudResult.warning
       };
       await upsertRecentSave(updatedSave);

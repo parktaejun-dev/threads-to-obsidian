@@ -9,6 +9,7 @@ import type { AiOrganizationResult, ExtractedPost } from "@threads/shared/types"
 import type {
   AdminRuntimeConfigResponse,
   AdminRuntimeConfigSecretState,
+  BillingCycle,
   EmailDeliveryDraft,
   LicenseRecord,
   PaymentMethod,
@@ -35,42 +36,43 @@ import {
   validateNotionClient
 } from "./server/notion-service";
 import {
-  activateBotOauthSession,
-  failBotOauthSession,
-  completeExtensionLinkCode,
+  activateBotOauthSessionFromStore,
+  failBotOauthSessionFromStore,
+  completeExtensionLinkCodeFromStore,
   type BotIngestPayload,
-  createExtensionLinkCode,
+  createExtensionLinkCodeFromStore,
   deleteArchiveFromStore,
-  deleteExtensionCloudArchive,
-  completeBotOauth,
-  getExtensionCloudConnectionStatus,
+  deleteExtensionCloudArchiveFromStore,
+  completeBotOauthFromStore,
+  getExtensionCloudConnectionStatusFromStore,
   getBotPublicConfig,
   getBotSessionStateFromStore,
-  listExtensionCloudArchives,
+  listExtensionCloudArchivesFromStore,
   readBotArchiveZipFromStore,
   ingestBotMention,
-  pollBotOauthSession,
-  revokeExtensionCloudConnection,
+  pollBotOauthSessionFromStore,
+  revokeExtensionCloudConnectionFromStore,
   readBotArchiveMarkdownFromStore,
-  saveCloudArchiveWithExtensionToken,
-  revokeBotSession,
-  startBotOauth,
+  saveCloudArchiveWithExtensionTokenFromStore,
+  revokeBotSessionFromStore,
+  startBotOauthFromStore,
   validateBotIngestRequest
 } from "./server/bot-service";
 import {
-  archiveSearchResult,
-  archiveTrackedPost,
-  archiveTrackedInsightPost,
-  createSearchMonitor,
-  createWatchlist,
-  deleteSearchMonitor,
-  deleteWatchlist,
-  dismissSearchResult,
-  readAuthenticatedScrapbookPlusState,
-  readScrapbookPlusState,
-  refreshInsights,
-  runSearchMonitor,
-  syncWatchlist
+  archiveSearchResultFromStore,
+  archiveTrackedPostFromStore,
+  archiveTrackedInsightPostFromStore,
+  activateScrapbookPlusForSessionFromStore,
+  clearScrapbookPlusForSessionFromStore,
+  createSearchMonitorFromStore,
+  createWatchlistFromStore,
+  deleteSearchMonitorFromStore,
+  deleteWatchlistFromStore,
+  dismissSearchResultFromStore,
+  readScrapbookPlusStateFromStore,
+  refreshInsightsFromStore,
+  runSearchMonitorFromStore,
+  syncWatchlistFromStore
 } from "./server/scrapbook-plus-service";
 import {
   createBotMentionCollector,
@@ -199,6 +201,8 @@ const PROVIDER_ACTION_URL_PATTERNS: Record<PaymentProvider, RegExp> = {
 const DEFAULT_PUBLIC_ORIGIN = "https://ss-threads.dahanda.dev";
 const LEGACY_PUBLIC_HOSTS = new Set(["threads-obsidian.dahanda.dev"]);
 const LEGACY_PUBLIC_PAGE_PATHS = new Set(["/", "/landing", "/landing/", "/scrapbook", "/scrapbook/", "/checkout", "/checkout/"]);
+const SCRAPBOOK_HANDLE_PATH_RE = /^\/scrapbook\/@[^/.?#/]+\/?$/;
+const SCRAPBOOK_ARCHIVE_PATH_RE = /^\/scrapbook(?:\/@[^/.?#/]+)?\/archive\/[^/]+\/?$/;
 
 function trimEnv(name: string): string | undefined {
   return process.env[name]?.trim();
@@ -243,6 +247,33 @@ function parseMaxBodyBytes(raw: string | undefined): number {
   }
 
   return parsed;
+}
+
+function isProductionRuntime(): boolean {
+  return trimEnv("NODE_ENV") === "production";
+}
+
+function assertSupportedProductionDatabaseConfig(
+  database: RuntimeDatabaseConfig,
+  statusCode = 500
+): void {
+  if (!isProductionRuntime()) {
+    return;
+  }
+
+  if (database.backend !== "postgres") {
+    throw new RequestError(
+      statusCode,
+      "Production requires THREADS_WEB_STORE_BACKEND=postgres and a Supabase/Postgres database."
+    );
+  }
+
+  if (!database.postgresUrl.trim()) {
+    throw new RequestError(
+      statusCode,
+      "Production requires THREADS_WEB_POSTGRES_URL or THREADS_WEB_DATABASE_URL."
+    );
+  }
 }
 
 function resolveConfig(portOverride?: number): ServerConfig {
@@ -558,18 +589,18 @@ function describeProActivationFailure(
   reason: "invalid" | "expired" | "revoked" | "seat_limit" | "activation_required"
 ): string {
   if (reason === "activation_required") {
-    return "Pro activation is required.";
+    return "Plus activation is required.";
   }
   if (reason === "seat_limit") {
-    return "This Pro key has reached the device limit.";
+    return "This Plus key has reached the device limit.";
   }
   if (reason === "revoked") {
-    return "This Pro key has been revoked.";
+    return "This Plus key has been revoked.";
   }
   if (reason === "expired") {
-    return "This Pro key has expired.";
+    return "This Plus key has expired.";
   }
-  return "This Pro key is not valid.";
+  return "This Plus key is not valid.";
 }
 
 function escapeHtml(value: string): string {
@@ -2008,7 +2039,11 @@ function shouldRedirectLegacyPublicPage(request: IncomingMessage, requestUrl: UR
     return null;
   }
 
-  if (!LEGACY_PUBLIC_HOSTS.has(requestHost) || !LEGACY_PUBLIC_PAGE_PATHS.has(requestUrl.pathname)) {
+  const isLegacyPublicPath =
+    LEGACY_PUBLIC_PAGE_PATHS.has(requestUrl.pathname) ||
+    SCRAPBOOK_HANDLE_PATH_RE.test(requestUrl.pathname) ||
+    SCRAPBOOK_ARCHIVE_PATH_RE.test(requestUrl.pathname);
+  if (!LEGACY_PUBLIC_HOSTS.has(requestHost) || !isLegacyPublicPath) {
     return null;
   }
 
@@ -2024,7 +2059,7 @@ function resolveLandingMeta(_siteHost: string): { title: string; description: st
   const botHandle = getBotPublicConfig().botHandle;
   const publicHost = resolvePreferredPublicOrigin().replace(/^https?:\/\//, "");
   return {
-    title: "Threads Saver",
+    title: "SS Threads",
     description: `Threads 저장용 Chrome extension과 @${botHandle} mention scrapbook을 ${publicHost}에서 함께 제공합니다.`
   };
 }
@@ -2343,6 +2378,10 @@ function getStaticCandidates(urlPath: string): string[] {
     return ["scrapbook/index.html"];
   }
 
+  if (SCRAPBOOK_HANDLE_PATH_RE.test(normalizedPath) || SCRAPBOOK_ARCHIVE_PATH_RE.test(normalizedPath)) {
+    return ["scrapbook/index.html"];
+  }
+
   if (normalizedPath === "/checkout" || normalizedPath === "/checkout/") {
     return ["checkout/index.html"];
   }
@@ -2638,6 +2677,21 @@ function parseOptionalDate(raw: string | undefined | null): string | null {
   return new Date(parsed).toISOString();
 }
 
+function normalizeBillingCycle(value: string | null | undefined): BillingCycle {
+  return value === "monthly" ? "monthly" : "yearly";
+}
+
+function deriveLicenseExpiry(billingCycle: BillingCycle | null | undefined, issuedAtIso: string): string {
+  const issuedAt = new Date(issuedAtIso);
+  if (normalizeBillingCycle(billingCycle) === "monthly") {
+    issuedAt.setMonth(issuedAt.getMonth() + 1);
+  } else {
+    issuedAt.setFullYear(issuedAt.getFullYear() + 1);
+  }
+
+  return issuedAt.toISOString();
+}
+
 async function issueLicenseForOrder(
   data: WebDatabase,
   order: PurchaseOrder,
@@ -2663,7 +2717,8 @@ async function issueLicenseForOrder(
     order.paidAt = now;
   }
 
-  const token = await signProLicenseToken(order.buyerEmail, expiresAt);
+  const effectiveExpiresAt = expiresAt ?? deriveLicenseExpiry(order.billingCycle ?? "yearly", now);
+  const token = await signProLicenseToken(order.buyerEmail, effectiveExpiresAt);
   const license: LicenseRecord = {
     id: crypto.randomUUID(),
     orderId: order.id,
@@ -2672,7 +2727,7 @@ async function issueLicenseForOrder(
     token,
     tokenPreview: buildTokenPreview(token),
     issuedAt: now,
-    expiresAt,
+    expiresAt: effectiveExpiresAt,
     revokedAt: null,
     status: "active"
   };
@@ -2689,7 +2744,7 @@ async function issueLicenseForOrder(
   upsertLicense(data, license);
   appendHistory(data, {
     kind: "license_issued",
-    message: `Issued Pro key for ${order.buyerEmail}`,
+    message: `Issued Plus key for ${order.buyerEmail}`,
     orderId: order.id,
     paymentMethodId: order.paymentMethodId,
     licenseId: license.id
@@ -2724,12 +2779,14 @@ async function handleCreateOrder(
   const body = await parseJsonBody<{
     buyerName?: string;
     buyerEmail?: string;
+    billingCycle?: BillingCycle | null;
     paymentMethodId?: string;
     note?: string;
   }>(request, config.maxBodyBytes);
 
   const buyerName = safeText(body.buyerName);
   const buyerEmail = normalizeEmail(safeText(body.buyerEmail));
+  const billingCycle = normalizeBillingCycle(body.billingCycle ?? "yearly");
   const paymentMethodId = safeText(body.paymentMethodId);
   const note = safeText(body.note);
 
@@ -2754,6 +2811,7 @@ async function handleCreateOrder(
       id: crypto.randomUUID(),
       buyerName,
       buyerEmail,
+      billingCycle,
       paymentMethodId,
       paymentReference: crypto.randomUUID(),
       status: "pending",
@@ -3028,7 +3086,7 @@ async function handlePublicBotRoute(
     }
 
     try {
-      const result = await withDatabaseTransaction((data) => startBotOauth(data, publicOrigin));
+      const result = await startBotOauthFromStore(publicOrigin);
       if (requestUrl.searchParams.get("redirect") === "1") {
         response.writeHead(302, {
           location: result.authorizeUrl,
@@ -3051,7 +3109,7 @@ async function handlePublicBotRoute(
     }
 
     try {
-      const result = await withDatabaseTransaction((data) => startBotOauth(data, publicOrigin));
+      const result = await startBotOauthFromStore(publicOrigin);
       const bridgeMarkup = renderOauthBridgePage(result.authorizeUrl, result.botHandle, result.pollToken, publicOrigin, locale);
       response.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" });
       response.end(bridgeMarkup);
@@ -3073,7 +3131,7 @@ async function handlePublicBotRoute(
       return;
     }
 
-    const pollResult = await withDatabaseTransaction((data) => pollBotOauthSession(data, rawPollToken));
+    const pollResult = await pollBotOauthSessionFromStore(rawPollToken);
     response.writeHead(200, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
     response.end(JSON.stringify(pollResult));
     return;
@@ -3095,7 +3153,7 @@ async function handlePublicBotRoute(
       return;
     }
 
-    const activationResult = await withDatabaseTransaction((data) => activateBotOauthSession(data, rawCode));
+    const activationResult = await activateBotOauthSessionFromStore(rawCode);
     if (!activationResult) {
       redirectUrl.searchParams.set("authError", msg.threadsSigninUnexpected);
       response.writeHead(302, { location: redirectUrl.toString() });
@@ -3124,7 +3182,7 @@ async function handlePublicBotRoute(
 
     if (providerError) {
       if (rawState) {
-        await withDatabaseTransaction((data) => failBotOauthSession(data, rawState));
+        await failBotOauthSessionFromStore(rawState);
       }
       redirectUrl.searchParams.set("authError", providerErrorDescription || providerError);
       response.writeHead(302, { location: redirectUrl.toString() });
@@ -3140,14 +3198,14 @@ async function handlePublicBotRoute(
     }
 
     try {
-      const session = await withDatabaseTransaction((data) => completeBotOauth(data, rawState, code, publicOrigin));
+      const session = await completeBotOauthFromStore(rawState, code, publicOrigin);
       appendSetCookie(response, buildSessionCookie(session.sessionToken, secureCookie));
       redirectUrl.searchParams.set("connected", "1");
       response.writeHead(302, { location: redirectUrl.toString() });
       response.end();
       return;
     } catch (error) {
-      await withDatabaseTransaction((data) => failBotOauthSession(data, rawState));
+      await failBotOauthSessionFromStore(rawState);
       redirectUrl.searchParams.set(
         "authError",
         toPublicErrorMessage(error, msg.threadsSigninUnexpected)
@@ -3175,7 +3233,7 @@ async function handlePublicBotRoute(
     }
 
     try {
-      const link = await withDatabaseTransaction((data) => createExtensionLinkCode(data, rawSession, linkState));
+      const link = await createExtensionLinkCodeFromStore(rawSession, linkState);
       redirectUrl.searchParams.set("extensionLinked", "1");
       redirectUrl.hash = new URLSearchParams({
         state: linkState,
@@ -3279,11 +3337,50 @@ async function handlePublicBotRoute(
 
     const rawSession = readCookie(request.headers, BOT_SESSION_COOKIE);
     try {
-      const state = await readAuthenticatedScrapbookPlusState(await loadDatabase(), rawSession);
+      const state = await readScrapbookPlusStateFromStore(rawSession);
       json(response, 200, state);
-    } catch {
-      const state = readScrapbookPlusState(await loadDatabase(), rawSession);
+    } catch (error) {
+      json(response, 400, {
+        error: toPublicErrorMessage(error, "Could not load scrapbook state.")
+      });
+    }
+    return;
+  }
+
+  if (pathname === "/api/public/bot/plus/activate") {
+    if ((request.method ?? "GET") !== "POST") {
+      methodNotAllowed(response);
+      return;
+    }
+
+    const rawSession = readCookie(request.headers, BOT_SESSION_COOKIE);
+    const body = await parseJsonBody<{ token?: string }>(request, config.maxBodyBytes);
+
+    try {
+      const state = await activateScrapbookPlusForSessionFromStore(rawSession, safeText(body.token));
       json(response, 200, state);
+    } catch (error) {
+      json(response, 400, {
+        error: toPublicErrorMessage(error, "Could not activate Plus for this scrapbook account.")
+      });
+    }
+    return;
+  }
+
+  if (pathname === "/api/public/bot/plus/clear") {
+    if ((request.method ?? "GET") !== "POST") {
+      methodNotAllowed(response);
+      return;
+    }
+
+    const rawSession = readCookie(request.headers, BOT_SESSION_COOKIE);
+    try {
+      const state = await clearScrapbookPlusForSessionFromStore(rawSession);
+      json(response, 200, state);
+    } catch (error) {
+      json(response, 400, {
+        error: toPublicErrorMessage(error, "Could not remove Plus from this scrapbook account.")
+      });
     }
     return;
   }
@@ -3310,9 +3407,7 @@ async function handlePublicBotRoute(
     if ((request.method ?? "GET") === "DELETE" && watchlistDeleteMatch) {
       const rawSession = readCookie(request.headers, BOT_SESSION_COOKIE);
       try {
-        const state = await withDatabaseTransaction((data) =>
-          deleteWatchlist(data, rawSession, decodeURIComponent(watchlistDeleteMatch[1] ?? ""))
-        );
+        const state = await deleteWatchlistFromStore(rawSession, decodeURIComponent(watchlistDeleteMatch[1] ?? ""));
         json(response, 200, state);
       } catch (error) {
         json(response, 400, {
@@ -3326,9 +3421,7 @@ async function handlePublicBotRoute(
     if ((request.method ?? "GET") === "DELETE" && searchDeleteMatch) {
       const rawSession = readCookie(request.headers, BOT_SESSION_COOKIE);
       try {
-        const state = await withDatabaseTransaction((data) =>
-          deleteSearchMonitor(data, rawSession, decodeURIComponent(searchDeleteMatch[1] ?? ""))
-        );
+        const state = await deleteSearchMonitorFromStore(rawSession, decodeURIComponent(searchDeleteMatch[1] ?? ""));
         json(response, 200, state);
       } catch (error) {
         json(response, 400, {
@@ -3364,9 +3457,7 @@ async function handlePublicBotRoute(
 
   if (pathname === "/api/public/bot/logout") {
     const rawSession = readCookie(request.headers, BOT_SESSION_COOKIE);
-    await withDatabaseTransaction((data) => {
-      revokeBotSession(data, rawSession);
-    });
+    await revokeBotSessionFromStore(rawSession);
     appendSetCookie(response, buildClearedSessionCookie(secureCookie));
     json(response, 200, { ok: true });
     return;
@@ -3384,16 +3475,14 @@ async function handlePublicBotRoute(
     }>(request, config.maxBodyBytes);
 
     try {
-      const state = await withDatabaseTransaction((data) =>
-        createWatchlist(data, rawSession, {
-          targetHandle: body.targetHandle ?? "",
-          includeText: body.includeText ?? null,
-          excludeText: body.excludeText ?? null,
-          mediaTypes: body.mediaTypes ?? [],
-          autoArchive: body.autoArchive ?? false,
-          digestCadence: body.digestCadence ?? "off"
-        })
-      );
+      const state = await createWatchlistFromStore(rawSession, {
+        targetHandle: body.targetHandle ?? "",
+        includeText: body.includeText ?? null,
+        excludeText: body.excludeText ?? null,
+        mediaTypes: body.mediaTypes ?? [],
+        autoArchive: body.autoArchive ?? false,
+        digestCadence: body.digestCadence ?? "off"
+      });
       json(response, 200, state);
     } catch (error) {
       json(response, 400, {
@@ -3407,9 +3496,7 @@ async function handlePublicBotRoute(
   if (watchlistSyncMatch) {
     const rawSession = readCookie(request.headers, BOT_SESSION_COOKIE);
     try {
-      const state = await withDatabaseTransaction((data) =>
-        syncWatchlist(data, rawSession, decodeURIComponent(watchlistSyncMatch[1] ?? ""))
-      );
+      const state = await syncWatchlistFromStore(rawSession, decodeURIComponent(watchlistSyncMatch[1] ?? ""));
       json(response, 200, state);
     } catch (error) {
       json(response, 400, {
@@ -3436,15 +3523,13 @@ async function handlePublicBotRoute(
         : [];
 
     try {
-      const state = await withDatabaseTransaction((data) =>
-        createSearchMonitor(data, rawSession, {
-          query: body.query ?? "",
-          authorHandle: body.authorHandle ?? null,
-          excludeHandles,
-          autoArchive: body.autoArchive ?? false,
-          searchType: body.searchType ?? "top"
-        })
-      );
+      const state = await createSearchMonitorFromStore(rawSession, {
+        query: body.query ?? "",
+        authorHandle: body.authorHandle ?? null,
+        excludeHandles,
+        autoArchive: body.autoArchive ?? false,
+        searchType: body.searchType ?? "top"
+      });
       json(response, 200, state);
     } catch (error) {
       json(response, 400, {
@@ -3458,9 +3543,7 @@ async function handlePublicBotRoute(
   if (searchRunMatch) {
     const rawSession = readCookie(request.headers, BOT_SESSION_COOKIE);
     try {
-      const state = await withDatabaseTransaction((data) =>
-        runSearchMonitor(data, rawSession, decodeURIComponent(searchRunMatch[1] ?? ""))
-      );
+      const state = await runSearchMonitorFromStore(rawSession, decodeURIComponent(searchRunMatch[1] ?? ""));
       json(response, 200, state);
     } catch (error) {
       json(response, 400, {
@@ -3474,9 +3557,7 @@ async function handlePublicBotRoute(
   if (searchArchiveMatch) {
     const rawSession = readCookie(request.headers, BOT_SESSION_COOKIE);
     try {
-      const state = await withDatabaseTransaction((data) =>
-        archiveSearchResult(data, rawSession, decodeURIComponent(searchArchiveMatch[1] ?? ""))
-      );
+      const state = await archiveSearchResultFromStore(rawSession, decodeURIComponent(searchArchiveMatch[1] ?? ""));
       json(response, 200, state);
     } catch (error) {
       json(response, 400, {
@@ -3490,9 +3571,7 @@ async function handlePublicBotRoute(
   if (searchDismissMatch) {
     const rawSession = readCookie(request.headers, BOT_SESSION_COOKIE);
     try {
-      const state = await withDatabaseTransaction((data) =>
-        dismissSearchResult(data, rawSession, decodeURIComponent(searchDismissMatch[1] ?? ""))
-      );
+      const state = await dismissSearchResultFromStore(rawSession, decodeURIComponent(searchDismissMatch[1] ?? ""));
       json(response, 200, state);
     } catch (error) {
       json(response, 400, {
@@ -3506,9 +3585,7 @@ async function handlePublicBotRoute(
   if (trackedArchiveMatch) {
     const rawSession = readCookie(request.headers, BOT_SESSION_COOKIE);
     try {
-      const state = await withDatabaseTransaction((data) =>
-        archiveTrackedPost(data, rawSession, decodeURIComponent(trackedArchiveMatch[1] ?? ""))
-      );
+      const state = await archiveTrackedPostFromStore(rawSession, decodeURIComponent(trackedArchiveMatch[1] ?? ""));
       json(response, 200, state);
     } catch (error) {
       json(response, 400, {
@@ -3521,7 +3598,7 @@ async function handlePublicBotRoute(
   if (pathname === "/api/public/bot/insights/refresh") {
     const rawSession = readCookie(request.headers, BOT_SESSION_COOKIE);
     try {
-      const state = await withDatabaseTransaction((data) => refreshInsights(data, rawSession));
+      const state = await refreshInsightsFromStore(rawSession);
       json(response, 200, state);
     } catch (error) {
       json(response, 400, {
@@ -3535,9 +3612,7 @@ async function handlePublicBotRoute(
     const rawSession = readCookie(request.headers, BOT_SESSION_COOKIE);
     const body = await parseJsonBody<{ postId?: string }>(request, config.maxBodyBytes);
     try {
-      const state = await withDatabaseTransaction((data) =>
-        archiveTrackedInsightPost(data, rawSession, safeText(body.postId))
-      );
+      const state = await archiveTrackedInsightPostFromStore(rawSession, safeText(body.postId));
       json(response, 200, state);
     } catch (error) {
       json(response, 400, {
@@ -3805,9 +3880,7 @@ async function handleExtensionRoutes(
 
     const body = await parseJsonBody<{ code?: string; state?: string }>(request, config.maxBodyBytes);
     try {
-      const result = await withDatabaseTransaction((data) =>
-        Promise.resolve(completeExtensionLinkCode(data, safeText(body.code), safeText(body.state)))
-      );
+      const result = await completeExtensionLinkCodeFromStore(safeText(body.code), safeText(body.state));
       json(response, 200, result);
     } catch (error) {
       json(response, 400, {
@@ -3823,7 +3896,7 @@ async function handleExtensionRoutes(
       return;
     }
 
-    const status = getExtensionCloudConnectionStatus(await loadDatabase(), bearerToken);
+    const status = await getExtensionCloudConnectionStatusFromStore(bearerToken);
     json(response, 200, status);
     return;
   }
@@ -3834,9 +3907,7 @@ async function handleExtensionRoutes(
       return;
     }
 
-    const status = await withDatabaseTransaction((data) =>
-      Promise.resolve(revokeExtensionCloudConnection(data, bearerToken))
-    );
+    const status = await revokeExtensionCloudConnectionFromStore(bearerToken);
     json(response, 200, status);
     return;
   }
@@ -3857,7 +3928,7 @@ async function handleExtensionRoutes(
     try {
       const rawLimit = requestUrl.searchParams.get("limit");
       const limit = rawLimit ? Number.parseInt(rawLimit, 10) : 10;
-      const archives = listExtensionCloudArchives(await loadDatabase(), bearerToken, publicOrigin, limit);
+      const archives = await listExtensionCloudArchivesFromStore(bearerToken, publicOrigin, limit);
       json(response, 200, { archives });
     } catch (error) {
       json(response, 401, {
@@ -3882,9 +3953,7 @@ async function handleExtensionRoutes(
     }
 
     try {
-      await withDatabaseTransaction((data) =>
-        Promise.resolve(deleteExtensionCloudArchive(data, bearerToken, decodeURIComponent(cloudArchiveDeleteMatch[1] ?? "")))
-      );
+      await deleteExtensionCloudArchiveFromStore(bearerToken, decodeURIComponent(cloudArchiveDeleteMatch[1] ?? ""));
       json(response, 200, { ok: true });
     } catch (error) {
       json(response, 401, {
@@ -3923,7 +3992,7 @@ async function handleExtensionRoutes(
 
     if (!token || !deviceId || !deviceLabel) {
       json(response, 403, {
-        error: "A valid Pro activation is required for cloud save."
+        error: "A valid Plus activation is required for cloud save."
       });
       return;
     }
@@ -3934,24 +4003,21 @@ async function handleExtensionRoutes(
     }
 
     try {
-      const result = await withDatabaseTransaction(async (data) => {
-        const activation = await getLicenseSeatStatus(data, token, deviceId, deviceLabel);
-        if (!activation.ok) {
-          throw new RequestError(403, describeProActivationFailure(activation.reason));
-        }
+      const activation = await withDatabaseTransaction((data) => getLicenseSeatStatus(data, token, deviceId, deviceLabel));
+      if (!activation.ok) {
+        throw new RequestError(403, describeProActivationFailure(activation.reason));
+      }
 
-        return await saveCloudArchiveWithExtensionToken(
-          data,
-          bearerToken,
-          {
-            post,
-            aiResult: (body.aiResult as AiOrganizationResult | null | undefined) ?? null,
-            aiWarning: typeof body.aiWarning === "string" ? body.aiWarning : null,
-            locale: normalizeLocale(body.locale, "ko")
-          },
-          publicOrigin
-        );
-      });
+      const result = await saveCloudArchiveWithExtensionTokenFromStore(
+        bearerToken,
+        {
+          post,
+          aiResult: (body.aiResult as AiOrganizationResult | null | undefined) ?? null,
+          aiWarning: typeof body.aiWarning === "string" ? body.aiWarning : null,
+          locale: normalizeLocale(body.locale, "ko")
+        },
+        publicOrigin
+      );
       json(response, 200, result);
     } catch (error) {
       const message = toPublicErrorMessage(error, "Could not save this post to cloud scrapbook.");
@@ -4083,6 +4149,7 @@ async function handleAdminRoutes(
         const currentActiveConfig = getRuntimeConfigSnapshot();
         const currentSavedConfig = getPersistedRuntimeConfigSnapshot();
         const nextSavedConfig = mergeRuntimeConfig(currentSavedConfig, body);
+        assertSupportedProductionDatabaseConfig(nextSavedConfig.database, 400);
         const didDatabaseSettingsChange = databaseConfigRequiresRestart(nextSavedConfig.database, currentSavedConfig.database);
         const restartRequired = databaseConfigRequiresRestart(nextSavedConfig.database, currentActiveConfig.database);
 
@@ -4125,6 +4192,7 @@ async function handleAdminRoutes(
     const candidate = mergeRuntimeConfig(getPersistedRuntimeConfigSnapshot(), {
       database: body.database ?? {}
     });
+    assertSupportedProductionDatabaseConfig(candidate.database, 400);
     await testDatabaseConfig(candidate.database);
     const payload: RuntimeConfigTestResult = {
       ok: true,
@@ -4358,7 +4426,7 @@ async function handleAdminRoutes(
           existing.revokedAt = now;
           appendHistory(data, {
             kind: "license_revoked",
-            message: `Revoked Pro key for ${existing.holderEmail} (reissue)`,
+            message: `Revoked Plus key for ${existing.holderEmail} (reissue)`,
             orderId: order.id,
             paymentMethodId: null,
             licenseId: existing.id
@@ -4372,7 +4440,8 @@ async function handleAdminRoutes(
       order.deliveryStatus = "not_sent";
       order.updatedAt = now;
 
-      const token = await signProLicenseToken(order.buyerEmail, expiresAt);
+      const effectiveExpiresAt = expiresAt ?? deriveLicenseExpiry(order.billingCycle ?? "yearly", now);
+      const token = await signProLicenseToken(order.buyerEmail, effectiveExpiresAt);
       const license: LicenseRecord = {
         id: crypto.randomUUID(),
         orderId: order.id,
@@ -4381,7 +4450,7 @@ async function handleAdminRoutes(
         token,
         tokenPreview: buildTokenPreview(token),
         issuedAt: now,
-        expiresAt,
+        expiresAt: effectiveExpiresAt,
         revokedAt: null,
         status: "active"
       };
@@ -4394,7 +4463,7 @@ async function handleAdminRoutes(
       upsertLicense(data, license);
       appendHistory(data, {
         kind: "license_issued",
-        message: `Reissued Pro key for ${order.buyerEmail}`,
+        message: `Reissued Plus key for ${order.buyerEmail}`,
         orderId: order.id,
         paymentMethodId: order.paymentMethodId,
         licenseId: license.id
@@ -4481,7 +4550,7 @@ async function handleAdminRoutes(
         license.revokedAt = new Date().toISOString();
         appendHistory(data, {
           kind: "license_revoked",
-          message: `Revoked Pro key for ${license.holderEmail}`,
+          message: `Revoked Plus key for ${license.holderEmail}`,
           orderId: license.orderId,
           paymentMethodId: null,
           licenseId: license.id
@@ -4545,7 +4614,7 @@ async function handleRequest(
     }
 
     if (pathname === "/health" && method === "GET") {
-      json(response, 200, { status: "ok", service: "threads-to-obsidian-web" });
+      json(response, 200, { status: "ok", service: "ss-threads-web" });
       return;
     }
     if (pathname === "/ready") {
@@ -4557,7 +4626,7 @@ async function handleRequest(
       const data = await loadDatabase();
       json(response, 200, {
         status: "ready",
-        service: "threads-to-obsidian-web",
+        service: "ss-threads-web",
         databaseLoaded: Array.isArray(data.orders) && Array.isArray(data.paymentMethods)
       });
       return;
@@ -4652,6 +4721,7 @@ function createWebRuntime(port?: number): {
   requestHandler: (request: IncomingMessage, response: ServerResponse) => Promise<void>;
 } {
   const config = resolveConfig(port);
+  assertSupportedProductionDatabaseConfig(getRuntimeConfigSnapshot().database);
   const collector = createBotMentionCollector({
     runTransaction: withDatabaseTransaction,
     loadDatabase
@@ -4680,7 +4750,7 @@ export function startWebServer(port?: number): import("node:http").Server {
   });
 
   server.listen(config.port, () => {
-    console.log(`Threads Pro web app running at http://127.0.0.1:${config.port}`);
+    console.log(`SS Threads Plus web app running at http://127.0.0.1:${config.port}`);
   });
 
   collector.start();

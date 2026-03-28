@@ -120,7 +120,7 @@ var landingMessageLocales = {
       "productsTitle": "2\u3064\u306E\u4FDD\u5B58\u65B9\u6CD5",
       "productsCopy": "",
       "productATag": "Chrome extension",
-      "productATitle": "Threads to Obsidian",
+      "productATitle": "SS Threads",
       "productADesc": "\u8868\u793A\u3057\u3066\u3044\u308B\u6295\u7A3F\u3092 Obsidian \u307E\u305F\u306F Notion \u306B\u4FDD\u5B58\u3057\u307E\u3059\u3002",
       "productACta": "GitHub\u304B\u3089\u30A4\u30F3\u30B9\u30C8\u30FC\u30EB",
       "productBTag": "\u30E1\u30F3\u30B7\u30E7\u30F3\u30DC\u30C3\u30C8",
@@ -131,7 +131,7 @@ var landingMessageLocales = {
       "pricingTitle": "\u30B7\u30F3\u30D7\u30EB\u306A\u8ACB\u6C42\u3002",
       "pricingCopy": "",
       "bundleTag": "\u30EF\u30F3\u30BF\u30A4\u30E0",
-      "bundleTitle": "Threads Saver Pro",
+      "bundleTitle": "SS Threads Pro",
       "bundleDesc": "1\u56DE29\u30C9\u30EB\u3002\u62E1\u5F35\u6A5F\u80FD Pro + Scrapbook \u30B3\u30A2\u3002",
       "bundleCta": "Pro \u3092\u8CFC\u5165\u3059\u308B",
       "cloudTag": "Cloud \u30A2\u30C9\u30AA\u30F3",
@@ -152,7 +152,7 @@ var landingMessageLocales = {
       "orderSuccess1": "\u30EA\u30AF\u30A8\u30B9\u30C8\u306F {email} \u3067\u53D7\u4FE1\u3055\u308C\u307E\u3057\u305F\u3002",
       "orderNextStep": "\u6B21\u306E\u30B9\u30C6\u30C3\u30D7: {instructions}",
       "orderPayLink": "\u652F\u6255\u3044\u30EA\u30F3\u30AF: {url}",
-      "orderFinal": "\u652F\u6255\u3044\u78BA\u8A8D\u5F8C\u306B\u3001Threads Saver Pro \u30AD\u30FC\u304C\u96FB\u5B50\u30E1\u30FC\u30EB\u3067\u9001\u4FE1\u3055\u308C\u307E\u3059\u3002",
+      "orderFinal": "\u652F\u6255\u3044\u78BA\u8A8D\u5F8C\u306B\u3001SS Threads Pro \u30AD\u30FC\u304C\u96FB\u5B50\u30E1\u30FC\u30EB\u3067\u9001\u4FE1\u3055\u308C\u307E\u3059\u3002",
       "footerPurchaseLink": ""
     },
     "bot": {
@@ -175,7 +175,7 @@ var landingMessageLocales = {
       "flowStep2": "\u5FC5\u8981\u306B\u5FDC\u3058\u3066 Pro \u306B\u30A2\u30C3\u30D7\u30B0\u30EC\u30FC\u30C9\u3057\u307E\u3059",
       "flowStep3": "\u30AD\u30FC\u306F\u96FB\u5B50\u30E1\u30FC\u30EB\u3067\u914D\u4FE1\u3055\u308C\u307E\u3059",
       "storyEyebrow": "Chrome \u62E1\u5F35\u5B50",
-      "storyH2": "Threads to Obsidian \u3082\u3053\u3053\u3067\u5165\u624B\u3067\u304D\u307E\u3059\u3002",
+      "storyH2": "SS Threads \u3082\u3053\u3053\u3067\u5165\u624B\u3067\u304D\u307E\u3059\u3002",
       "storyP": "\u30DC\u30C3\u30C8\u306F\u30E1\u30F3\u30B7\u30E7\u30F3\u30D9\u30FC\u30B9\u306E scrapbook \u4FDD\u5B58\u3092\u51E6\u7406\u3057\u307E\u3059\u304C\u3001\u62E1\u5F35\u6A5F\u80FD\u306F\u30A2\u30AF\u30C6\u30A3\u30D6\u306B\u8868\u793A\u3057\u3066\u3044\u308B\u6295\u7A3F\u3092 Obsidian \u306B\u76F4\u63A5\u9001\u4FE1\u3057\u307E\u3059\u3002",
       "guideInstallCta": "\u30A4\u30F3\u30B9\u30C8\u30FC\u30EB\u30AC\u30A4\u30C9\u3092\u958B\u304F",
       "guideUpgradeCta": "\u30EA\u30AF\u30A8\u30B9\u30C8Pro",
@@ -199,7 +199,7 @@ var landingMessageLocales = {
       "step2Desc": "Pro \u306F\u3001\u30D5\u30A1\u30A4\u30EB \u30EB\u30FC\u30EB\u3068 AI \u7D44\u7E54\u3092\u8FFD\u52A0\u3057\u307E\u3059\u3002",
       "step3Title": "\u30AD\u30FC\u3092\u8CBC\u308A\u4ED8\u3051\u307E\u3059",
       "step3Desc": "\u30A2\u30AF\u30C6\u30A3\u30D6\u5316\u3059\u308B\u306B\u306F\u3001\u30AA\u30D7\u30B7\u30E7\u30F3\u306B Pro \u30AD\u30FC\u3092\u5165\u529B\u3057\u307E\u3059\u3002",
-      "commerceH2": "Threads to Obsidian Pro \u3092\u8CFC\u5165\u3059\u308B",
+      "commerceH2": "SS Threads Pro \u3092\u8CFC\u5165\u3059\u308B",
       "commerceLead": "\u4EE5\u4E0B\u306E\u30D5\u30A9\u30FC\u30E0\u306F\u3001Chrome extension Pro \u306E\u8CFC\u5165\u7528\u3067\u3059\u3002 scrapbook \u30DC\u30C3\u30C8\u306B\u3064\u3044\u3066\u306F\u3001\u4E0A\u306E\u30BB\u30AF\u30B7\u30E7\u30F3\u3067\u8AAC\u660E\u3057\u3066\u3044\u307E\u3059\u3002",
       "commerceNote": "\u6700\u521D\u306B\u6CE8\u6587\u304C\u78BA\u8A8D\u3055\u308C\u3001\u305D\u306E\u5F8C\u652F\u6255\u3044\u304C\u78BA\u8A8D\u3055\u308C\u307E\u3059\u3002",
       "commerceRefund": "7\u65E5\u9593\u306E\u8FD4\u91D1",
@@ -234,14 +234,14 @@ var landingMessageLocales = {
       "productADesc": "\u8FD4\u4FE1\u306B @parktaejun \u3092\u8FFD\u52A0\u3059\u308B\u3068\u3001\u30A2\u30A4\u30C6\u30E0\u304C\u30D7\u30E9\u30A4\u30D9\u30FC\u30C8 scrapbook \u306B\u914D\u7F6E\u3055\u308C\u3001\u5F8C\u3067 Markdown \u3068\u3057\u3066\u30A8\u30AF\u30B9\u30DD\u30FC\u30C8\u3067\u304D\u308B\u3088\u3046\u306B\u306A\u308A\u307E\u3059\u3002",
       "productACta": "scrapbook \u3092\u958B\u304F",
       "productBTag": "Chrome extension",
-      "productBTitle": "Threads to Obsidian",
+      "productBTitle": "SS Threads",
       "productBDesc": "\u8868\u793A\u3057\u3066\u3044\u308B Threads \u6295\u7A3F\u3092 Obsidian \u306B\u76F4\u63A5\u4FDD\u5B58\u3057\u307E\u3059\u3002 Pro \u3067\u306F\u3001\u30EB\u30FC\u30EB\u30D9\u30FC\u30B9\u306E\u7DE8\u6210\u3068 AI \u5F8C\u51E6\u7406\u304C\u6709\u52B9\u306B\u306A\u308A\u307E\u3059\u3002",
       "productBCta": "\u62E1\u5F35\u30AC\u30A4\u30C9\u3092\u53C2\u7167",
       "pricingEyebrow": "\u4FA1\u683C\u8A2D\u5B9A",
       "pricingTitle": "\u30B7\u30F3\u30D7\u30EB\u306A\u8ACB\u6C42\u3002",
       "pricingCopy": "",
       "bundleTag": "\u30EF\u30F3\u30BF\u30A4\u30E0",
-      "bundleTitle": "Threads Saver Pro",
+      "bundleTitle": "SS Threads Pro",
       "bundleDesc": "1\u56DE29\u30C9\u30EB\u3002\u62E1\u5F35\u6A5F\u80FD Pro + Scrapbook \u30B3\u30A2\u3002",
       "bundleCta": "Pro \u3092\u8CFC\u5165\u3059\u308B",
       "cloudTag": "Cloud \u30A2\u30C9\u30AA\u30F3",
@@ -262,7 +262,7 @@ var landingMessageLocales = {
       "orderSuccess1": "\u30EA\u30AF\u30A8\u30B9\u30C8\u306F {email} \u3067\u53D7\u4FE1\u3055\u308C\u307E\u3057\u305F\u3002",
       "orderNextStep": "\u6B21\u306E\u30B9\u30C6\u30C3\u30D7: {instructions}",
       "orderPayLink": "\u652F\u6255\u3044\u30EA\u30F3\u30AF: {url}",
-      "orderFinal": "\u652F\u6255\u3044\u78BA\u8A8D\u5F8C\u306B\u3001Threads Saver Pro \u30AD\u30FC\u304C\u96FB\u5B50\u30E1\u30FC\u30EB\u3067\u9001\u4FE1\u3055\u308C\u307E\u3059\u3002",
+      "orderFinal": "\u652F\u6255\u3044\u78BA\u8A8D\u5F8C\u306B\u3001SS Threads Pro \u30AD\u30FC\u304C\u96FB\u5B50\u30E1\u30FC\u30EB\u3067\u9001\u4FE1\u3055\u308C\u307E\u3059\u3002",
       "footerPurchaseLink": ""
     }
   },
@@ -342,7 +342,7 @@ var landingMessageLocales = {
       "productsTitle": "Duas maneiras de economizar",
       "productsCopy": "",
       "productATag": "Chrome extension",
-      "productATitle": "Threads to Obsidian",
+      "productATitle": "SS Threads",
       "productADesc": "Salve a postagem que voc\xEA est\xE1 visualizando em Obsidian ou Notion.",
       "productACta": "Instalar a partir de GitHub",
       "productBTag": "Mencionar bot",
@@ -353,7 +353,7 @@ var landingMessageLocales = {
       "pricingTitle": "Faturamento simples.",
       "pricingCopy": "",
       "bundleTag": "\xDAnico",
-      "bundleTitle": "Threads Saver Pro",
+      "bundleTitle": "SS Threads Pro",
       "bundleDesc": "$ 29 uma vez. Extens\xE3o Pro + N\xFAcleo Scrapbook.",
       "bundleCta": "Comprar Pro",
       "cloudTag": "Complemento Cloud",
@@ -374,7 +374,7 @@ var landingMessageLocales = {
       "orderSuccess1": "Sua solicita\xE7\xE3o foi recebida em {email}.",
       "orderNextStep": "Pr\xF3xima etapa: {instructions}",
       "orderPayLink": "Link de pagamento: {url}",
-      "orderFinal": "Sua chave Threads Saver Pro ser\xE1 enviada por e-mail ap\xF3s a confirma\xE7\xE3o do pagamento.",
+      "orderFinal": "Sua chave SS Threads Pro ser\xE1 enviada por e-mail ap\xF3s a confirma\xE7\xE3o do pagamento.",
       "footerPurchaseLink": ""
     },
     "bot": {
@@ -397,7 +397,7 @@ var landingMessageLocales = {
       "flowStep2": "Atualize para Pro quando necess\xE1rio",
       "flowStep3": "Chave entregue por email",
       "storyEyebrow": "Extens\xE3o Chrome",
-      "storyH2": "Threads to Obsidian tamb\xE9m est\xE1 dispon\xEDvel aqui.",
+      "storyH2": "SS Threads tamb\xE9m est\xE1 dispon\xEDvel aqui.",
       "storyP": "O bot lida com salvamentos scrapbook baseados em men\xE7\xF5es, enquanto a extens\xE3o envia a postagem que voc\xEA est\xE1 visualizando ativamente diretamente para Obsidian.",
       "guideInstallCta": "Abra o guia de instala\xE7\xE3o",
       "guideUpgradeCta": "Solicitar Pro",
@@ -421,7 +421,7 @@ var landingMessageLocales = {
       "step2Desc": "Pro adiciona regras de arquivo e organiza\xE7\xE3o de IA.",
       "step3Title": "Cole sua chave",
       "step3Desc": "Digite a tecla Pro nas op\xE7\xF5es para ativar.",
-      "commerceH2": "Compre Threads to Obsidian Pro",
+      "commerceH2": "Compre SS Threads Pro",
       "commerceLead": "O formul\xE1rio abaixo \xE9 para compra do Chrome extension Pro. A men\xE7\xE3o do bot scrapbook \xE9 explicada nas se\xE7\xF5es acima.",
       "commerceNote": "Os pedidos s\xE3o revisados primeiro e depois o pagamento \xE9 confirmado.",
       "commerceRefund": "Reembolso de 7 dias",
@@ -456,14 +456,14 @@ var landingMessageLocales = {
       "productADesc": "Adicione @parktaejun em uma resposta e o item chegar\xE1 ao seu scrapbook privado, pronto para ser exportado como Markdown posteriormente.",
       "productACta": "Abra scrapbook",
       "productBTag": "Chrome extension",
-      "productBTitle": "Threads to Obsidian",
+      "productBTitle": "SS Threads",
       "productBDesc": "Salve a postagem Threads que voc\xEA est\xE1 visualizando diretamente no Obsidian. A organiza\xE7\xE3o baseada em regras e o p\xF3s-processamento de IA s\xE3o ativados no Pro.",
       "productBCta": "Veja o guia de extens\xE3o",
       "pricingEyebrow": "Pre\xE7os",
       "pricingTitle": "Faturamento simples.",
       "pricingCopy": "",
       "bundleTag": "\xDAnico",
-      "bundleTitle": "Threads Saver Pro",
+      "bundleTitle": "SS Threads Pro",
       "bundleDesc": "$ 29 uma vez. Extens\xE3o Pro + N\xFAcleo Scrapbook.",
       "bundleCta": "Comprar Pro",
       "cloudTag": "Complemento Cloud",
@@ -484,7 +484,7 @@ var landingMessageLocales = {
       "orderSuccess1": "Sua solicita\xE7\xE3o foi recebida em {email}.",
       "orderNextStep": "Pr\xF3xima etapa: {instructions}",
       "orderPayLink": "Link de pagamento: {url}",
-      "orderFinal": "Sua chave Threads Saver Pro ser\xE1 enviada por e-mail ap\xF3s a confirma\xE7\xE3o do pagamento.",
+      "orderFinal": "Sua chave SS Threads Pro ser\xE1 enviada por e-mail ap\xF3s a confirma\xE7\xE3o do pagamento.",
       "footerPurchaseLink": ""
     }
   },
@@ -564,7 +564,7 @@ var landingMessageLocales = {
       "productsTitle": "Dos formas de ahorrar",
       "productsCopy": "",
       "productATag": "Chrome extension",
-      "productATitle": "Threads to Obsidian",
+      "productATitle": "SS Threads",
       "productADesc": "Guarde la publicaci\xF3n que est\xE1 viendo en Obsidian o Notion.",
       "productACta": "Instalar desde GitHub",
       "productBTag": "Mencionar robot",
@@ -575,7 +575,7 @@ var landingMessageLocales = {
       "pricingTitle": "Facturaci\xF3n sencilla.",
       "pricingCopy": "",
       "bundleTag": "una sola vez",
-      "bundleTitle": "Threads Saver Pro",
+      "bundleTitle": "SS Threads Pro",
       "bundleDesc": "$29 por \xFAnica vez. Extensi\xF3n Pro + N\xFAcleo de Scrapbook.",
       "bundleCta": "Comprar Pro",
       "cloudTag": "Complemento Cloud",
@@ -596,7 +596,7 @@ var landingMessageLocales = {
       "orderSuccess1": "Su solicitud ha sido recibida en {email}.",
       "orderNextStep": "Siguiente paso: {instructions}",
       "orderPayLink": "Enlace de pago: {url}",
-      "orderFinal": "Su clave Threads Saver Pro se enviar\xE1 por correo electr\xF3nico despu\xE9s de la confirmaci\xF3n del pago.",
+      "orderFinal": "Su clave SS Threads Pro se enviar\xE1 por correo electr\xF3nico despu\xE9s de la confirmaci\xF3n del pago.",
       "footerPurchaseLink": ""
     },
     "bot": {
@@ -619,7 +619,7 @@ var landingMessageLocales = {
       "flowStep2": "Actualice a Pro cuando sea necesario",
       "flowStep3": "Llave entregada por correo electr\xF3nico",
       "storyEyebrow": "Extensi\xF3n Chrome",
-      "storyH2": "Threads to Obsidian tambi\xE9n est\xE1 disponible aqu\xED.",
+      "storyH2": "SS Threads tambi\xE9n est\xE1 disponible aqu\xED.",
       "storyP": "El bot maneja los guardados de scrapbook basados en menciones, mientras que la extensi\xF3n env\xEDa la publicaci\xF3n que est\xE1s viendo activamente directamente a Obsidian.",
       "guideInstallCta": "Abrir gu\xEDa de instalaci\xF3n",
       "guideUpgradeCta": "Solicitar Pro",
@@ -643,7 +643,7 @@ var landingMessageLocales = {
       "step2Desc": "Pro agrega reglas de archivos y organizaci\xF3n de IA.",
       "step3Title": "Pega tu clave",
       "step3Desc": "Ingrese la clave Pro en opciones para activar.",
-      "commerceH2": "Comprar Threads to Obsidian Pro",
+      "commerceH2": "Comprar SS Threads Pro",
       "commerceLead": "El siguiente formulario es para la compra de Chrome extension Pro. La menci\xF3n del bot scrapbook se explica en las secciones anteriores.",
       "commerceNote": "Primero se revisan los pedidos y luego se confirma el pago.",
       "commerceRefund": "reembolso de 7 d\xEDas",
@@ -678,14 +678,14 @@ var landingMessageLocales = {
       "productADesc": "Agregue @parktaejun en una respuesta y el elemento llegar\xE1 a su scrapbook privado, listo para exportar como Markdown m\xE1s adelante.",
       "productACta": "Abrir scrapbook",
       "productBTag": "Chrome extension",
-      "productBTitle": "Threads to Obsidian",
+      "productBTitle": "SS Threads",
       "productBDesc": "Guarde la publicaci\xF3n de Threads que est\xE1 viendo directamente en Obsidian. La organizaci\xF3n basada en reglas y el posprocesamiento de IA se activan en Pro.",
       "productBCta": "Ver gu\xEDa de extensiones",
       "pricingEyebrow": "Precios",
       "pricingTitle": "Facturaci\xF3n sencilla.",
       "pricingCopy": "",
       "bundleTag": "una sola vez",
-      "bundleTitle": "Threads Saver Pro",
+      "bundleTitle": "SS Threads Pro",
       "bundleDesc": "$29 por \xFAnica vez. Extensi\xF3n Pro + N\xFAcleo de Scrapbook.",
       "bundleCta": "Comprar Pro",
       "cloudTag": "Complemento Cloud",
@@ -706,7 +706,7 @@ var landingMessageLocales = {
       "orderSuccess1": "Su solicitud ha sido recibida en {email}.",
       "orderNextStep": "Siguiente paso: {instructions}",
       "orderPayLink": "Enlace de pago: {url}",
-      "orderFinal": "Su clave Threads Saver Pro se enviar\xE1 por correo electr\xF3nico despu\xE9s de la confirmaci\xF3n del pago.",
+      "orderFinal": "Su clave SS Threads Pro se enviar\xE1 por correo electr\xF3nico despu\xE9s de la confirmaci\xF3n del pago.",
       "footerPurchaseLink": ""
     }
   },
@@ -797,7 +797,7 @@ var landingMessageLocales = {
       "pricingTitle": "\u7C21\u55AE\u7684\u8A08\u8CBB\u3002",
       "pricingCopy": "",
       "bundleTag": "\u4E00\u6B21\u6027",
-      "bundleTitle": "Threads Saver Pro",
+      "bundleTitle": "SS Threads Pro",
       "bundleDesc": "\u4E00\u6B21\u6027 29 \u7F8E\u5143\u3002\u64F4\u5145 Pro + \u526A\u8CBC\u7C3F\u6838\u5FC3\u3002",
       "bundleCta": "\u8CFC\u8CB7Pro",
       "cloudTag": "Cloud \u9644\u52A0\u5143\u4EF6",
@@ -818,7 +818,7 @@ var landingMessageLocales = {
       "orderSuccess1": "{email} \u5DF2\u6536\u5230\u60A8\u7684\u8981\u6C42\u3002",
       "orderNextStep": "\u4E0B\u4E00\u6B65\uFF1A{instructions}",
       "orderPayLink": "\u4ED8\u6B3E\u9023\u7D50\uFF1A{url}",
-      "orderFinal": "\u60A8\u7684 Threads Saver Pro \u91D1\u9470\u5C07\u5728\u4ED8\u6B3E\u78BA\u8A8D\u5F8C\u900F\u904E\u96FB\u5B50\u90F5\u4EF6\u767C\u9001\u3002",
+      "orderFinal": "\u60A8\u7684 SS Threads Pro \u91D1\u9470\u5C07\u5728\u4ED8\u6B3E\u78BA\u8A8D\u5F8C\u900F\u904E\u96FB\u5B50\u90F5\u4EF6\u767C\u9001\u3002",
       "footerPurchaseLink": ""
     },
     "bot": {
@@ -841,7 +841,7 @@ var landingMessageLocales = {
       "flowStep2": "\u9700\u8981\u6642\u5347\u7D1A\u5230 Pro",
       "flowStep3": "\u900F\u904E\u96FB\u5B50\u90F5\u4EF6\u767C\u9001\u5BC6\u9470",
       "storyEyebrow": "Chrome \u64F4\u5C55",
-      "storyH2": "Threads to Obsidian \u4E5F\u53EF\u4EE5\u5728\u9019\u88E1\u627E\u5230\u3002",
+      "storyH2": "SS Threads \u4E5F\u53EF\u4EE5\u5728\u9019\u88E1\u627E\u5230\u3002",
       "storyP": "\u8A72\u6A5F\u5668\u4EBA\u8655\u7406\u57FA\u65BC\u63D0\u53CA\u7684 scrapbook \u4FDD\u5B58\uFF0C\u800C\u64F4\u5145\u529F\u80FD\u5C07\u60A8\u6B63\u5728\u4E3B\u52D5\u67E5\u770B\u7684\u8CBC\u6587\u76F4\u63A5\u767C\u9001\u5230 Obsidian\u3002",
       "guideInstallCta": "\u958B\u555F\u5B89\u88DD\u6307\u5357",
       "guideUpgradeCta": "\u8ACB\u6C42 Pro",
@@ -865,7 +865,7 @@ var landingMessageLocales = {
       "step2Desc": "Pro \u65B0\u589E\u6A94\u6848\u898F\u5247\u548C AI \u7D44\u7E54\u3002",
       "step3Title": "\u8CBC\u4E0A\u60A8\u7684\u91D1\u9470",
       "step3Desc": "\u5728\u9078\u9805\u4E2D\u8F38\u5165 Pro \u9375\u4EE5\u555F\u52D5\u3002",
-      "commerceH2": "\u8CFC\u8CB7 Threads to Obsidian Pro",
+      "commerceH2": "\u8CFC\u8CB7 SS Threads Pro",
       "commerceLead": "\u4E0B\u9762\u7684\u8868\u683C\u9069\u7528\u65BC Chrome extension Pro \u8CFC\u8CB7\u3002\u4E0A\u9762\u7684\u7AE0\u7BC0\u4E2D\u5C0D\u63D0\u5230\u7684 scrapbook \u6A5F\u5668\u4EBA\u9032\u884C\u4E86\u89E3\u91CB\u3002",
       "commerceNote": "\u9996\u5148\u5BE9\u6838\u8A02\u55AE\uFF0C\u7136\u5F8C\u78BA\u8A8D\u4ED8\u6B3E\u3002",
       "commerceRefund": "7\u5929\u9000\u6B3E",
@@ -907,7 +907,7 @@ var landingMessageLocales = {
       "pricingTitle": "\u7C21\u55AE\u7684\u8A08\u8CBB\u3002",
       "pricingCopy": "",
       "bundleTag": "\u4E00\u6B21\u6027",
-      "bundleTitle": "Threads Saver Pro",
+      "bundleTitle": "SS Threads Pro",
       "bundleDesc": "\u4E00\u6B21\u6027 29 \u7F8E\u5143\u3002\u64F4\u5145 Pro + \u526A\u8CBC\u7C3F\u6838\u5FC3\u3002",
       "bundleCta": "\u8CFC\u8CB7Pro",
       "cloudTag": "Cloud \u9644\u52A0\u5143\u4EF6",
@@ -928,7 +928,7 @@ var landingMessageLocales = {
       "orderSuccess1": "{email} \u5DF2\u6536\u5230\u60A8\u7684\u8981\u6C42\u3002",
       "orderNextStep": "\u4E0B\u4E00\u6B65\uFF1A{instructions}",
       "orderPayLink": "\u4ED8\u6B3E\u9023\u7D50\uFF1A{url}",
-      "orderFinal": "\u60A8\u7684 Threads Saver Pro \u91D1\u9470\u5C07\u5728\u4ED8\u6B3E\u78BA\u8A8D\u5F8C\u900F\u904E\u96FB\u5B50\u90F5\u4EF6\u767C\u9001\u3002",
+      "orderFinal": "\u60A8\u7684 SS Threads Pro \u91D1\u9470\u5C07\u5728\u4ED8\u6B3E\u78BA\u8A8D\u5F8C\u900F\u904E\u96FB\u5B50\u90F5\u4EF6\u767C\u9001\u3002",
       "footerPurchaseLink": ""
     }
   },
@@ -1008,7 +1008,7 @@ var landingMessageLocales = {
       "productsTitle": "Hai c\xE1ch \u0111\u1EC3 ti\u1EBFt ki\u1EC7m",
       "productsCopy": "",
       "productATag": "Chrome extension",
-      "productATitle": "Threads to Obsidian",
+      "productATitle": "SS Threads",
       "productADesc": "L\u01B0u b\xE0i \u0111\u0103ng b\u1EA1n \u0111ang xem v\xE0o Obsidian ho\u1EB7c Notion.",
       "productACta": "C\xE0i \u0111\u1EB7t t\u1EEB GitHub",
       "productBTag": "\u0110\u1EC1 c\u1EADp \u0111\u1EBFn bot",
@@ -1019,7 +1019,7 @@ var landingMessageLocales = {
       "pricingTitle": "Thanh to\xE1n \u0111\u01A1n gi\u1EA3n.",
       "pricingCopy": "",
       "bundleTag": "M\u1ED9t l\u1EA7n",
-      "bundleTitle": "Threads Saver Pro",
+      "bundleTitle": "SS Threads Pro",
       "bundleDesc": "$29 m\u1ED9t l\u1EA7n. Ph\u1EA7n m\u1EDF r\u1ED9ng Pro + l\xF5i s\u1ED5 l\u01B0u ni\u1EC7m.",
       "bundleCta": "Mua Pro",
       "cloudTag": "Ti\u1EC7n \xEDch b\u1ED5 sung Cloud",
@@ -1040,7 +1040,7 @@ var landingMessageLocales = {
       "orderSuccess1": "Y\xEAu c\u1EA7u c\u1EE7a b\u1EA1n \u0111\xE3 \u0111\u01B0\u1EE3c nh\u1EADn t\u1EA1i {email}.",
       "orderNextStep": "B\u01B0\u1EDBc ti\u1EBFp theo: {instructions}",
       "orderPayLink": "Link thanh to\xE1n: {url}",
-      "orderFinal": "Kh\xF3a Threads Saver Pro c\u1EE7a b\u1EA1n s\u1EBD \u0111\u01B0\u1EE3c g\u1EEDi qua email sau khi x\xE1c nh\u1EADn thanh to\xE1n.",
+      "orderFinal": "Kh\xF3a SS Threads Pro c\u1EE7a b\u1EA1n s\u1EBD \u0111\u01B0\u1EE3c g\u1EEDi qua email sau khi x\xE1c nh\u1EADn thanh to\xE1n.",
       "footerPurchaseLink": ""
     },
     "bot": {
@@ -1063,7 +1063,7 @@ var landingMessageLocales = {
       "flowStep2": "N\xE2ng c\u1EA5p l\xEAn Pro khi c\u1EA7n",
       "flowStep3": "Ch\xECa kh\xF3a \u0111\u01B0\u1EE3c g\u1EEDi qua email",
       "storyEyebrow": "Ti\u1EC7n \xEDch m\u1EDF r\u1ED9ng Chrome",
-      "storyH2": "Threads to Obsidian c\u0169ng c\xF3 s\u1EB5n \u1EDF \u0111\xE2y.",
+      "storyH2": "SS Threads c\u0169ng c\xF3 s\u1EB5n \u1EDF \u0111\xE2y.",
       "storyP": "Bot x\u1EED l\xFD c\xE1c l\u1EA7n l\u01B0u scrapbook d\u1EF1a tr\xEAn \u0111\u1EC1 c\u1EADp, trong khi ti\u1EC7n \xEDch m\u1EDF r\u1ED9ng s\u1EBD g\u1EEDi b\xE0i \u0111\u0103ng m\xE0 b\u1EA1n \u0111ang t\xEDch c\u1EF1c xem th\u1EB3ng v\xE0o Obsidian.",
       "guideInstallCta": "M\u1EDF h\u01B0\u1EDBng d\u1EABn c\xE0i \u0111\u1EB7t",
       "guideUpgradeCta": "Y\xEAu c\u1EA7u Pro",
@@ -1087,7 +1087,7 @@ var landingMessageLocales = {
       "step2Desc": "Pro th\xEAm quy t\u1EAFc t\u1EC7p v\xE0 t\u1ED5 ch\u1EE9c AI.",
       "step3Title": "D\xE1n ch\xECa kh\xF3a c\u1EE7a b\u1EA1n",
       "step3Desc": "Nh\u1EADp key Pro v\xE0o c\xE1c t\xF9y ch\u1ECDn \u0111\u1EC3 k\xEDch ho\u1EA1t.",
-      "commerceH2": "Mua Threads to Obsidian Pro",
+      "commerceH2": "Mua SS Threads Pro",
       "commerceLead": "Bi\u1EC3u m\u1EABu b\xEAn d\u01B0\u1EDBi d\xE0nh cho vi\u1EC7c mua Chrome extension Pro. Vi\u1EC7c \u0111\u1EC1 c\u1EADp \u0111\u1EBFn bot scrapbook \u0111\xE3 \u0111\u01B0\u1EE3c gi\u1EA3i th\xEDch trong c\xE1c ph\u1EA7n tr\xEAn.",
       "commerceNote": "\u0110\u01A1n \u0111\u1EB7t h\xE0ng \u0111\u01B0\u1EE3c xem x\xE9t tr\u01B0\u1EDBc, sau \u0111\xF3 thanh to\xE1n \u0111\u01B0\u1EE3c x\xE1c nh\u1EADn.",
       "commerceRefund": "Ho\xE0n ti\u1EC1n trong 7 ng\xE0y",
@@ -1122,14 +1122,14 @@ var landingMessageLocales = {
       "productADesc": "Th\xEAm @parktaejun v\xE0o th\u01B0 tr\u1EA3 l\u1EDDi v\xE0 m\u1EE5c n\xE0y s\u1EBD n\u1EB1m trong scrapbook ri\xEAng t\u01B0 c\u1EE7a b\u1EA1n, s\u1EB5n s\xE0ng xu\u1EA5t d\u01B0\u1EDBi d\u1EA1ng Markdown sau n\xE0y.",
       "productACta": "M\u1EDF scrapbook",
       "productBTag": "Chrome extension",
-      "productBTitle": "Threads to Obsidian",
+      "productBTitle": "SS Threads",
       "productBDesc": "L\u01B0u b\xE0i \u0111\u0103ng Threads b\u1EA1n \u0111ang xem th\u1EB3ng v\xE0o Obsidian. T\u1ED5 ch\u1EE9c d\u1EF1a tr\xEAn quy t\u1EAFc v\xE0 x\u1EED l\xFD h\u1EADu k\u1EF3 AI \u0111\u01B0\u1EE3c b\u1EADt trong Pro.",
       "productBCta": "Xem h\u01B0\u1EDBng d\u1EABn m\u1EDF r\u1ED9ng",
       "pricingEyebrow": "\u0110\u1ECBnh gi\xE1",
       "pricingTitle": "Thanh to\xE1n \u0111\u01A1n gi\u1EA3n.",
       "pricingCopy": "",
       "bundleTag": "M\u1ED9t l\u1EA7n",
-      "bundleTitle": "Threads Saver Pro",
+      "bundleTitle": "SS Threads Pro",
       "bundleDesc": "$29 m\u1ED9t l\u1EA7n. Ph\u1EA7n m\u1EDF r\u1ED9ng Pro + l\xF5i s\u1ED5 l\u01B0u ni\u1EC7m.",
       "bundleCta": "Mua Pro",
       "cloudTag": "Ti\u1EC7n \xEDch b\u1ED5 sung Cloud",
@@ -1150,7 +1150,7 @@ var landingMessageLocales = {
       "orderSuccess1": "Y\xEAu c\u1EA7u c\u1EE7a b\u1EA1n \u0111\xE3 \u0111\u01B0\u1EE3c nh\u1EADn t\u1EA1i {email}.",
       "orderNextStep": "B\u01B0\u1EDBc ti\u1EBFp theo: {instructions}",
       "orderPayLink": "Link thanh to\xE1n: {url}",
-      "orderFinal": "Kh\xF3a Threads Saver Pro c\u1EE7a b\u1EA1n s\u1EBD \u0111\u01B0\u1EE3c g\u1EEDi qua email sau khi x\xE1c nh\u1EADn thanh to\xE1n.",
+      "orderFinal": "Kh\xF3a SS Threads Pro c\u1EE7a b\u1EA1n s\u1EBD \u0111\u01B0\u1EE3c g\u1EEDi qua email sau khi x\xE1c nh\u1EADn thanh to\xE1n.",
       "footerPurchaseLink": ""
     }
   }
@@ -1158,10 +1158,10 @@ var landingMessageLocales = {
 var landingStorefrontLocales = {
   "ja": {
     "obsidian": {
-      "productName": "Threads Saver",
+      "productName": "SS Threads",
       "headline": "PC\u306F extension\u3002\u30E2\u30D0\u30A4\u30EB\u306F mention\u3002",
       "subheadline": "\u4ECA\u898B\u3066\u3044\u308B\u6295\u7A3F\u306F Chrome extension \u3067\u4FDD\u5B58\u3057\u3001\u30E2\u30D0\u30A4\u30EB\u3067\u306F mention scrapbook \u3067\u96C6\u3081\u307E\u3059\u3002",
-      "priceLabel": "Threads Saver Pro",
+      "priceLabel": "SS Threads Pro",
       "includedUpdates": "29 \u30C9\u30EB\u306E 1 \u56DE\u9650\u308A \xB7 \u62E1\u5F35 Pro + scrapbook \u30B3\u30A2 \xB7 7 \u65E5\u9593\u306E\u8FD4\u91D1",
       "heroNotes": [
         "Chrome extension: \u4ECA\u8AAD\u3093\u3067\u3044\u308B\u6295\u7A3F\u3092\u4FDD\u5B58\u3057\u307E\u3059",
@@ -1209,7 +1209,7 @@ var landingStorefrontLocales = {
       "productName": "Threads Mention Scrapbook",
       "headline": "Threads \u5FDC\u7B54\u306B @parktaejun \u3092\u8FFD\u52A0\u3059\u308B\u3068\u3001\u4FDD\u5B58\u3055\u308C\u307E\u3059\u3002",
       "subheadline": "\u30D1\u30D6\u30EA\u30C3\u30AF\u5FDC\u7B54\u3092\u30D7\u30E9\u30A4\u30D9\u30FC\u30C8 scrapbook \u306E\u4FDD\u5B58\u30C8\u30EA\u30AC\u30FC\u306B\u5909\u63DB\u3057\u3001\u5F8C\u3067\u305D\u306E\u7D50\u679C\u3092 Markdown\u3001Obsidian\u3001\u307E\u305F\u306F Notion \u306B\u79FB\u52D5\u3057\u307E\u3059\u3002",
-      "priceLabel": "Threads to Obsidian Pro",
+      "priceLabel": "SS Threads Pro",
       "includedUpdates": "Chrome extension \xB7 1 \u56DE\u9650\u308A\u306E\u652F\u6255\u3044 \xB7 1 \u5E74\u9593\u306E\u66F4\u65B0",
       "heroNotes": [
         "\u8FD4\u4FE1\u306F\u516C\u958B\u30C8\u30EA\u30AC\u30FC\u3067\u3042\u308B\u305F\u3081\u3001\u305D\u3053\u306B\u6A5F\u5BC6\u306E\u30E1\u30E2\u3092\u66F8\u304D\u8FBC\u307E\u306A\u3044\u3067\u304F\u3060\u3055\u3044\u3002",
@@ -1256,10 +1256,10 @@ var landingStorefrontLocales = {
   },
   "pt-BR": {
     "obsidian": {
-      "productName": "Threads Saver",
+      "productName": "SS Threads",
       "headline": "PC \xE9 extension. Celular \xE9 mention.",
       "subheadline": "Salve a postagem que voc\xEA est\xE1 vendo no PC com a Chrome extension e re\xFAna-a no celular com o mention scrapbook.",
-      "priceLabel": "Threads Saver Pro",
+      "priceLabel": "SS Threads Pro",
       "includedUpdates": "US$ 29 \xFAnicos \xB7 extens\xE3o Pro + n\xFAcleo scrapbook \xB7 reembolso em 7 dias",
       "heroNotes": [
         "Chrome extension: salve a postagem que voc\xEA est\xE1 lendo agora",
@@ -1307,7 +1307,7 @@ var landingStorefrontLocales = {
       "productName": "Threads Mention Scrapbook",
       "headline": "Adicione @parktaejun em uma resposta Threads e ela ser\xE1 salva.",
       "subheadline": "Transforme uma resposta p\xFAblica em um gatilho de salvamento para um scrapbook privado e, posteriormente, mova o resultado para Markdown, Obsidian ou Notion.",
-      "priceLabel": "Threads to Obsidian Pro",
+      "priceLabel": "SS Threads Pro",
       "includedUpdates": "Chrome extension \xB7 pagamento \xFAnico \xB7 1 ano de atualiza\xE7\xF5es",
       "heroNotes": [
         "As respostas s\xE3o gatilhos p\xFAblicos, portanto, n\xE3o escreva notas confidenciais ali.",
@@ -1354,10 +1354,10 @@ var landingStorefrontLocales = {
   },
   "es": {
     "obsidian": {
-      "productName": "Threads Saver",
+      "productName": "SS Threads",
       "headline": "PC es extension. M\xF3vil es mention.",
       "subheadline": "Guarda la publicaci\xF3n que est\xE1s viendo con la Chrome extension y recop\xEDlala en el m\xF3vil con el mention scrapbook.",
-      "priceLabel": "Threads Saver Pro",
+      "priceLabel": "SS Threads Pro",
       "includedUpdates": "$29 por \xFAnica vez \xB7 extensi\xF3n Pro + n\xFAcleo scrapbook \xB7 reembolso de 7 d\xEDas",
       "heroNotes": [
         "Chrome extension: guarda el post que est\xE1s leyendo ahora",
@@ -1405,7 +1405,7 @@ var landingStorefrontLocales = {
       "productName": "Threads Mention Scrapbook",
       "headline": "Agregue @parktaejun en una respuesta Threads y se guardar\xE1.",
       "subheadline": "Convierta una respuesta p\xFAblica en un activador de guardado para un scrapbook privado y luego mueva el resultado a Markdown, Obsidian o Notion m\xE1s tarde.",
-      "priceLabel": "Threads to Obsidian Pro",
+      "priceLabel": "SS Threads Pro",
       "includedUpdates": "Chrome extension \xB7 pago \xFAnico \xB7 1 a\xF1o de actualizaciones",
       "heroNotes": [
         "Las respuestas son activadores p\xFAblicos, as\xED que no escriba notas confidenciales all\xED.",
@@ -1455,7 +1455,7 @@ var landingStorefrontLocales = {
       "productName": "ZZ\u8853\u8A9E0ZZ",
       "headline": "\u96FB\u8166\u7528 extension\u3002\u624B\u6A5F\u7528 mention\u3002",
       "subheadline": "\u73FE\u5728\u89C0\u770B\u7684\u8CBC\u6587\u7528 Chrome extension \u5132\u5B58\uFF0C\u624B\u6A5F\u4E0A\u5247\u7528 mention scrapbook \u6536\u96C6\u3002",
-      "priceLabel": "Threads Saver Pro",
+      "priceLabel": "SS Threads Pro",
       "includedUpdates": "\u4E00\u6B21\u6027 29 \u7F8E\u5143 \xB7 \u64F4\u5145 Pro + scrapbook \u6838\u5FC3 \xB7 7 \u5929\u9000\u6B3E",
       "heroNotes": [
         "Chrome extension\uFF1A\u5132\u5B58\u60A8\u6B63\u5728\u95B1\u8B80\u7684\u5E16\u5B50",
@@ -1503,7 +1503,7 @@ var landingStorefrontLocales = {
       "productName": "ZZ\u8853\u8A9E0ZZ",
       "headline": "\u5728 Threads \u56DE\u8986\u4E2D\u52A0\u5165 @parktaejun \u5373\u53EF\u5132\u5B58\u3002",
       "subheadline": "\u5C07\u516C\u958B\u56DE\u61C9\u8F49\u63DB\u70BA\u79C1\u4EBA scrapbook \u7684\u5132\u5B58\u89F8\u767C\u5668\uFF0C\u7136\u5F8C\u5C07\u7D50\u679C\u79FB\u81F3 Markdown\u3001Obsidian \u6216 Notion \u4E2D\u3002",
-      "priceLabel": "Threads to Obsidian Pro",
+      "priceLabel": "SS Threads Pro",
       "includedUpdates": "Chrome extension \xB7 \u4E00\u6B21\u6027\u4ED8\u6B3E \xB7 1 \u5E74\u66F4\u65B0",
       "heroNotes": [
         "\u56DE\u5FA9\u662F\u516C\u958B\u89F8\u767C\u56E0\u7D20\uFF0C\u56E0\u6B64\u8ACB\u52FF\u5728\u5176\u4E2D\u5BEB\u654F\u611F\u8A3B\u91CB\u3002",
@@ -1550,10 +1550,10 @@ var landingStorefrontLocales = {
   },
   "vi": {
     "obsidian": {
-      "productName": "Threads Saver",
+      "productName": "SS Threads",
       "headline": "PC d\xF9ng extension. Mobile d\xF9ng mention.",
       "subheadline": "L\u01B0u b\xE0i vi\u1EBFt b\u1EA1n \u0111ang xem b\u1EB1ng Chrome extension v\xE0 thu th\u1EADp n\xF3 tr\xEAn thi\u1EBFt b\u1ECB di \u0111\u1ED9ng b\u1EB1ng mention scrapbook.",
-      "priceLabel": "Threads Saver Pro",
+      "priceLabel": "SS Threads Pro",
       "includedUpdates": "$29 m\u1ED9t l\u1EA7n \xB7 ti\u1EC7n \xEDch m\u1EDF r\u1ED9ng Pro + l\xF5i scrapbook \xB7 Ho\xE0n ti\u1EC1n trong 7 ng\xE0y",
       "heroNotes": [
         "Chrome extension: l\u01B0u b\xE0i vi\u1EBFt b\u1EA1n \u0111ang \u0111\u1ECDc",
@@ -1601,7 +1601,7 @@ var landingStorefrontLocales = {
       "productName": "Threads Mention Scrapbook",
       "headline": "Th\xEAm @parktaejun v\xE0o c\xE2u tr\u1EA3 l\u1EDDi Threads v\xE0 n\xF3 s\u1EBD \u0111\u01B0\u1EE3c l\u01B0u.",
       "subheadline": "Bi\u1EBFn c\xE2u tr\u1EA3 l\u1EDDi c\xF4ng khai th\xE0nh tr\xECnh k\xEDch ho\u1EA1t l\u01B0u cho scrapbook ri\xEAng t\u01B0, sau \u0111\xF3 chuy\u1EC3n k\u1EBFt qu\u1EA3 sang Markdown, Obsidian ho\u1EB7c Notion sau.",
-      "priceLabel": "Threads to Obsidian Pro",
+      "priceLabel": "SS Threads Pro",
       "includedUpdates": "Chrome extension \xB7 thanh to\xE1n m\u1ED9t l\u1EA7n \xB7 1 n\u0103m c\u1EADp nh\u1EADt",
       "heroNotes": [
         "C\xE1c c\xE2u tr\u1EA3 l\u1EDDi \u0111\u01B0\u1EE3c k\xEDch ho\u1EA1t c\xF4ng khai, v\xEC v\u1EADy \u0111\u1EEBng vi\u1EBFt nh\u1EEFng ghi ch\xFA nh\u1EA1y c\u1EA3m \u1EDF \u0111\xF3.",
@@ -2168,10 +2168,11 @@ var adminMessageLocales = {
 // src/lib/web-i18n.ts
 var LS_KEY = "web-locale";
 var COOKIE_KEY = "threads-web-locale";
-var EXTENSION_RELEASE_ASSET_NAME = "threads-saver-extension.zip";
+var EXTENSION_RELEASE_ASSET_NAME = "ss-threads-extension.zip";
 var EXTENSION_RELEASE_DOWNLOAD_URL = `https://github.com/parktaejun-dev/threads-to-obsidian/releases/latest/download/${EXTENSION_RELEASE_ASSET_NAME}`;
 var LEGACY_EXTENSION_REPO_URL = "https://github.com/parktaejun-dev/threads-to-obsidian";
 var LEGACY_EXTENSION_SOURCE_ZIP_URL = `${LEGACY_EXTENSION_REPO_URL}/archive/refs/heads/main.zip`;
+var LEGACY_PLAN_PATTERN = /\bPro\b/g;
 function readLocaleCookie() {
   if (typeof document === "undefined") {
     return null;
@@ -2279,53 +2280,127 @@ function bindLangToggle(onSwitch) {
     });
   }
 }
+function applyPlanBrandingToString(value) {
+  return value.replaceAll("SS Threads Pro", "SS Threads Plus").replace(LEGACY_PLAN_PATTERN, "Plus");
+}
+function applyPlanBrandingCopy(value) {
+  if (typeof value === "string") {
+    return applyPlanBrandingToString(value);
+  }
+  if (Array.isArray(value)) {
+    return value.map((entry) => applyPlanBrandingCopy(entry));
+  }
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, entry]) => [key, applyPlanBrandingCopy(entry)])
+    );
+  }
+  return value;
+}
+function normalizeLegacyLandingMessage(message) {
+  return {
+    ...applyPlanBrandingCopy(message),
+    heroRailLabel2: "Plus",
+    heroRailText2: "1,000 saves + 50 folders",
+    priceNote: "yearly default",
+    priceSummary: "Free 100/5 -> Plus 1000/50",
+    pricePointProDesc: "Raise scrapbook save and folder limits.",
+    flowStep2: "Upgrade to Plus when needed",
+    flowStep3: "Use the same Plus key in scrapbook and the extension",
+    shotSmallCapTitle: "Plus higher limits",
+    shotSmallCapDesc: "Raise scrapbook limits to 1,000 saves and 50 folders, and use the same key in the extension.",
+    compProDesc: "1,000 saves, 50 folders, same key in the extension",
+    step2Title: "Upgrade when needed",
+    step2Desc: "Free includes 100 saved posts and 5 folders. Plus raises it to 1,000 and 50.",
+    step3Title: "Use the same key",
+    step3Desc: "Paste the same Plus key into scrapbook and extension settings.",
+    commerceH2: "Buy Plus",
+    commerceLead: "US$19.99 yearly or US$2.99 monthly. The Plus key is delivered by email after payment confirmation.",
+    formRemark: "The Plus key is emailed after payment confirmation.",
+    compareH2: "Free vs Plus",
+    bundleTag: "Plus",
+    bundleTitle: "SS Threads Plus",
+    bundleDesc: "Free 100/5 -> Plus 1000/50",
+    bundleCta: "Buy Plus",
+    orderFinal: "Your SS Threads Plus key will be emailed after payment confirmation."
+  };
+}
+function normalizeLegacyStorefrontCopy(copy) {
+  return {
+    ...applyPlanBrandingCopy(copy),
+    priceLabel: "SS Threads Plus",
+    includedUpdates: "US$2.99 monthly \xB7 US$19.99 yearly \xB7 Free 100/5 -> Plus 1000/50"
+  };
+}
+function normalizeLegacyAdminMessage(message) {
+  return applyPlanBrandingCopy(message);
+}
+var secondaryLandingMessages = Object.fromEntries(
+  Object.entries(landingMessageLocales).filter(([locale]) => locale !== "ko" && locale !== "en").map(([locale, variants]) => [
+    locale,
+    Object.fromEntries(
+      Object.entries(variants).map(([variant, message]) => [variant, normalizeLegacyLandingMessage(message)])
+    )
+  ])
+);
+var secondaryLandingStorefrontCopy = Object.fromEntries(
+  Object.entries(landingStorefrontLocales).filter(([locale]) => locale !== "ko" && locale !== "en").map(([locale, variants]) => [
+    locale,
+    Object.fromEntries(
+      Object.entries(variants).map(([variant, copy]) => [variant, normalizeLegacyStorefrontCopy(copy)])
+    )
+  ])
+);
+var secondaryAdminMessages = Object.fromEntries(
+  Object.entries(adminMessageLocales).filter(([locale]) => locale !== "ko" && locale !== "en").map(([locale, message]) => [locale, normalizeLegacyAdminMessage(message)])
+);
 var obsidianLandingMessages = {
   ko: {
     topbarCta: "\uC124\uCE58 \uC548\uB0B4",
     siteLabel: "\uC548\uB0B4 \uC8FC\uC18C",
     heroEyebrow: "Extension + Scrapbook",
     heroGuideCta: "scrapbook \uC5F4\uAE30",
-    heroPurchaseCta: "Pro \uAD6C\uB9E4",
+    heroPurchaseCta: "Plus \uAD6C\uB9E4",
     heroRailLabel1: "Free",
     heroRailText1: "\uAE00\xB7\uC774\uBBF8\uC9C0\xB7\uB2F5\uAE00 \uC800\uC7A5",
-    heroRailLabel2: "Pro",
-    heroRailText2: "\uD30C\uC77C\uBA85 \uADDC\uCE59 + AI \uC815\uB9AC",
-    priceNote: "1\uD68C \uACB0\uC81C",
-    priceSummary: "Free\uB85C \uC800\uC7A5\uD558\uACE0, \uD544\uC694\uD560 \uB54C Pro\uB97C \uCD94\uAC00\uD558\uC138\uC694.",
+    heroRailLabel2: "Plus",
+    heroRailText2: "\uC800\uC7A5 1000\uAC1C + \uD3F4\uB354 50\uAC1C",
+    priceNote: "\uC5F0\uAC04 \uAE30\uBCF8",
+    priceSummary: "Free 100/5\uB85C \uC2DC\uC791\uD558\uACE0, \uD55C\uB3C4\uC5D0 \uB2FF\uC73C\uBA74 Plus\uB85C \uB113\uD788\uC138\uC694.",
     pricePointFreeDesc: "\uD575\uC2EC \uC800\uC7A5\uC740 \uBC14\uB85C \uC0AC\uC6A9 \uAC00\uB2A5.",
-    pricePointProDesc: "\uD30C\uC77C\uBA85 \uADDC\uCE59\uACFC AI \uC815\uB9AC\uB97C \uD65C\uC131\uD654.",
-    primaryCta: "Pro \uAD6C\uB9E4",
+    pricePointProDesc: "\uC800\uC7A5 \uD55C\uB3C4\uC640 \uD3F4\uB354 \uD55C\uB3C4\uB97C \uB113\uD799\uB2C8\uB2E4.",
+    primaryCta: "Plus \uAD6C\uB9E4",
     secondaryCta: "scrapbook \uC5F4\uAE30",
     flowStep1: "Free\uB85C \uBA3C\uC800 \uC800\uC7A5\uD574\uBCF4\uAE30",
-    flowStep2: "\uD544\uC694\uD558\uBA74 Pro\uB85C \uC5C5\uADF8\uB808\uC774\uB4DC",
-    flowStep3: "\uC774\uBA54\uC77C\uB85C \uD0A4 \uC804\uB2EC",
+    flowStep2: "\uD55C\uB3C4\uC5D0 \uB2FF\uC73C\uBA74 Plus\uB85C \uC5C5\uADF8\uB808\uC774\uB4DC",
+    flowStep3: "Plus \uD0A4\uB97C \uC591\uCABD\uC5D0 \uC5F0\uACB0",
     storyEyebrow: "Quick Start",
     storyH2: "\uC124\uCE58 \u2192 \uC5F0\uACB0 \u2192 \uC800\uC7A5, 3\uB2E8\uACC4.",
     storyP: "Free\uB85C \uBC14\uB85C \uC2DC\uC791\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.",
     guideInstallCta: "\uC124\uCE58 \uC548\uB0B4 \uBCF4\uAE30",
-    guideUpgradeCta: "Pro \uAD6C\uB9E4 \uC694\uCCAD",
+    guideUpgradeCta: "Plus \uAD6C\uB9E4 \uC694\uCCAD",
     card1Title: "Chrome\uC5D0 \uB85C\uB4DC",
     card1Desc: "\uC555\uCD95\uC744 \uD480\uACE0 Chrome\uC5D0\uC11C dist/extension \uD3F4\uB354\uB97C \uC5B8\uD329\uB4DC \uD655\uC7A5\uC73C\uB85C \uB85C\uB4DC\uD569\uB2C8\uB2E4.",
     card2Title: "Vault \uC5F0\uACB0",
     card2Desc: "\uC635\uC158\uC5D0\uC11C Obsidian \uD3F4\uB354\uB97C \uC5F0\uACB0\uD558\uBA74 \uB9C8\uD06C\uB2E4\uC6B4\uACFC \uBBF8\uB514\uC5B4\uB97C \uBC14\uB85C \uC800\uC7A5\uD569\uB2C8\uB2E4.",
     card3Title: "Threads\uC5D0\uC11C \uC800\uC7A5",
-    card3Desc: "Threads \uAC1C\uBCC4 \uAE00\uC5D0\uC11C \uC800\uC7A5\uC744 \uB204\uB974\uBA74 \uB429\uB2C8\uB2E4. Pro\uC5D0\uC11C\uB294 \uADDC\uCE59\uACFC AI \uC815\uB9AC\uAE4C\uC9C0 \uC774\uC5B4\uC9D1\uB2C8\uB2E4.",
+    card3Desc: "Threads \uAC1C\uBCC4 \uAE00\uC5D0\uC11C \uC800\uC7A5\uD558\uBA74 \uB429\uB2C8\uB2E4. \uAC19\uC740 Plus \uD0A4\uB97C scrapbook\uACFC extension \uC591\uCABD\uC5D0 \uC5F0\uACB0\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.",
     showcaseH2: "\uD655\uC7A5 \uC548\uC5D0\uC11C \uC2E4\uC81C\uB85C \uBCF4\uC774\uB294 \uD654\uBA74",
-    showcaseCopy: "Free\uC640 Pro\uC758 \uCC28\uC774\uB97C \uC9C1\uC811 \uD655\uC778\uD558\uC138\uC694.",
+    showcaseCopy: "Free\uC640 Plus\uC758 \uCC28\uC774\uB97C \uC9C1\uC811 \uD655\uC778\uD558\uC138\uC694.",
     shotLargeCapTitle: "Free \uC800\uC7A5 \uD750\uB984",
     shotLargeCapDesc: "\uD575\uC2EC \uC800\uC7A5 \uACBD\uD5D8\uC740 \uBE60\uB974\uACE0 \uB2E8\uC21C\uD558\uAC8C \uC720\uC9C0\uB429\uB2C8\uB2E4.",
-    shotSmallCapTitle: "Pro \uC815\uB9AC \uC790\uB3D9\uD654",
-    shotSmallCapDesc: "\uC6D0\uD558\uB294 \uADDC\uCE59\uACFC \uB0B4 LLM \uD0A4 \uAE30\uBC18 \uC694\uC57D\xB7\uD0DC\uADF8\uAC00 \uD568\uAED8 \uC801\uC6A9\uB429\uB2C8\uB2E4.",
+    shotSmallCapTitle: "Plus \uD655\uC7A5 \uD55C\uB3C4",
+    shotSmallCapDesc: "\uC800\uC7A5\uAE00 1,000\uAC1C\uC640 \uD3F4\uB354 50\uAC1C\uAE4C\uC9C0 \uB113\uD788\uACE0, \uAC19\uC740 \uD0A4\uB97C extension\uC5D0\uB3C4 \uC5F0\uACB0\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.",
     compFreeDesc: "\uD575\uC2EC \uC800\uC7A5\uC774 \uC774\uBBF8 \uC644\uC131\uB41C \uAE30\uBCF8 \uD750\uB984",
-    compProDesc: "\uD30C\uC77C\uBA85\xB7\uACBD\uB85C \uADDC\uCE59\uACFC AI \uC694\uC57D\xB7\uD0DC\uADF8\xB7frontmatter\uB97C \uCD94\uAC00\uD558\uB294 \uC5C5\uADF8\uB808\uC774\uB4DC",
+    compProDesc: "\uC800\uC7A5\uAE00 1,000\uAC1C, \uD3F4\uB354 50\uAC1C, \uB3D9\uC77C \uD0A4 extension \uC5F0\uACB0",
     step1Title: "Free\uB85C \uC800\uC7A5 \uCCB4\uD5D8",
     step1Desc: "\uAE00\xB7\uC774\uBBF8\uC9C0\xB7\uB2F5\uAE00 \uC800\uC7A5\uC774 \uBC14\uB85C \uB429\uB2C8\uB2E4.",
-    step2Title: "\uD544\uC694\uD560 \uB54C Pro \uC5C5\uADF8\uB808\uC774\uB4DC",
-    step2Desc: "\uD30C\uC77C\uBA85 \uADDC\uCE59\uACFC AI \uC815\uB9AC\uAC00 \uD544\uC694\uD558\uBA74 Pro.",
-    step3Title: "\uD0A4 \uC785\uB825\uC73C\uB85C \uD65C\uC131\uD654",
-    step3Desc: "\uC635\uC158 \uD398\uC774\uC9C0\uC5D0 Pro \uD0A4\uB97C \uB123\uC73C\uBA74 \uB05D.",
-    commerceH2: "Pro \uAD6C\uB9E4",
-    commerceLead: "29\uB2EC\uB7EC 1\uD68C \uACB0\uC81C. \uC774\uBA54\uC77C\uB85C \uD0A4\uB97C \uBC1C\uC1A1\uD569\uB2C8\uB2E4.",
+    step2Title: "\uD55C\uB3C4\uC5D0 \uB2FF\uC73C\uBA74 Plus\uB85C \uD655\uC7A5",
+    step2Desc: "Free\uB294 \uC800\uC7A5\uAE00 100\uAC1C, \uD3F4\uB354 5\uAC1C\uAE4C\uC9C0. Plus\uB294 1,000\uAC1C\uC640 50\uAC1C\uAE4C\uC9C0 \uD655\uC7A5\uB429\uB2C8\uB2E4.",
+    step3Title: "\uAC19\uC740 \uD0A4\uB97C \uB450 \uACF3\uC5D0 \uC5F0\uACB0",
+    step3Desc: "scrapbook\uACFC extension\uC5D0 \uAC19\uC740 Plus \uD0A4\uB97C \uBD99\uC5EC\uB123\uC73C\uBA74 \uB429\uB2C8\uB2E4.",
+    commerceH2: "Plus \uAD6C\uB9E4",
+    commerceLead: "\uC5F0 US$19.99 \uB610\uB294 \uC6D4 US$2.99. \uACB0\uC81C \uD655\uC778 \uD6C4 \uD0A4\uB97C \uBC1C\uC1A1\uD569\uB2C8\uB2E4.",
     commerceNote: "\uC8FC\uBB38 \uC694\uCCAD \uD6C4 \uACB0\uC81C\uB97C \uD655\uC778\uD558\uB294 \uBC29\uC2DD\uC73C\uB85C \uC6B4\uC601\uD569\uB2C8\uB2E4.",
     commerceRefund: "7\uC77C \uD658\uBD88",
     backToHome: "\uC81C\uD488 \uD398\uC774\uC9C0\uB85C \uB3CC\uC544\uAC00\uAE30",
@@ -2334,13 +2409,13 @@ var obsidianLandingMessages = {
     formMethodLabel: "\uACB0\uC81C\uC218\uB2E8",
     formNoteLabel: "\uBA54\uBAA8",
     formSubmitBtn: "\uAD6C\uB9E4 \uC694\uCCAD \uBCF4\uB0B4\uAE30",
-    formRemark: "\uACB0\uC81C \uD655\uC778 \uD6C4 Pro \uD0A4\uB97C \uC774\uBA54\uC77C\uB85C \uBCF4\uB0C5\uB2C8\uB2E4.",
+    formRemark: "\uACB0\uC81C \uD655\uC778 \uD6C4 Plus \uD0A4\uB97C \uC774\uBA54\uC77C\uB85C \uBCF4\uB0C5\uB2C8\uB2E4.",
     faqH2: "\uAD6C\uB9E4 \uC804\uC5D0 \uAC00\uC7A5 \uB9CE\uC774 \uBB3B\uB294 \uC9C8\uBB38",
     phName: "\uD64D\uAE38\uB3D9",
     phNote: "\uC138\uAE08\uACC4\uC0B0\uC11C, \uD1B5\uD654, \uD300\uC6A9 \uC88C\uC11D \uC694\uCCAD \uB4F1\uC774 \uC788\uC73C\uBA74 \uC801\uC5B4\uC8FC\uC138\uC694",
     phMethod: "\uACB0\uC81C\uC218\uB2E8\uC744 \uC120\uD0DD\uD558\uC138\uC694",
     methodBadge: "\uC774\uC6A9 \uAC00\uB2A5",
-    compareH2: "Free vs Pro",
+    compareH2: "Free vs Plus",
     compareLead: "",
     compareColFeature: "\uAE30\uB2A5",
     compareRowSavePost: "\uD604\uC7AC \uAE00 \uC800\uC7A5",
@@ -2350,12 +2425,12 @@ var obsidianLandingMessages = {
     compareRowAi: "\uB0B4 LLM \uD0A4 \uC694\uC57D / \uD0DC\uADF8 / frontmatter",
     screenH2: "Preview",
     screenUsageCaption: "\uC2E4\uC0AC\uC6A9 \uC800\uC7A5 \uD654\uBA74",
-    screenProCaption: "Pro \uD65C\uC131\uD654 \uD6C4 \uC635\uC158 \uD654\uBA74",
+    screenProCaption: "Plus \uD0A4 \uC5F0\uACB0 \uD6C4 \uC635\uC158 \uD654\uBA74",
     productsEyebrow: "Two products",
     productsTitle: "\uC800\uC7A5\uD558\uB294 \uB450 \uAC00\uC9C0 \uBC29\uC2DD",
     productsCopy: "",
     productATag: "Chrome extension",
-    productATitle: "Threads to Obsidian",
+    productATitle: "SS Threads",
     productADesc: "PC\uC5D0\uC11C \uBCF4\uACE0 \uC788\uB294 Threads \uAE00\uC744 \uBC14\uB85C \uC800\uC7A5.",
     productACta: "ZIP \uB2E4\uC6B4\uB85C\uB4DC",
     productBTag: "Mention bot",
@@ -2365,10 +2440,10 @@ var obsidianLandingMessages = {
     pricingEyebrow: "Pricing",
     pricingTitle: "\uACB0\uC81C\uB294 \uB2E8\uC21C\uD558\uAC8C.",
     pricingCopy: "",
-    bundleTag: "One-time",
-    bundleTitle: "Threads Saver Pro",
-    bundleDesc: "29\uB2EC\uB7EC 1\uD68C \uACB0\uC81C. Extension Pro\uC640 Scrapbook core \uD3EC\uD568.",
-    bundleCta: "Pro \uAD6C\uB9E4",
+    bundleTag: "Plus",
+    bundleTitle: "SS Threads Plus",
+    bundleDesc: "Free 100/5\uC5D0\uC11C \uC2DC\uC791\uD558\uACE0, Plus\uC5D0\uC11C 1,000/50\uC73C\uB85C \uD655\uC7A5\uD569\uB2C8\uB2E4.",
+    bundleCta: "Plus \uAD6C\uB9E4",
     cloudTag: "Cloud Add-on",
     cloudTitle: "Watchlists + Searches + Insights",
     cloudDesc: "\uC9C0\uC18D \uB3D9\uAE30\uD654\uAC00 \uD544\uC694\uD55C \uAE30\uB2A5\uC740 \uBCC4\uB3C4 add-on.",
@@ -2387,7 +2462,7 @@ var obsidianLandingMessages = {
     orderSuccess1: "{email}\uB85C \uC694\uCCAD\uC774 \uC811\uC218\uB410\uC2B5\uB2C8\uB2E4.",
     orderNextStep: "\uB2E4\uC74C \uB2E8\uACC4: {instructions}",
     orderPayLink: "\uACB0\uC81C \uB9C1\uD06C: {url}",
-    orderFinal: "\uACB0\uC81C \uD655\uC778 \uD6C4 Threads Saver Pro \uD0A4\uB97C \uC774\uBA54\uC77C\uB85C \uBCF4\uB0B4\uB4DC\uB9BD\uB2C8\uB2E4.",
+    orderFinal: "\uACB0\uC81C \uD655\uC778 \uD6C4 SS Threads Plus \uD0A4\uB97C \uC774\uBA54\uC77C\uB85C \uBCF4\uB0B4\uB4DC\uB9BD\uB2C8\uB2E4.",
     footerPurchaseLink: ""
   },
   en: {
@@ -2395,47 +2470,47 @@ var obsidianLandingMessages = {
     siteLabel: "Guide URL",
     heroEyebrow: "Extension + Scrapbook",
     heroGuideCta: "Open scrapbook",
-    heroPurchaseCta: "Buy Pro",
+    heroPurchaseCta: "Buy Plus",
     heroRailLabel1: "Free",
     heroRailText1: "Save posts, images, and reply chains",
-    heroRailLabel2: "Pro",
-    heroRailText2: "File/path rules + AI organization",
-    priceNote: "one-time",
-    priceSummary: "Start with Free. Add Pro when you need it.",
+    heroRailLabel2: "Plus",
+    heroRailText2: "1,000 saves + 50 folders",
+    priceNote: "yearly default",
+    priceSummary: "Start on Free 100/5, then move to Plus when you hit the limit.",
     pricePointFreeDesc: "Core saving works right away.",
-    pricePointProDesc: "Unlock file rules and AI organization.",
-    primaryCta: "Buy Pro",
+    pricePointProDesc: "Raise your scrapbook save and folder limits.",
+    primaryCta: "Buy Plus",
     secondaryCta: "Open scrapbook",
     flowStep1: "Try Free first",
-    flowStep2: "Upgrade to Pro when needed",
-    flowStep3: "Key delivered by email",
+    flowStep2: "Upgrade when you hit the limit",
+    flowStep3: "Use the same key in both places",
     storyEyebrow: "Quick Start",
     storyH2: "Install \u2192 Connect \u2192 Save. Three steps.",
     storyP: "Free is ready to go.",
     guideInstallCta: "Open install guide",
-    guideUpgradeCta: "Request Pro",
+    guideUpgradeCta: "Request Plus",
     card1Title: "Load in Chrome",
     card1Desc: "Unzip the project and load the dist/extension folder as an unpacked Chrome extension.",
     card2Title: "Connect your vault",
     card2Desc: "Connect your Obsidian folder in options so markdown and media save directly.",
     card3Title: "Save from Threads",
-    card3Desc: "Save from any single post page. Pro adds file rules and AI organization on top.",
+    card3Desc: "Save from any single post page. The same Plus key can also be connected in scrapbook and the extension.",
     showcaseH2: "What you actually see in the extension",
-    showcaseCopy: "See the difference between Free and Pro for yourself.",
+    showcaseCopy: "See the difference between Free and Plus for yourself.",
     shotLargeCapTitle: "Free save flow",
     shotLargeCapDesc: "The core saving experience stays fast and simple.",
-    shotSmallCapTitle: "Pro auto-organization",
-    shotSmallCapDesc: "Organized using your chosen rules and your own LLM-powered summary/tag pass.",
+    shotSmallCapTitle: "Plus higher limits",
+    shotSmallCapDesc: "Raise scrapbook limits to 1,000 saves and 50 folders, using the same key across scrapbook and extension.",
     compFreeDesc: "The core save flow that already works well",
-    compProDesc: "An upgrade that adds file/path rules plus AI summaries, tags, and frontmatter",
+    compProDesc: "An upgrade that raises scrapbook limits and keeps the same key usable in the extension",
     step1Title: "Try Free first",
     step1Desc: "Posts, images, and reply chains save immediately.",
     step2Title: "Upgrade when needed",
-    step2Desc: "Pro adds file rules and AI organization.",
-    step3Title: "Paste your key",
-    step3Desc: "Enter the Pro key in options to activate.",
-    commerceH2: "Buy Pro",
-    commerceLead: "$29 one-time. Key delivered by email.",
+    step2Desc: "Free includes 100 saved posts and 5 folders. Plus raises it to 1,000 and 50.",
+    step3Title: "Paste the same key",
+    step3Desc: "Use the same Plus key in scrapbook and in extension settings.",
+    commerceH2: "Buy Plus",
+    commerceLead: "US$19.99 yearly or US$2.99 monthly. The key is delivered by email after payment confirmation.",
     commerceNote: "Orders are reviewed first, then payment is confirmed.",
     commerceRefund: "7-day refund",
     backToHome: "Back to product page",
@@ -2444,13 +2519,13 @@ var obsidianLandingMessages = {
     formMethodLabel: "Payment method",
     formNoteLabel: "Note",
     formSubmitBtn: "Send purchase request",
-    formRemark: "Your Pro key is emailed after payment confirmation.",
+    formRemark: "Your Plus key is emailed after payment confirmation.",
     faqH2: "Most common questions before buying",
     phName: "John Doe",
     phNote: "Invoice, currency, team seat requests, etc.",
     phMethod: "Select a payment method",
     methodBadge: "Available",
-    compareH2: "Free vs Pro",
+    compareH2: "Free vs Plus",
     compareLead: "",
     compareColFeature: "Feature",
     compareRowSavePost: "Save current post",
@@ -2460,12 +2535,12 @@ var obsidianLandingMessages = {
     compareRowAi: "BYO LLM summary / tags / frontmatter",
     screenH2: "Preview",
     screenUsageCaption: "Save flow in use",
-    screenProCaption: "Options page with Pro enabled",
+    screenProCaption: "Options page with Plus enabled",
     productsEyebrow: "Two products",
     productsTitle: "Two ways to save",
     productsCopy: "",
     productATag: "Chrome extension",
-    productATitle: "Threads to Obsidian",
+    productATitle: "SS Threads",
     productADesc: "Save the Threads post you are viewing on desktop.",
     productACta: "Download ZIP",
     productBTag: "Mention bot",
@@ -2475,10 +2550,10 @@ var obsidianLandingMessages = {
     pricingEyebrow: "Pricing",
     pricingTitle: "Simple billing.",
     pricingCopy: "",
-    bundleTag: "One-time",
-    bundleTitle: "Threads Saver Pro",
-    bundleDesc: "$29 one-time. Includes Extension Pro and Scrapbook core.",
-    bundleCta: "Buy Pro",
+    bundleTag: "Plus",
+    bundleTitle: "SS Threads Plus",
+    bundleDesc: "Start on Free 100/5, then raise it to 1,000 saves and 50 folders with Plus.",
+    bundleCta: "Buy Plus",
     cloudTag: "Cloud Add-on",
     cloudTitle: "Watchlists + Searches + Insights",
     cloudDesc: "Always-on sync features as a separate add-on.",
@@ -2497,7 +2572,7 @@ var obsidianLandingMessages = {
     orderSuccess1: "Your request has been received at {email}.",
     orderNextStep: "Next step: {instructions}",
     orderPayLink: "Payment link: {url}",
-    orderFinal: "Your Threads Saver Pro key will be emailed after payment confirmation.",
+    orderFinal: "Your SS Threads Plus key will be emailed after payment confirmation.",
     footerPurchaseLink: ""
   }
 };
@@ -2509,17 +2584,17 @@ var landingMessages = {
       topbarCta: "scrapbook \uC5F4\uAE30",
       heroEyebrow: "Mention Scrapbook SaaS",
       heroGuideCta: "scrapbook \uC5F4\uAE30",
-      heroPurchaseCta: "\uD655\uC7A5 Pro \uAD6C\uB9E4",
-      primaryCta: "\uD655\uC7A5 Pro \uAD6C\uB9E4",
+      heroPurchaseCta: "\uD655\uC7A5 Plus \uAD6C\uB9E4",
+      primaryCta: "\uD655\uC7A5 Plus \uAD6C\uB9E4",
       storyEyebrow: "Chrome Extension",
-      storyH2: "Threads to Obsidian \uD655\uC7A5\uB3C4 \uD568\uAED8 \uC81C\uACF5\uD569\uB2C8\uB2E4.",
+      storyH2: "SS Threads \uD655\uC7A5\uB3C4 \uD568\uAED8 \uC81C\uACF5\uD569\uB2C8\uB2E4.",
       storyP: "\uB313\uAE00 \uBA58\uC158 \uC800\uC7A5\uC740 bot\uC774 \uB9E1\uACE0, \uBE0C\uB77C\uC6B0\uC800\uC5D0\uC11C \uBCF4\uACE0 \uC788\uB294 Threads \uAE00\uC744 \uC989\uC2DC Obsidian\uC73C\uB85C \uBCF4\uB0B4\uB294 \uD750\uB984\uC740 extension\uC774 \uB9E1\uC2B5\uB2C8\uB2E4.",
       card3Title: "Threads\uC5D0\uC11C \uBC14\uB85C \uC800\uC7A5",
       card3Desc: "\uBE0C\uB77C\uC6B0\uC800\uC5D0\uC11C \uBCF4\uACE0 \uC788\uB294 \uAE00\uC744 \uC989\uC2DC \uC800\uC7A5\uD569\uB2C8\uB2E4. mention bot\uC640 \uBCC4\uB3C4\uB85C \uC4F0\uAC70\uB098 \uD568\uAED8 \uC4F8 \uC218 \uC788\uC2B5\uB2C8\uB2E4.",
-      commerceH2: "Threads to Obsidian Pro \uAD6C\uB9E4",
-      commerceLead: "\uC774 \uC544\uB798 \uD3FC\uC740 Chrome extension Pro \uAD6C\uB9E4\uC6A9\uC785\uB2C8\uB2E4. mention scrapbook bot \uC548\uB0B4\uB294 \uC704 \uC139\uC158\uC5D0\uC11C \uD655\uC778\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.",
+      commerceH2: "SS Threads Plus \uAD6C\uB9E4",
+      commerceLead: "\uC774 \uC544\uB798 \uD3FC\uC740 SS Threads Plus \uAD6C\uB9E4\uC6A9\uC785\uB2C8\uB2E4. \uAC19\uC740 \uD0A4\uB97C scrapbook\uACFC extension \uC591\uCABD\uC5D0 \uC5F0\uACB0\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.",
       faqH2: "Bot / Extension FAQ",
-      compareH2: "Chrome Extension Free vs Pro",
+      compareH2: "Chrome Extension Free vs Plus",
       screenH2: "Chrome extension preview",
       productsEyebrow: "Two products",
       productsTitle: "Threads\uC5D0\uC11C \uC800\uC7A5\uD558\uB294 \uB450 \uAC00\uC9C0 \uBC29\uC2DD",
@@ -2529,8 +2604,8 @@ var landingMessages = {
       productADesc: "\uB313\uAE00\uC5D0 @parktaejun\uB9CC \uBD99\uC774\uBA74 \uB0B4 private scrapbook\uC73C\uB85C \uC800\uC7A5\uB418\uACE0, \uB098\uC911\uC5D0 Markdown\uC73C\uB85C \uAEBC\uB0B4 \uC4F8 \uC218 \uC788\uC2B5\uB2C8\uB2E4.",
       productACta: "scrapbook \uC5F4\uAE30",
       productBTag: "Chrome extension",
-      productBTitle: "Threads to Obsidian",
-      productBDesc: "\uBE0C\uB77C\uC6B0\uC800\uC5D0\uC11C \uBCF4\uACE0 \uC788\uB294 Threads \uAE00\uC744 \uBC14\uB85C Obsidian\uC73C\uB85C \uC800\uC7A5\uD569\uB2C8\uB2E4. \uC815\uB9AC \uADDC\uCE59\uACFC AI \uD6C4\uCC98\uB9AC\uB294 Pro\uC5D0\uC11C \uCF2D\uB2C8\uB2E4.",
+      productBTitle: "SS Threads",
+      productBDesc: "\uBE0C\uB77C\uC6B0\uC800\uC5D0\uC11C \uBCF4\uACE0 \uC788\uB294 Threads \uAE00\uC744 \uBC14\uB85C Obsidian\uC73C\uB85C \uC800\uC7A5\uD569\uB2C8\uB2E4. \uAC19\uC740 Plus \uD0A4\uB97C extension\uC5D0\uB3C4 \uC5F0\uACB0\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.",
       productBCta: "\uD655\uC7A5 \uC548\uB0B4 \uBCF4\uAE30",
       botEyebrow: "How it works",
       botTitle: "\uACF5\uAC1C \uB313\uAE00\uB85C \uD2B8\uB9AC\uAC70\uD558\uACE0, private scrapbook\uC5D0 \uC800\uC7A5\uD569\uB2C8\uB2E4.",
@@ -2550,17 +2625,17 @@ var landingMessages = {
       topbarCta: "Open scrapbook",
       heroEyebrow: "Mention Scrapbook SaaS",
       heroGuideCta: "Open scrapbook",
-      heroPurchaseCta: "Buy extension Pro",
-      primaryCta: "Buy extension Pro",
+      heroPurchaseCta: "Buy extension Plus",
+      primaryCta: "Buy extension Plus",
       storyEyebrow: "Chrome Extension",
-      storyH2: "Threads to Obsidian is also available here.",
+      storyH2: "SS Threads is also available here.",
       storyP: "The bot handles mention-based scrapbook saves, while the extension sends the post you are actively viewing straight into Obsidian.",
       card3Title: "Save directly from Threads",
       card3Desc: "Save the post you are viewing in the browser immediately. You can use it separately from the mention bot or alongside it.",
-      commerceH2: "Buy Threads to Obsidian Pro",
-      commerceLead: "The form below is for the Chrome extension Pro purchase. The mention scrapbook bot is explained in the sections above.",
+      commerceH2: "Buy SS Threads Plus",
+      commerceLead: "The form below is for SS Threads Plus. The same key can be used in both scrapbook and the extension.",
       faqH2: "Bot / Extension FAQ",
-      compareH2: "Chrome Extension Free vs Pro",
+      compareH2: "Chrome Extension Free vs Plus",
       screenH2: "Chrome extension preview",
       productsEyebrow: "Two products",
       productsTitle: "Two ways to save from Threads",
@@ -2570,8 +2645,8 @@ var landingMessages = {
       productADesc: "Add @parktaejun in a reply and the item lands in your private scrapbook, ready to export as Markdown later.",
       productACta: "Open scrapbook",
       productBTag: "Chrome extension",
-      productBTitle: "Threads to Obsidian",
-      productBDesc: "Save the Threads post you are viewing straight into Obsidian. Rule-based organization and AI post-processing turn on in Pro.",
+      productBTitle: "SS Threads",
+      productBDesc: "Save the Threads post you are viewing straight into Obsidian. The same Plus key can also be used in the extension.",
       productBCta: "See extension guide",
       botEyebrow: "How it works",
       botTitle: "Use a public reply as the trigger and keep the scrapbook private.",
@@ -2583,16 +2658,16 @@ var landingMessages = {
       botStep3Title: "Review on the web and export",
       botStep3Desc: "The target is to reflect saves within 60 seconds, then let users export as Markdown or plain text for Obsidian, Notion, or note apps."
     }
-  },
-  ...landingMessageLocales
+  }
 };
+Object.assign(landingMessages, secondaryLandingMessages);
 var obsidianLandingStorefrontCopy = {
   ko: {
-    productName: "Threads Saver",
+    productName: "SS Threads",
     headline: '<span class="headline-row"><span>PC</span><span>extension.</span></span><span class="headline-row"><span>Mobile</span><span>mention.</span></span>',
     subheadline: "\uC9C0\uAE08 \uBCF4\uB294 \uAE00\uC740 Chrome extension\uC73C\uB85C \uC800\uC7A5\uD558\uACE0, \uBAA8\uBC14\uC77C\uC5D0\uC11C\uB294 mention scrapbook\uC73C\uB85C \uBAA8\uC74D\uB2C8\uB2E4.",
-    priceLabel: "Threads Saver Pro",
-    includedUpdates: "29\uB2EC\uB7EC 1\uD68C \uACB0\uC81C \xB7 Extension Pro + Scrapbook core \xB7 7\uC77C \uD658\uBD88",
+    priceLabel: "SS Threads Plus",
+    includedUpdates: "\uC6D4 US$2.99 \xB7 \uC5F0 US$19.99 \xB7 Free 100/5 -> Plus 1000/50",
     heroNotes: [
       "Chrome extension: \uD604\uC7AC \uBCF4\uACE0 \uC788\uB294 \uAE00 \uC800\uC7A5",
       "scrapbook: \uBA58\uC158, watchlist, search \uACB0\uACFC \uC815\uB9AC",
@@ -2610,23 +2685,23 @@ var obsidianLandingStorefrontCopy = {
     faqs: [
       {
         id: "faq-1",
-        question: "\uC800\uC7A5\uD558\uB824\uBA74 Pro\uAC00 \uD544\uC694\uD55C\uAC00\uC694?",
-        answer: "\uC544\uB2C8\uC694. \uC800\uC7A5, \uC774\uBBF8\uC9C0 \uD3EC\uD568, \uC5F0\uC18D \uB2F5\uAE00, \uC911\uBCF5 \uAC74\uB108\uB700 \uBAA8\uB450 Free\uC5D0\uC11C \uAC00\uB2A5\uD569\uB2C8\uB2E4."
+        question: "\uC800\uC7A5\uD558\uB824\uBA74 Plus\uAC00 \uD544\uC694\uD55C\uAC00\uC694?",
+        answer: "\uC544\uB2C8\uC694. Free\uC5D0\uC11C\uB3C4 \uC800\uC7A5, \uC774\uBBF8\uC9C0 \uD3EC\uD568, \uC5F0\uC18D \uB2F5\uAE00, \uC911\uBCF5 \uAC74\uB108\uB700\uC774 \uAC00\uB2A5\uD569\uB2C8\uB2E4. \uB300\uC2E0 \uC800\uC7A5\uAE00\uC740 100\uAC1C, \uD3F4\uB354\uB294 5\uAC1C\uAE4C\uC9C0\uC785\uB2C8\uB2E4."
       },
       {
         id: "faq-2",
-        question: "\uB204\uAC00 Pro\uB97C \uC0AC\uBA74 \uC88B\uB098\uC694?",
-        answer: "\uC800\uC7A5\uD560 \uB54C \uD30C\uC77C\uBA85\xB7\uACBD\uB85C \uADDC\uCE59\uC744 \uC9C1\uC811 \uC81C\uC5B4\uD558\uACE0, \uC790\uC2E0\uC758 LLM \uD0A4\uB85C \uC694\uC57D\xB7\uD0DC\uADF8\xB7frontmatter\uB97C \uBD99\uC774\uACE0 \uC2F6\uC740 \uBD84\uAED8 \uB9DE\uC2B5\uB2C8\uB2E4."
+        question: "\uB204\uAC00 Plus\uB97C \uC4F0\uBA74 \uC88B\uB098\uC694?",
+        answer: "scrapbook \uC800\uC7A5\uAE00\uC774 100\uAC1C\uB97C \uB118\uAC70\uB098, \uD3F4\uB354\uB97C 5\uAC1C \uC774\uC0C1 \uC4F0\uACE0 \uC2F6\uC740 \uC0AC\uC6A9\uC790\uC5D0\uAC8C \uB9DE\uC2B5\uB2C8\uB2E4. \uAC19\uC740 \uD0A4\uB97C extension\uC5D0\uB3C4 \uC5F0\uACB0\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4."
       },
       {
         id: "faq-3",
-        question: "\uC694\uC57D\uC774\uB098 \uD0DC\uADF8 \uAC19\uC740 AI \uC815\uB9AC\uB294 \uB418\uB098\uC694?",
-        answer: "\uB429\uB2C8\uB2E4. Pro\uC5D0\uC11C OpenAI \uD638\uD658 \uC5D4\uB4DC\uD3EC\uC778\uD2B8\uC640 \uC790\uC2E0\uC758 \uD0A4\uB97C \uB123\uC73C\uBA74 \uC694\uC57D, \uD0DC\uADF8, \uCD94\uAC00 frontmatter\uB97C \uC0DD\uC131\uD569\uB2C8\uB2E4."
+        question: "Plus\uC5D0\uC11C\uB294 \uBB50\uAC00 \uB2EC\uB77C\uC9C0\uB098\uC694?",
+        answer: "scrapbook \uC800\uC7A5\uAE00 1,000\uAC1C, \uD3F4\uB354 50\uAC1C\uAE4C\uC9C0 \uD655\uC7A5\uB418\uACE0, \uB3D9\uC77C\uD55C \uD0A4\uB97C extension\uC5D0\uB3C4 \uC5F0\uACB0\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4."
       },
       {
         id: "faq-4",
-        question: "Pro \uD0A4\uB294 \uC5B4\uB5BB\uAC8C \uC804\uB2EC\uB418\uB098\uC694?",
-        answer: "\uACB0\uC81C\uAC00 \uD655\uC778\uB418\uBA74 Pro \uD0A4\uB97C \uC774\uBA54\uC77C\uB85C \uBCF4\uB0B4\uB4DC\uB9BD\uB2C8\uB2E4."
+        question: "Plus \uD0A4\uB294 \uC5B4\uB5BB\uAC8C \uC804\uB2EC\uB418\uB098\uC694?",
+        answer: "\uACB0\uC81C\uAC00 \uD655\uC778\uB418\uBA74 Plus \uD0A4\uB97C \uC774\uBA54\uC77C\uB85C \uBCF4\uB0B4\uB4DC\uB9BD\uB2C8\uB2E4."
       },
       {
         id: "faq-5",
@@ -2636,11 +2711,11 @@ var obsidianLandingStorefrontCopy = {
     ]
   },
   en: {
-    productName: "Threads Saver",
+    productName: "SS Threads",
     headline: '<span class="headline-row"><span>PC</span><span>extension.</span></span><span class="headline-row"><span>Mobile</span><span>mention.</span></span>',
     subheadline: "Save the current post using the Chrome extension, or collect it later via mention scrapbook on mobile.",
-    priceLabel: "Threads Saver Pro",
-    includedUpdates: "$29 one-time \xB7 extension Pro + scrapbook core \xB7 7-day refund",
+    priceLabel: "SS Threads Plus",
+    includedUpdates: "US$2.99 monthly \xB7 US$19.99 yearly \xB7 Free 100/5 -> Plus 1000/50",
     heroNotes: [
       "Chrome extension: save the post you are reading now",
       "scrapbook: organize mentions, watchlists, and searches",
@@ -2658,23 +2733,23 @@ var obsidianLandingStorefrontCopy = {
     faqs: [
       {
         id: "faq-1",
-        question: "Do I need Pro to save posts?",
-        answer: "No. Saving, image capture, author reply chains, and duplicate skipping all work in Free."
+        question: "Do I need Plus to save posts?",
+        answer: "No. Free already supports saving, image capture, author reply chains, and duplicate skipping. Free is limited to 100 saved posts and 5 folders."
       },
       {
         id: "faq-2",
-        question: "Who should buy Pro?",
-        answer: "It fits people who want direct control over file/path rules and want summaries, tags, and frontmatter generated with their own LLM key."
+        question: "Who should buy Plus?",
+        answer: "It fits users who will go beyond 100 saved posts or need more than 5 folders in scrapbook. The same key can also be used in the extension."
       },
       {
         id: "faq-3",
-        question: "Does it do AI summaries or tagging?",
-        answer: "Yes. In Pro, you can connect an OpenAI-compatible endpoint and your own key to generate summaries, tags, and extra frontmatter."
+        question: "What changes on Plus?",
+        answer: "Plus raises scrapbook limits to 1,000 saved posts and 50 folders, and the same key can be used in the extension."
       },
       {
         id: "faq-4",
-        question: "How is the Pro key delivered?",
-        answer: "After payment is confirmed, the Pro key is sent to your email."
+        question: "How is the Plus key delivered?",
+        answer: "After payment is confirmed, the Plus key is sent to your email."
       },
       {
         id: "faq-5",
@@ -2691,8 +2766,8 @@ var landingStorefrontCopy = {
       productName: "Threads Mention Scrapbook",
       headline: "Threads \uB313\uAE00\uC5D0 @parktaejun\uB9CC \uBD99\uC774\uBA74 \uC800\uC7A5\uB429\uB2C8\uB2E4.",
       subheadline: "\uACF5\uAC1C \uB313\uAE00\uC744 private scrapbook \uC800\uC7A5 \uD2B8\uB9AC\uAC70\uB85C \uBC14\uAFB8\uACE0, \uB098\uC911\uC5D0 Markdown\uC774\uB098 Obsidian, Notion\uC73C\uB85C \uAEBC\uB0B4 \uC4F0\uB294 SaaS\uC785\uB2C8\uB2E4.",
-      priceLabel: "Threads to Obsidian Pro",
-      includedUpdates: "Chrome extension \xB7 1\uD68C \uACB0\uC81C \xB7 \uC5C5\uB370\uC774\uD2B8 1\uB144",
+      priceLabel: "SS Threads Plus",
+      includedUpdates: "Free 100/5 \xB7 Plus 1000/50 \xB7 \uAC19\uC740 \uD0A4\uB97C extension\uC5D0\uB3C4 \uC0AC\uC6A9",
       heroNotes: [
         "\uB313\uAE00\uC740 \uACF5\uAC1C \uD2B8\uB9AC\uAC70\uC785\uB2C8\uB2E4. \uBBFC\uAC10\uD55C \uBA54\uBAA8\uB294 \uC801\uC9C0 \uB9C8\uC138\uC694.",
         "Threads \uB85C\uADF8\uC778\uC73C\uB85C \uC5F0\uACB0\uB41C \uACC4\uC815\uACFC \uB313\uAE00 \uC791\uC131 \uACC4\uC815\uC744 \uAE30\uC900\uC73C\uB85C \uC0AC\uC6A9\uC790\uBCC4\uB85C \uBD84\uB9AC \uC800\uC7A5\uD569\uB2C8\uB2E4.",
@@ -2742,8 +2817,8 @@ var landingStorefrontCopy = {
       productName: "Threads Mention Scrapbook",
       headline: "Add @parktaejun in a Threads reply and it gets saved.",
       subheadline: "Turn a public reply into a save trigger for a private scrapbook, then move the result into Markdown, Obsidian, or Notion later.",
-      priceLabel: "Threads to Obsidian Pro",
-      includedUpdates: "Chrome extension \xB7 one-time payment \xB7 1 year of updates",
+      priceLabel: "SS Threads Plus",
+      includedUpdates: "Free 100/5 \xB7 Plus 1000/50 \xB7 use the same key in the extension too",
       heroNotes: [
         "Replies are public triggers, so do not write sensitive notes there.",
         "The system matches the reply author against the Threads account linked through OAuth and stores items per user.",
@@ -2786,22 +2861,30 @@ var landingStorefrontCopy = {
         }
       ]
     }
-  },
-  ...landingStorefrontLocales
+  }
 };
+Object.assign(landingStorefrontCopy, secondaryLandingStorefrontCopy);
 var adminMessages = {
   ko: {
-    adminH1: "\uACB0\uC81C, \uBC1C\uAE09, \uC804\uB2EC \uAD00\uB9AC",
-    adminLead: "\uACB0\uC81C \uC218\uB2E8 \uAD00\uB9AC, \uAD6C\uB9E4 \uC694\uCCAD \uAC80\uD1A0, Pro \uD0A4 \uBC1C\uAE09, \uC218\uB3D9 \uC774\uBA54\uC77C \uC804\uB2EC\uC744 \uC704\uD55C \uAD00\uB9AC\uC790 \uD328\uB110\uC785\uB2C8\uB2E4.",
-    authBannerEyebrow: "\uC6B4\uC601 \uAD8C\uD55C",
-    authBannerTitle: "\uBA3C\uC800 \uB85C\uADF8\uC778\uD574\uC57C \uC2E4\uC2DC\uAC04 \uC6B4\uC601 \uD56D\uBAA9\uC744 \uC218\uC815\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.",
-    authBannerCopy: "\uB9E4\uCD9C, \uC218\uC9D1\uAE30 \uB3D9\uAE30\uD654, \uB7F0\uD0C0\uC784 \uC124\uC815, \uACB0\uC81C \uC218\uB2E8, \uD0A4 \uBC1C\uAE09\uC740 \uAD00\uB9AC\uC790 \uD1A0\uD070 \uAC80\uC99D \uC804\uAE4C\uC9C0 \uC7A0\uAE08 \uC0C1\uD0DC\uB85C \uC720\uC9C0\uB429\uB2C8\uB2E4.",
-    authOverlayLabel: "\uAD00\uB9AC\uC790 \uD1A0\uD070\uC73C\uB85C \uB85C\uADF8\uC778\uD558\uBA74 \uC774 \uC139\uC158\uC744 \uC0AC\uC6A9\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.",
+    adminH1: "\uC6B4\uC601 \uD328\uB110",
+    adminLead: "\uACB0\uC81C, \uD0A4 \uBC1C\uAE09, \uC804\uB2EC\uC744 \uAD00\uB9AC\uD569\uB2C8\uB2E4.",
+    runtimeSectionEyebrow: "\uB7F0\uD0C0\uC784",
+    runtimeSectionTitle: "\uC6B4\uC601 \uC124\uC815",
+    authBannerEyebrow: "\uC7A0\uAE08",
+    authBannerTitle: "\uB85C\uADF8\uC778 \uD544\uC694",
+    authBannerCopy: "\uC6B4\uC601 \uBCC0\uACBD\uC740 \uB85C\uADF8\uC778 \uB4A4\uC5D0\uB9CC \uAC00\uB2A5\uD569\uB2C8\uB2E4.",
+    authOverlayLabel: "\uB85C\uADF8\uC778\uD558\uBA74 \uC774 \uC139\uC158\uC774 \uC5F4\uB9BD\uB2C8\uB2E4.",
+    authStateLabel: "\uC138\uC158",
+    authStateLoggedIn: "\uB85C\uADF8\uC778\uB428",
+    authStateLoggedOut: "\uB85C\uADF8\uC778 \uD544\uC694",
+    authDetailLoggedIn: "\uC6B4\uC601 \uBCC0\uACBD\uC774 \uAC00\uB2A5\uD569\uB2C8\uB2E4.",
+    authDetailLoggedOut: "\uC6B4\uC601 \uBCC0\uACBD\uC740 \uC7A0\uAE08 \uC0C1\uD0DC\uC785\uB2C8\uB2E4.",
     tokenLabel: "\uAD00\uB9AC\uC790 \uD1A0\uD070",
     tokenApply: "\uB85C\uADF8\uC778",
     tokenLogout: "\uB85C\uADF8\uC544\uC6C3",
+    tokenLoggingOut: "\uB85C\uADF8\uC544\uC6C3 \uC911...",
     tokenPlaceholder: "\uAD00\uB9AC\uC790 \uC811\uADFC \uD1A0\uD070",
-    tokenStatusDefault: "/api/admin/* \uC811\uADFC\uC744 \uC704\uD574 \uB85C\uADF8\uC778\uC774 \uD544\uC694\uD569\uB2C8\uB2E4",
+    tokenStatusDefault: "\uAD00\uB9AC\uC790 \uD1A0\uD070\uC744 \uC785\uB825\uD558\uC138\uC694.",
     statPending: "\uBBF8\uACB0 \uC8FC\uBB38",
     statPaid: "\uACB0\uC81C \uD655\uC778, \uD0A4 \uB300\uAE30",
     statIssued: "\uBC1C\uAE09\uB41C \uD0A4",
@@ -2902,7 +2985,7 @@ var adminMessages = {
     statDeliveryReady: "\uBC1C\uC1A1 \uB300\uAE30",
     statDeliverySent: "\uBC1C\uC1A1 \uC644\uB8CC",
     collectorTitle: "\uBA58\uC158 \uC218\uC9D1\uAE30",
-    collectorCopy: "\uC218\uC9D1\uAE30 \uC0C1\uD0DC\uB97C \uC810\uAC80\uD558\uACE0, \uD3F4\uB9C1 \uC124\uC815\uC744 \uC218\uC815\uD558\uACE0, \uC989\uC2DC \uB3D9\uAE30\uD654\uB97C \uC2E4\uD589\uD569\uB2C8\uB2E4.",
+    collectorCopy: "\uC0C1\uD0DC \uD655\uC778, \uD3F4\uB9C1 \uC124\uC815, \uC218\uB3D9 \uB3D9\uAE30\uD654.",
     collectorSyncBtn: "\uC9C0\uAE08 \uB3D9\uAE30\uD654",
     collectorStateLabel: "\uC0C1\uD0DC",
     collectorLastSuccessLabel: "\uB9C8\uC9C0\uB9C9 \uC131\uACF5",
@@ -2918,8 +3001,8 @@ var adminMessages = {
     collectorPagesLabel: "\uCD5C\uB300 \uD398\uC774\uC9C0",
     collectorPublicHandleLabel: "\uACF5\uAC1C \uBD07 \uACC4\uC815",
     collectorProfileLink: "\uD504\uB85C\uD544 \uC5F4\uAE30",
-    collectorHandleCopy: "\uC5EC\uAE30\uC11C \uBCC0\uACBD\uD55C \uD578\uB4E4\uC740 \uACF5\uAC1C scrapbook \uC548\uB0B4 \uBB38\uAD6C\uC640 \uC218\uC9D1\uAE30 \uC870\uD68C \uB300\uC0C1\uC5D0 \uD568\uAED8 \uBC18\uC601\uB429\uB2C8\uB2E4.",
-    collectorSaveBtn: "\uC218\uC9D1\uAE30 \uC124\uC815 \uC800\uC7A5",
+    collectorHandleCopy: "\uD578\uB4E4\uC744 \uBC14\uAFB8\uBA74 \uACF5\uAC1C \uC548\uB0B4\uC640 \uC218\uC9D1 \uB300\uC0C1\uC774 \uD568\uAED8 \uBC14\uB01D\uB2C8\uB2E4.",
+    collectorSaveBtn: "\uC218\uC9D1\uAE30 \uC800\uC7A5",
     collectorStateRunning: "\uC2E4\uD589 \uC911",
     collectorStateReady: "\uC900\uBE44\uB428",
     collectorStateDisabled: "\uBE44\uD65C\uC131",
@@ -2928,7 +3011,7 @@ var adminMessages = {
     collectorSyncing: "\uBA58\uC158\uC744 \uC989\uC2DC \uB3D9\uAE30\uD654\uD558\uB294 \uC911...",
     collectorSynced: "\uC218\uC9D1\uAE30 \uC218\uB3D9 \uB3D9\uAE30\uD654\uAC00 \uC644\uB8CC\uB418\uC5C8\uC2B5\uB2C8\uB2E4.",
     runtimeTitle: "\uB7F0\uD0C0\uC784 \uC124\uC815",
-    runtimeCopy: "\uC11C\uBC84 \uD30C\uC77C\uC744 \uC9C1\uC811 \uC218\uC815\uD558\uC9C0 \uC54A\uACE0 public origin, \uB370\uC774\uD130\uBCA0\uC774\uC2A4, SMTP\uB97C \uBCC0\uACBD\uD569\uB2C8\uB2E4.",
+    runtimeCopy: "public origin, DB, SMTP\uB97C \uBCC0\uACBD\uD569\uB2C8\uB2E4.",
     publicOriginLabel: "Public origin",
     publicOriginPlaceholder: "https://ss-threads.dahanda.dev",
     databaseTitle: "\uB370\uC774\uD130\uBCA0\uC774\uC2A4",
@@ -2947,9 +3030,9 @@ var adminMessages = {
     databaseClearUrlLabel: "\uC800\uC7A5\uB41C Postgres URL\uC744 \uC800\uC7A5 \uC2DC \uC81C\uAC70",
     databaseUrlConfiguredPlaceholder: "\uC774\uBBF8 \uC800\uC7A5\uB418\uC5B4 \uC788\uC2B5\uB2C8\uB2E4. \uAD50\uCCB4\uD560 \uC0C8 URL\uB9CC \uC785\uB825\uD558\uC138\uC694.",
     databaseTesting: "DB \uC5F0\uACB0\uC744 \uD14C\uC2A4\uD2B8\uD558\uB294 \uC911...",
-    databaseTestBtn: "DB \uC5F0\uACB0 \uD14C\uC2A4\uD2B8",
+    databaseTestBtn: "DB \uD14C\uC2A4\uD2B8",
     runtimeSaving: "\uB7F0\uD0C0\uC784 \uC124\uC815 \uC800\uC7A5 \uC911...",
-    runtimeSaveBtn: "\uB7F0\uD0C0\uC784 \uC124\uC815 \uC800\uC7A5",
+    runtimeSaveBtn: "\uC800\uC7A5",
     runtimeSaved: "\uB7F0\uD0C0\uC784 \uC124\uC815\uC774 \uC800\uC7A5\uB418\uC5C8\uC2B5\uB2C8\uB2E4.",
     runtimeMigrated: "\uB7F0\uD0C0\uC784 \uC124\uC815\uC774 \uC800\uC7A5\uB418\uC5C8\uACE0 \uB370\uC774\uD130\uAC00 \uC0C8 \uB370\uC774\uD130\uBCA0\uC774\uC2A4\uB85C \uC774\uC804\uB418\uC5C8\uC2B5\uB2C8\uB2E4.",
     runtimeRestartRequired: "\uB370\uC774\uD130\uBCA0\uC774\uC2A4 \uC124\uC815\uC774 \uC800\uC7A5\uB418\uC5C8\uC2B5\uB2C8\uB2E4. \uC0C8 \uBC31\uC5D4\uB4DC\uB97C \uC4F0\uAE30 \uC804\uC5D0 \uC11C\uBC84\uB97C \uC7AC\uC2DC\uC791\uD558\uC138\uC694.",
@@ -2982,7 +3065,7 @@ var adminMessages = {
     storefrontFaqsLabel: "FAQ",
     storefrontFaqsPlaceholder: "\uC9C8\uBB38 :: \uB2F5\uBCC0",
     storefrontSaving: "\uC2A4\uD1A0\uC5B4\uD504\uB860\uD2B8 \uC124\uC815 \uC800\uC7A5 \uC911...",
-    storefrontSaveBtn: "\uC2A4\uD1A0\uC5B4\uD504\uB860\uD2B8 \uC800\uC7A5",
+    storefrontSaveBtn: "\uBB38\uAD6C \uC800\uC7A5",
     storefrontSaved: "\uC2A4\uD1A0\uC5B4\uD504\uB860\uD2B8 \uC124\uC815\uC774 \uC800\uC7A5\uB418\uC5C8\uC2B5\uB2C8\uB2E4.",
     methodEditBtn: "\uC218\uC815",
     methodSaveBtn: "\uACB0\uC81C \uC218\uB2E8 \uC800\uC7A5",
@@ -3019,17 +3102,25 @@ var adminMessages = {
     issueExpiryInvalid: "\uB9CC\uB8CC\uC77C\uC740 YYYY-MM-DD \uD615\uC2DD\uC758 \uC720\uD6A8\uD55C \uB0A0\uC9DC\uC5EC\uC57C \uD569\uB2C8\uB2E4."
   },
   en: {
-    adminH1: "Payments, issuance, and delivery",
-    adminLead: "Manage accepted payment methods, review purchase requests, issue signed Pro keys, and keep an auditable history for manual email delivery.",
-    authBannerEyebrow: "Admin access",
-    authBannerTitle: "Sign in first to unlock live operations.",
-    authBannerCopy: "Revenue, collector sync, runtime settings, payment methods, and key issuance stay locked until the admin token is verified.",
-    authOverlayLabel: "Sign in with the admin token to unlock this section.",
+    adminH1: "Admin panel",
+    adminLead: "Manage payments, keys, and delivery.",
+    runtimeSectionEyebrow: "Runtime",
+    runtimeSectionTitle: "Operations",
+    authBannerEyebrow: "Locked",
+    authBannerTitle: "Sign in required",
+    authBannerCopy: "Live changes stay locked until you sign in.",
+    authOverlayLabel: "Sign in to unlock this section.",
+    authStateLabel: "Session",
+    authStateLoggedIn: "Signed in",
+    authStateLoggedOut: "Sign in required",
+    authDetailLoggedIn: "Live changes are enabled.",
+    authDetailLoggedOut: "Live changes are locked.",
     tokenLabel: "Admin token",
     tokenApply: "Sign in",
     tokenLogout: "Sign out",
+    tokenLoggingOut: "Signing out...",
     tokenPlaceholder: "Admin access token",
-    tokenStatusDefault: "Sign in required for /api/admin/*",
+    tokenStatusDefault: "Enter the admin token.",
     statPending: "Pending orders",
     statPaid: "Paid, awaiting key",
     statIssued: "Issued keys",
@@ -3130,7 +3221,7 @@ var adminMessages = {
     statDeliveryReady: "Awaiting delivery",
     statDeliverySent: "Delivered",
     collectorTitle: "Mention collector",
-    collectorCopy: "Review collector health, update polling settings, and run a manual sync.",
+    collectorCopy: "Health, polling, and manual sync.",
     collectorSyncBtn: "Sync now",
     collectorStateLabel: "State",
     collectorLastSuccessLabel: "Last success",
@@ -3146,8 +3237,8 @@ var adminMessages = {
     collectorPagesLabel: "Max pages",
     collectorPublicHandleLabel: "Public bot account",
     collectorProfileLink: "Open profile",
-    collectorHandleCopy: "Changing this updates both the public scrapbook mention target and the collector lookup handle.",
-    collectorSaveBtn: "Save collector settings",
+    collectorHandleCopy: "This handle is used for both the public mention target and collector lookup.",
+    collectorSaveBtn: "Save collector",
     collectorStateRunning: "Running",
     collectorStateReady: "Ready",
     collectorStateDisabled: "Disabled",
@@ -3156,7 +3247,7 @@ var adminMessages = {
     collectorSyncing: "Syncing mentions now...",
     collectorSynced: "Collector sync completed.",
     runtimeTitle: "Runtime settings",
-    runtimeCopy: "Change public origin, database, and SMTP without editing the server manually.",
+    runtimeCopy: "Public origin, DB, and SMTP.",
     publicOriginLabel: "Public origin",
     publicOriginPlaceholder: "https://ss-threads.dahanda.dev",
     databaseTitle: "Database",
@@ -3175,9 +3266,9 @@ var adminMessages = {
     databaseClearUrlLabel: "Clear saved Postgres URL on save",
     databaseUrlConfiguredPlaceholder: "Already configured. Enter a new URL only if you want to replace it.",
     databaseTesting: "Testing database connection...",
-    databaseTestBtn: "Test database",
+    databaseTestBtn: "Test DB",
     runtimeSaving: "Saving runtime settings...",
-    runtimeSaveBtn: "Save runtime settings",
+    runtimeSaveBtn: "Save",
     runtimeSaved: "Runtime settings saved.",
     runtimeMigrated: "Runtime settings saved and data migrated to the new database.",
     runtimeRestartRequired: "Database settings were saved. Restart the server before using the new backend.",
@@ -3210,7 +3301,7 @@ var adminMessages = {
     storefrontFaqsLabel: "FAQs",
     storefrontFaqsPlaceholder: "Question :: Answer",
     storefrontSaving: "Saving storefront settings...",
-    storefrontSaveBtn: "Save storefront settings",
+    storefrontSaveBtn: "Save copy",
     storefrontSaved: "Storefront settings saved.",
     methodEditBtn: "Edit",
     methodSaveBtn: "Save method",
@@ -3245,9 +3336,9 @@ var adminMessages = {
     issueExpiryHint: "Applied when you use Issue key or Reissue. Leave it empty for a key without expiry.",
     issueExpiryClear: "Clear expiry",
     issueExpiryInvalid: "Expiry must be a valid YYYY-MM-DD date."
-  },
-  ...adminMessageLocales
+  }
 };
+Object.assign(adminMessages, secondaryAdminMessages);
 
 // src/admin/main.ts
 var methodList = document.getElementById("method-list");
@@ -3260,9 +3351,13 @@ var copyEmailButton = document.getElementById("copy-email");
 var issueExpiryInput = document.getElementById("license-expiry-date");
 var issueExpiryClearButton = document.getElementById("license-expiry-clear");
 var tokenInput = document.getElementById("admin-token");
+var tokenLabel = document.getElementById("admin-token-label");
+var tokenLoginRow = document.getElementById("token-login-row");
 var tokenStatus = document.getElementById("token-status");
 var applyTokenButton = document.getElementById("token-apply");
 var logoutButton = document.getElementById("token-logout");
+var authState = document.getElementById("admin-auth-state");
+var authDetail = document.getElementById("admin-auth-detail");
 var authBanner = document.getElementById("admin-auth-banner");
 var authBannerStatus = document.getElementById("admin-auth-banner-status");
 var reloadButton = document.getElementById("reload-all");
@@ -3275,6 +3370,7 @@ var methodCancelButton = document.getElementById("method-cancel");
 var methodStatus = document.getElementById("method-status");
 var collectorForm = document.getElementById("collector-form");
 var collectorSyncButton = document.getElementById("collector-sync");
+var collectorSaveButton = document.getElementById("collector-save");
 var collectorStatusText = document.getElementById("collector-status");
 var collectorState = document.getElementById("collector-state");
 var collectorLastSuccess = document.getElementById("collector-last-success");
@@ -3285,9 +3381,11 @@ var runtimeForm = document.getElementById("runtime-form");
 var runtimeStatus = document.getElementById("runtime-status");
 var runtimeActiveDatabase = document.getElementById("runtime-active-database");
 var databaseTestButton = document.getElementById("database-test");
+var runtimeSaveButton = document.getElementById("runtime-save");
 var smtpTestButton = document.getElementById("smtp-test");
 var smtpStatus = document.getElementById("smtp-status");
 var storefrontForm = document.getElementById("storefront-form");
+var storefrontSaveButton = document.getElementById("storefront-save");
 var storefrontStatus = document.getElementById("storefront-status");
 var ordersStatus = document.getElementById("orders-status");
 var licensesStatus = document.getElementById("licenses-status");
@@ -3352,6 +3450,40 @@ function setStatus(element, text, state = "neutral") {
     return;
   }
   element.dataset.state = state;
+}
+function setTokenFeedback(text, state = "neutral") {
+  if (!tokenStatus) {
+    return;
+  }
+  tokenStatus.hidden = false;
+  setStatus(tokenStatus, text, state);
+}
+function clearTokenFeedback() {
+  if (!tokenStatus) {
+    return;
+  }
+  tokenStatus.hidden = true;
+  tokenStatus.textContent = "";
+  delete tokenStatus.dataset.state;
+}
+function setButtonBusyState(button, busy, label) {
+  if (!button) {
+    return;
+  }
+  if (busy) {
+    button.dataset.idleLabel = button.textContent?.trim() ?? "";
+    button.dataset.busy = "true";
+    button.setAttribute("aria-busy", "true");
+    if (label) {
+      button.textContent = label;
+    }
+    return;
+  }
+  if (button.dataset.idleLabel) {
+    button.textContent = button.dataset.idleLabel;
+  }
+  delete button.dataset.busy;
+  button.removeAttribute("aria-busy");
 }
 function setBusy(target, busy) {
   if (!target) {
@@ -3419,22 +3551,32 @@ function parseExpiryIsoFromInput() {
 async function runWithFeedback(work, options = {}) {
   const statusEl = options.statusEl ?? null;
   const busyTargets = options.busyTargets ?? [];
+  const busyButtons = options.busyButtons ?? [];
   const previousDisabled = busyTargets.map(
     (target) => target instanceof HTMLButtonElement || target instanceof HTMLInputElement || target instanceof HTMLSelectElement || target instanceof HTMLTextAreaElement ? target.disabled : null
   );
   for (const target of busyTargets) {
     setBusy(target, true);
   }
+  for (const { button, label } of busyButtons) {
+    setButtonBusyState(button, true, label);
+  }
   if (options.pendingText) {
+    if (statusEl === tokenStatus && tokenStatus) {
+      tokenStatus.hidden = false;
+    }
     setStatus(statusEl, options.pendingText, "warning");
   }
   try {
     return await work();
   } catch (error) {
     const message = error instanceof Error ? error.message : options.errorFallback ?? msg.dashboardError;
+    if (statusEl === tokenStatus && tokenStatus) {
+      tokenStatus.hidden = false;
+    }
     setStatus(statusEl, message, "error");
-    if (statusEl !== tokenStatus && !adminAuthenticated && tokenStatus) {
-      setStatus(tokenStatus, message, "error");
+    if (statusEl !== tokenStatus && !adminAuthenticated) {
+      setTokenFeedback(message, "error");
     }
     return null;
   } finally {
@@ -3453,6 +3595,9 @@ async function runWithFeedback(work, options = {}) {
         setBusy(target, false);
       }
     });
+    for (const { button } of busyButtons) {
+      setButtonBusyState(button, false);
+    }
     updateAdminSessionUi();
   }
 }
@@ -3566,6 +3711,13 @@ function clearAdminState() {
 function updateAdminSessionUi() {
   document.body.classList.toggle("admin-authenticated", adminAuthenticated);
   authBanner?.toggleAttribute("hidden", adminAuthenticated);
+  if (authState) {
+    authState.textContent = adminAuthenticated ? msg.authStateLoggedIn ?? "Signed in" : msg.authStateLoggedOut ?? "Sign in required";
+    authState.dataset.state = adminAuthenticated ? "success" : "warning";
+  }
+  if (authDetail) {
+    authDetail.textContent = adminAuthenticated ? msg.authDetailLoggedIn ?? "Live changes are enabled." : msg.authDetailLoggedOut ?? "Live changes are locked.";
+  }
   const lockLabel = msg.authOverlayLabel ?? "Sign in to unlock this section.";
   for (const section of protectedSections) {
     section.classList.toggle("is-locked", !adminAuthenticated);
@@ -3585,17 +3737,20 @@ function updateAdminSessionUi() {
       tokenInput.value = "";
     }
   }
+  if (tokenLabel) {
+    tokenLabel.hidden = adminAuthenticated;
+  }
+  if (tokenLoginRow) {
+    tokenLoginRow.hidden = adminAuthenticated;
+  }
   if (applyTokenButton) {
     applyTokenButton.disabled = adminAuthenticated;
   }
   if (logoutButton) {
     logoutButton.hidden = !adminAuthenticated;
   }
-  if (!adminAuthenticated) {
-    setStatus(tokenStatus, msg.tokenStatusDefault, "warning");
-    if (authBannerStatus) {
-      setStatus(authBannerStatus, msg.authBannerCopy ?? "Sign in before changing live settings or issuing keys.");
-    }
+  if (authBannerStatus) {
+    setStatus(authBannerStatus, msg.authBannerCopy ?? "Sign in before changing live settings or issuing keys.");
   }
 }
 function setMethodFormMode(editing) {
@@ -4089,7 +4244,7 @@ async function refreshDashboard() {
   dashboard = await requestAdmin("/api/admin/dashboard");
   collector = dashboard.collectorStatus ?? collector;
   renderAll();
-  setStatus(tokenStatus, msg.dashboardLoaded, "success");
+  clearTokenFeedback();
 }
 async function refreshAdminData() {
   const [nextDashboard, runtimeResponse] = await Promise.all([
@@ -4102,7 +4257,7 @@ async function refreshAdminData() {
   activeRuntimeDatabase = runtimeResponse.activeDatabase;
   collector = nextDashboard.collectorStatus ?? collector;
   renderAll();
-  setStatus(tokenStatus, msg.dashboardLoaded, "success");
+  clearTokenFeedback();
 }
 async function refreshAdminSession() {
   const session = await requestJson("/api/admin/session");
@@ -4117,9 +4272,7 @@ async function refreshAdminSession() {
 async function loginAdminSession() {
   const token = tokenInput?.value.trim() ?? "";
   if (!token) {
-    if (tokenStatus) {
-      tokenStatus.textContent = msg.tokenStatusDefault;
-    }
+    setTokenFeedback(msg.tokenStatusDefault, "warning");
     return;
   }
   const result = await runWithFeedback(
@@ -4130,6 +4283,7 @@ async function loginAdminSession() {
     {
       statusEl: tokenStatus,
       busyTargets: [applyTokenButton, tokenInput],
+      busyButtons: [{ button: applyTokenButton, label: msg.tokenSaving }],
       pendingText: msg.tokenSaving,
       errorFallback: msg.dashboardError
     }
@@ -4150,7 +4304,8 @@ async function logoutAdminSession() {
     {
       statusEl: tokenStatus,
       busyTargets: [logoutButton],
-      pendingText: msg.tokenCleared
+      busyButtons: [{ button: logoutButton, label: msg.tokenLoggingOut ?? "Signing out..." }],
+      pendingText: msg.tokenLoggingOut ?? "Signing out..."
     }
   );
   if (!result) {
@@ -4160,7 +4315,7 @@ async function logoutAdminSession() {
   clearAdminState();
   renderAll();
   updateAdminSessionUi();
-  setStatus(tokenStatus, msg.tokenCleared, "success");
+  setTokenFeedback(msg.tokenCleared, "success");
 }
 async function handleMethodSubmit(event) {
   event.preventDefault();
@@ -4186,6 +4341,7 @@ async function handleMethodSubmit(event) {
     {
       statusEl: methodStatus,
       busyTargets: [methodForm],
+      busyButtons: [{ button: methodSubmitButton, label: msg.methodSaving ?? "Saving payment method..." }],
       pendingText: msg.methodSaving ?? "Saving payment method...",
       errorFallback: msg.dashboardError
     }
@@ -4197,7 +4353,7 @@ async function handleMethodSubmit(event) {
   setStatus(methodStatus, methodId ? msg.methodSaved ?? "Payment method updated." : msg.methodCreated ?? "Payment method created.", "success");
   await refreshDashboard();
 }
-async function togglePaymentMethod(methodId) {
+async function togglePaymentMethod(methodId, actionButton) {
   if (!dashboard) {
     return;
   }
@@ -4215,6 +4371,8 @@ async function togglePaymentMethod(methodId) {
     }),
     {
       statusEl: methodStatus,
+      busyTargets: actionButton ? [actionButton] : [],
+      busyButtons: actionButton ? [{ button: actionButton, label: msg.methodSaving ?? "Updating payment method..." }] : [],
       pendingText: msg.methodSaving ?? "Updating payment method...",
       errorFallback: msg.dashboardError
     }
@@ -4238,6 +4396,7 @@ async function saveCollectorSettings(event) {
     {
       statusEl: collectorStatusText,
       busyTargets: [collectorForm, collectorSyncButton],
+      busyButtons: [{ button: collectorSaveButton, label: msg.collectorSaving ?? "Saving collector settings..." }],
       pendingText: msg.collectorSaving ?? "Saving collector settings...",
       errorFallback: msg.dashboardError
     }
@@ -4262,6 +4421,7 @@ async function syncCollectorNow() {
     {
       statusEl: collectorStatusText,
       busyTargets: [collectorSyncButton, collectorForm],
+      busyButtons: [{ button: collectorSyncButton, label: msg.collectorSyncing ?? "Syncing mentions now..." }],
       pendingText: msg.collectorSyncing ?? "Syncing mentions now...",
       errorFallback: msg.dashboardError
     }
@@ -4286,6 +4446,7 @@ async function saveRuntimeSettings(event) {
     {
       statusEl: runtimeStatus,
       busyTargets: [runtimeForm, databaseTestButton, smtpTestButton],
+      busyButtons: [{ button: runtimeSaveButton, label: msg.runtimeSaving ?? "Saving runtime settings..." }],
       pendingText: msg.runtimeSaving ?? "Saving runtime settings...",
       errorFallback: msg.dashboardError
     }
@@ -4317,6 +4478,7 @@ async function testRuntimeDatabase() {
     {
       statusEl: runtimeStatus,
       busyTargets: [databaseTestButton],
+      busyButtons: [{ button: databaseTestButton, label: msg.databaseTesting ?? "Testing database connection..." }],
       pendingText: msg.databaseTesting ?? "Testing database connection...",
       errorFallback: msg.dashboardError
     }
@@ -4337,6 +4499,7 @@ async function testRuntimeSmtp() {
     {
       statusEl: smtpStatus,
       busyTargets: [smtpTestButton],
+      busyButtons: [{ button: smtpTestButton, label: msg.smtpTesting ?? "Testing SMTP connection..." }],
       pendingText: msg.smtpTesting ?? "Testing SMTP connection...",
       errorFallback: msg.dashboardError
     }
@@ -4356,6 +4519,7 @@ async function saveStorefrontSettings(event) {
     {
       statusEl: storefrontStatus,
       busyTargets: [storefrontForm],
+      busyButtons: [{ button: storefrontSaveButton, label: msg.storefrontSaving ?? "Saving storefront settings..." }],
       pendingText: msg.storefrontSaving ?? "Saving storefront settings...",
       errorFallback: msg.dashboardError
     }
@@ -4413,6 +4577,7 @@ async function handleOrderAction(target) {
       {
         statusEl: ordersStatus,
         busyTargets: [actionButton],
+        busyButtons: [{ button: actionButton, label: msg.orderMarkingPaid ?? "Marking the order as paid..." }],
         pendingText: msg.orderMarkingPaid ?? "Marking the order as paid...",
         errorFallback: msg.dashboardError
       }
@@ -4448,6 +4613,12 @@ async function handleOrderAction(target) {
       {
         statusEl: ordersStatus,
         busyTargets: [actionButton, copyEmailButton],
+        busyButtons: [
+          {
+            button: actionButton,
+            label: isReissue ? msg.keyReissuing ?? "Reissuing a key..." : msg.keyIssuing ?? "Issuing a key..."
+          }
+        ],
         pendingText: isReissue ? msg.keyReissuing ?? "Reissuing a key..." : msg.keyIssuing ?? "Issuing a key...",
         errorFallback: msg.dashboardError
       }
@@ -4482,6 +4653,7 @@ ${result.emailDraft.body}`;
       {
         statusEl: ordersStatus,
         busyTargets: [actionButton, copyEmailButton],
+        busyButtons: [{ button: actionButton, label: msg.emailSending ?? "Sending email..." }],
         pendingText: msg.emailSending ?? "Sending email...",
         errorFallback: msg.dashboardError
       }
@@ -4524,6 +4696,7 @@ async function handleLicenseAction(target) {
     {
       statusEl: licensesStatus,
       busyTargets: [actionButton],
+      busyButtons: [{ button: actionButton, label: msg.licenseRevoking ?? "Revoking the key..." }],
       pendingText: msg.licenseRevoking ?? "Revoking the key...",
       errorFallback: msg.dashboardError
     }
@@ -4553,16 +4726,12 @@ function bindEvents() {
   }
   applyTokenButton?.addEventListener("click", () => {
     void loginAdminSession().catch((error) => {
-      if (tokenStatus) {
-        tokenStatus.textContent = error instanceof Error ? error.message : msg.dashboardError;
-      }
+      setTokenFeedback(error instanceof Error ? error.message : msg.dashboardError, "error");
     });
   });
   logoutButton?.addEventListener("click", () => {
     void logoutAdminSession().catch((error) => {
-      if (tokenStatus) {
-        tokenStatus.textContent = error instanceof Error ? error.message : msg.dashboardError;
-      }
+      setTokenFeedback(error instanceof Error ? error.message : msg.dashboardError, "error");
     });
   });
   tokenInput?.addEventListener("keydown", (event) => {
@@ -4571,16 +4740,12 @@ function bindEvents() {
     }
     event.preventDefault();
     void loginAdminSession().catch((error) => {
-      if (tokenStatus) {
-        tokenStatus.textContent = error instanceof Error ? error.message : msg.dashboardError;
-      }
+      setTokenFeedback(error instanceof Error ? error.message : msg.dashboardError, "error");
     });
   });
   reloadButton?.addEventListener("click", () => {
     void refreshAdminData().catch((error) => {
-      if (tokenStatus) {
-        tokenStatus.textContent = error instanceof Error ? error.message : msg.dashboardError;
-      }
+      setTokenFeedback(error instanceof Error ? error.message : msg.dashboardError, "error");
     });
   });
   methodForm?.addEventListener("submit", (event) => {
@@ -4607,7 +4772,7 @@ function bindEvents() {
     }
     const methodId = target.getAttribute("data-toggle-method");
     if (methodId) {
-      void togglePaymentMethod(methodId);
+      void togglePaymentMethod(methodId, target.closest("button"));
     }
   });
   collectorForm?.addEventListener("submit", (event) => {
@@ -4706,9 +4871,7 @@ void (async () => {
   try {
     authenticated = await refreshAdminSession();
   } catch (error) {
-    if (tokenStatus) {
-      tokenStatus.textContent = error instanceof Error ? error.message : msg.dashboardError;
-    }
+    setTokenFeedback(error instanceof Error ? error.message : msg.dashboardError, "error");
   }
   if (!authenticated) {
     return;
@@ -4716,8 +4879,6 @@ void (async () => {
   try {
     await refreshAdminData();
   } catch (error) {
-    if (tokenStatus) {
-      tokenStatus.textContent = error instanceof Error ? error.message : msg.dashboardError;
-    }
+    setTokenFeedback(error instanceof Error ? error.message : msg.dashboardError, "error");
   }
 })();

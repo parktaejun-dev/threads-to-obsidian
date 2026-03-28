@@ -2530,8 +2530,8 @@ var ko = {
   popupTitle: "\uD604\uC7AC \uAE00 \uC800\uC7A5",
   popupSave: "\uD604\uC7AC \uAE00 \uC800\uC7A5",
   popupSettings: "\uC124\uC815",
-  popupPromoTitle: "\uD5A5\uD6C4 \uD655\uC7A5 \uC601\uC5ED",
-  popupPromoDescription: "\uCD94\uD6C4 \uC548\uB0B4\uC640 \uCD94\uCC9C\uC774 \uB4E4\uC5B4\uAC08 \uC790\uB9AC\uB97C \uBBF8\uB9AC \uD655\uBCF4\uD574 \uB450\uC5C8\uC2B5\uB2C8\uB2E4.",
+  popupPromoTitle: "\uAD11\uACE0 \uC2AC\uB86F",
+  popupPromoDescription: "\uD5A5\uD6C4 \uAD11\uACE0 \uC601\uC5ED",
   popupSubtitleDirect: "\uC5F0\uACB0\uB41C Obsidian \uD3F4\uB354\uC5D0 \uBC14\uB85C \uC800\uC7A5\uD569\uB2C8\uB2E4.",
   popupSubtitleDownload: "\uC800\uC7A5 \uD3F4\uB354\uAC00 \uC5C6\uC5B4 \uD30C\uC77C\uB85C \uB2E4\uC6B4\uB85C\uB4DC\uD569\uB2C8\uB2E4. \uC124\uC815\uC5D0\uC11C \uD3F4\uB354\uB97C \uC5F0\uACB0\uD558\uC138\uC694.",
   popupSubtitleConnected: "\uC5F0\uACB0\uB41C Obsidian \uD3F4\uB354\uC5D0 \uBC14\uB85C \uC800\uC7A5\uD569\uB2C8\uB2E4.",
@@ -2540,7 +2540,7 @@ var ko = {
   popupSubtitleUnsupported: "\uC774 \uBE0C\uB77C\uC6B0\uC800\uC5D0\uC11C\uB294 \uD30C\uC77C\uB85C \uB2E4\uC6B4\uB85C\uB4DC\uD569\uB2C8\uB2E4.",
   popupSubtitleNotion: "\uC124\uC815\uD55C Notion \uB300\uC0C1\uC5D0 \uC0C8 \uD398\uC774\uC9C0\uB85C \uC800\uC7A5\uD569\uB2C8\uB2E4.",
   popupSubtitleNotionSetup: "Notion \uC800\uC7A5\uC744 \uC4F0\uB824\uBA74 \uC124\uC815\uC5D0\uC11C \uD1A0\uD070\uACFC \uC800\uC7A5 \uB300\uC0C1\uC744 \uBA3C\uC800 \uC785\uB825\uD558\uC138\uC694.",
-  popupSubtitleCloud: "Threads Archive scrapbook \uD074\uB77C\uC6B0\uB4DC\uC5D0 \uC800\uC7A5\uD569\uB2C8\uB2E4. \uBA3C\uC800 \uC6F9\uC5D0\uC11C \uB85C\uADF8\uC778\uB418\uC5B4 \uC788\uC5B4\uC57C \uD569\uB2C8\uB2E4.",
+  popupSubtitleCloud: "",
   popupRecentSaves: "\uCD5C\uADFC \uC800\uC7A5",
   popupClearAll: "\uC804\uCCB4 \uC0AD\uC81C",
   popupEmpty: "\uC544\uC9C1 \uC800\uC7A5\uD55C \uAE00\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.",
@@ -2817,8 +2817,8 @@ var en = {
   popupTitle: "Save Current Post",
   popupSave: "Save Current Post",
   popupSettings: "Settings",
-  popupPromoTitle: "Reserved Area",
-  popupPromoDescription: "This space is reserved for future guidance and recommendations.",
+  popupPromoTitle: "Ad Slot",
+  popupPromoDescription: "Reserved for ads.",
   popupSubtitleDirect: "Saving directly to your connected Obsidian folder.",
   popupSubtitleDownload: "No folder connected. Saving as a download. Connect a folder in settings.",
   popupSubtitleConnected: "Saving directly to your connected Obsidian folder.",
@@ -2827,7 +2827,7 @@ var en = {
   popupSubtitleUnsupported: "This browser only supports file downloads.",
   popupSubtitleNotion: "Saving to your configured Notion destination.",
   popupSubtitleNotionSetup: "To use Notion saving, enter your token and destination in settings first.",
-  popupSubtitleCloud: "Saving to your Threads Archive cloud scrapbook. Make sure you are signed in on the web first.",
+  popupSubtitleCloud: "",
   popupRecentSaves: "Recent Saves",
   popupClearAll: "Clear All",
   popupEmpty: "No saved posts yet.",
@@ -3103,8 +3103,8 @@ var ja = {
   popupTitle: "\u73FE\u5728\u306E\u6295\u7A3F\u3092\u4FDD\u5B58",
   popupSave: "\u73FE\u5728\u306E\u6295\u7A3F\u3092\u4FDD\u5B58",
   popupSettings: "\u8A2D\u5B9A",
-  popupPromoTitle: "\u4E88\u7D04\u6E08\u307F\u30A8\u30EA\u30A2",
-  popupPromoDescription: "\u4ECA\u5F8C\u306E\u6848\u5185\u3084\u304A\u3059\u3059\u3081\u3092\u8868\u793A\u3059\u308B\u305F\u3081\u306E\u9818\u57DF\u3067\u3059\u3002",
+  popupPromoTitle: "\u5E83\u544A\u67A0",
+  popupPromoDescription: "\u4ECA\u5F8C\u306E\u5E83\u544A\u67A0\u3067\u3059\u3002",
   popupSubtitleDirect: "\u63A5\u7D9A\u6E08\u307F\u306E Obsidian \u30D5\u30A9\u30EB\u30C0\u306B\u76F4\u63A5\u4FDD\u5B58\u3057\u307E\u3059\u3002",
   popupSubtitleDownload: "\u30D5\u30A9\u30EB\u30C0\u304C\u63A5\u7D9A\u3055\u308C\u3066\u3044\u306A\u3044\u305F\u3081\u3001\u30D5\u30A1\u30A4\u30EB\u3068\u3057\u3066\u30C0\u30A6\u30F3\u30ED\u30FC\u30C9\u3057\u307E\u3059\u3002\u8A2D\u5B9A\u3067\u30D5\u30A9\u30EB\u30C0\u3092\u63A5\u7D9A\u3057\u3066\u304F\u3060\u3055\u3044\u3002",
   popupSubtitleConnected: "\u63A5\u7D9A\u6E08\u307F\u306E Obsidian \u30D5\u30A9\u30EB\u30C0\u306B\u76F4\u63A5\u4FDD\u5B58\u3057\u307E\u3059\u3002",
@@ -3113,7 +3113,7 @@ var ja = {
   popupSubtitleUnsupported: "\u3053\u306E\u30D6\u30E9\u30A6\u30B6\u3067\u306F\u30D5\u30A1\u30A4\u30EB\u306E\u30C0\u30A6\u30F3\u30ED\u30FC\u30C9\u306E\u307F\u5229\u7528\u3067\u304D\u307E\u3059\u3002",
   popupSubtitleNotion: "\u8A2D\u5B9A\u6E08\u307F\u306E Notion \u4FDD\u5B58\u5148\u306B\u4FDD\u5B58\u3057\u307E\u3059\u3002",
   popupSubtitleNotionSetup: "Notion \u4FDD\u5B58\u3092\u4F7F\u3046\u306B\u306F\u3001\u5148\u306B\u8A2D\u5B9A\u3067\u30C8\u30FC\u30AF\u30F3\u3068\u4FDD\u5B58\u5148\u3092\u6307\u5B9A\u3057\u3066\u304F\u3060\u3055\u3044\u3002",
-  popupSubtitleCloud: "Threads Archive \u306E\u30AF\u30E9\u30A6\u30C9 scrapbook \u306B\u4FDD\u5B58\u3057\u307E\u3059\u3002\u5148\u306B Web \u3067\u30B5\u30A4\u30F3\u30A4\u30F3\u3057\u3066\u304F\u3060\u3055\u3044\u3002",
+  popupSubtitleCloud: "",
   popupRecentSaves: "\u6700\u8FD1\u306E\u4FDD\u5B58",
   popupClearAll: "\u3059\u3079\u3066\u524A\u9664",
   popupEmpty: "\u307E\u3060\u4FDD\u5B58\u3057\u305F\u6295\u7A3F\u306F\u3042\u308A\u307E\u305B\u3093\u3002",
@@ -3358,8 +3358,8 @@ var ptBR = {
   popupTitle: "Salvar post atual",
   popupSave: "Salvar post atual",
   popupSettings: "Configura\xE7\xF5es",
-  popupPromoTitle: "\xC1rea reservada",
-  popupPromoDescription: "Este espa\xE7o est\xE1 reservado para futuras orienta\xE7\xF5es e recomenda\xE7\xF5es.",
+  popupPromoTitle: "Espa\xE7o de an\xFAncio",
+  popupPromoDescription: "Reservado para an\xFAncios.",
   popupSubtitleDirect: "Salvando diretamente na pasta do Obsidian conectada.",
   popupSubtitleDownload: "Nenhuma pasta conectada. O conte\xFAdo ser\xE1 baixado como arquivo. Conecte uma pasta nas configura\xE7\xF5es.",
   popupSubtitleConnected: "Salvando diretamente na pasta do Obsidian conectada.",
@@ -3368,7 +3368,7 @@ var ptBR = {
   popupSubtitleUnsupported: "Este navegador s\xF3 oferece suporte a download de arquivos.",
   popupSubtitleNotion: "Salvando no destino do Notion configurado.",
   popupSubtitleNotionSetup: "Para usar o salvamento no Notion, informe primeiro o token e o destino nas configura\xE7\xF5es.",
-  popupSubtitleCloud: "Salvando no seu scrapbook em nuvem do Threads Archive. Primeiro fa\xE7a login na web.",
+  popupSubtitleCloud: "",
   popupRecentSaves: "Salvos recentes",
   popupClearAll: "Limpar tudo",
   popupEmpty: "Ainda n\xE3o h\xE1 posts salvos.",
@@ -3608,8 +3608,8 @@ var es = {
   popupTitle: "Guardar publicaci\xF3n actual",
   popupSave: "Guardar publicaci\xF3n actual",
   popupSettings: "Configuraci\xF3n",
-  popupPromoTitle: "\xC1rea reservada",
-  popupPromoDescription: "Este espacio queda reservado para futuras gu\xEDas y recomendaciones.",
+  popupPromoTitle: "Espacio publicitario",
+  popupPromoDescription: "Reservado para anuncios.",
   popupSubtitleDirect: "Guardando directamente en tu carpeta conectada de Obsidian.",
   popupSubtitleDownload: "No hay carpeta conectada. Se descargar\xE1 como archivo. Conecta una carpeta en la configuraci\xF3n.",
   popupSubtitleConnected: "Guardando directamente en tu carpeta conectada de Obsidian.",
@@ -3618,7 +3618,7 @@ var es = {
   popupSubtitleUnsupported: "Este navegador solo admite descargas de archivos.",
   popupSubtitleNotion: "Guardando en tu destino de Notion configurado.",
   popupSubtitleNotionSetup: "Para usar el guardado en Notion, primero configura el token y el destino.",
-  popupSubtitleCloud: "Guardando en tu scrapbook en la nube de Threads Archive. Primero inicia sesi\xF3n en la web.",
+  popupSubtitleCloud: "",
   popupRecentSaves: "Guardados recientes",
   popupClearAll: "Borrar todo",
   popupEmpty: "Todav\xEDa no hay publicaciones guardadas.",
@@ -3858,8 +3858,8 @@ var zhTW = {
   popupTitle: "\u5132\u5B58\u76EE\u524D\u8CBC\u6587",
   popupSave: "\u5132\u5B58\u76EE\u524D\u8CBC\u6587",
   popupSettings: "\u8A2D\u5B9A",
-  popupPromoTitle: "\u4FDD\u7559\u5340\u57DF",
-  popupPromoDescription: "\u9019\u500B\u5340\u57DF\u4FDD\u7559\u7D66\u4E4B\u5F8C\u7684\u8AAA\u660E\u8207\u63A8\u85A6\u5167\u5BB9\u3002",
+  popupPromoTitle: "\u5EE3\u544A\u6B04\u4F4D",
+  popupPromoDescription: "\u4FDD\u7559\u4F5C\u70BA\u5EE3\u544A\u5340\u57DF\u3002",
   popupSubtitleDirect: "\u6B63\u5728\u76F4\u63A5\u5132\u5B58\u5230\u4F60\u5DF2\u9023\u63A5\u7684 Obsidian \u8CC7\u6599\u593E\u3002",
   popupSubtitleDownload: "\u5C1A\u672A\u9023\u63A5\u8CC7\u6599\u593E\u3002\u5C07\u4EE5\u6A94\u6848\u5F62\u5F0F\u4E0B\u8F09\u3002\u8ACB\u5728\u8A2D\u5B9A\u4E2D\u9023\u63A5\u8CC7\u6599\u593E\u3002",
   popupSubtitleConnected: "\u6B63\u5728\u76F4\u63A5\u5132\u5B58\u5230\u4F60\u5DF2\u9023\u63A5\u7684 Obsidian \u8CC7\u6599\u593E\u3002",
@@ -3868,7 +3868,7 @@ var zhTW = {
   popupSubtitleUnsupported: "\u6B64\u700F\u89BD\u5668\u50C5\u652F\u63F4\u6A94\u6848\u4E0B\u8F09\u3002",
   popupSubtitleNotion: "\u6B63\u5728\u5132\u5B58\u5230\u4F60\u8A2D\u5B9A\u7684 Notion \u76EE\u7684\u5730\u3002",
   popupSubtitleNotionSetup: "\u82E5\u8981\u4F7F\u7528 Notion \u5132\u5B58\uFF0C\u8ACB\u5148\u5728\u8A2D\u5B9A\u4E2D\u586B\u5165 token \u8207\u76EE\u7684\u5730\u3002",
-  popupSubtitleCloud: "\u6B63\u5728\u5132\u5B58\u5230\u4F60\u7684 Threads Archive \u96F2\u7AEF scrapbook\u3002\u8ACB\u5148\u5728\u7DB2\u9801\u4E0A\u767B\u5165\u3002",
+  popupSubtitleCloud: "",
   popupRecentSaves: "\u6700\u8FD1\u5132\u5B58",
   popupClearAll: "\u5168\u90E8\u6E05\u9664",
   popupEmpty: "\u76EE\u524D\u9084\u6C92\u6709\u5132\u5B58\u7684\u8CBC\u6587\u3002",
@@ -4108,8 +4108,8 @@ var vi = {
   popupTitle: "L\u01B0u b\xE0i vi\u1EBFt hi\u1EC7n t\u1EA1i",
   popupSave: "L\u01B0u b\xE0i vi\u1EBFt hi\u1EC7n t\u1EA1i",
   popupSettings: "C\xE0i \u0111\u1EB7t",
-  popupPromoTitle: "Khu v\u1EF1c d\u1EF1 tr\u1EEF",
-  popupPromoDescription: "Khu v\u1EF1c n\xE0y \u0111\u01B0\u1EE3c d\xE0nh s\u1EB5n cho h\u01B0\u1EDBng d\u1EABn v\xE0 g\u1EE3i \xFD trong t\u01B0\u01A1ng lai.",
+  popupPromoTitle: "V\u1ECB tr\xED qu\u1EA3ng c\xE1o",
+  popupPromoDescription: "D\xE0nh cho qu\u1EA3ng c\xE1o sau n\xE0y.",
   popupSubtitleDirect: "\u0110ang l\u01B0u tr\u1EF1c ti\u1EBFp v\xE0o th\u01B0 m\u1EE5c Obsidian \u0111\xE3 k\u1EBFt n\u1ED1i.",
   popupSubtitleDownload: "Ch\u01B0a k\u1EBFt n\u1ED1i th\u01B0 m\u1EE5c. B\xE0i vi\u1EBFt s\u1EBD \u0111\u01B0\u1EE3c t\u1EA3i xu\u1ED1ng d\u01B0\u1EDBi d\u1EA1ng t\u1EC7p. H\xE3y k\u1EBFt n\u1ED1i th\u01B0 m\u1EE5c trong ph\u1EA7n c\xE0i \u0111\u1EB7t.",
   popupSubtitleConnected: "\u0110ang l\u01B0u tr\u1EF1c ti\u1EBFp v\xE0o th\u01B0 m\u1EE5c Obsidian \u0111\xE3 k\u1EBFt n\u1ED1i.",
@@ -4118,7 +4118,7 @@ var vi = {
   popupSubtitleUnsupported: "Tr\xECnh duy\u1EC7t n\xE0y ch\u1EC9 h\u1ED7 tr\u1EE3 t\u1EA3i t\u1EC7p xu\u1ED1ng.",
   popupSubtitleNotion: "\u0110ang l\u01B0u v\xE0o \u0111\xEDch Notion \u0111\xE3 c\u1EA5u h\xECnh.",
   popupSubtitleNotionSetup: "\u0110\u1EC3 d\xF9ng l\u01B0u v\xE0o Notion, tr\u01B0\u1EDBc ti\xEAn h\xE3y nh\u1EADp token v\xE0 \u0111\xEDch l\u01B0u trong ph\u1EA7n c\xE0i \u0111\u1EB7t.",
-  popupSubtitleCloud: "\u0110ang l\u01B0u v\xE0o scrapbook \u0111\xE1m m\xE2y c\u1EE7a Threads Archive. H\xE3y \u0111\u0103ng nh\u1EADp tr\xEAn web tr\u01B0\u1EDBc.",
+  popupSubtitleCloud: "",
   popupRecentSaves: "L\u1EA7n l\u01B0u g\u1EA7n \u0111\xE2y",
   popupClearAll: "X\xF3a t\u1EA5t c\u1EA3",
   popupEmpty: "Ch\u01B0a c\xF3 b\xE0i vi\u1EBFt n\xE0o \u0111\u01B0\u1EE3c l\u01B0u.",
@@ -4361,6 +4361,22 @@ var dictionaries = {
   "zh-TW": zhTW,
   vi
 };
+var PLAN_BRAND_PATTERN = /\bPro\b/g;
+var brandedDictionaryCache = /* @__PURE__ */ new WeakMap();
+function applyPlanBrandingToString(value) {
+  return value.replaceAll("SS Threads Pro", "SS Threads Plus").replace(PLAN_BRAND_PATTERN, "Plus");
+}
+function brandMessages(messages) {
+  const cached = brandedDictionaryCache.get(messages);
+  if (cached) {
+    return cached;
+  }
+  const branded = Object.fromEntries(
+    Object.entries(messages).map(([key, value]) => [key, applyPlanBrandingToString(value)])
+  );
+  brandedDictionaryCache.set(messages, branded);
+  return branded;
+}
 var currentLocale = null;
 function detectDefaultLocale() {
   return detectLocaleFromNavigator(typeof navigator !== "undefined" ? navigator.language : null, "en");
@@ -4383,10 +4399,10 @@ async function getLocale() {
 }
 async function t() {
   const locale = await getLocale();
-  return dictionaries[locale];
+  return brandMessages(dictionaries[locale]);
 }
 function tSync(locale) {
-  return dictionaries[locale];
+  return brandMessages(dictionaries[locale]);
 }
 
 // src/lib/pro-activation.ts
@@ -4671,10 +4687,20 @@ var OLD_FIRST_SENTENCE_DEFAULT_FILENAME_PATTERN = "{author}_{first_sentence}";
 var PREVIOUS_SHORTCODE_DEFAULT_FILENAME_PATTERN = "{author}_{shortcode}";
 var MAX_RECENT_SAVES = 10;
 var PLAN_STATUS_TTL_MS = 5 * 6e4;
+function normalizeStoredSaveTarget(value) {
+  if (value === "threads_cloud") {
+    return "cloud";
+  }
+  if (value === "obsidian" || value === "notion" || value === "cloud") {
+    return value;
+  }
+  return void 0;
+}
 function mergeOptionsWithDefaults(options) {
   return {
     ...DEFAULT_OPTIONS,
     ...options,
+    saveTarget: normalizeStoredSaveTarget(options?.saveTarget) ?? DEFAULT_OPTIONS.saveTarget,
     notion: {
       ...DEFAULT_OPTIONS.notion,
       ...options?.notion ?? {}
@@ -4707,6 +4733,7 @@ function normalizeRecentSave(item) {
     savedRelativePath: item.savedRelativePath ?? null,
     remotePageId: item.remotePageId ?? null,
     remotePageUrl: item.remotePageUrl ?? null,
+    remoteOrigin: item.remoteOrigin ?? (saveTarget === "cloud" ? "cloud" : void 0),
     warning: item.warning ?? null,
     post,
     title: decodeEscapedJsonString(item.title)
@@ -4717,6 +4744,7 @@ async function getOptions() {
   const storedOptions = stored[OPTIONS_KEY];
   const merged = mergeOptionsWithDefaults(storedOptions);
   let shouldPersist = false;
+  const normalizedStoredSaveTarget = normalizeStoredSaveTarget(storedOptions?.saveTarget);
   if (!merged.filenamePattern || merged.filenamePattern === LEGACY_DEFAULT_FILENAME_PATTERN || merged.filenamePattern === PREVIOUS_DEFAULT_FILENAME_PATTERN || merged.filenamePattern === OLD_FIRST_SENTENCE_DEFAULT_FILENAME_PATTERN || merged.filenamePattern === PREVIOUS_SHORTCODE_DEFAULT_FILENAME_PATTERN) {
     merged.filenamePattern = DEFAULT_OPTIONS.filenamePattern;
     shouldPersist = true;
@@ -4727,6 +4755,9 @@ async function getOptions() {
   }
   if (merged.saveTarget === void 0) {
     merged.saveTarget = DEFAULT_OPTIONS.saveTarget;
+    shouldPersist = true;
+  }
+  if (normalizedStoredSaveTarget !== storedOptions?.saveTarget) {
     shouldPersist = true;
   }
   if (merged.savePathPattern === void 0) {
@@ -4962,6 +4993,7 @@ function buildRecentSaveFromCloudArchive(record) {
     savedRelativePath: null,
     remotePageId: record.archiveId,
     remotePageUrl: record.archiveUrl,
+    remoteOrigin: record.origin ?? "cloud",
     warning: record.warning,
     post: record.post
   };
@@ -6140,6 +6172,7 @@ async function createCloudRecentSave(post, archiveId, archiveUrl, archiveTitle, 
     savedRelativePath: null,
     remotePageId: archiveId,
     remotePageUrl: archiveUrl,
+    remoteOrigin: "cloud",
     warning,
     post
   };
@@ -6248,6 +6281,7 @@ async function saveCurrentPost(tab, allowDuplicate = false, imageOverride) {
         savedRelativePath: null,
         remotePageId: cloudResult.archiveId,
         remotePageUrl: cloudResult.archiveUrl,
+        remoteOrigin: "cloud",
         warning: cloudResult.warning,
         post
       } : await createCloudRecentSave(
@@ -6386,6 +6420,7 @@ async function redownloadSave(saveId, successMessage, imageOverride) {
         savedRelativePath: null,
         remotePageId: cloudResult.archiveId,
         remotePageUrl: cloudResult.archiveUrl,
+        remoteOrigin: "cloud",
         warning: cloudResult.warning
       };
       await upsertRecentSave(updatedSave2);

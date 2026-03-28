@@ -107,6 +107,48 @@ test("mutating public routes reject requests without an Origin header", async ()
   }
 });
 
+test("production startup rejects file-backed runtime databases", () => {
+  const previousAdminToken = process.env.THREADS_WEB_ADMIN_TOKEN;
+  const previousNodeEnv = process.env.NODE_ENV;
+  const previousStoreBackend = process.env.THREADS_WEB_STORE_BACKEND;
+  const previousPostgresUrl = process.env.THREADS_WEB_POSTGRES_URL;
+
+  process.env.THREADS_WEB_ADMIN_TOKEN = "threads-admin-secret";
+  process.env.NODE_ENV = "production";
+  delete process.env.THREADS_WEB_STORE_BACKEND;
+  delete process.env.THREADS_WEB_POSTGRES_URL;
+  replaceRuntimeConfigForTests(null);
+
+  try {
+    assert.throws(
+      () => createWebRequestHandler(),
+      /THREADS_WEB_STORE_BACKEND=postgres/
+    );
+  } finally {
+    if (typeof previousAdminToken === "string") {
+      process.env.THREADS_WEB_ADMIN_TOKEN = previousAdminToken;
+    } else {
+      delete process.env.THREADS_WEB_ADMIN_TOKEN;
+    }
+    if (typeof previousNodeEnv === "string") {
+      process.env.NODE_ENV = previousNodeEnv;
+    } else {
+      delete process.env.NODE_ENV;
+    }
+    if (typeof previousStoreBackend === "string") {
+      process.env.THREADS_WEB_STORE_BACKEND = previousStoreBackend;
+    } else {
+      delete process.env.THREADS_WEB_STORE_BACKEND;
+    }
+    if (typeof previousPostgresUrl === "string") {
+      process.env.THREADS_WEB_POSTGRES_URL = previousPostgresUrl;
+    } else {
+      delete process.env.THREADS_WEB_POSTGRES_URL;
+    }
+    replaceRuntimeConfigForTests(null);
+  }
+});
+
 test("JSON endpoints require application/json content types", async () => {
   const previousAdminToken = process.env.THREADS_WEB_ADMIN_TOKEN;
   const previousDbFile = process.env.THREADS_WEB_DB_FILE;

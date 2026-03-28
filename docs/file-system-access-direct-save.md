@@ -225,7 +225,7 @@ export interface ExtensionOptions {
 
 저장소 설계:
 
-- DB 이름: `threads-to-obsidian`
+- DB 이름(레거시 호환 유지용): `threads-to-obsidian`
 - object store: `handles`
 - key: `"obsidian-target-directory"`
 - value:

@@ -7,8 +7,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(__dirname, "..");
 const extensionDist = path.join(root, "dist", "extension");
 const releaseOutputDir = path.join(root, "output", "release-assets");
-const releaseAssetName = "threads-saver-extension.zip";
-const archiveRootDirectory = "threads-saver-extension";
+const releaseAssetName = "ss-threads-extension.zip";
+const archiveRootDirectory = "ss-threads-extension";
 
 async function addDirectoryToZip(zip, sourceDir, zipDir) {
   const entries = await readdir(sourceDir, { withFileTypes: true });

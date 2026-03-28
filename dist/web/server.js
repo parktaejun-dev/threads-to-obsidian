@@ -9882,15 +9882,22 @@ function parseJsonWebKey(raw, source) {
     throw new Error(`Invalid JSON web key data in ${source}.`);
   }
 }
+var PRIVATE_KEY_ENV_NAME = "SS_THREADS_PRO_PRIVATE_JWK";
+var PRIVATE_KEY_FILE_ENV_NAME = "SS_THREADS_PRO_PRIVATE_JWK_FILE";
+var LEGACY_PRIVATE_KEY_ENV_NAME = "THREADS_TO_OBSIDIAN_PRO_PRIVATE_JWK";
+var LEGACY_PRIVATE_KEY_FILE_ENV_NAME = "THREADS_TO_OBSIDIAN_PRO_PRIVATE_JWK_FILE";
 async function readPrivateKeyJwk() {
-  const inline = process.env.THREADS_TO_OBSIDIAN_PRO_PRIVATE_JWK?.trim();
+  const inline = process.env[PRIVATE_KEY_ENV_NAME]?.trim() || process.env[LEGACY_PRIVATE_KEY_ENV_NAME]?.trim();
   if (inline) {
-    return parseJsonWebKey(inline, "THREADS_TO_OBSIDIAN_PRO_PRIVATE_JWK");
+    return parseJsonWebKey(
+      inline,
+      process.env[PRIVATE_KEY_ENV_NAME]?.trim() ? PRIVATE_KEY_ENV_NAME : LEGACY_PRIVATE_KEY_ENV_NAME
+    );
   }
-  const explicitFile = process.env.THREADS_TO_OBSIDIAN_PRO_PRIVATE_JWK_FILE?.trim();
+  const explicitFile = process.env[PRIVATE_KEY_FILE_ENV_NAME]?.trim() || process.env[LEGACY_PRIVATE_KEY_FILE_ENV_NAME]?.trim();
   if (!explicitFile) {
     throw new Error(
-      "Missing license private key. Set THREADS_TO_OBSIDIAN_PRO_PRIVATE_JWK or THREADS_TO_OBSIDIAN_PRO_PRIVATE_JWK_FILE."
+      `Missing license private key. Set ${PRIVATE_KEY_ENV_NAME} or ${PRIVATE_KEY_FILE_ENV_NAME}. Legacy THREADS_TO_OBSIDIAN_* names are still accepted.`
     );
   }
   const fileContents = await readFile(explicitFile, "utf8");
@@ -9932,24 +9939,26 @@ function buildTokenPreview(token) {
   return `${token.slice(0, 12)}...${token.slice(-8)}`;
 }
 function buildDeliveryDraft(order, license) {
-  const subject = "Your Threads to Obsidian Pro key";
+  const cycleLabel = order.billingCycle === "monthly" ? "monthly" : "yearly";
+  const subject = "Your SS Threads Plus key";
   const body = [
     `Hi ${order.buyerName || "there"},`,
     "",
-    "Thanks for purchasing Threads to Obsidian Pro.",
+    `Thanks for purchasing SS Threads Plus (${cycleLabel}).`,
     "",
-    "Your Pro key:",
+    "Your Plus key:",
     license.token,
     "",
     "Activation steps:",
     "1. Open the extension settings page.",
-    "2. Go to the Pro section.",
+    "2. Go to the Plus section.",
     "3. Paste the key and activate organization rules.",
+    "4. In scrapbook, you can also paste the same key in the Plus panel to unlock the higher save/folder limits.",
     "",
     "Notes:",
     "- The key is meant for your use and should not be shared.",
     "- You can activate it on up to 3 devices. Remove it from an old device to free a seat.",
-    "- Free saving still works without this key.",
+    "- Free keeps working without this key, but scrapbook stays limited to 100 saved posts and 5 folders.",
     license.expiresAt ? `- This key expires on ${license.expiresAt}.` : "- This key currently has no expiration date.",
     "",
     "If you need help, reply to this email with the address you used for purchase.",
@@ -10084,38 +10093,38 @@ import { Pool } from "pg";
 
 // ../web-schema/src/index.ts
 var DEFAULT_SETTINGS = {
-  productName: "Threads Saver",
+  productName: "SS Threads",
   headline: "Threads \uC800\uC7A5\uC744 \uD55C \uACF3\uC5D0\uC11C.",
-  subheadline: "29\uB2EC\uB7EC 1\uD68C \uACB0\uC81C\uB85C Chrome extension Pro\uC640 scrapbook core\uB97C \uD568\uAED8 \uC501\uB2C8\uB2E4. Discovery, Search, Insights\uB294 cloud add-on\uC73C\uB85C \uD655\uC7A5\uD569\uB2C8\uB2E4.",
-  priceLabel: "Threads Saver Pro",
-  priceValue: "$29",
+  subheadline: "Free\uB294 \uC800\uC7A5\uAE00 100\uAC1C\uC640 \uD3F4\uB354 5\uAC1C\uAE4C\uC9C0. Plus\uB294 \uC800\uC7A5\uAE00 1,000\uAC1C\uC640 \uD3F4\uB354 50\uAC1C, \uADF8\uB9AC\uACE0 \uAE30\uC874 extension \uACE0\uAE09 \uC800\uC7A5 \uAE30\uB2A5\uAE4C\uC9C0 \uD568\uAED8 \uC5FD\uB2C8\uB2E4.",
+  priceLabel: "SS Threads Plus",
+  priceValue: "US$19.99",
   supportEmail: "hello@oxcorp.ninja",
-  includedUpdates: "1\uD68C \uACB0\uC81C \xB7 7\uC77C \uD658\uBD88 \xB7 extension Pro + scrapbook core",
+  includedUpdates: "US$2.99 monthly \xB7 US$19.99 yearly \xB7 scrapbook 1000/50 + extension advanced",
   heroNotes: [
-    "Free: \uD604\uC7AC \uAE00 \uC800\uC7A5 \xB7 \uC774\uBBF8\uC9C0 \uD3EC\uD568 \xB7 \uC791\uC131\uC790 \uC5F0\uC18D \uB2F5\uAE00",
-    "Pro: \uD30C\uC77C\uBA85 \uD328\uD134 \xB7 \uC800\uC7A5 \uACBD\uB85C \xB7 AI \uC694\uC57D \xB7 AI \uD0DC\uADF8 \xB7 scrapbook core",
-    "Cloud add-on: Watchlists \xB7 Keyword search \xB7 Insights"
+    "Free: \uC800\uC7A5\uAE00 100\uAC1C \xB7 \uD3F4\uB354 5\uAC1C",
+    "Plus: \uC800\uC7A5\uAE00 1,000\uAC1C \xB7 \uD3F4\uB354 50\uAC1C",
+    "Plus bonus: extension \uD30C\uC77C \uADDC\uCE59 \xB7 Notion \uACE0\uAE09 \uC800\uC7A5 \xB7 AI \uC815\uB9AC"
   ],
   faqs: [
     {
       id: "faq-1",
-      question: "\uC800\uC7A5\uD558\uB824\uBA74 Pro\uAC00 \uD544\uC694\uD55C\uAC00\uC694?",
-      answer: "\uC544\uB2C8\uC694. \uC800\uC7A5, \uC774\uBBF8\uC9C0 \uD3EC\uD568, \uC5F0\uC18D \uB2F5\uAE00, \uC911\uBCF5 \uAC74\uB108\uB700 \uBAA8\uB450 Free\uC5D0\uC11C \uAC00\uB2A5\uD569\uB2C8\uB2E4."
+      question: "\uBB34\uB8CC\uC5D0\uC11C\uB3C4 \uC800\uC7A5\uD560 \uC218 \uC788\uB098\uC694?",
+      answer: "\uB124. Free\uB294 \uC800\uC7A5\uAE00 100\uAC1C, \uD3F4\uB354 5\uAC1C\uAE4C\uC9C0 \uC0AC\uC6A9\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4."
     },
     {
       id: "faq-2",
-      question: "\uB204\uAC00 Pro\uB97C \uC0AC\uBA74 \uC88B\uB098\uC694?",
-      answer: "\uC800\uC7A5\uD560 \uB54C \uD30C\uC77C\uBA85\xB7\uACBD\uB85C \uADDC\uCE59\uC744 \uC9C1\uC811 \uC81C\uC5B4\uD558\uACE0, \uC790\uC2E0\uC758 LLM \uD0A4\uB85C \uC694\uC57D\xB7\uD0DC\uADF8\xB7frontmatter\uB97C \uBD99\uC774\uACE0 \uC2F6\uC740 \uBD84\uAED8 \uB9DE\uC2B5\uB2C8\uB2E4."
+      question: "\uB204\uAC00 Plus\uB97C \uC4F0\uBA74 \uC88B\uB098\uC694?",
+      answer: "\uC800\uC7A5\uAE00\uC744 \uB9CE\uC774 \uC313\uACE0 \uD3F4\uB354\uB97C \uCD18\uCD18\uD788 \uC4F0\uB294 \uC0AC\uC6A9\uC790, \uADF8\uB9AC\uACE0 extension\uC758 \uADDC\uCE59 \uC800\uC7A5\uACFC AI \uC815\uB9AC\uAE4C\uC9C0 \uD568\uAED8 \uC4F0\uB824\uB294 \uC0AC\uC6A9\uC790\uC5D0\uAC8C \uB9DE\uC2B5\uB2C8\uB2E4."
     },
     {
       id: "faq-3",
-      question: "\uC694\uC57D\uC774\uB098 \uD0DC\uADF8 \uAC19\uC740 AI \uC815\uB9AC\uB294 \uB418\uB098\uC694?",
-      answer: "\uB429\uB2C8\uB2E4. Pro\uC5D0\uC11C OpenAI \uD638\uD658 \uC5D4\uB4DC\uD3EC\uC778\uD2B8\uC640 \uC790\uC2E0\uC758 \uD0A4\uB97C \uB123\uC73C\uBA74 \uC694\uC57D, \uD0DC\uADF8, \uCD94\uAC00 frontmatter\uB97C \uC0DD\uC131\uD569\uB2C8\uB2E4."
+      question: "Plus\uC5D0 extension \uACE0\uAE09 \uAE30\uB2A5\uB3C4 \uD3EC\uD568\uB418\uB098\uC694?",
+      answer: "\uB124. Plus \uD0A4\uB97C extension\uC5D0 \uB123\uC73C\uBA74 \uD30C\uC77C\uBA85\xB7\uACBD\uB85C \uADDC\uCE59, Notion \uACE0\uAE09 \uC800\uC7A5, AI \uC694\uC57D\uACFC \uD0DC\uADF8 \uAC19\uC740 \uAE30\uC874 \uACE0\uAE09 \uAE30\uB2A5\uB3C4 \uD568\uAED8 \uD65C\uC131\uD654\uB429\uB2C8\uB2E4."
     },
     {
       id: "faq-4",
-      question: "Pro \uD0A4\uB294 \uC5B4\uB5BB\uAC8C \uC804\uB2EC\uB418\uB098\uC694?",
-      answer: "\uACB0\uC81C\uAC00 \uD655\uC778\uB418\uBA74 Pro \uD0A4\uB97C \uC774\uBA54\uC77C\uB85C \uBCF4\uB0B4\uB4DC\uB9BD\uB2C8\uB2E4."
+      question: "Plus \uD0A4\uB294 \uC5B4\uB5BB\uAC8C \uC804\uB2EC\uB418\uB098\uC694?",
+      answer: "\uACB0\uC81C\uAC00 \uD655\uC778\uB418\uBA74 Plus \uD0A4\uB97C \uC774\uBA54\uC77C\uB85C \uBCF4\uB0B4\uB4DC\uB9BD\uB2C8\uB2E4."
     },
     {
       id: "faq-5",
@@ -10131,7 +10140,7 @@ function buildDefaultDatabase(now = (/* @__PURE__ */ new Date()).toISOString()) 
       {
         id: "pm-stableorder",
         name: "Stableorder",
-        summary: "KRW-friendly checkout with card and transfer options",
+        summary: "Card and transfer checkout",
         instructions: "Open the Stableorder checkout page, pay using the order email, and return with the paid confirmation.",
         actionLabel: "Pay with Stableorder",
         actionUrl: "https://stableorder.com/",
@@ -10427,8 +10436,10 @@ var ensuredPostgresStores = /* @__PURE__ */ new Set();
 var ensuredPostgresMentionJobStores = /* @__PURE__ */ new Set();
 var ensuredPostgresBotUserStores = /* @__PURE__ */ new Set();
 var ensuredPostgresBotArchiveStores = /* @__PURE__ */ new Set();
+var ensuredPostgresRelationalStores = /* @__PURE__ */ new Set();
 var seededPostgresBotUserStores = /* @__PURE__ */ new Set();
 var seededPostgresBotArchiveStores = /* @__PURE__ */ new Set();
+var seededPostgresRelationalStores = /* @__PURE__ */ new Set();
 var activeDatabaseAccessCount = 0;
 var databaseReconfigurationBarrier = null;
 var releaseDatabaseReconfigurationBarrier = null;
@@ -10548,6 +10559,8 @@ function normalizeDatabasePayload(raw) {
     grantedScopes: Array.isArray(candidate?.grantedScopes) ? candidate.grantedScopes.filter((scope) => typeof scope === "string" && scope.trim().length > 0) : [],
     scopeVersion: typeof candidate?.scopeVersion === "number" && Number.isFinite(candidate.scopeVersion) ? candidate.scopeVersion : 0,
     lastScopeUpgradeAt: typeof candidate?.lastScopeUpgradeAt === "string" ? candidate.lastScopeUpgradeAt : null,
+    plusLicenseId: typeof candidate?.plusLicenseId === "string" ? candidate.plusLicenseId : null,
+    plusActivatedAt: typeof candidate?.plusActivatedAt === "string" ? candidate.plusActivatedAt : null,
     createdAt: typeof candidate?.createdAt === "string" ? candidate.createdAt : now,
     updatedAt: typeof candidate?.updatedAt === "string" ? candidate.updatedAt : now,
     lastLoginAt: typeof candidate?.lastLoginAt === "string" ? candidate.lastLoginAt : null,
@@ -10640,6 +10653,47 @@ function getPostgresBotArchivesTableName(tableName) {
   const baseName = parts.pop() ?? DEFAULT_POSTGRES_TABLE2;
   return [...parts, `${baseName}_bot_archives`].join(".");
 }
+function getPostgresDerivedTableName(tableName, suffix) {
+  const parts = tableName.split(".");
+  const baseName = parts.pop() ?? DEFAULT_POSTGRES_TABLE2;
+  return [...parts, `${baseName}_${suffix}`].join(".");
+}
+function getPostgresBotLoginTokensTableName(tableName) {
+  return getPostgresDerivedTableName(tableName, "bot_login_tokens");
+}
+function getPostgresBotOauthSessionsTableName(tableName) {
+  return getPostgresDerivedTableName(tableName, "bot_oauth_sessions");
+}
+function getPostgresBotSessionsTableName(tableName) {
+  return getPostgresDerivedTableName(tableName, "bot_sessions");
+}
+function getPostgresBotExtensionLinkSessionsTableName(tableName) {
+  return getPostgresDerivedTableName(tableName, "bot_extension_link_sessions");
+}
+function getPostgresBotExtensionAccessTokensTableName(tableName) {
+  return getPostgresDerivedTableName(tableName, "bot_extension_access_tokens");
+}
+function getPostgresCloudArchivesTableName(tableName) {
+  return getPostgresDerivedTableName(tableName, "cloud_archives");
+}
+function getPostgresWatchlistsTableName(tableName) {
+  return getPostgresDerivedTableName(tableName, "watchlists");
+}
+function getPostgresSearchMonitorsTableName(tableName) {
+  return getPostgresDerivedTableName(tableName, "search_monitors");
+}
+function getPostgresSearchResultsTableName(tableName) {
+  return getPostgresDerivedTableName(tableName, "search_results");
+}
+function getPostgresTrackedPostsTableName(tableName) {
+  return getPostgresDerivedTableName(tableName, "tracked_posts");
+}
+function getPostgresInsightsSnapshotsTableName(tableName) {
+  return getPostgresDerivedTableName(tableName, "insights_snapshots");
+}
+function getPostgresSavedViewsTableName(tableName) {
+  return getPostgresDerivedTableName(tableName, "saved_views");
+}
 async function ensurePostgresMentionJobsStore(client, tableName) {
   const mentionJobsTableName = getPostgresMentionJobsTableName(tableName);
   const cacheKey = `${postgresPoolConnectionString ?? "unknown"}::${mentionJobsTableName}`;
@@ -10695,12 +10749,16 @@ async function ensurePostgresBotUsersStore(client, tableName) {
       granted_scopes JSONB NOT NULL DEFAULT '[]'::jsonb,
       scope_version INTEGER NOT NULL DEFAULT 0,
       last_scope_upgrade_at TIMESTAMPTZ,
+      plus_license_id TEXT,
+      plus_activated_at TIMESTAMPTZ,
       created_at TIMESTAMPTZ NOT NULL,
       updated_at TIMESTAMPTZ NOT NULL,
       last_login_at TIMESTAMPTZ,
       status TEXT NOT NULL
     )`
   );
+  await client.query(`ALTER TABLE ${escapedTableName} ADD COLUMN IF NOT EXISTS plus_license_id TEXT`);
+  await client.query(`ALTER TABLE ${escapedTableName} ADD COLUMN IF NOT EXISTS plus_activated_at TIMESTAMPTZ`);
   await client.query(
     `CREATE UNIQUE INDEX IF NOT EXISTS ${escapeQualifiedIdentifier(`${botUsersTableName.replaceAll(".", "_")}_threads_handle_uidx`)}
      ON ${escapedTableName} (threads_handle)`
@@ -10768,12 +10826,90 @@ async function ensurePostgresBotArchivesStore(client, tableName) {
   );
   ensuredPostgresBotArchiveStores.add(cacheKey);
 }
+async function ensurePostgresRelationalStore(client, tableName, statements) {
+  const cacheKey = `${postgresPoolConnectionString ?? "unknown"}::${tableName}`;
+  if (ensuredPostgresRelationalStores.has(cacheKey)) {
+    return;
+  }
+  for (const statement of statements) {
+    await client.query(statement);
+  }
+  ensuredPostgresRelationalStores.add(cacheKey);
+}
+async function upsertPostgresRecords(client, tableName, columns, records) {
+  if (records.length === 0) {
+    return;
+  }
+  const escapedTableName = escapeQualifiedIdentifier(tableName);
+  const escapedColumns = columns.map((column) => escapeQualifiedIdentifier(column.name)).join(", ");
+  const values = [];
+  const placeholders = records.map((record, rowIndex) => {
+    const rowPlaceholders = columns.map((column, columnIndex) => {
+      values.push(column.getValue(record));
+      const placeholder = `$${rowIndex * columns.length + columnIndex + 1}`;
+      return column.cast ? `${placeholder}::${column.cast}` : placeholder;
+    }).join(", ");
+    return `(${rowPlaceholders})`;
+  }).join(", ");
+  const updateAssignments = columns.filter((column) => column.name !== "id").map(
+    (column) => `${escapeQualifiedIdentifier(column.name)} = EXCLUDED.${escapeQualifiedIdentifier(column.name)}`
+  ).join(", ");
+  await client.query(
+    `INSERT INTO ${escapedTableName} (${escapedColumns})
+     VALUES ${placeholders}
+     ON CONFLICT (id) DO UPDATE SET ${updateAssignments}`,
+    values
+  );
+}
+async function deletePostgresRecords(client, tableName, ids) {
+  if (ids.length === 0) {
+    return;
+  }
+  await client.query(
+    `DELETE FROM ${escapeQualifiedIdentifier(tableName)}
+     WHERE id = ANY($1::text[])`,
+    [ids]
+  );
+}
+async function loadPostgresRecords(client, tableName, orderBy, normalize) {
+  const result = await client.query(
+    `SELECT *
+     FROM ${escapeQualifiedIdentifier(tableName)}
+     ORDER BY ${orderBy}`
+  );
+  return result.rows.map(normalize);
+}
+async function maybeSeedPostgresRelationalStore(client, tableName, records, upsert) {
+  const cacheKey = `${postgresPoolConnectionString ?? "unknown"}::seed::${tableName}`;
+  if (seededPostgresRelationalStores.has(cacheKey)) {
+    return;
+  }
+  const countResult = await client.query(
+    `SELECT COUNT(*)::text AS count FROM ${escapeQualifiedIdentifier(tableName)}`
+  );
+  if ((countResult.rows[0]?.count ?? "0") === "0" && records.length > 0) {
+    await upsert(client, records);
+  }
+  seededPostgresRelationalStores.add(cacheKey);
+}
 function serializeDatabaseForPostgres(data) {
   return {
     ...data,
     botUsers: [],
+    botLoginTokens: [],
+    botOauthSessions: [],
+    botSessions: [],
+    botExtensionLinkSessions: [],
+    botExtensionAccessTokens: [],
     botMentionJobs: [],
-    botArchives: []
+    botArchives: [],
+    cloudArchives: [],
+    watchlists: [],
+    searchMonitors: [],
+    searchResults: [],
+    trackedPosts: [],
+    insightsSnapshots: [],
+    savedViews: []
   };
 }
 function toIsoString(value) {
@@ -10782,6 +10918,16 @@ function toIsoString(value) {
   }
   if (typeof value === "string") {
     return value;
+  }
+  return null;
+}
+function toNullableNumber(value) {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === "string" && value.trim()) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
   }
   return null;
 }
@@ -10821,6 +10967,8 @@ function normalizePostgresBotUser(row) {
     grantedScopes: readStringArray(row.granted_scopes),
     scopeVersion: typeof row.scope_version === "number" ? row.scope_version : Number(row.scope_version ?? 0),
     lastScopeUpgradeAt: toIsoString(row.last_scope_upgrade_at),
+    plusLicenseId: typeof row.plus_license_id === "string" ? row.plus_license_id : null,
+    plusActivatedAt: toIsoString(row.plus_activated_at),
     createdAt: toIsoString(row.created_at) ?? now,
     updatedAt: toIsoString(row.updated_at) ?? now,
     lastLoginAt: toIsoString(row.last_login_at),
@@ -10850,24 +10998,1051 @@ function normalizePostgresBotArchive(row) {
     status: "saved"
   };
 }
-function buildBotUserSyncMarker(user) {
-  return [
-    user.id,
-    user.threadsUserId ?? "",
-    user.threadsHandle,
-    user.updatedAt,
-    user.status
-  ].join("|");
+function normalizePostgresBotLoginToken(row) {
+  const now = (/* @__PURE__ */ new Date()).toISOString();
+  const status = row.status === "consumed" ? "consumed" : row.status === "expired" ? "expired" : "pending";
+  return {
+    id: typeof row.id === "string" ? row.id : crypto.randomUUID(),
+    userId: typeof row.user_id === "string" ? row.user_id : "",
+    tokenHash: typeof row.token_hash === "string" ? row.token_hash : "",
+    requestedHandle: typeof row.requested_handle === "string" ? row.requested_handle : "",
+    createdAt: toIsoString(row.created_at) ?? now,
+    expiresAt: toIsoString(row.expires_at) ?? now,
+    consumedAt: toIsoString(row.consumed_at),
+    status
+  };
 }
-function buildBotArchiveSyncMarker(archive) {
-  return [
-    archive.id,
-    archive.userId,
-    archive.mentionId ?? "",
-    archive.mentionUrl,
-    archive.updatedAt,
-    archive.status
-  ].join("|");
+function normalizePostgresBotOauthSession(row) {
+  const now = (/* @__PURE__ */ new Date()).toISOString();
+  const status = row.status === "completed" ? "completed" : row.status === "expired" ? "expired" : row.status === "failed" ? "failed" : "pending";
+  return {
+    id: typeof row.id === "string" ? row.id : crypto.randomUUID(),
+    stateHash: typeof row.state_hash === "string" ? row.state_hash : "",
+    pollTokenHash: typeof row.poll_token_hash === "string" ? row.poll_token_hash : "",
+    createdAt: toIsoString(row.created_at) ?? now,
+    expiresAt: toIsoString(row.expires_at) ?? now,
+    completedAt: toIsoString(row.completed_at),
+    activationCode: typeof row.activation_code === "string" ? row.activation_code : null,
+    activationExpiresAt: toIsoString(row.activation_expires_at),
+    linkedSessionToken: typeof row.linked_session_token === "string" ? row.linked_session_token : null,
+    status
+  };
+}
+function normalizePostgresBotSession(row) {
+  const now = (/* @__PURE__ */ new Date()).toISOString();
+  const status = row.status === "revoked" ? "revoked" : row.status === "expired" ? "expired" : "active";
+  return {
+    id: typeof row.id === "string" ? row.id : crypto.randomUUID(),
+    userId: typeof row.user_id === "string" ? row.user_id : "",
+    sessionHash: typeof row.session_hash === "string" ? row.session_hash : "",
+    createdAt: toIsoString(row.created_at) ?? now,
+    expiresAt: toIsoString(row.expires_at) ?? now,
+    lastSeenAt: toIsoString(row.last_seen_at) ?? now,
+    revokedAt: toIsoString(row.revoked_at),
+    status
+  };
+}
+function normalizePostgresBotExtensionLinkSession(row) {
+  const now = (/* @__PURE__ */ new Date()).toISOString();
+  const status = row.status === "consumed" ? "consumed" : row.status === "expired" ? "expired" : row.status === "revoked" ? "revoked" : "pending";
+  return {
+    id: typeof row.id === "string" ? row.id : crypto.randomUUID(),
+    userId: typeof row.user_id === "string" ? row.user_id : "",
+    state: typeof row.state === "string" ? row.state : "",
+    codeHash: typeof row.code_hash === "string" ? row.code_hash : "",
+    createdAt: toIsoString(row.created_at) ?? now,
+    expiresAt: toIsoString(row.expires_at) ?? now,
+    consumedAt: toIsoString(row.consumed_at),
+    revokedAt: toIsoString(row.revoked_at),
+    status
+  };
+}
+function normalizePostgresBotExtensionAccessToken(row) {
+  const now = (/* @__PURE__ */ new Date()).toISOString();
+  const status = row.status === "revoked" ? "revoked" : row.status === "expired" ? "expired" : "active";
+  return {
+    id: typeof row.id === "string" ? row.id : crypto.randomUUID(),
+    userId: typeof row.user_id === "string" ? row.user_id : "",
+    tokenHash: typeof row.token_hash === "string" ? row.token_hash : "",
+    createdAt: toIsoString(row.created_at) ?? now,
+    expiresAt: toIsoString(row.expires_at) ?? now,
+    linkedAt: toIsoString(row.linked_at) ?? now,
+    lastUsedAt: toIsoString(row.last_used_at),
+    revokedAt: toIsoString(row.revoked_at),
+    status
+  };
+}
+function normalizePostgresCloudArchive(row) {
+  const now = (/* @__PURE__ */ new Date()).toISOString();
+  return {
+    id: typeof row.id === "string" ? row.id : crypto.randomUUID(),
+    userId: typeof row.user_id === "string" ? row.user_id : "",
+    canonicalUrl: typeof row.canonical_url === "string" ? row.canonical_url : "",
+    shortcode: typeof row.shortcode === "string" ? row.shortcode : "",
+    targetAuthorHandle: typeof row.target_author_handle === "string" ? row.target_author_handle : null,
+    targetAuthorDisplayName: typeof row.target_author_display_name === "string" ? row.target_author_display_name : null,
+    targetTitle: typeof row.target_title === "string" ? row.target_title : "",
+    targetText: typeof row.target_text === "string" ? row.target_text : "",
+    targetPublishedAt: toIsoString(row.target_published_at),
+    mediaUrls: readStringArray(row.media_urls),
+    markdownContent: typeof row.markdown_content === "string" ? row.markdown_content : "",
+    rawPayloadJson: typeof row.raw_payload_json === "string" ? row.raw_payload_json : null,
+    contentHash: typeof row.content_hash === "string" ? row.content_hash : "",
+    savedAt: toIsoString(row.saved_at) ?? now,
+    updatedAt: toIsoString(row.updated_at) ?? now,
+    status: "saved"
+  };
+}
+var BOT_LOGIN_TOKEN_COLUMNS = [
+  { name: "id", getValue: (record) => record.id },
+  { name: "user_id", getValue: (record) => record.userId },
+  { name: "token_hash", getValue: (record) => record.tokenHash },
+  { name: "requested_handle", getValue: (record) => record.requestedHandle },
+  { name: "created_at", cast: "timestamptz", getValue: (record) => record.createdAt },
+  { name: "expires_at", cast: "timestamptz", getValue: (record) => record.expiresAt },
+  { name: "consumed_at", cast: "timestamptz", getValue: (record) => record.consumedAt },
+  { name: "status", getValue: (record) => record.status }
+];
+var BOT_OAUTH_SESSION_COLUMNS = [
+  { name: "id", getValue: (record) => record.id },
+  { name: "state_hash", getValue: (record) => record.stateHash },
+  { name: "poll_token_hash", getValue: (record) => record.pollTokenHash },
+  { name: "created_at", cast: "timestamptz", getValue: (record) => record.createdAt },
+  { name: "expires_at", cast: "timestamptz", getValue: (record) => record.expiresAt },
+  { name: "completed_at", cast: "timestamptz", getValue: (record) => record.completedAt },
+  { name: "activation_code", getValue: (record) => record.activationCode },
+  { name: "activation_expires_at", cast: "timestamptz", getValue: (record) => record.activationExpiresAt },
+  { name: "linked_session_token", getValue: (record) => record.linkedSessionToken },
+  { name: "status", getValue: (record) => record.status }
+];
+var BOT_SESSION_COLUMNS = [
+  { name: "id", getValue: (record) => record.id },
+  { name: "user_id", getValue: (record) => record.userId },
+  { name: "session_hash", getValue: (record) => record.sessionHash },
+  { name: "created_at", cast: "timestamptz", getValue: (record) => record.createdAt },
+  { name: "expires_at", cast: "timestamptz", getValue: (record) => record.expiresAt },
+  { name: "last_seen_at", cast: "timestamptz", getValue: (record) => record.lastSeenAt },
+  { name: "revoked_at", cast: "timestamptz", getValue: (record) => record.revokedAt },
+  { name: "status", getValue: (record) => record.status }
+];
+var BOT_EXTENSION_LINK_SESSION_COLUMNS = [
+  { name: "id", getValue: (record) => record.id },
+  { name: "user_id", getValue: (record) => record.userId },
+  { name: "state", getValue: (record) => record.state },
+  { name: "code_hash", getValue: (record) => record.codeHash },
+  { name: "created_at", cast: "timestamptz", getValue: (record) => record.createdAt },
+  { name: "expires_at", cast: "timestamptz", getValue: (record) => record.expiresAt },
+  { name: "consumed_at", cast: "timestamptz", getValue: (record) => record.consumedAt },
+  { name: "revoked_at", cast: "timestamptz", getValue: (record) => record.revokedAt },
+  { name: "status", getValue: (record) => record.status }
+];
+var BOT_EXTENSION_ACCESS_TOKEN_COLUMNS = [
+  { name: "id", getValue: (record) => record.id },
+  { name: "user_id", getValue: (record) => record.userId },
+  { name: "token_hash", getValue: (record) => record.tokenHash },
+  { name: "created_at", cast: "timestamptz", getValue: (record) => record.createdAt },
+  { name: "expires_at", cast: "timestamptz", getValue: (record) => record.expiresAt },
+  { name: "linked_at", cast: "timestamptz", getValue: (record) => record.linkedAt },
+  { name: "last_used_at", cast: "timestamptz", getValue: (record) => record.lastUsedAt },
+  { name: "revoked_at", cast: "timestamptz", getValue: (record) => record.revokedAt },
+  { name: "status", getValue: (record) => record.status }
+];
+var CLOUD_ARCHIVE_COLUMNS = [
+  { name: "id", getValue: (record) => record.id },
+  { name: "user_id", getValue: (record) => record.userId },
+  { name: "canonical_url", getValue: (record) => record.canonicalUrl },
+  { name: "shortcode", getValue: (record) => record.shortcode },
+  { name: "target_author_handle", getValue: (record) => record.targetAuthorHandle },
+  { name: "target_author_display_name", getValue: (record) => record.targetAuthorDisplayName },
+  { name: "target_title", getValue: (record) => record.targetTitle },
+  { name: "target_text", getValue: (record) => record.targetText },
+  { name: "target_published_at", cast: "timestamptz", getValue: (record) => record.targetPublishedAt },
+  { name: "media_urls", cast: "jsonb", getValue: (record) => JSON.stringify(record.mediaUrls) },
+  { name: "markdown_content", getValue: (record) => record.markdownContent },
+  { name: "raw_payload_json", getValue: (record) => record.rawPayloadJson },
+  { name: "content_hash", getValue: (record) => record.contentHash },
+  { name: "saved_at", cast: "timestamptz", getValue: (record) => record.savedAt },
+  { name: "updated_at", cast: "timestamptz", getValue: (record) => record.updatedAt },
+  { name: "status", getValue: (record) => record.status }
+];
+async function ensurePostgresBotLoginTokensStore(client, tableName) {
+  const fullTableName = getPostgresBotLoginTokensTableName(tableName);
+  const escapedTableName = escapeQualifiedIdentifier(fullTableName);
+  await ensurePostgresRelationalStore(client, fullTableName, [
+    `CREATE TABLE IF NOT EXISTS ${escapedTableName} (
+       id TEXT PRIMARY KEY,
+       user_id TEXT NOT NULL,
+       token_hash TEXT NOT NULL UNIQUE,
+       requested_handle TEXT NOT NULL,
+       created_at TIMESTAMPTZ NOT NULL,
+       expires_at TIMESTAMPTZ NOT NULL,
+       consumed_at TIMESTAMPTZ,
+       status TEXT NOT NULL
+     )`,
+    `CREATE INDEX IF NOT EXISTS ${escapeQualifiedIdentifier(`${fullTableName.replaceAll(".", "_")}_user_status_idx`)}
+     ON ${escapedTableName} (user_id, status, created_at DESC)`,
+    `CREATE INDEX IF NOT EXISTS ${escapeQualifiedIdentifier(`${fullTableName.replaceAll(".", "_")}_expires_idx`)}
+     ON ${escapedTableName} (expires_at)`
+  ]);
+}
+async function ensurePostgresBotOauthSessionsStore(client, tableName) {
+  const fullTableName = getPostgresBotOauthSessionsTableName(tableName);
+  const escapedTableName = escapeQualifiedIdentifier(fullTableName);
+  await ensurePostgresRelationalStore(client, fullTableName, [
+    `CREATE TABLE IF NOT EXISTS ${escapedTableName} (
+       id TEXT PRIMARY KEY,
+       state_hash TEXT NOT NULL UNIQUE,
+       poll_token_hash TEXT NOT NULL UNIQUE,
+       created_at TIMESTAMPTZ NOT NULL,
+       expires_at TIMESTAMPTZ NOT NULL,
+       completed_at TIMESTAMPTZ,
+       activation_code TEXT UNIQUE,
+       activation_expires_at TIMESTAMPTZ,
+       linked_session_token TEXT,
+       status TEXT NOT NULL
+     )`,
+    `CREATE INDEX IF NOT EXISTS ${escapeQualifiedIdentifier(`${fullTableName.replaceAll(".", "_")}_status_idx`)}
+     ON ${escapedTableName} (status, expires_at, created_at DESC)`
+  ]);
+}
+async function ensurePostgresBotSessionsStore(client, tableName) {
+  const fullTableName = getPostgresBotSessionsTableName(tableName);
+  const escapedTableName = escapeQualifiedIdentifier(fullTableName);
+  await ensurePostgresRelationalStore(client, fullTableName, [
+    `CREATE TABLE IF NOT EXISTS ${escapedTableName} (
+       id TEXT PRIMARY KEY,
+       user_id TEXT NOT NULL,
+       session_hash TEXT NOT NULL UNIQUE,
+       created_at TIMESTAMPTZ NOT NULL,
+       expires_at TIMESTAMPTZ NOT NULL,
+       last_seen_at TIMESTAMPTZ NOT NULL,
+       revoked_at TIMESTAMPTZ,
+       status TEXT NOT NULL
+     )`,
+    `CREATE INDEX IF NOT EXISTS ${escapeQualifiedIdentifier(`${fullTableName.replaceAll(".", "_")}_user_status_idx`)}
+     ON ${escapedTableName} (user_id, status, last_seen_at DESC)`,
+    `CREATE INDEX IF NOT EXISTS ${escapeQualifiedIdentifier(`${fullTableName.replaceAll(".", "_")}_expires_idx`)}
+     ON ${escapedTableName} (expires_at)`
+  ]);
+}
+async function ensurePostgresBotExtensionLinkSessionsStore(client, tableName) {
+  const fullTableName = getPostgresBotExtensionLinkSessionsTableName(tableName);
+  const escapedTableName = escapeQualifiedIdentifier(fullTableName);
+  await ensurePostgresRelationalStore(client, fullTableName, [
+    `CREATE TABLE IF NOT EXISTS ${escapedTableName} (
+       id TEXT PRIMARY KEY,
+       user_id TEXT NOT NULL,
+       state TEXT NOT NULL UNIQUE,
+       code_hash TEXT NOT NULL UNIQUE,
+       created_at TIMESTAMPTZ NOT NULL,
+       expires_at TIMESTAMPTZ NOT NULL,
+       consumed_at TIMESTAMPTZ,
+       revoked_at TIMESTAMPTZ,
+       status TEXT NOT NULL
+     )`,
+    `CREATE INDEX IF NOT EXISTS ${escapeQualifiedIdentifier(`${fullTableName.replaceAll(".", "_")}_user_status_idx`)}
+     ON ${escapedTableName} (user_id, status, created_at DESC)`,
+    `CREATE INDEX IF NOT EXISTS ${escapeQualifiedIdentifier(`${fullTableName.replaceAll(".", "_")}_expires_idx`)}
+     ON ${escapedTableName} (expires_at)`
+  ]);
+}
+async function ensurePostgresBotExtensionAccessTokensStore(client, tableName) {
+  const fullTableName = getPostgresBotExtensionAccessTokensTableName(tableName);
+  const escapedTableName = escapeQualifiedIdentifier(fullTableName);
+  await ensurePostgresRelationalStore(client, fullTableName, [
+    `CREATE TABLE IF NOT EXISTS ${escapedTableName} (
+       id TEXT PRIMARY KEY,
+       user_id TEXT NOT NULL,
+       token_hash TEXT NOT NULL UNIQUE,
+       created_at TIMESTAMPTZ NOT NULL,
+       expires_at TIMESTAMPTZ NOT NULL,
+       linked_at TIMESTAMPTZ NOT NULL,
+       last_used_at TIMESTAMPTZ,
+       revoked_at TIMESTAMPTZ,
+       status TEXT NOT NULL
+     )`,
+    `CREATE INDEX IF NOT EXISTS ${escapeQualifiedIdentifier(`${fullTableName.replaceAll(".", "_")}_user_status_idx`)}
+     ON ${escapedTableName} (user_id, status, linked_at DESC)`,
+    `CREATE INDEX IF NOT EXISTS ${escapeQualifiedIdentifier(`${fullTableName.replaceAll(".", "_")}_expires_idx`)}
+     ON ${escapedTableName} (expires_at)`
+  ]);
+}
+async function ensurePostgresCloudArchivesStore(client, tableName) {
+  const fullTableName = getPostgresCloudArchivesTableName(tableName);
+  const escapedTableName = escapeQualifiedIdentifier(fullTableName);
+  await ensurePostgresRelationalStore(client, fullTableName, [
+    `CREATE TABLE IF NOT EXISTS ${escapedTableName} (
+       id TEXT PRIMARY KEY,
+       user_id TEXT NOT NULL,
+       canonical_url TEXT NOT NULL,
+       shortcode TEXT NOT NULL,
+       target_author_handle TEXT,
+       target_author_display_name TEXT,
+       target_title TEXT NOT NULL,
+       target_text TEXT NOT NULL,
+       target_published_at TIMESTAMPTZ,
+       media_urls JSONB NOT NULL DEFAULT '[]'::jsonb,
+       markdown_content TEXT NOT NULL,
+       raw_payload_json TEXT,
+       content_hash TEXT NOT NULL,
+       saved_at TIMESTAMPTZ NOT NULL,
+       updated_at TIMESTAMPTZ NOT NULL,
+       status TEXT NOT NULL
+     )`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS ${escapeQualifiedIdentifier(`${fullTableName.replaceAll(".", "_")}_canonical_url_uidx`)}
+     ON ${escapedTableName} (user_id, canonical_url)`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS ${escapeQualifiedIdentifier(`${fullTableName.replaceAll(".", "_")}_content_hash_uidx`)}
+     ON ${escapedTableName} (user_id, content_hash)`,
+    `CREATE INDEX IF NOT EXISTS ${escapeQualifiedIdentifier(`${fullTableName.replaceAll(".", "_")}_user_updated_idx`)}
+     ON ${escapedTableName} (user_id, updated_at DESC)`
+  ]);
+}
+async function upsertPostgresBotLoginTokens(client, tableName, records) {
+  await ensurePostgresBotLoginTokensStore(client, tableName);
+  await upsertPostgresRecords(client, getPostgresBotLoginTokensTableName(tableName), BOT_LOGIN_TOKEN_COLUMNS, records);
+}
+async function upsertPostgresBotOauthSessions(client, tableName, records) {
+  await ensurePostgresBotOauthSessionsStore(client, tableName);
+  await upsertPostgresRecords(client, getPostgresBotOauthSessionsTableName(tableName), BOT_OAUTH_SESSION_COLUMNS, records);
+}
+async function upsertPostgresBotSessions(client, tableName, records) {
+  await ensurePostgresBotSessionsStore(client, tableName);
+  await upsertPostgresRecords(client, getPostgresBotSessionsTableName(tableName), BOT_SESSION_COLUMNS, records);
+}
+async function upsertPostgresBotExtensionLinkSessions(client, tableName, records) {
+  await ensurePostgresBotExtensionLinkSessionsStore(client, tableName);
+  await upsertPostgresRecords(
+    client,
+    getPostgresBotExtensionLinkSessionsTableName(tableName),
+    BOT_EXTENSION_LINK_SESSION_COLUMNS,
+    records
+  );
+}
+async function upsertPostgresBotExtensionAccessTokens(client, tableName, records) {
+  await ensurePostgresBotExtensionAccessTokensStore(client, tableName);
+  await upsertPostgresRecords(
+    client,
+    getPostgresBotExtensionAccessTokensTableName(tableName),
+    BOT_EXTENSION_ACCESS_TOKEN_COLUMNS,
+    records
+  );
+}
+async function upsertPostgresCloudArchives(client, tableName, records) {
+  await ensurePostgresCloudArchivesStore(client, tableName);
+  await upsertPostgresRecords(client, getPostgresCloudArchivesTableName(tableName), CLOUD_ARCHIVE_COLUMNS, records);
+}
+async function loadPostgresBotLoginTokens(client, backend, seedRecords = []) {
+  const tableName = getPostgresBotLoginTokensTableName(backend.tableName);
+  await ensurePostgresBotLoginTokensStore(client, backend.tableName);
+  await maybeSeedPostgresRelationalStore(
+    client,
+    tableName,
+    seedRecords,
+    async (currentClient, records) => upsertPostgresBotLoginTokens(currentClient, backend.tableName, records)
+  );
+  return loadPostgresRecords(client, tableName, "created_at DESC", normalizePostgresBotLoginToken);
+}
+async function loadPostgresBotOauthSessions(client, backend, seedRecords = []) {
+  const tableName = getPostgresBotOauthSessionsTableName(backend.tableName);
+  await ensurePostgresBotOauthSessionsStore(client, backend.tableName);
+  await maybeSeedPostgresRelationalStore(
+    client,
+    tableName,
+    seedRecords,
+    async (currentClient, records) => upsertPostgresBotOauthSessions(currentClient, backend.tableName, records)
+  );
+  return loadPostgresRecords(client, tableName, "created_at DESC", normalizePostgresBotOauthSession);
+}
+async function loadPostgresBotSessions(client, backend, seedRecords = []) {
+  const tableName = getPostgresBotSessionsTableName(backend.tableName);
+  await ensurePostgresBotSessionsStore(client, backend.tableName);
+  await maybeSeedPostgresRelationalStore(
+    client,
+    tableName,
+    seedRecords,
+    async (currentClient, records) => upsertPostgresBotSessions(currentClient, backend.tableName, records)
+  );
+  return loadPostgresRecords(client, tableName, "last_seen_at DESC, created_at DESC", normalizePostgresBotSession);
+}
+async function loadPostgresBotExtensionLinkSessions(client, backend, seedRecords = []) {
+  const tableName = getPostgresBotExtensionLinkSessionsTableName(backend.tableName);
+  await ensurePostgresBotExtensionLinkSessionsStore(client, backend.tableName);
+  await maybeSeedPostgresRelationalStore(
+    client,
+    tableName,
+    seedRecords,
+    async (currentClient, records) => upsertPostgresBotExtensionLinkSessions(currentClient, backend.tableName, records)
+  );
+  return loadPostgresRecords(
+    client,
+    tableName,
+    "created_at DESC",
+    normalizePostgresBotExtensionLinkSession
+  );
+}
+async function loadPostgresBotExtensionAccessTokens(client, backend, seedRecords = []) {
+  const tableName = getPostgresBotExtensionAccessTokensTableName(backend.tableName);
+  await ensurePostgresBotExtensionAccessTokensStore(client, backend.tableName);
+  await maybeSeedPostgresRelationalStore(
+    client,
+    tableName,
+    seedRecords,
+    async (currentClient, records) => upsertPostgresBotExtensionAccessTokens(currentClient, backend.tableName, records)
+  );
+  return loadPostgresRecords(
+    client,
+    tableName,
+    "linked_at DESC, created_at DESC",
+    normalizePostgresBotExtensionAccessToken
+  );
+}
+async function loadPostgresCloudArchives(client, backend, seedRecords = []) {
+  const tableName = getPostgresCloudArchivesTableName(backend.tableName);
+  await ensurePostgresCloudArchivesStore(client, backend.tableName);
+  await maybeSeedPostgresRelationalStore(
+    client,
+    tableName,
+    seedRecords,
+    async (currentClient, records) => upsertPostgresCloudArchives(currentClient, backend.tableName, records)
+  );
+  return loadPostgresRecords(client, tableName, "updated_at DESC, saved_at DESC", normalizePostgresCloudArchive);
+}
+function normalizePostgresWatchlist(row) {
+  const now = (/* @__PURE__ */ new Date()).toISOString();
+  return {
+    id: typeof row.id === "string" ? row.id : crypto.randomUUID(),
+    userId: typeof row.user_id === "string" ? row.user_id : "",
+    targetHandle: typeof row.target_handle === "string" ? row.target_handle : "",
+    targetThreadsUserId: typeof row.target_threads_user_id === "string" ? row.target_threads_user_id : null,
+    targetDisplayName: typeof row.target_display_name === "string" ? row.target_display_name : null,
+    targetProfilePictureUrl: typeof row.target_profile_picture_url === "string" ? row.target_profile_picture_url : null,
+    includeText: typeof row.include_text === "string" ? row.include_text : "",
+    excludeText: typeof row.exclude_text === "string" ? row.exclude_text : "",
+    mediaTypes: readStringArray(row.media_types),
+    autoArchive: row.auto_archive === true,
+    digestCadence: row.digest_cadence === "daily" ? "daily" : row.digest_cadence === "weekly" ? "weekly" : "off",
+    lastCursor: typeof row.last_cursor === "string" ? row.last_cursor : null,
+    lastSyncedAt: toIsoString(row.last_synced_at),
+    lastError: typeof row.last_error === "string" ? row.last_error : null,
+    createdAt: toIsoString(row.created_at) ?? now,
+    updatedAt: toIsoString(row.updated_at) ?? now,
+    status: row.status === "paused" ? "paused" : "active"
+  };
+}
+function normalizePostgresSearchMonitor(row) {
+  const now = (/* @__PURE__ */ new Date()).toISOString();
+  return {
+    id: typeof row.id === "string" ? row.id : crypto.randomUUID(),
+    userId: typeof row.user_id === "string" ? row.user_id : "",
+    query: typeof row.query === "string" ? row.query : "",
+    authorHandle: typeof row.author_handle === "string" ? row.author_handle : null,
+    excludeHandles: readStringArray(row.exclude_handles),
+    autoArchive: row.auto_archive === true,
+    searchType: row.search_type === "recent" ? "recent" : "top",
+    lastCursor: typeof row.last_cursor === "string" ? row.last_cursor : null,
+    lastRunAt: toIsoString(row.last_run_at),
+    lastError: typeof row.last_error === "string" ? row.last_error : null,
+    createdAt: toIsoString(row.created_at) ?? now,
+    updatedAt: toIsoString(row.updated_at) ?? now,
+    status: row.status === "paused" ? "paused" : "active"
+  };
+}
+function normalizePostgresSearchResult(row) {
+  const now = (/* @__PURE__ */ new Date()).toISOString();
+  const status = row.status === "archived" ? "archived" : row.status === "dismissed" ? "dismissed" : "new";
+  return {
+    id: typeof row.id === "string" ? row.id : crypto.randomUUID(),
+    userId: typeof row.user_id === "string" ? row.user_id : "",
+    monitorId: typeof row.monitor_id === "string" ? row.monitor_id : "",
+    externalPostId: typeof row.external_post_id === "string" ? row.external_post_id : "",
+    canonicalUrl: typeof row.canonical_url === "string" ? row.canonical_url : "",
+    authorHandle: typeof row.author_handle === "string" ? row.author_handle : "",
+    authorDisplayName: typeof row.author_display_name === "string" ? row.author_display_name : null,
+    text: typeof row.text === "string" ? row.text : "",
+    publishedAt: toIsoString(row.published_at),
+    mediaType: typeof row.media_type === "string" ? row.media_type : null,
+    mediaUrls: readStringArray(row.media_urls),
+    matchedTerms: readStringArray(row.matched_terms),
+    relevanceScore: toNullableNumber(row.relevance_score),
+    archiveId: typeof row.archive_id === "string" ? row.archive_id : null,
+    archivedAt: toIsoString(row.archived_at),
+    dismissedAt: toIsoString(row.dismissed_at),
+    discoveredAt: toIsoString(row.discovered_at) ?? now,
+    updatedAt: toIsoString(row.updated_at) ?? now,
+    rawPayloadJson: typeof row.raw_payload_json === "string" ? row.raw_payload_json : null,
+    status
+  };
+}
+function normalizePostgresTrackedPost(row) {
+  const now = (/* @__PURE__ */ new Date()).toISOString();
+  return {
+    id: typeof row.id === "string" ? row.id : crypto.randomUUID(),
+    userId: typeof row.user_id === "string" ? row.user_id : "",
+    origin: row.origin === "insight" ? "insight" : "watchlist",
+    sourceId: typeof row.source_id === "string" ? row.source_id : null,
+    externalPostId: typeof row.external_post_id === "string" ? row.external_post_id : "",
+    canonicalUrl: typeof row.canonical_url === "string" ? row.canonical_url : "",
+    authorHandle: typeof row.author_handle === "string" ? row.author_handle : "",
+    authorDisplayName: typeof row.author_display_name === "string" ? row.author_display_name : null,
+    text: typeof row.text === "string" ? row.text : "",
+    publishedAt: toIsoString(row.published_at),
+    mediaType: typeof row.media_type === "string" ? row.media_type : null,
+    mediaUrls: readStringArray(row.media_urls),
+    matchedTerms: readStringArray(row.matched_terms),
+    relevanceScore: toNullableNumber(row.relevance_score),
+    archiveId: typeof row.archive_id === "string" ? row.archive_id : null,
+    archivedAt: toIsoString(row.archived_at),
+    discoveredAt: toIsoString(row.discovered_at) ?? now,
+    updatedAt: toIsoString(row.updated_at) ?? now,
+    rawPayloadJson: typeof row.raw_payload_json === "string" ? row.raw_payload_json : null
+  };
+}
+function normalizePostgresInsightsSnapshot(row) {
+  const now = (/* @__PURE__ */ new Date()).toISOString();
+  return {
+    id: typeof row.id === "string" ? row.id : crypto.randomUUID(),
+    userId: typeof row.user_id === "string" ? row.user_id : "",
+    kind: row.kind === "post" ? "post" : "profile",
+    externalPostId: typeof row.external_post_id === "string" ? row.external_post_id : null,
+    canonicalUrl: typeof row.canonical_url === "string" ? row.canonical_url : null,
+    title: typeof row.title === "string" ? row.title : null,
+    likes: toNullableNumber(row.likes),
+    replies: toNullableNumber(row.replies),
+    reposts: toNullableNumber(row.reposts),
+    quotes: toNullableNumber(row.quotes),
+    views: toNullableNumber(row.views),
+    followers: toNullableNumber(row.followers),
+    profileViews: toNullableNumber(row.profile_views),
+    capturedAt: toIsoString(row.captured_at) ?? now,
+    rawPayloadJson: typeof row.raw_payload_json === "string" ? row.raw_payload_json : null
+  };
+}
+function normalizePostgresSavedView(row) {
+  const now = (/* @__PURE__ */ new Date()).toISOString();
+  return {
+    id: typeof row.id === "string" ? row.id : crypto.randomUUID(),
+    userId: typeof row.user_id === "string" ? row.user_id : "",
+    name: typeof row.name === "string" ? row.name : "",
+    kind: row.kind === "search" ? "search" : row.kind === "insight" ? "insight" : "watchlist",
+    targetIds: readStringArray(row.target_ids),
+    createdAt: toIsoString(row.created_at) ?? now,
+    updatedAt: toIsoString(row.updated_at) ?? now,
+    status: "active"
+  };
+}
+var WATCHLIST_COLUMNS = [
+  { name: "id", getValue: (record) => record.id },
+  { name: "user_id", getValue: (record) => record.userId },
+  { name: "target_handle", getValue: (record) => record.targetHandle },
+  { name: "target_threads_user_id", getValue: (record) => record.targetThreadsUserId },
+  { name: "target_display_name", getValue: (record) => record.targetDisplayName },
+  { name: "target_profile_picture_url", getValue: (record) => record.targetProfilePictureUrl },
+  { name: "include_text", getValue: (record) => record.includeText },
+  { name: "exclude_text", getValue: (record) => record.excludeText },
+  { name: "media_types", cast: "jsonb", getValue: (record) => JSON.stringify(record.mediaTypes) },
+  { name: "auto_archive", getValue: (record) => record.autoArchive },
+  { name: "digest_cadence", getValue: (record) => record.digestCadence },
+  { name: "last_cursor", getValue: (record) => record.lastCursor },
+  { name: "last_synced_at", cast: "timestamptz", getValue: (record) => record.lastSyncedAt },
+  { name: "last_error", getValue: (record) => record.lastError },
+  { name: "created_at", cast: "timestamptz", getValue: (record) => record.createdAt },
+  { name: "updated_at", cast: "timestamptz", getValue: (record) => record.updatedAt },
+  { name: "status", getValue: (record) => record.status }
+];
+var SEARCH_MONITOR_COLUMNS = [
+  { name: "id", getValue: (record) => record.id },
+  { name: "user_id", getValue: (record) => record.userId },
+  { name: "query", getValue: (record) => record.query },
+  { name: "author_handle", getValue: (record) => record.authorHandle },
+  { name: "exclude_handles", cast: "jsonb", getValue: (record) => JSON.stringify(record.excludeHandles) },
+  { name: "auto_archive", getValue: (record) => record.autoArchive },
+  { name: "search_type", getValue: (record) => record.searchType },
+  { name: "last_cursor", getValue: (record) => record.lastCursor },
+  { name: "last_run_at", cast: "timestamptz", getValue: (record) => record.lastRunAt },
+  { name: "last_error", getValue: (record) => record.lastError },
+  { name: "created_at", cast: "timestamptz", getValue: (record) => record.createdAt },
+  { name: "updated_at", cast: "timestamptz", getValue: (record) => record.updatedAt },
+  { name: "status", getValue: (record) => record.status }
+];
+var SEARCH_RESULT_COLUMNS = [
+  { name: "id", getValue: (record) => record.id },
+  { name: "user_id", getValue: (record) => record.userId },
+  { name: "monitor_id", getValue: (record) => record.monitorId },
+  { name: "external_post_id", getValue: (record) => record.externalPostId },
+  { name: "canonical_url", getValue: (record) => record.canonicalUrl },
+  { name: "author_handle", getValue: (record) => record.authorHandle },
+  { name: "author_display_name", getValue: (record) => record.authorDisplayName },
+  { name: "text", getValue: (record) => record.text },
+  { name: "published_at", cast: "timestamptz", getValue: (record) => record.publishedAt },
+  { name: "media_type", getValue: (record) => record.mediaType },
+  { name: "media_urls", cast: "jsonb", getValue: (record) => JSON.stringify(record.mediaUrls) },
+  { name: "matched_terms", cast: "jsonb", getValue: (record) => JSON.stringify(record.matchedTerms) },
+  { name: "relevance_score", cast: "double precision", getValue: (record) => record.relevanceScore },
+  { name: "archive_id", getValue: (record) => record.archiveId },
+  { name: "archived_at", cast: "timestamptz", getValue: (record) => record.archivedAt },
+  { name: "dismissed_at", cast: "timestamptz", getValue: (record) => record.dismissedAt },
+  { name: "discovered_at", cast: "timestamptz", getValue: (record) => record.discoveredAt },
+  { name: "updated_at", cast: "timestamptz", getValue: (record) => record.updatedAt },
+  { name: "raw_payload_json", getValue: (record) => record.rawPayloadJson },
+  { name: "status", getValue: (record) => record.status }
+];
+var TRACKED_POST_COLUMNS = [
+  { name: "id", getValue: (record) => record.id },
+  { name: "user_id", getValue: (record) => record.userId },
+  { name: "origin", getValue: (record) => record.origin },
+  { name: "source_id", getValue: (record) => record.sourceId },
+  { name: "external_post_id", getValue: (record) => record.externalPostId },
+  { name: "canonical_url", getValue: (record) => record.canonicalUrl },
+  { name: "author_handle", getValue: (record) => record.authorHandle },
+  { name: "author_display_name", getValue: (record) => record.authorDisplayName },
+  { name: "text", getValue: (record) => record.text },
+  { name: "published_at", cast: "timestamptz", getValue: (record) => record.publishedAt },
+  { name: "media_type", getValue: (record) => record.mediaType },
+  { name: "media_urls", cast: "jsonb", getValue: (record) => JSON.stringify(record.mediaUrls) },
+  { name: "matched_terms", cast: "jsonb", getValue: (record) => JSON.stringify(record.matchedTerms) },
+  { name: "relevance_score", cast: "double precision", getValue: (record) => record.relevanceScore },
+  { name: "archive_id", getValue: (record) => record.archiveId },
+  { name: "archived_at", cast: "timestamptz", getValue: (record) => record.archivedAt },
+  { name: "discovered_at", cast: "timestamptz", getValue: (record) => record.discoveredAt },
+  { name: "updated_at", cast: "timestamptz", getValue: (record) => record.updatedAt },
+  { name: "raw_payload_json", getValue: (record) => record.rawPayloadJson }
+];
+var INSIGHTS_SNAPSHOT_COLUMNS = [
+  { name: "id", getValue: (record) => record.id },
+  { name: "user_id", getValue: (record) => record.userId },
+  { name: "kind", getValue: (record) => record.kind },
+  { name: "external_post_id", getValue: (record) => record.externalPostId },
+  { name: "canonical_url", getValue: (record) => record.canonicalUrl },
+  { name: "title", getValue: (record) => record.title },
+  { name: "likes", cast: "bigint", getValue: (record) => record.likes },
+  { name: "replies", cast: "bigint", getValue: (record) => record.replies },
+  { name: "reposts", cast: "bigint", getValue: (record) => record.reposts },
+  { name: "quotes", cast: "bigint", getValue: (record) => record.quotes },
+  { name: "views", cast: "bigint", getValue: (record) => record.views },
+  { name: "followers", cast: "bigint", getValue: (record) => record.followers },
+  { name: "profile_views", cast: "bigint", getValue: (record) => record.profileViews },
+  { name: "captured_at", cast: "timestamptz", getValue: (record) => record.capturedAt },
+  { name: "raw_payload_json", getValue: (record) => record.rawPayloadJson }
+];
+var SAVED_VIEW_COLUMNS = [
+  { name: "id", getValue: (record) => record.id },
+  { name: "user_id", getValue: (record) => record.userId },
+  { name: "name", getValue: (record) => record.name },
+  { name: "kind", getValue: (record) => record.kind },
+  { name: "target_ids", cast: "jsonb", getValue: (record) => JSON.stringify(record.targetIds) },
+  { name: "created_at", cast: "timestamptz", getValue: (record) => record.createdAt },
+  { name: "updated_at", cast: "timestamptz", getValue: (record) => record.updatedAt },
+  { name: "status", getValue: (record) => record.status }
+];
+async function ensurePostgresWatchlistsStore(client, tableName) {
+  const fullTableName = getPostgresWatchlistsTableName(tableName);
+  const escapedTableName = escapeQualifiedIdentifier(fullTableName);
+  await ensurePostgresRelationalStore(client, fullTableName, [
+    `CREATE TABLE IF NOT EXISTS ${escapedTableName} (
+       id TEXT PRIMARY KEY,
+       user_id TEXT NOT NULL,
+       target_handle TEXT NOT NULL,
+       target_threads_user_id TEXT,
+       target_display_name TEXT,
+       target_profile_picture_url TEXT,
+       include_text TEXT NOT NULL DEFAULT '',
+       exclude_text TEXT NOT NULL DEFAULT '',
+       media_types JSONB NOT NULL DEFAULT '[]'::jsonb,
+       auto_archive BOOLEAN NOT NULL DEFAULT FALSE,
+       digest_cadence TEXT NOT NULL DEFAULT 'off',
+       last_cursor TEXT,
+       last_synced_at TIMESTAMPTZ,
+       last_error TEXT,
+       created_at TIMESTAMPTZ NOT NULL,
+       updated_at TIMESTAMPTZ NOT NULL,
+       status TEXT NOT NULL
+     )`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS ${escapeQualifiedIdentifier(`${fullTableName.replaceAll(".", "_")}_target_handle_uidx`)}
+     ON ${escapedTableName} (user_id, target_handle)`,
+    `CREATE INDEX IF NOT EXISTS ${escapeQualifiedIdentifier(`${fullTableName.replaceAll(".", "_")}_user_status_idx`)}
+     ON ${escapedTableName} (user_id, status, updated_at DESC)`
+  ]);
+}
+async function ensurePostgresSearchMonitorsStore(client, tableName) {
+  const fullTableName = getPostgresSearchMonitorsTableName(tableName);
+  const escapedTableName = escapeQualifiedIdentifier(fullTableName);
+  await ensurePostgresRelationalStore(client, fullTableName, [
+    `CREATE TABLE IF NOT EXISTS ${escapedTableName} (
+       id TEXT PRIMARY KEY,
+       user_id TEXT NOT NULL,
+       query TEXT NOT NULL,
+       author_handle TEXT,
+       exclude_handles JSONB NOT NULL DEFAULT '[]'::jsonb,
+       auto_archive BOOLEAN NOT NULL DEFAULT FALSE,
+       search_type TEXT NOT NULL DEFAULT 'top',
+       last_cursor TEXT,
+       last_run_at TIMESTAMPTZ,
+       last_error TEXT,
+       created_at TIMESTAMPTZ NOT NULL,
+       updated_at TIMESTAMPTZ NOT NULL,
+       status TEXT NOT NULL
+     )`,
+    `CREATE INDEX IF NOT EXISTS ${escapeQualifiedIdentifier(`${fullTableName.replaceAll(".", "_")}_user_status_idx`)}
+     ON ${escapedTableName} (user_id, status, updated_at DESC)`
+  ]);
+}
+async function ensurePostgresSearchResultsStore(client, tableName) {
+  const fullTableName = getPostgresSearchResultsTableName(tableName);
+  const escapedTableName = escapeQualifiedIdentifier(fullTableName);
+  await ensurePostgresRelationalStore(client, fullTableName, [
+    `CREATE TABLE IF NOT EXISTS ${escapedTableName} (
+       id TEXT PRIMARY KEY,
+       user_id TEXT NOT NULL,
+       monitor_id TEXT NOT NULL,
+       external_post_id TEXT NOT NULL,
+       canonical_url TEXT NOT NULL,
+       author_handle TEXT NOT NULL,
+       author_display_name TEXT,
+       text TEXT NOT NULL,
+       published_at TIMESTAMPTZ,
+       media_type TEXT,
+       media_urls JSONB NOT NULL DEFAULT '[]'::jsonb,
+       matched_terms JSONB NOT NULL DEFAULT '[]'::jsonb,
+       relevance_score DOUBLE PRECISION,
+       archive_id TEXT,
+       archived_at TIMESTAMPTZ,
+       dismissed_at TIMESTAMPTZ,
+       discovered_at TIMESTAMPTZ NOT NULL,
+       updated_at TIMESTAMPTZ NOT NULL,
+       raw_payload_json TEXT,
+       status TEXT NOT NULL
+     )`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS ${escapeQualifiedIdentifier(`${fullTableName.replaceAll(".", "_")}_monitor_external_uidx`)}
+     ON ${escapedTableName} (user_id, monitor_id, external_post_id)`,
+    `CREATE INDEX IF NOT EXISTS ${escapeQualifiedIdentifier(`${fullTableName.replaceAll(".", "_")}_user_status_idx`)}
+     ON ${escapedTableName} (user_id, status, discovered_at DESC)`
+  ]);
+}
+async function ensurePostgresTrackedPostsStore(client, tableName) {
+  const fullTableName = getPostgresTrackedPostsTableName(tableName);
+  const escapedTableName = escapeQualifiedIdentifier(fullTableName);
+  await ensurePostgresRelationalStore(client, fullTableName, [
+    `CREATE TABLE IF NOT EXISTS ${escapedTableName} (
+       id TEXT PRIMARY KEY,
+       user_id TEXT NOT NULL,
+       origin TEXT NOT NULL,
+       source_id TEXT,
+       external_post_id TEXT NOT NULL,
+       canonical_url TEXT NOT NULL,
+       author_handle TEXT NOT NULL,
+       author_display_name TEXT,
+       text TEXT NOT NULL,
+       published_at TIMESTAMPTZ,
+       media_type TEXT,
+       media_urls JSONB NOT NULL DEFAULT '[]'::jsonb,
+       matched_terms JSONB NOT NULL DEFAULT '[]'::jsonb,
+       relevance_score DOUBLE PRECISION,
+       archive_id TEXT,
+       archived_at TIMESTAMPTZ,
+       discovered_at TIMESTAMPTZ NOT NULL,
+       updated_at TIMESTAMPTZ NOT NULL,
+       raw_payload_json TEXT
+     )`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS ${escapeQualifiedIdentifier(`${fullTableName.replaceAll(".", "_")}_source_external_uidx`)}
+     ON ${escapedTableName} (user_id, origin, COALESCE(source_id, ''), external_post_id)`,
+    `CREATE INDEX IF NOT EXISTS ${escapeQualifiedIdentifier(`${fullTableName.replaceAll(".", "_")}_user_origin_idx`)}
+     ON ${escapedTableName} (user_id, origin, discovered_at DESC)`
+  ]);
+}
+async function ensurePostgresInsightsSnapshotsStore(client, tableName) {
+  const fullTableName = getPostgresInsightsSnapshotsTableName(tableName);
+  const escapedTableName = escapeQualifiedIdentifier(fullTableName);
+  await ensurePostgresRelationalStore(client, fullTableName, [
+    `CREATE TABLE IF NOT EXISTS ${escapedTableName} (
+       id TEXT PRIMARY KEY,
+       user_id TEXT NOT NULL,
+       kind TEXT NOT NULL,
+       external_post_id TEXT,
+       canonical_url TEXT,
+       title TEXT,
+       likes BIGINT,
+       replies BIGINT,
+       reposts BIGINT,
+       quotes BIGINT,
+       views BIGINT,
+       followers BIGINT,
+       profile_views BIGINT,
+       captured_at TIMESTAMPTZ NOT NULL,
+       raw_payload_json TEXT
+     )`,
+    `CREATE INDEX IF NOT EXISTS ${escapeQualifiedIdentifier(`${fullTableName.replaceAll(".", "_")}_user_kind_idx`)}
+     ON ${escapedTableName} (user_id, kind, captured_at DESC)`,
+    `CREATE INDEX IF NOT EXISTS ${escapeQualifiedIdentifier(`${fullTableName.replaceAll(".", "_")}_external_post_idx`)}
+     ON ${escapedTableName} (user_id, external_post_id, captured_at DESC)`
+  ]);
+}
+async function ensurePostgresSavedViewsStore(client, tableName) {
+  const fullTableName = getPostgresSavedViewsTableName(tableName);
+  const escapedTableName = escapeQualifiedIdentifier(fullTableName);
+  await ensurePostgresRelationalStore(client, fullTableName, [
+    `CREATE TABLE IF NOT EXISTS ${escapedTableName} (
+       id TEXT PRIMARY KEY,
+       user_id TEXT NOT NULL,
+       name TEXT NOT NULL,
+       kind TEXT NOT NULL,
+       target_ids JSONB NOT NULL DEFAULT '[]'::jsonb,
+       created_at TIMESTAMPTZ NOT NULL,
+       updated_at TIMESTAMPTZ NOT NULL,
+       status TEXT NOT NULL
+     )`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS ${escapeQualifiedIdentifier(`${fullTableName.replaceAll(".", "_")}_name_uidx`)}
+     ON ${escapedTableName} (user_id, name)`,
+    `CREATE INDEX IF NOT EXISTS ${escapeQualifiedIdentifier(`${fullTableName.replaceAll(".", "_")}_user_kind_idx`)}
+     ON ${escapedTableName} (user_id, kind, updated_at DESC)`
+  ]);
+}
+async function upsertPostgresWatchlists(client, tableName, records) {
+  await ensurePostgresWatchlistsStore(client, tableName);
+  await upsertPostgresRecords(client, getPostgresWatchlistsTableName(tableName), WATCHLIST_COLUMNS, records);
+}
+async function upsertPostgresSearchMonitors(client, tableName, records) {
+  await ensurePostgresSearchMonitorsStore(client, tableName);
+  await upsertPostgresRecords(client, getPostgresSearchMonitorsTableName(tableName), SEARCH_MONITOR_COLUMNS, records);
+}
+async function upsertPostgresSearchResults(client, tableName, records) {
+  await ensurePostgresSearchResultsStore(client, tableName);
+  await upsertPostgresRecords(client, getPostgresSearchResultsTableName(tableName), SEARCH_RESULT_COLUMNS, records);
+}
+async function upsertPostgresTrackedPosts(client, tableName, records) {
+  await ensurePostgresTrackedPostsStore(client, tableName);
+  await upsertPostgresRecords(client, getPostgresTrackedPostsTableName(tableName), TRACKED_POST_COLUMNS, records);
+}
+async function upsertPostgresInsightsSnapshots(client, tableName, records) {
+  await ensurePostgresInsightsSnapshotsStore(client, tableName);
+  await upsertPostgresRecords(
+    client,
+    getPostgresInsightsSnapshotsTableName(tableName),
+    INSIGHTS_SNAPSHOT_COLUMNS,
+    records
+  );
+}
+async function upsertPostgresSavedViews(client, tableName, records) {
+  await ensurePostgresSavedViewsStore(client, tableName);
+  await upsertPostgresRecords(client, getPostgresSavedViewsTableName(tableName), SAVED_VIEW_COLUMNS, records);
+}
+async function loadPostgresWatchlists(client, backend, seedRecords = []) {
+  const tableName = getPostgresWatchlistsTableName(backend.tableName);
+  await ensurePostgresWatchlistsStore(client, backend.tableName);
+  await maybeSeedPostgresRelationalStore(
+    client,
+    tableName,
+    seedRecords,
+    async (currentClient, records) => upsertPostgresWatchlists(currentClient, backend.tableName, records)
+  );
+  return loadPostgresRecords(client, tableName, "updated_at DESC, created_at DESC", normalizePostgresWatchlist);
+}
+async function loadPostgresSearchMonitors(client, backend, seedRecords = []) {
+  const tableName = getPostgresSearchMonitorsTableName(backend.tableName);
+  await ensurePostgresSearchMonitorsStore(client, backend.tableName);
+  await maybeSeedPostgresRelationalStore(
+    client,
+    tableName,
+    seedRecords,
+    async (currentClient, records) => upsertPostgresSearchMonitors(currentClient, backend.tableName, records)
+  );
+  return loadPostgresRecords(
+    client,
+    tableName,
+    "updated_at DESC, created_at DESC",
+    normalizePostgresSearchMonitor
+  );
+}
+async function loadPostgresSearchResults(client, backend, seedRecords = []) {
+  const tableName = getPostgresSearchResultsTableName(backend.tableName);
+  await ensurePostgresSearchResultsStore(client, backend.tableName);
+  await maybeSeedPostgresRelationalStore(
+    client,
+    tableName,
+    seedRecords,
+    async (currentClient, records) => upsertPostgresSearchResults(currentClient, backend.tableName, records)
+  );
+  return loadPostgresRecords(
+    client,
+    tableName,
+    "discovered_at DESC, updated_at DESC",
+    normalizePostgresSearchResult
+  );
+}
+async function loadPostgresTrackedPosts(client, backend, seedRecords = []) {
+  const tableName = getPostgresTrackedPostsTableName(backend.tableName);
+  await ensurePostgresTrackedPostsStore(client, backend.tableName);
+  await maybeSeedPostgresRelationalStore(
+    client,
+    tableName,
+    seedRecords,
+    async (currentClient, records) => upsertPostgresTrackedPosts(currentClient, backend.tableName, records)
+  );
+  return loadPostgresRecords(client, tableName, "discovered_at DESC, updated_at DESC", normalizePostgresTrackedPost);
+}
+async function loadPostgresInsightsSnapshots(client, backend, seedRecords = []) {
+  const tableName = getPostgresInsightsSnapshotsTableName(backend.tableName);
+  await ensurePostgresInsightsSnapshotsStore(client, backend.tableName);
+  await maybeSeedPostgresRelationalStore(
+    client,
+    tableName,
+    seedRecords,
+    async (currentClient, records) => upsertPostgresInsightsSnapshots(currentClient, backend.tableName, records)
+  );
+  return loadPostgresRecords(client, tableName, "captured_at DESC", normalizePostgresInsightsSnapshot);
+}
+async function loadPostgresSavedViews(client, backend, seedRecords = []) {
+  const tableName = getPostgresSavedViewsTableName(backend.tableName);
+  await ensurePostgresSavedViewsStore(client, backend.tableName);
+  await maybeSeedPostgresRelationalStore(
+    client,
+    tableName,
+    seedRecords,
+    async (currentClient, records) => upsertPostgresSavedViews(currentClient, backend.tableName, records)
+  );
+  return loadPostgresRecords(client, tableName, "updated_at DESC, created_at DESC", normalizePostgresSavedView);
+}
+async function findPostgresBotUserById(client, backend, userId) {
+  await ensurePostgresBotUsersStore(client, backend.tableName);
+  const result = await client.query(
+    `SELECT *
+     FROM ${escapeQualifiedIdentifier(getPostgresBotUsersTableName(backend.tableName))}
+     WHERE id = $1
+     LIMIT 1`,
+    [userId]
+  );
+  return result.rows[0] ? normalizePostgresBotUser(result.rows[0]) : null;
+}
+async function loadPostgresBotLoginTokensForUser(client, backend, userId) {
+  await ensurePostgresBotLoginTokensStore(client, backend.tableName);
+  const result = await client.query(
+    `SELECT *
+     FROM ${escapeQualifiedIdentifier(getPostgresBotLoginTokensTableName(backend.tableName))}
+     WHERE user_id = $1
+     ORDER BY created_at DESC`,
+    [userId]
+  );
+  return result.rows.map(normalizePostgresBotLoginToken);
+}
+async function loadPostgresBotSessionsForUser(client, backend, userId) {
+  await ensurePostgresBotSessionsStore(client, backend.tableName);
+  const result = await client.query(
+    `SELECT *
+     FROM ${escapeQualifiedIdentifier(getPostgresBotSessionsTableName(backend.tableName))}
+     WHERE user_id = $1
+     ORDER BY last_seen_at DESC, created_at DESC`,
+    [userId]
+  );
+  return result.rows.map(normalizePostgresBotSession);
+}
+async function loadPostgresBotExtensionLinkSessionsForUser(client, backend, userId) {
+  await ensurePostgresBotExtensionLinkSessionsStore(client, backend.tableName);
+  const result = await client.query(
+    `SELECT *
+     FROM ${escapeQualifiedIdentifier(getPostgresBotExtensionLinkSessionsTableName(backend.tableName))}
+     WHERE user_id = $1
+     ORDER BY created_at DESC`,
+    [userId]
+  );
+  return result.rows.map(normalizePostgresBotExtensionLinkSession);
+}
+async function loadPostgresBotExtensionAccessTokensForUser(client, backend, userId) {
+  await ensurePostgresBotExtensionAccessTokensStore(client, backend.tableName);
+  const result = await client.query(
+    `SELECT *
+     FROM ${escapeQualifiedIdentifier(getPostgresBotExtensionAccessTokensTableName(backend.tableName))}
+     WHERE user_id = $1
+     ORDER BY linked_at DESC, created_at DESC`,
+    [userId]
+  );
+  return result.rows.map(normalizePostgresBotExtensionAccessToken);
+}
+async function loadPostgresBotArchivesForUser(client, backend, userId) {
+  await ensurePostgresBotArchivesStore(client, backend.tableName);
+  const result = await client.query(
+    `SELECT *
+     FROM ${escapeQualifiedIdentifier(getPostgresBotArchivesTableName(backend.tableName))}
+     WHERE user_id = $1
+     ORDER BY updated_at DESC, archived_at DESC`,
+    [userId]
+  );
+  return result.rows.map(normalizePostgresBotArchive);
+}
+async function loadPostgresCloudArchivesForUser(client, backend, userId) {
+  await ensurePostgresCloudArchivesStore(client, backend.tableName);
+  const result = await client.query(
+    `SELECT *
+     FROM ${escapeQualifiedIdentifier(getPostgresCloudArchivesTableName(backend.tableName))}
+     WHERE user_id = $1
+     ORDER BY updated_at DESC, saved_at DESC`,
+    [userId]
+  );
+  return result.rows.map(normalizePostgresCloudArchive);
+}
+async function loadPostgresWatchlistsForUser(client, backend, userId) {
+  await ensurePostgresWatchlistsStore(client, backend.tableName);
+  const result = await client.query(
+    `SELECT *
+     FROM ${escapeQualifiedIdentifier(getPostgresWatchlistsTableName(backend.tableName))}
+     WHERE user_id = $1
+     ORDER BY updated_at DESC, created_at DESC`,
+    [userId]
+  );
+  return result.rows.map(normalizePostgresWatchlist);
+}
+async function loadPostgresSearchMonitorsForUser(client, backend, userId) {
+  await ensurePostgresSearchMonitorsStore(client, backend.tableName);
+  const result = await client.query(
+    `SELECT *
+     FROM ${escapeQualifiedIdentifier(getPostgresSearchMonitorsTableName(backend.tableName))}
+     WHERE user_id = $1
+     ORDER BY updated_at DESC, created_at DESC`,
+    [userId]
+  );
+  return result.rows.map(normalizePostgresSearchMonitor);
+}
+async function loadPostgresSearchResultsForUser(client, backend, userId) {
+  await ensurePostgresSearchResultsStore(client, backend.tableName);
+  const result = await client.query(
+    `SELECT *
+     FROM ${escapeQualifiedIdentifier(getPostgresSearchResultsTableName(backend.tableName))}
+     WHERE user_id = $1
+     ORDER BY discovered_at DESC, updated_at DESC`,
+    [userId]
+  );
+  return result.rows.map(normalizePostgresSearchResult);
+}
+async function loadPostgresTrackedPostsForUser(client, backend, userId) {
+  await ensurePostgresTrackedPostsStore(client, backend.tableName);
+  const result = await client.query(
+    `SELECT *
+     FROM ${escapeQualifiedIdentifier(getPostgresTrackedPostsTableName(backend.tableName))}
+     WHERE user_id = $1
+     ORDER BY discovered_at DESC, updated_at DESC`,
+    [userId]
+  );
+  return result.rows.map(normalizePostgresTrackedPost);
+}
+async function loadPostgresInsightsSnapshotsForUser(client, backend, userId) {
+  await ensurePostgresInsightsSnapshotsStore(client, backend.tableName);
+  const result = await client.query(
+    `SELECT *
+     FROM ${escapeQualifiedIdentifier(getPostgresInsightsSnapshotsTableName(backend.tableName))}
+     WHERE user_id = $1
+     ORDER BY captured_at DESC`,
+    [userId]
+  );
+  return result.rows.map(normalizePostgresInsightsSnapshot);
+}
+async function loadPostgresSavedViewsForUser(client, backend, userId) {
+  await ensurePostgresSavedViewsStore(client, backend.tableName);
+  const result = await client.query(
+    `SELECT *
+     FROM ${escapeQualifiedIdentifier(getPostgresSavedViewsTableName(backend.tableName))}
+     WHERE user_id = $1
+     ORDER BY updated_at DESC, created_at DESC`,
+    [userId]
+  );
+  return result.rows.map(normalizePostgresSavedView);
 }
 async function upsertPostgresBotUsers(client, tableName, users) {
   if (users.length === 0) {
@@ -10877,7 +12052,7 @@ async function upsertPostgresBotUsers(client, tableName, users) {
   const escapedTableName = escapeQualifiedIdentifier(getPostgresBotUsersTableName(tableName));
   const values = [];
   const placeholders = users.map((user, index) => {
-    const offset = index * 17;
+    const offset = index * 19;
     values.push(
       user.id,
       user.threadsUserId,
@@ -10892,12 +12067,14 @@ async function upsertPostgresBotUsers(client, tableName, users) {
       JSON.stringify(user.grantedScopes),
       user.scopeVersion,
       user.lastScopeUpgradeAt,
+      user.plusLicenseId ?? null,
+      user.plusActivatedAt ?? null,
       user.createdAt,
       user.updatedAt,
       user.lastLoginAt,
       user.status
     );
-    return `($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5}, $${offset + 6}, $${offset + 7}, $${offset + 8}, $${offset + 9}::timestamptz, $${offset + 10}, $${offset + 11}::jsonb, $${offset + 12}, $${offset + 13}::timestamptz, $${offset + 14}::timestamptz, $${offset + 15}::timestamptz, $${offset + 16}::timestamptz, $${offset + 17})`;
+    return `($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5}, $${offset + 6}, $${offset + 7}, $${offset + 8}, $${offset + 9}::timestamptz, $${offset + 10}, $${offset + 11}::jsonb, $${offset + 12}, $${offset + 13}::timestamptz, $${offset + 14}, $${offset + 15}::timestamptz, $${offset + 16}::timestamptz, $${offset + 17}::timestamptz, $${offset + 18}::timestamptz, $${offset + 19})`;
   }).join(", ");
   await client.query(
     `INSERT INTO ${escapedTableName} (
@@ -10914,6 +12091,8 @@ async function upsertPostgresBotUsers(client, tableName, users) {
        granted_scopes,
        scope_version,
        last_scope_upgrade_at,
+       plus_license_id,
+       plus_activated_at,
        created_at,
        updated_at,
        last_login_at,
@@ -10933,6 +12112,8 @@ async function upsertPostgresBotUsers(client, tableName, users) {
        granted_scopes = EXCLUDED.granted_scopes,
        scope_version = EXCLUDED.scope_version,
        last_scope_upgrade_at = EXCLUDED.last_scope_upgrade_at,
+       plus_license_id = EXCLUDED.plus_license_id,
+       plus_activated_at = EXCLUDED.plus_activated_at,
        created_at = EXCLUDED.created_at,
        updated_at = EXCLUDED.updated_at,
        last_login_at = EXCLUDED.last_login_at,
@@ -11060,7 +12241,7 @@ async function ensurePrimaryPostgresStoreRow(client, backend) {
     [backend.storeKey, JSON.stringify(serializeDatabaseForPostgres(buildDefaultDatabase()))]
   );
 }
-async function maybeSeedPostgresBotUsersStore(client, backend) {
+async function maybeSeedPostgresBotUsersStore(client, backend, seedRecords = []) {
   const botUsersTableName = getPostgresBotUsersTableName(backend.tableName);
   const cacheKey = `${postgresPoolConnectionString ?? "unknown"}::${botUsersTableName}`;
   if (seededPostgresBotUserStores.has(cacheKey)) {
@@ -11072,12 +12253,15 @@ async function maybeSeedPostgresBotUsersStore(client, backend) {
     `SELECT COUNT(*)::text AS count FROM ${escapedTableName}`
   );
   if ((countResult.rows[0]?.count ?? "0") === "0") {
-    const database = await loadPrimaryDatabasePayload(client, backend);
-    await upsertPostgresBotUsers(client, backend.tableName, database.botUsers);
+    await upsertPostgresBotUsers(
+      client,
+      backend.tableName,
+      seedRecords.length > 0 ? seedRecords : (await loadPrimaryDatabasePayload(client, backend)).botUsers
+    );
   }
   seededPostgresBotUserStores.add(cacheKey);
 }
-async function maybeSeedPostgresBotArchivesStore(client, backend) {
+async function maybeSeedPostgresBotArchivesStore(client, backend, seedRecords = []) {
   const botArchivesTableName = getPostgresBotArchivesTableName(backend.tableName);
   const cacheKey = `${postgresPoolConnectionString ?? "unknown"}::${botArchivesTableName}`;
   if (seededPostgresBotArchiveStores.has(cacheKey)) {
@@ -11089,50 +12273,284 @@ async function maybeSeedPostgresBotArchivesStore(client, backend) {
     `SELECT COUNT(*)::text AS count FROM ${escapedTableName}`
   );
   if ((countResult.rows[0]?.count ?? "0") === "0") {
-    const database = await loadPrimaryDatabasePayload(client, backend);
-    await upsertPostgresBotArchives(client, backend.tableName, database.botArchives);
+    await upsertPostgresBotArchives(
+      client,
+      backend.tableName,
+      seedRecords.length > 0 ? seedRecords : (await loadPrimaryDatabasePayload(client, backend)).botArchives
+    );
   }
   seededPostgresBotArchiveStores.add(cacheKey);
 }
-async function loadPostgresBotUsers(client, backend) {
+async function loadPostgresBotUsers(client, backend, seedRecords = []) {
   await ensurePostgresBotUsersStore(client, backend.tableName);
-  await maybeSeedPostgresBotUsersStore(client, backend);
-  const escapedTableName = escapeQualifiedIdentifier(getPostgresBotUsersTableName(backend.tableName));
-  const result = await client.query(
-    `SELECT *
-     FROM ${escapedTableName}
-     ORDER BY updated_at DESC, created_at DESC`
+  await maybeSeedPostgresBotUsersStore(client, backend, seedRecords);
+  return loadPostgresRecords(
+    client,
+    getPostgresBotUsersTableName(backend.tableName),
+    "updated_at DESC, created_at DESC",
+    normalizePostgresBotUser
   );
-  return result.rows.map(normalizePostgresBotUser);
 }
-async function loadPostgresBotArchives(client, backend) {
+async function loadPostgresBotArchives(client, backend, seedRecords = []) {
   await ensurePostgresBotArchivesStore(client, backend.tableName);
-  await maybeSeedPostgresBotArchivesStore(client, backend);
-  const escapedTableName = escapeQualifiedIdentifier(getPostgresBotArchivesTableName(backend.tableName));
-  const result = await client.query(
-    `SELECT *
-     FROM ${escapedTableName}
-     ORDER BY updated_at DESC, archived_at DESC`
+  await maybeSeedPostgresBotArchivesStore(client, backend, seedRecords);
+  return loadPostgresRecords(
+    client,
+    getPostgresBotArchivesTableName(backend.tableName),
+    "updated_at DESC, archived_at DESC",
+    normalizePostgresBotArchive
   );
-  return result.rows.map(normalizePostgresBotArchive);
 }
 async function syncPostgresBotUsers(client, backend, initialUsers, nextUsers) {
-  const initialMarkers = new Map(initialUsers.map((user) => [user.id, buildBotUserSyncMarker(user)]));
   const nextIds = new Set(nextUsers.map((user) => user.id));
-  const changed = nextUsers.filter((user) => initialMarkers.get(user.id) !== buildBotUserSyncMarker(user));
   const removed = initialUsers.filter((user) => !nextIds.has(user.id)).map((user) => user.id);
-  await upsertPostgresBotUsers(client, backend.tableName, changed);
+  await upsertPostgresBotUsers(client, backend.tableName, nextUsers);
   await deletePostgresBotUsers(client, backend.tableName, removed);
 }
 async function syncPostgresBotArchives(client, backend, initialArchives, nextArchives) {
-  const initialMarkers = new Map(initialArchives.map((archive) => [archive.id, buildBotArchiveSyncMarker(archive)]));
   const nextIds = new Set(nextArchives.map((archive) => archive.id));
-  const changed = nextArchives.filter(
-    (archive) => initialMarkers.get(archive.id) !== buildBotArchiveSyncMarker(archive)
-  );
   const removed = initialArchives.filter((archive) => !nextIds.has(archive.id)).map((archive) => archive.id);
-  await upsertPostgresBotArchives(client, backend.tableName, changed);
+  await upsertPostgresBotArchives(client, backend.tableName, nextArchives);
   await deletePostgresBotArchives(client, backend.tableName, removed);
+}
+async function syncPostgresBotLoginTokens(client, backend, initialRecords, nextRecords) {
+  const nextIds = new Set(nextRecords.map((record) => record.id));
+  const removed = initialRecords.filter((record) => !nextIds.has(record.id)).map((record) => record.id);
+  await upsertPostgresBotLoginTokens(client, backend.tableName, nextRecords);
+  await deletePostgresRecords(client, getPostgresBotLoginTokensTableName(backend.tableName), removed);
+}
+async function syncPostgresBotOauthSessions(client, backend, initialRecords, nextRecords) {
+  const nextIds = new Set(nextRecords.map((record) => record.id));
+  const removed = initialRecords.filter((record) => !nextIds.has(record.id)).map((record) => record.id);
+  await upsertPostgresBotOauthSessions(client, backend.tableName, nextRecords);
+  await deletePostgresRecords(client, getPostgresBotOauthSessionsTableName(backend.tableName), removed);
+}
+async function syncPostgresBotSessions(client, backend, initialRecords, nextRecords) {
+  const nextIds = new Set(nextRecords.map((record) => record.id));
+  const removed = initialRecords.filter((record) => !nextIds.has(record.id)).map((record) => record.id);
+  await upsertPostgresBotSessions(client, backend.tableName, nextRecords);
+  await deletePostgresRecords(client, getPostgresBotSessionsTableName(backend.tableName), removed);
+}
+async function syncPostgresBotExtensionLinkSessions(client, backend, initialRecords, nextRecords) {
+  const nextIds = new Set(nextRecords.map((record) => record.id));
+  const removed = initialRecords.filter((record) => !nextIds.has(record.id)).map((record) => record.id);
+  await upsertPostgresBotExtensionLinkSessions(client, backend.tableName, nextRecords);
+  await deletePostgresRecords(
+    client,
+    getPostgresBotExtensionLinkSessionsTableName(backend.tableName),
+    removed
+  );
+}
+async function syncPostgresBotExtensionAccessTokens(client, backend, initialRecords, nextRecords) {
+  const nextIds = new Set(nextRecords.map((record) => record.id));
+  const removed = initialRecords.filter((record) => !nextIds.has(record.id)).map((record) => record.id);
+  await upsertPostgresBotExtensionAccessTokens(client, backend.tableName, nextRecords);
+  await deletePostgresRecords(
+    client,
+    getPostgresBotExtensionAccessTokensTableName(backend.tableName),
+    removed
+  );
+}
+async function syncPostgresCloudArchives(client, backend, initialRecords, nextRecords) {
+  const nextIds = new Set(nextRecords.map((record) => record.id));
+  const removed = initialRecords.filter((record) => !nextIds.has(record.id)).map((record) => record.id);
+  await upsertPostgresCloudArchives(client, backend.tableName, nextRecords);
+  await deletePostgresRecords(client, getPostgresCloudArchivesTableName(backend.tableName), removed);
+}
+async function syncPostgresWatchlists(client, backend, initialRecords, nextRecords) {
+  const nextIds = new Set(nextRecords.map((record) => record.id));
+  const removed = initialRecords.filter((record) => !nextIds.has(record.id)).map((record) => record.id);
+  await upsertPostgresWatchlists(client, backend.tableName, nextRecords);
+  await deletePostgresRecords(client, getPostgresWatchlistsTableName(backend.tableName), removed);
+}
+async function syncPostgresSearchMonitors(client, backend, initialRecords, nextRecords) {
+  const nextIds = new Set(nextRecords.map((record) => record.id));
+  const removed = initialRecords.filter((record) => !nextIds.has(record.id)).map((record) => record.id);
+  await upsertPostgresSearchMonitors(client, backend.tableName, nextRecords);
+  await deletePostgresRecords(client, getPostgresSearchMonitorsTableName(backend.tableName), removed);
+}
+async function syncPostgresSearchResults(client, backend, initialRecords, nextRecords) {
+  const nextIds = new Set(nextRecords.map((record) => record.id));
+  const removed = initialRecords.filter((record) => !nextIds.has(record.id)).map((record) => record.id);
+  await upsertPostgresSearchResults(client, backend.tableName, nextRecords);
+  await deletePostgresRecords(client, getPostgresSearchResultsTableName(backend.tableName), removed);
+}
+async function syncPostgresTrackedPosts(client, backend, initialRecords, nextRecords) {
+  const nextIds = new Set(nextRecords.map((record) => record.id));
+  const removed = initialRecords.filter((record) => !nextIds.has(record.id)).map((record) => record.id);
+  await upsertPostgresTrackedPosts(client, backend.tableName, nextRecords);
+  await deletePostgresRecords(client, getPostgresTrackedPostsTableName(backend.tableName), removed);
+}
+async function syncPostgresInsightsSnapshots(client, backend, initialRecords, nextRecords) {
+  const nextIds = new Set(nextRecords.map((record) => record.id));
+  const removed = initialRecords.filter((record) => !nextIds.has(record.id)).map((record) => record.id);
+  await upsertPostgresInsightsSnapshots(client, backend.tableName, nextRecords);
+  await deletePostgresRecords(client, getPostgresInsightsSnapshotsTableName(backend.tableName), removed);
+}
+async function syncPostgresSavedViews(client, backend, initialRecords, nextRecords) {
+  const nextIds = new Set(nextRecords.map((record) => record.id));
+  const removed = initialRecords.filter((record) => !nextIds.has(record.id)).map((record) => record.id);
+  await upsertPostgresSavedViews(client, backend.tableName, nextRecords);
+  await deletePostgresRecords(client, getPostgresSavedViewsTableName(backend.tableName), removed);
+}
+function snapshotRelationalCollections(data) {
+  return {
+    botUsers: structuredClone(data.botUsers),
+    botLoginTokens: structuredClone(data.botLoginTokens),
+    botOauthSessions: structuredClone(data.botOauthSessions),
+    botSessions: structuredClone(data.botSessions),
+    botExtensionLinkSessions: structuredClone(data.botExtensionLinkSessions),
+    botExtensionAccessTokens: structuredClone(data.botExtensionAccessTokens),
+    botArchives: structuredClone(data.botArchives),
+    cloudArchives: structuredClone(data.cloudArchives),
+    watchlists: structuredClone(data.watchlists),
+    searchMonitors: structuredClone(data.searchMonitors),
+    searchResults: structuredClone(data.searchResults),
+    trackedPosts: structuredClone(data.trackedPosts),
+    insightsSnapshots: structuredClone(data.insightsSnapshots),
+    savedViews: structuredClone(data.savedViews)
+  };
+}
+async function hydratePostgresDatabase(client, backend, database) {
+  database.botUsers = await loadPostgresBotUsers(client, backend, database.botUsers);
+  database.botLoginTokens = await loadPostgresBotLoginTokens(client, backend, database.botLoginTokens);
+  database.botOauthSessions = await loadPostgresBotOauthSessions(client, backend, database.botOauthSessions);
+  database.botSessions = await loadPostgresBotSessions(client, backend, database.botSessions);
+  database.botExtensionLinkSessions = await loadPostgresBotExtensionLinkSessions(
+    client,
+    backend,
+    database.botExtensionLinkSessions
+  );
+  database.botExtensionAccessTokens = await loadPostgresBotExtensionAccessTokens(
+    client,
+    backend,
+    database.botExtensionAccessTokens
+  );
+  database.botArchives = await loadPostgresBotArchives(client, backend, database.botArchives);
+  database.cloudArchives = await loadPostgresCloudArchives(client, backend, database.cloudArchives);
+  database.watchlists = await loadPostgresWatchlists(client, backend, database.watchlists);
+  database.searchMonitors = await loadPostgresSearchMonitors(client, backend, database.searchMonitors);
+  database.searchResults = await loadPostgresSearchResults(client, backend, database.searchResults);
+  database.trackedPosts = await loadPostgresTrackedPosts(client, backend, database.trackedPosts);
+  database.insightsSnapshots = await loadPostgresInsightsSnapshots(client, backend, database.insightsSnapshots);
+  database.savedViews = await loadPostgresSavedViews(client, backend, database.savedViews);
+  return database;
+}
+async function syncPostgresRelationalCollections(client, backend, initial, next) {
+  await syncPostgresBotUsers(client, backend, initial.botUsers, next.botUsers);
+  await syncPostgresBotLoginTokens(client, backend, initial.botLoginTokens, next.botLoginTokens);
+  await syncPostgresBotOauthSessions(client, backend, initial.botOauthSessions, next.botOauthSessions);
+  await syncPostgresBotSessions(client, backend, initial.botSessions, next.botSessions);
+  await syncPostgresBotExtensionLinkSessions(
+    client,
+    backend,
+    initial.botExtensionLinkSessions,
+    next.botExtensionLinkSessions
+  );
+  await syncPostgresBotExtensionAccessTokens(
+    client,
+    backend,
+    initial.botExtensionAccessTokens,
+    next.botExtensionAccessTokens
+  );
+  await syncPostgresBotArchives(client, backend, initial.botArchives, next.botArchives);
+  await syncPostgresCloudArchives(client, backend, initial.cloudArchives, next.cloudArchives);
+  await syncPostgresWatchlists(client, backend, initial.watchlists, next.watchlists);
+  await syncPostgresSearchMonitors(client, backend, initial.searchMonitors, next.searchMonitors);
+  await syncPostgresSearchResults(client, backend, initial.searchResults, next.searchResults);
+  await syncPostgresTrackedPosts(client, backend, initial.trackedPosts, next.trackedPosts);
+  await syncPostgresInsightsSnapshots(client, backend, initial.insightsSnapshots, next.insightsSnapshots);
+  await syncPostgresSavedViews(client, backend, initial.savedViews, next.savedViews);
+}
+function snapshotBotAuthCollections(data) {
+  return {
+    botUsers: structuredClone(data.botUsers),
+    botLoginTokens: structuredClone(data.botLoginTokens),
+    botOauthSessions: structuredClone(data.botOauthSessions),
+    botSessions: structuredClone(data.botSessions),
+    botExtensionLinkSessions: structuredClone(data.botExtensionLinkSessions),
+    botExtensionAccessTokens: structuredClone(data.botExtensionAccessTokens)
+  };
+}
+async function syncPostgresBotAuthCollections(client, backend, initial, next) {
+  await syncPostgresBotUsers(client, backend, initial.botUsers, next.botUsers);
+  await syncPostgresBotLoginTokens(client, backend, initial.botLoginTokens, next.botLoginTokens);
+  await syncPostgresBotOauthSessions(client, backend, initial.botOauthSessions, next.botOauthSessions);
+  await syncPostgresBotSessions(client, backend, initial.botSessions, next.botSessions);
+  await syncPostgresBotExtensionLinkSessions(
+    client,
+    backend,
+    initial.botExtensionLinkSessions,
+    next.botExtensionLinkSessions
+  );
+  await syncPostgresBotExtensionAccessTokens(
+    client,
+    backend,
+    initial.botExtensionAccessTokens,
+    next.botExtensionAccessTokens
+  );
+}
+function snapshotUserScopedCollections(data) {
+  return {
+    botUsers: structuredClone(data.botUsers),
+    botLoginTokens: structuredClone(data.botLoginTokens),
+    botSessions: structuredClone(data.botSessions),
+    botExtensionLinkSessions: structuredClone(data.botExtensionLinkSessions),
+    botExtensionAccessTokens: structuredClone(data.botExtensionAccessTokens),
+    botArchives: structuredClone(data.botArchives),
+    cloudArchives: structuredClone(data.cloudArchives),
+    watchlists: structuredClone(data.watchlists),
+    searchMonitors: structuredClone(data.searchMonitors),
+    searchResults: structuredClone(data.searchResults),
+    trackedPosts: structuredClone(data.trackedPosts),
+    insightsSnapshots: structuredClone(data.insightsSnapshots),
+    savedViews: structuredClone(data.savedViews)
+  };
+}
+async function hydrateUserScopedPostgresDatabase(client, backend, userId) {
+  const database = await loadPrimaryDatabasePayload(client, backend);
+  const user = await findPostgresBotUserById(client, backend, userId);
+  database.botUsers = user ? [user] : [];
+  database.botLoginTokens = await loadPostgresBotLoginTokensForUser(client, backend, userId);
+  database.botOauthSessions = [];
+  database.botSessions = await loadPostgresBotSessionsForUser(client, backend, userId);
+  database.botExtensionLinkSessions = await loadPostgresBotExtensionLinkSessionsForUser(client, backend, userId);
+  database.botExtensionAccessTokens = await loadPostgresBotExtensionAccessTokensForUser(client, backend, userId);
+  database.botMentionJobs = [];
+  database.botArchives = await loadPostgresBotArchivesForUser(client, backend, userId);
+  database.cloudArchives = await loadPostgresCloudArchivesForUser(client, backend, userId);
+  database.watchlists = await loadPostgresWatchlistsForUser(client, backend, userId);
+  database.searchMonitors = await loadPostgresSearchMonitorsForUser(client, backend, userId);
+  database.searchResults = await loadPostgresSearchResultsForUser(client, backend, userId);
+  database.trackedPosts = await loadPostgresTrackedPostsForUser(client, backend, userId);
+  database.insightsSnapshots = await loadPostgresInsightsSnapshotsForUser(client, backend, userId);
+  database.savedViews = await loadPostgresSavedViewsForUser(client, backend, userId);
+  return database;
+}
+async function syncPostgresUserScopedCollections(client, backend, initial, next) {
+  await syncPostgresBotUsers(client, backend, initial.botUsers, next.botUsers);
+  await syncPostgresBotLoginTokens(client, backend, initial.botLoginTokens, next.botLoginTokens);
+  await syncPostgresBotSessions(client, backend, initial.botSessions, next.botSessions);
+  await syncPostgresBotExtensionLinkSessions(
+    client,
+    backend,
+    initial.botExtensionLinkSessions,
+    next.botExtensionLinkSessions
+  );
+  await syncPostgresBotExtensionAccessTokens(
+    client,
+    backend,
+    initial.botExtensionAccessTokens,
+    next.botExtensionAccessTokens
+  );
+  await syncPostgresBotArchives(client, backend, initial.botArchives, next.botArchives);
+  await syncPostgresCloudArchives(client, backend, initial.cloudArchives, next.cloudArchives);
+  await syncPostgresWatchlists(client, backend, initial.watchlists, next.watchlists);
+  await syncPostgresSearchMonitors(client, backend, initial.searchMonitors, next.searchMonitors);
+  await syncPostgresSearchResults(client, backend, initial.searchResults, next.searchResults);
+  await syncPostgresTrackedPosts(client, backend, initial.trackedPosts, next.trackedPosts);
+  await syncPostgresInsightsSnapshots(client, backend, initial.insightsSnapshots, next.insightsSnapshots);
+  await syncPostgresSavedViews(client, backend, initial.savedViews, next.savedViews);
 }
 async function ensureParentDirectory(filePath) {
   await mkdir2(path2.dirname(filePath), { recursive: true });
@@ -11156,7 +12574,7 @@ function normalizeStorefrontSettings(parsed, fallback) {
     ...fallback,
     ...parsed ?? {}
   };
-  if (!parsed || parsed.productName === "Threads to Obsidian") {
+  if (!parsed || parsed.productName === "Threads to Obsidian" || parsed.productName === "Threads Saver") {
     merged.productName = fallback.productName;
   }
   if (!parsed || parsed.headline === "Threads\uB97C Obsidian\uC5D0 \uC800\uC7A5.") {
@@ -11165,7 +12583,7 @@ function normalizeStorefrontSettings(parsed, fallback) {
   if (!parsed || parsed.subheadline === "Free\uB294 \uC800\uC7A5. Pro\uB294 \uADDC\uCE59 + \uB0B4 LLM \uD0A4\uB85C \uC694\uC57D, \uD0DC\uADF8, frontmatter.") {
     merged.subheadline = fallback.subheadline;
   }
-  if (!parsed || parsed.priceLabel === "Pro \uC5C5\uADF8\uB808\uC774\uB4DC") {
+  if (!parsed || parsed.priceLabel === "Pro \uC5C5\uADF8\uB808\uC774\uB4DC" || parsed.priceLabel === "Threads to Obsidian Pro" || parsed.priceLabel === "Threads Saver Pro") {
     merged.priceLabel = fallback.priceLabel;
   }
   if (!parsed || parsed.priceValue === "$19") {
@@ -11196,12 +12614,12 @@ async function savePostgresDatabase(data, backend) {
   try {
     await client.query("BEGIN");
     await ensurePrimaryPostgresStoreRow(client, backend);
-    await ensurePostgresBotUsersStore(client, backend.tableName);
-    await ensurePostgresBotArchivesStore(client, backend.tableName);
-    const initialBotUsers = await loadPostgresBotUsers(client, backend);
-    const initialBotArchives = await loadPostgresBotArchives(client, backend);
-    await syncPostgresBotUsers(client, backend, initialBotUsers, data.botUsers);
-    await syncPostgresBotArchives(client, backend, initialBotArchives, data.botArchives);
+    const initialDatabase = await hydratePostgresDatabase(
+      client,
+      backend,
+      await loadPrimaryDatabasePayload(client, backend)
+    );
+    await syncPostgresRelationalCollections(client, backend, snapshotRelationalCollections(initialDatabase), data);
     await client.query(
       `INSERT INTO ${escapedTableName} (store_key, payload, updated_at)
        VALUES ($1, $2::jsonb, NOW())
@@ -11220,10 +12638,7 @@ async function savePostgresDatabase(data, backend) {
 async function loadDatabaseFromPostgres(backend) {
   const pool = await getPostgresPool(backend.connectionString);
   await ensurePrimaryPostgresStoreRow(pool, backend);
-  let database = await loadPrimaryDatabasePayload(pool, backend);
-  database.botUsers = await loadPostgresBotUsers(pool, backend);
-  database.botArchives = await loadPostgresBotArchives(pool, backend);
-  return database;
+  return hydratePostgresDatabase(pool, backend, await loadPrimaryDatabasePayload(pool, backend));
 }
 async function withPostgresDatabaseTransaction(handler, backend) {
   const pool = await getPostgresPool(backend.connectionString);
@@ -11232,20 +12647,18 @@ async function withPostgresDatabaseTransaction(handler, backend) {
   try {
     await client.query("BEGIN");
     await ensurePrimaryPostgresStoreRow(client, backend);
-    await ensurePostgresBotUsersStore(client, backend.tableName);
-    await ensurePostgresBotArchivesStore(client, backend.tableName);
     const selected = await client.query(
       `SELECT payload FROM ${escapedTableName} WHERE store_key = $1 FOR UPDATE`,
       [backend.storeKey]
     );
-    const database = selected.rows[0] ? normalizeDatabasePayload(selected.rows[0].payload) : buildDefaultDatabase();
-    const initialBotUsers = await loadPostgresBotUsers(client, backend);
-    const initialBotArchives = await loadPostgresBotArchives(client, backend);
-    database.botUsers = structuredClone(initialBotUsers);
-    database.botArchives = structuredClone(initialBotArchives);
+    const database = await hydratePostgresDatabase(
+      client,
+      backend,
+      selected.rows[0] ? normalizeDatabasePayload(selected.rows[0].payload) : buildDefaultDatabase()
+    );
+    const initialRelationalCollections = snapshotRelationalCollections(database);
     const output = await handler(database);
-    await syncPostgresBotUsers(client, backend, initialBotUsers, database.botUsers);
-    await syncPostgresBotArchives(client, backend, initialBotArchives, database.botArchives);
+    await syncPostgresRelationalCollections(client, backend, initialRelationalCollections, database);
     await client.query(
       `UPDATE ${escapedTableName}
        SET payload = $2::jsonb,
@@ -11289,44 +12702,69 @@ async function loadDatabaseForConfig(config) {
   const backend = resolveDatabaseBackendFromConfig(config);
   return backend.kind === "postgres" ? loadDatabaseFromPostgres(backend) : loadDatabaseUnsafe(backend.filePath);
 }
-async function withPrimaryDatabaseTransaction(handler, filePath) {
+async function withBotAuthDatabaseTransaction(handler, filePath) {
   return withDatabaseAccess(async () => {
     const backend = resolveDatabaseBackend(filePath);
-    if (backend.kind === "postgres") {
-      const pool = await getPostgresPool(backend.connectionString);
-      const client = await pool.connect();
-      const escapedTableName = escapeQualifiedIdentifier(backend.tableName);
-      try {
-        await client.query("BEGIN");
-        await ensurePrimaryPostgresStoreRow(client, backend);
-        const selected = await client.query(
-          `SELECT payload FROM ${escapedTableName} WHERE store_key = $1 FOR UPDATE`,
-          [backend.storeKey]
-        );
-        const database = selected.rows[0] ? normalizeDatabasePayload(selected.rows[0].payload) : buildDefaultDatabase();
-        const output = await handler(database);
-        await client.query(
-          `UPDATE ${escapedTableName}
-           SET payload = $2::jsonb,
-               updated_at = NOW()
-           WHERE store_key = $1`,
-          [backend.storeKey, JSON.stringify(serializeDatabaseForPostgres(database))]
-        );
-        await client.query("COMMIT");
-        return output;
-      } catch (error) {
-        await client.query("ROLLBACK").catch(() => void 0);
-        throw error;
-      } finally {
-        client.release();
-      }
+    if (backend.kind !== "postgres") {
+      return withDatabaseTransaction(handler, backend.filePath);
     }
-    return withDatabaseLock(async () => {
-      const database = await loadDatabaseUnsafe(backend.filePath);
+    const pool = await getPostgresPool(backend.connectionString);
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      await ensurePrimaryPostgresStoreRow(client, backend);
+      const database = await loadPrimaryDatabasePayload(client, backend);
+      database.botUsers = await loadPostgresBotUsers(client, backend, database.botUsers);
+      database.botLoginTokens = await loadPostgresBotLoginTokens(client, backend, database.botLoginTokens);
+      database.botOauthSessions = await loadPostgresBotOauthSessions(client, backend, database.botOauthSessions);
+      database.botSessions = await loadPostgresBotSessions(client, backend, database.botSessions);
+      database.botExtensionLinkSessions = await loadPostgresBotExtensionLinkSessions(
+        client,
+        backend,
+        database.botExtensionLinkSessions
+      );
+      database.botExtensionAccessTokens = await loadPostgresBotExtensionAccessTokens(
+        client,
+        backend,
+        database.botExtensionAccessTokens
+      );
+      const initial = snapshotBotAuthCollections(database);
       const output = await handler(database);
-      await saveFileDatabase(database, backend.filePath);
+      await syncPostgresBotAuthCollections(client, backend, initial, database);
+      await client.query("COMMIT");
       return output;
-    });
+    } catch (error) {
+      await client.query("ROLLBACK").catch(() => void 0);
+      throw error;
+    } finally {
+      client.release();
+    }
+  });
+}
+async function withUserScopedDatabaseTransaction(userId, handler, filePath) {
+  return withDatabaseAccess(async () => {
+    const backend = resolveDatabaseBackend(filePath);
+    if (backend.kind !== "postgres") {
+      return withDatabaseTransaction(handler, backend.filePath);
+    }
+    const normalizedUserId = userId.trim();
+    const pool = await getPostgresPool(backend.connectionString);
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      await ensurePrimaryPostgresStoreRow(client, backend);
+      const database = await hydrateUserScopedPostgresDatabase(client, backend, normalizedUserId);
+      const initial = snapshotUserScopedCollections(database);
+      const output = await handler(database);
+      await syncPostgresUserScopedCollections(client, backend, initial, database);
+      await client.query("COMMIT");
+      return output;
+    } catch (error) {
+      await client.query("ROLLBACK").catch(() => void 0);
+      throw error;
+    } finally {
+      client.release();
+    }
   });
 }
 async function saveDatabaseForConfig(data, config) {
@@ -11345,6 +12783,18 @@ async function testDatabaseConfig(config) {
     await ensurePostgresMentionJobsStore(pool, backend.tableName);
     await ensurePostgresBotUsersStore(pool, backend.tableName);
     await ensurePostgresBotArchivesStore(pool, backend.tableName);
+    await ensurePostgresBotLoginTokensStore(pool, backend.tableName);
+    await ensurePostgresBotOauthSessionsStore(pool, backend.tableName);
+    await ensurePostgresBotSessionsStore(pool, backend.tableName);
+    await ensurePostgresBotExtensionLinkSessionsStore(pool, backend.tableName);
+    await ensurePostgresBotExtensionAccessTokensStore(pool, backend.tableName);
+    await ensurePostgresCloudArchivesStore(pool, backend.tableName);
+    await ensurePostgresWatchlistsStore(pool, backend.tableName);
+    await ensurePostgresSearchMonitorsStore(pool, backend.tableName);
+    await ensurePostgresSearchResultsStore(pool, backend.tableName);
+    await ensurePostgresTrackedPostsStore(pool, backend.tableName);
+    await ensurePostgresInsightsSnapshotsStore(pool, backend.tableName);
+    await ensurePostgresSavedViewsStore(pool, backend.tableName);
     await pool.query("SELECT 1");
     return;
   }
@@ -11464,33 +12914,6 @@ async function findBotUserByHandle(rawHandle, filePath) {
     ) ?? null;
   });
 }
-async function findBotUserById(userId, filePath) {
-  const normalizedUserId = typeof userId === "string" ? userId.trim() : "";
-  if (!normalizedUserId) {
-    return null;
-  }
-  return withDatabaseAccess(async () => {
-    const backend = resolveDatabaseBackend(filePath);
-    if (backend.kind === "postgres") {
-      const pool = await getPostgresPool(backend.connectionString);
-      await ensurePostgresBotUsersStore(pool, backend.tableName);
-      await maybeSeedPostgresBotUsersStore(pool, backend);
-      const escapedTableName = escapeQualifiedIdentifier(getPostgresBotUsersTableName(backend.tableName));
-      const result = await pool.query(
-        `SELECT *
-         FROM ${escapedTableName}
-         WHERE id = $1
-           AND status = 'active'
-         LIMIT 1`,
-        [normalizedUserId]
-      );
-      return result.rows[0] ? normalizePostgresBotUser(result.rows[0]) : null;
-    }
-    return (await loadDatabaseUnsafe(backend.filePath)).botUsers.find(
-      (candidate) => candidate.id === normalizedUserId && candidate.status === "active"
-    ) ?? null;
-  });
-}
 async function saveBotUserRecord(user, filePath) {
   await withDatabaseAccess(async () => {
     const backend = resolveDatabaseBackend(filePath);
@@ -11545,84 +12968,6 @@ async function findBotArchiveByMention(userId, mentionId, mentionUrl, filePath) 
     }) ?? null;
   });
 }
-async function findBotArchiveById(userId, archiveId, filePath) {
-  const normalizedUserId = userId.trim();
-  const normalizedArchiveId = typeof archiveId === "string" ? archiveId.trim() : "";
-  if (!normalizedUserId || !normalizedArchiveId) {
-    return null;
-  }
-  return withDatabaseAccess(async () => {
-    const backend = resolveDatabaseBackend(filePath);
-    if (backend.kind === "postgres") {
-      const pool = await getPostgresPool(backend.connectionString);
-      await ensurePostgresBotArchivesStore(pool, backend.tableName);
-      await maybeSeedPostgresBotArchivesStore(pool, backend);
-      const escapedTableName = escapeQualifiedIdentifier(getPostgresBotArchivesTableName(backend.tableName));
-      const result = await pool.query(
-        `SELECT *
-         FROM ${escapedTableName}
-         WHERE user_id = $1
-           AND id = $2
-         LIMIT 1`,
-        [normalizedUserId, normalizedArchiveId]
-      );
-      return result.rows[0] ? normalizePostgresBotArchive(result.rows[0]) : null;
-    }
-    return (await loadDatabaseUnsafe(backend.filePath)).botArchives.find(
-      (candidate) => candidate.userId === normalizedUserId && candidate.id === normalizedArchiveId
-    ) ?? null;
-  });
-}
-async function listBotArchivesForUser(userId, filePath) {
-  const normalizedUserId = userId.trim();
-  if (!normalizedUserId) {
-    return [];
-  }
-  return withDatabaseAccess(async () => {
-    const backend = resolveDatabaseBackend(filePath);
-    if (backend.kind === "postgres") {
-      const pool = await getPostgresPool(backend.connectionString);
-      await ensurePostgresBotArchivesStore(pool, backend.tableName);
-      await maybeSeedPostgresBotArchivesStore(pool, backend);
-      const escapedTableName = escapeQualifiedIdentifier(getPostgresBotArchivesTableName(backend.tableName));
-      const result = await pool.query(
-        `SELECT *
-         FROM ${escapedTableName}
-         WHERE user_id = $1
-         ORDER BY updated_at DESC, archived_at DESC`,
-        [normalizedUserId]
-      );
-      return result.rows.map(normalizePostgresBotArchive);
-    }
-    return (await loadDatabaseUnsafe(backend.filePath)).botArchives.filter((candidate) => candidate.userId === normalizedUserId).map((candidate) => ({ ...candidate, mediaUrls: [...candidate.mediaUrls] }));
-  });
-}
-async function findBotArchivesByIds(userId, archiveIds, filePath) {
-  const normalizedUserId = userId.trim();
-  const ids = [...new Set(archiveIds.map((value) => value.trim()).filter(Boolean))];
-  if (!normalizedUserId || ids.length === 0) {
-    return [];
-  }
-  return withDatabaseAccess(async () => {
-    const backend = resolveDatabaseBackend(filePath);
-    if (backend.kind === "postgres") {
-      const pool = await getPostgresPool(backend.connectionString);
-      await ensurePostgresBotArchivesStore(pool, backend.tableName);
-      await maybeSeedPostgresBotArchivesStore(pool, backend);
-      const escapedTableName = escapeQualifiedIdentifier(getPostgresBotArchivesTableName(backend.tableName));
-      const result = await pool.query(
-        `SELECT *
-         FROM ${escapedTableName}
-         WHERE user_id = $1
-           AND id = ANY($2::text[])`,
-        [normalizedUserId, ids]
-      );
-      return result.rows.map(normalizePostgresBotArchive);
-    }
-    const byId = new Set(ids);
-    return (await loadDatabaseUnsafe(backend.filePath)).botArchives.filter((candidate) => candidate.userId === normalizedUserId && byId.has(candidate.id)).map((candidate) => ({ ...candidate, mediaUrls: [...candidate.mediaUrls] }));
-  });
-}
 async function saveBotArchiveRecord(archive, filePath) {
   await withDatabaseAccess(async () => {
     const backend = resolveDatabaseBackend(filePath);
@@ -11635,40 +12980,6 @@ async function saveBotArchiveRecord(archive, filePath) {
       const database = await loadDatabaseUnsafe(backend.filePath);
       upsertBotArchive(database, archive);
       await saveFileDatabase(database, backend.filePath);
-    });
-  });
-}
-async function deleteBotArchiveRecord(userId, archiveId, filePath) {
-  const normalizedUserId = userId.trim();
-  const normalizedArchiveId = archiveId.trim();
-  if (!normalizedUserId || !normalizedArchiveId) {
-    return false;
-  }
-  return withDatabaseAccess(async () => {
-    const backend = resolveDatabaseBackend(filePath);
-    if (backend.kind === "postgres") {
-      const pool = await getPostgresPool(backend.connectionString);
-      await ensurePostgresBotArchivesStore(pool, backend.tableName);
-      const escapedTableName = escapeQualifiedIdentifier(getPostgresBotArchivesTableName(backend.tableName));
-      const result = await pool.query(
-        `DELETE FROM ${escapedTableName}
-         WHERE user_id = $1
-           AND id = $2`,
-        [normalizedUserId, normalizedArchiveId]
-      );
-      return (result.rowCount ?? 0) > 0;
-    }
-    return withDatabaseLock(async () => {
-      const database = await loadDatabaseUnsafe(backend.filePath);
-      const index = database.botArchives.findIndex(
-        (candidate) => candidate.userId === normalizedUserId && candidate.id === normalizedArchiveId
-      );
-      if (index < 0) {
-        return false;
-      }
-      database.botArchives.splice(index, 1);
-      await saveFileDatabase(database, backend.filePath);
-      return true;
     });
   });
 }
@@ -14196,17 +15507,33 @@ var dictionaries = {
   en,
   ...localizedMessages
 };
+var PLAN_BRAND_PATTERN = /\bPro\b/g;
+var brandedDictionaryCache = /* @__PURE__ */ new WeakMap();
+function applyPlanBrandingToString(value) {
+  return value.replaceAll("SS Threads Pro", "SS Threads Plus").replace(PLAN_BRAND_PATTERN, "Plus");
+}
+function brandMessages(messages) {
+  const cached = brandedDictionaryCache.get(messages);
+  if (cached) {
+    return cached;
+  }
+  const branded = Object.fromEntries(
+    Object.entries(messages).map(([key, value]) => [key, applyPlanBrandingToString(value)])
+  );
+  brandedDictionaryCache.set(messages, branded);
+  return branded;
+}
 function detectDefaultLocale() {
   return detectLocaleFromNavigator(typeof navigator !== "undefined" ? navigator.language : null, "en");
 }
 function resolveMessages(locale) {
-  return dictionaries[locale ?? detectDefaultLocale()];
+  return brandMessages(dictionaries[locale ?? detectDefaultLocale()]);
 }
 async function t(locale) {
   return resolveMessages(locale);
 }
 function tSync(locale) {
-  return dictionaries[locale];
+  return brandMessages(dictionaries[locale]);
 }
 
 // ../shared/src/markdown.ts
@@ -15378,6 +16705,115 @@ async function hashPost(post) {
   return Array.from(new Uint8Array(digest)).map((value) => value.toString(16).padStart(2, "0")).join("").slice(0, 16);
 }
 
+// src/server/scrapbook-plan-service.ts
+var FREE_SCRAPBOOK_ARCHIVE_LIMIT = 100;
+var FREE_SCRAPBOOK_FOLDER_LIMIT = 5;
+var PLUS_SCRAPBOOK_ARCHIVE_LIMIT = 1e3;
+var PLUS_SCRAPBOOK_FOLDER_LIMIT = 50;
+function hasLicenseExpired(license) {
+  if (!license?.expiresAt) {
+    return false;
+  }
+  const expiresAt = Date.parse(license.expiresAt);
+  return !Number.isFinite(expiresAt) || expiresAt <= Date.now();
+}
+function findUserPlusLicense(data, user) {
+  if (!user?.plusLicenseId) {
+    return null;
+  }
+  return data.licenses.find((candidate) => candidate.id === user.plusLicenseId) ?? null;
+}
+function countScrapbookArchivesForUser(data, userId) {
+  return data.botArchives.filter((candidate) => candidate.userId === userId).length + data.cloudArchives.filter((candidate) => candidate.userId === userId).length;
+}
+function readScrapbookPlanState(data, user) {
+  const archiveCount = user ? countScrapbookArchivesForUser(data, user.id) : 0;
+  const license = findUserPlusLicense(data, user ?? null);
+  let plusStatus = "inactive";
+  if (user?.plusLicenseId) {
+    if (!license) {
+      plusStatus = "missing";
+    } else if (license.status === "revoked") {
+      plusStatus = "revoked";
+    } else if (hasLicenseExpired(license)) {
+      plusStatus = "expired";
+    } else {
+      plusStatus = "active";
+    }
+  }
+  const tier = plusStatus === "active" ? "plus" : "free";
+  const archiveLimit = tier === "plus" ? PLUS_SCRAPBOOK_ARCHIVE_LIMIT : FREE_SCRAPBOOK_ARCHIVE_LIMIT;
+  const folderLimit = tier === "plus" ? PLUS_SCRAPBOOK_FOLDER_LIMIT : FREE_SCRAPBOOK_FOLDER_LIMIT;
+  return {
+    tier,
+    archiveLimit,
+    folderLimit,
+    archiveCount,
+    remainingArchiveSlots: Math.max(0, archiveLimit - archiveCount),
+    plusStatus,
+    plusLicenseId: user?.plusLicenseId ?? null,
+    plusActivatedAt: user?.plusActivatedAt ?? null,
+    plusExpiresAt: license?.expiresAt ?? null
+  };
+}
+function canCreateScrapbookArchive(data, user, existingArchive) {
+  const plan = readScrapbookPlanState(data, user);
+  if (existingArchive) {
+    return { allowed: true, plan };
+  }
+  return {
+    allowed: plan.archiveCount < plan.archiveLimit,
+    plan
+  };
+}
+function getScrapbookArchiveLimitError(plan) {
+  if (plan.tier === "plus") {
+    return `Plus scrapbook is limited to ${plan.archiveLimit} saved posts. Delete older items to keep saving.`;
+  }
+  return `Free scrapbook is limited to ${plan.archiveLimit} saved posts. Upgrade to Plus to keep saving.`;
+}
+async function activateScrapbookPlus(data, user, token) {
+  const normalizedToken = token.trim();
+  if (!normalizedToken) {
+    throw new Error("Enter a Plus key first.");
+  }
+  const validation = await validateProLicenseToken(normalizedToken);
+  if (validation.state === "none" || validation.state === "invalid") {
+    throw new Error("This Plus key is not valid.");
+  }
+  if (validation.state === "expired") {
+    throw new Error("This Plus key has expired.");
+  }
+  const license = data.licenses.find((candidate) => candidate.token === normalizedToken) ?? null;
+  if (!license) {
+    throw new Error("This Plus key is not recognized by this server.");
+  }
+  if (license.status === "revoked") {
+    throw new Error("This Plus key has been revoked.");
+  }
+  if (hasLicenseExpired(license)) {
+    throw new Error("This Plus key has expired.");
+  }
+  const otherUser = data.botUsers.find(
+    (candidate) => candidate.id !== user.id && candidate.status === "active" && candidate.plusLicenseId === license.id
+  );
+  if (otherUser) {
+    throw new Error(`This Plus key is already linked to @${otherUser.threadsHandle}.`);
+  }
+  user.plusLicenseId = license.id;
+  user.plusActivatedAt = (/* @__PURE__ */ new Date()).toISOString();
+  user.updatedAt = user.plusActivatedAt;
+  upsertBotUser(data, user);
+  return readScrapbookPlanState(data, user);
+}
+function clearScrapbookPlus(data, user) {
+  user.plusLicenseId = null;
+  user.plusActivatedAt = null;
+  user.updatedAt = (/* @__PURE__ */ new Date()).toISOString();
+  upsertBotUser(data, user);
+  return readScrapbookPlanState(data, user);
+}
+
 // src/server/bot-service.ts
 var BOT_OAUTH_TTL_MS = 10 * 6e4;
 var BOT_OAUTH_ACTIVATION_TTL_MS = 5 * 6e4;
@@ -16106,9 +17542,22 @@ function buildCloudArchiveRawPayload(input) {
     locale: normalizeLocale(input.locale, "ko")
   });
 }
-function buildCloudArchiveUrl(publicOrigin, archiveId) {
-  const url = new URL("/scrapbook", publicOrigin);
-  url.searchParams.set("archive", archiveId);
+function normalizeScrapbookHandle(value) {
+  const normalized = safeText(value).replace(/^@+/, "").toLowerCase();
+  return normalized || null;
+}
+function buildScrapbookBaseUrl(publicOrigin, userHandle) {
+  const normalizedHandle = normalizeScrapbookHandle(userHandle);
+  if (!normalizedHandle) {
+    return new URL("/scrapbook", publicOrigin).toString();
+  }
+  const url = new URL(publicOrigin);
+  url.pathname = `/scrapbook/@${normalizedHandle}`;
+  return url.toString();
+}
+function buildCloudArchiveUrl(publicOrigin, archiveId, userHandle) {
+  const url = new URL(buildScrapbookBaseUrl(publicOrigin, userHandle));
+  url.pathname = `${url.pathname.replace(/\/+$/, "")}/archive/${encodeURIComponent(archiveId)}`;
   return url.toString();
 }
 async function buildArchiveZipBundle(archives) {
@@ -16174,7 +17623,7 @@ function toBotArchiveView(item) {
   return {
     id: item.id,
     origin: "mention",
-    originLabel: "\uBA58\uC158 inbox",
+    originLabel: "Inbox",
     mentionUrl: item.mentionUrl,
     mentionAuthorHandle: item.mentionAuthorHandle,
     mentionAuthorDisplayName: item.mentionAuthorDisplayName,
@@ -16237,14 +17686,48 @@ function buildFallbackExtractedPostFromCloudArchive(item) {
     contentHash: item.contentHash
   };
 }
-function toCloudArchiveRecentRecord(item, publicOrigin) {
+function buildFallbackExtractedPostFromBotArchive(item) {
+  return {
+    canonicalUrl: item.targetUrl,
+    shortcode: item.targetUrl.split("/").pop() ?? item.id,
+    author: item.targetAuthorHandle ?? "",
+    title: buildArchiveTitle(item.targetAuthorHandle, item.targetText),
+    text: item.targetText,
+    publishedAt: item.targetPublishedAt,
+    capturedAt: item.updatedAt,
+    sourceType: item.mediaUrls.length > 0 ? "image" : "text",
+    imageUrls: [...item.mediaUrls],
+    videoUrl: null,
+    externalUrl: null,
+    quotedPostUrl: null,
+    repliedToUrl: null,
+    thumbnailUrl: null,
+    authorReplies: [],
+    extractorVersion: "server-mention-cache",
+    contentHash: item.id
+  };
+}
+function toBotArchiveRecentRecord(item, publicOrigin, userHandle) {
+  const extractedPost = readArchiveExtractedPost(item.rawPayloadJson) ?? buildFallbackExtractedPostFromBotArchive(item);
+  return {
+    archiveId: item.id,
+    archiveUrl: buildCloudArchiveUrl(publicOrigin, item.id, userHandle),
+    title: buildArchiveTitle(item.targetAuthorHandle, extractedPost.text || item.targetText),
+    updatedAt: item.updatedAt,
+    warning: null,
+    origin: "mention",
+    post: extractedPost
+  };
+}
+function toCloudArchiveRecentRecord(item, publicOrigin, userHandle) {
   const payload = readCloudArchivePayload(item.rawPayloadJson);
   return {
     archiveId: item.id,
-    archiveUrl: buildCloudArchiveUrl(publicOrigin, item.id),
+    archiveUrl: buildCloudArchiveUrl(publicOrigin, item.id, userHandle),
     title: item.targetTitle,
     updatedAt: item.updatedAt,
     warning: payload.aiWarning,
+    origin: "cloud",
     post: payload.extractedPost ?? buildFallbackExtractedPostFromCloudArchive(item)
   };
 }
@@ -16734,51 +18217,33 @@ function revokeExtensionCloudConnection(data, rawToken) {
   }
   return buildCloudConnectionStatusFromTokenRecord(data, tokenRecord);
 }
-function buildUnauthenticatedSessionState() {
-  return {
-    authenticated: false,
-    botHandle: readBotHandle(),
-    oauthConfigured: isThreadsOauthConfigured(),
-    user: null,
-    archives: []
-  };
-}
-async function getBotSessionStateFromStore(rawSession) {
-  const snapshot = await withPrimaryDatabaseTransaction((data) => {
-    const session = getBotSessionRecord(data, rawSession);
-    if (!session) {
-      return {
-        session: null,
-        userId: null,
-        cloudArchives: []
-      };
-    }
+function getBotSessionState(data, rawSession) {
+  const session = getBotSessionRecord(data, rawSession);
+  if (!session) {
     return {
-      session: { ...session },
-      userId: session.userId,
-      cloudArchives: data.cloudArchives.filter((candidate) => candidate.userId === session.userId).map((candidate) => ({ ...candidate, mediaUrls: [...candidate.mediaUrls] }))
+      authenticated: false,
+      botHandle: readBotHandle(),
+      oauthConfigured: isThreadsOauthConfigured(),
+      user: null,
+      archives: []
     };
-  });
-  if (!snapshot.session || !snapshot.userId) {
-    return buildUnauthenticatedSessionState();
   }
-  const user = await findBotUserById(snapshot.userId);
+  const user = data.botUsers.find((candidate) => candidate.id === session.userId && candidate.status === "active");
   if (!user) {
-    await withPrimaryDatabaseTransaction((data) => {
-      const session = getBotSessionRecord(data, rawSession);
-      if (!session) {
-        return;
-      }
-      session.status = "revoked";
-      session.revokedAt = (/* @__PURE__ */ new Date()).toISOString();
-      upsertBotSession(data, session);
-    });
-    return buildUnauthenticatedSessionState();
+    session.status = "revoked";
+    session.revokedAt = (/* @__PURE__ */ new Date()).toISOString();
+    upsertBotSession(data, session);
+    return {
+      authenticated: false,
+      botHandle: readBotHandle(),
+      oauthConfigured: isThreadsOauthConfigured(),
+      user: null,
+      archives: []
+    };
   }
-  const mentionArchives = await listBotArchivesForUser(user.id);
   const archives = [
-    ...mentionArchives.map(toBotArchiveView),
-    ...snapshot.cloudArchives.map(toCloudArchiveView)
+    ...data.botArchives.filter((candidate) => candidate.userId === user.id).map(toBotArchiveView),
+    ...data.cloudArchives.filter((candidate) => candidate.userId === user.id).map(toCloudArchiveView)
   ].sort((left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt));
   return {
     authenticated: true,
@@ -16787,6 +18252,64 @@ async function getBotSessionStateFromStore(rawSession) {
     user: toBotUserView(user),
     archives
   };
+}
+async function resolveSessionUserId(rawSession) {
+  return withBotAuthDatabaseTransaction((data) => {
+    const session = getBotSessionRecord(data, rawSession);
+    return session?.userId ?? null;
+  });
+}
+async function resolveExtensionTokenUserId(rawToken) {
+  return withBotAuthDatabaseTransaction((data) => {
+    const tokenRecord = findBotExtensionAccessTokenRecord(data, rawToken);
+    return tokenRecord?.userId ?? null;
+  });
+}
+async function withBotSessionDatabaseTransaction(rawSession, handler) {
+  const userId = await resolveSessionUserId(rawSession);
+  if (userId) {
+    return withUserScopedDatabaseTransaction(userId, (data) => handler(data, userId));
+  }
+  return withBotAuthDatabaseTransaction((data) => handler(data, null));
+}
+async function withExtensionTokenDatabaseTransaction(rawToken, handler) {
+  const userId = await resolveExtensionTokenUserId(rawToken);
+  if (userId) {
+    return withUserScopedDatabaseTransaction(userId, (data) => handler(data, userId));
+  }
+  return withBotAuthDatabaseTransaction((data) => handler(data, null));
+}
+async function startBotOauthFromStore(publicOrigin) {
+  return withBotAuthDatabaseTransaction((data) => startBotOauth(data, publicOrigin));
+}
+async function pollBotOauthSessionFromStore(rawPollToken) {
+  return withBotAuthDatabaseTransaction((data) => pollBotOauthSession(data, rawPollToken));
+}
+async function activateBotOauthSessionFromStore(rawActivationCode) {
+  return withBotAuthDatabaseTransaction((data) => activateBotOauthSession(data, rawActivationCode));
+}
+async function failBotOauthSessionFromStore(rawState) {
+  await withBotAuthDatabaseTransaction((data) => {
+    failBotOauthSession(data, rawState);
+  });
+}
+async function completeBotOauthFromStore(rawState, code, publicOrigin) {
+  return withBotAuthDatabaseTransaction((data) => completeBotOauth(data, rawState, code, publicOrigin));
+}
+async function createExtensionLinkCodeFromStore(rawSession, state) {
+  return withBotSessionDatabaseTransaction(rawSession, (data) => createExtensionLinkCode(data, rawSession, state));
+}
+async function completeExtensionLinkCodeFromStore(rawCode, state) {
+  return withBotAuthDatabaseTransaction((data) => completeExtensionLinkCode(data, rawCode, state));
+}
+async function getExtensionCloudConnectionStatusFromStore(rawToken) {
+  return withBotAuthDatabaseTransaction((data) => getExtensionCloudConnectionStatus(data, rawToken));
+}
+async function revokeExtensionCloudConnectionFromStore(rawToken) {
+  return withBotAuthDatabaseTransaction((data) => revokeExtensionCloudConnection(data, rawToken));
+}
+async function getBotSessionStateFromStore(rawSession) {
+  return withBotSessionDatabaseTransaction(rawSession, (data) => getBotSessionState(data, rawSession));
 }
 function revokeBotSession(data, rawSession) {
   const session = getBotSessionRecord(data, rawSession);
@@ -16797,21 +18320,12 @@ function revokeBotSession(data, rawSession) {
   session.revokedAt = (/* @__PURE__ */ new Date()).toISOString();
   upsertBotSession(data, session);
 }
-async function readBotArchiveMarkdownFromStore(rawSession, archiveId) {
-  const snapshot = await withPrimaryDatabaseTransaction((data) => {
-    const session = getBotSessionRecord(data, rawSession);
-    if (!session) {
-      return { userId: null, cloudArchive: null };
-    }
-    return {
-      userId: session.userId,
-      cloudArchive: data.cloudArchives.find((candidate) => candidate.id === archiveId && candidate.userId === session.userId) ?? null
-    };
-  });
-  if (!snapshot.userId) {
+function readBotArchiveMarkdown(data, rawSession, archiveId) {
+  const session = getBotSessionRecord(data, rawSession);
+  if (!session) {
     throw new Error("You need to sign in first.");
   }
-  const mentionArchive = await findBotArchiveById(snapshot.userId, archiveId);
+  const mentionArchive = data.botArchives.find((candidate) => candidate.id === archiveId && candidate.userId === session.userId) ?? null;
   if (mentionArchive) {
     const extractedPost = readArchiveExtractedPost(mentionArchive.rawPayloadJson);
     const titleText2 = extractedPost?.text ?? mentionArchive.targetText;
@@ -16821,53 +18335,41 @@ async function readBotArchiveMarkdownFromStore(rawSession, archiveId) {
       markdownContent: buildArchiveMarkdownFromRecord(mentionArchive, mentionArchive.mediaUrls)
     };
   }
-  if (!snapshot.cloudArchive) {
+  const cloudArchive = data.cloudArchives.find((candidate) => candidate.id === archiveId && candidate.userId === session.userId) ?? null;
+  if (!cloudArchive) {
     throw new Error("The requested archive could not be found.");
   }
-  const payload = readCloudArchivePayload(snapshot.cloudArchive.rawPayloadJson);
-  const titleText = payload.extractedPost?.text ?? snapshot.cloudArchive.targetText;
-  const titleAuthor = snapshot.cloudArchive.targetAuthorHandle ?? payload.extractedPost?.author ?? null;
+  const payload = readCloudArchivePayload(cloudArchive.rawPayloadJson);
+  const titleText = payload.extractedPost?.text ?? cloudArchive.targetText;
+  const titleAuthor = cloudArchive.targetAuthorHandle ?? payload.extractedPost?.author ?? null;
   return {
     filename: `${buildArchiveFilenameBase(titleAuthor, titleText)}.md`,
-    markdownContent: safeText(snapshot.cloudArchive.markdownContent) || `# ${buildArchiveTitle(titleAuthor, titleText)}
+    markdownContent: safeText(cloudArchive.markdownContent) || `# ${buildArchiveTitle(titleAuthor, titleText)}
 `
   };
 }
-async function readBotArchiveZipFromStore(rawSession, archiveIds) {
+async function readBotArchiveMarkdownFromStore(rawSession, archiveId) {
+  return withBotSessionDatabaseTransaction(rawSession, (data) => readBotArchiveMarkdown(data, rawSession, archiveId));
+}
+async function readBotArchiveZip(data, rawSession, archiveIds) {
+  const session = getBotSessionRecord(data, rawSession);
+  if (!session) {
+    throw new Error("You need to sign in first.");
+  }
   const requestedIds = [...new Set(archiveIds.map((value) => safeText(value)).filter(Boolean))];
   if (requestedIds.length === 0) {
     throw new Error("Select at least one archive to export.");
   }
-  const snapshot = await withPrimaryDatabaseTransaction((data) => {
-    const session = getBotSessionRecord(data, rawSession);
-    if (!session) {
-      return {
-        userId: null,
-        cloudArchives: []
-      };
-    }
-    const requestedIdSet = new Set(requestedIds);
-    return {
-      userId: session.userId,
-      cloudArchives: data.cloudArchives.filter((candidate) => candidate.userId === session.userId && requestedIdSet.has(candidate.id)).map((candidate) => ({ ...candidate, mediaUrls: [...candidate.mediaUrls] }))
-    };
-  });
-  if (!snapshot.userId) {
-    throw new Error("You need to sign in first.");
-  }
-  const mentionArchives = await findBotArchivesByIds(snapshot.userId, requestedIds);
-  const archiveMap = /* @__PURE__ */ new Map();
-  for (const archive of mentionArchives) {
-    archiveMap.set(archive.id, archive);
-  }
-  for (const archive of snapshot.cloudArchives) {
-    archiveMap.set(archive.id, archive);
-  }
-  const archives = requestedIds.map((archiveId) => archiveMap.get(archiveId) ?? null).filter((candidate) => Boolean(candidate));
+  const archives = requestedIds.map(
+    (archiveId) => data.botArchives.find((candidate) => candidate.id === archiveId && candidate.userId === session.userId) ?? data.cloudArchives.find((candidate) => candidate.id === archiveId && candidate.userId === session.userId) ?? null
+  ).filter((candidate) => Boolean(candidate));
   if (archives.length === 0) {
     throw new Error("The requested archives could not be found.");
   }
   return buildArchiveZipBundle(archives);
+}
+async function readBotArchiveZipFromStore(rawSession, archiveIds) {
+  return withBotSessionDatabaseTransaction(rawSession, (data) => readBotArchiveZip(data, rawSession, archiveIds));
 }
 function buildArchiveRawPayload(payload) {
   if (payload.rawPayload === void 0 && !payload.extractedPost) {
@@ -16880,7 +18382,7 @@ function buildArchiveRawPayload(payload) {
   } : payload.rawPayload;
   return JSON.stringify(value);
 }
-function materializeBotMentionArchive(user, existingArchive, payload) {
+function materializeBotMentionArchive(user, existingArchive, payload, allowance = { allowed: true, reason: null }) {
   const mentionUrl = safeText(payload.mentionUrl);
   const mentionAuthorUserId = safeText(payload.mentionAuthorUserId) || null;
   const mentionAuthorHandle = normalizeThreadsHandle2(payload.mentionAuthorHandle ?? "");
@@ -16898,6 +18400,18 @@ function materializeBotMentionArchive(user, existingArchive, payload) {
         created: false,
         archiveId: null,
         reason: "user_not_found"
+      },
+      archive: null
+    };
+  }
+  if (!existingArchive && !allowance.allowed) {
+    return {
+      result: {
+        ok: true,
+        matched: true,
+        created: false,
+        archiveId: null,
+        reason: allowance.reason ?? "limit_reached"
       },
       archive: null
     };
@@ -16997,7 +18511,14 @@ function ingestBotMention(data, payload) {
     }
     return candidate.mentionUrl === mentionUrl;
   });
-  const materialized = materializeBotMentionArchive(user, existing ?? null, payload);
+  const allowance = user ? (() => {
+    const permission = canCreateScrapbookArchive(data, user, existing ?? null);
+    return {
+      allowed: permission.allowed,
+      reason: permission.allowed ? null : "limit_reached"
+    };
+  })() : { allowed: true, reason: null };
+  const materialized = materializeBotMentionArchive(user, existing ?? null, payload, allowance);
   if (materialized.archive) {
     upsertBotArchive(data, materialized.archive);
   }
@@ -17029,6 +18550,10 @@ async function saveCloudArchiveForUser(data, user, input, publicOrigin) {
   const existing = data.cloudArchives.find(
     (candidate) => candidate.userId === user.id && (candidate.contentHash === contentHash || candidate.canonicalUrl === canonicalUrl)
   ) ?? null;
+  const creationPermission = canCreateScrapbookArchive(data, user, existing);
+  if (!creationPermission.allowed) {
+    throw new Error(getScrapbookArchiveLimitError(creationPermission.plan));
+  }
   if (existing) {
     existing.canonicalUrl = canonicalUrl;
     existing.shortcode = shortcode;
@@ -17045,7 +18570,7 @@ async function saveCloudArchiveForUser(data, user, input, publicOrigin) {
     upsertCloudArchive(data, existing);
     return {
       archiveId: existing.id,
-      archiveUrl: buildCloudArchiveUrl(publicOrigin, existing.id),
+      archiveUrl: buildCloudArchiveUrl(publicOrigin, existing.id, user.threadsHandle),
       title: existing.targetTitle,
       warning: input.aiWarning ?? null,
       created: false
@@ -17072,7 +18597,7 @@ async function saveCloudArchiveForUser(data, user, input, publicOrigin) {
   upsertCloudArchive(data, archive);
   return {
     archiveId: archive.id,
-    archiveUrl: buildCloudArchiveUrl(publicOrigin, archive.id),
+    archiveUrl: buildCloudArchiveUrl(publicOrigin, archive.id, user.threadsHandle),
     title: archive.targetTitle,
     warning: input.aiWarning ?? null,
     created: true
@@ -17082,10 +18607,31 @@ async function saveCloudArchiveWithExtensionToken(data, rawToken, input, publicO
   const { user } = requireExtensionLinkUser(data, rawToken);
   return saveCloudArchiveForUser(data, user, input, publicOrigin);
 }
+async function saveCloudArchiveWithExtensionTokenFromStore(rawToken, input, publicOrigin) {
+  return withExtensionTokenDatabaseTransaction(
+    rawToken,
+    (data) => saveCloudArchiveWithExtensionToken(data, rawToken, input, publicOrigin)
+  );
+}
 function listExtensionCloudArchives(data, rawToken, publicOrigin, limit = 10) {
   const { user } = requireExtensionLinkUser(data, rawToken);
   const normalizedLimit = Number.isFinite(limit) ? Math.max(1, Math.min(50, Math.trunc(limit))) : 10;
-  return data.cloudArchives.filter((candidate) => candidate.userId === user.id).sort((left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt)).slice(0, normalizedLimit).map((item) => toCloudArchiveRecentRecord(item, publicOrigin));
+  return [
+    ...data.botArchives.filter((candidate) => candidate.userId === user.id).map((item) => ({
+      updatedAt: item.updatedAt,
+      record: toBotArchiveRecentRecord(item, publicOrigin, user.threadsHandle)
+    })),
+    ...data.cloudArchives.filter((candidate) => candidate.userId === user.id).map((item) => ({
+      updatedAt: item.updatedAt,
+      record: toCloudArchiveRecentRecord(item, publicOrigin, user.threadsHandle)
+    }))
+  ].sort((left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt)).slice(0, normalizedLimit).map((entry) => entry.record);
+}
+async function listExtensionCloudArchivesFromStore(rawToken, publicOrigin, limit = 10) {
+  return withExtensionTokenDatabaseTransaction(
+    rawToken,
+    (data) => listExtensionCloudArchives(data, rawToken, publicOrigin, limit)
+  );
 }
 function deleteExtensionCloudArchive(data, rawToken, archiveId) {
   const { user } = requireExtensionLinkUser(data, rawToken);
@@ -17096,11 +18642,26 @@ function deleteExtensionCloudArchive(data, rawToken, archiveId) {
   const cloudIndex = data.cloudArchives.findIndex(
     (candidate) => candidate.id === normalizedId && candidate.userId === user.id
   );
-  if (cloudIndex < 0) {
-    throw new Error("The requested archive could not be found.");
+  if (cloudIndex >= 0) {
+    data.cloudArchives.splice(cloudIndex, 1);
+    clearArchiveReferences(data, user.id, normalizedId);
+    return;
   }
-  data.cloudArchives.splice(cloudIndex, 1);
-  clearArchiveReferences(data, user.id, normalizedId);
+  const mentionIndex = data.botArchives.findIndex(
+    (candidate) => candidate.id === normalizedId && candidate.userId === user.id
+  );
+  if (mentionIndex >= 0) {
+    data.botArchives.splice(mentionIndex, 1);
+    clearArchiveReferences(data, user.id, normalizedId);
+    return;
+  }
+  throw new Error("The requested archive could not be found.");
+}
+async function deleteExtensionCloudArchiveFromStore(rawToken, archiveId) {
+  await withExtensionTokenDatabaseTransaction(
+    rawToken,
+    (data) => deleteExtensionCloudArchive(data, rawToken, archiveId)
+  );
 }
 function clearArchiveReferences(data, userId, archiveId) {
   for (const result of data.searchResults) {
@@ -17121,51 +18682,35 @@ function clearArchiveReferences(data, userId, archiveId) {
     tracked.archivedAt = null;
   }
 }
-async function deleteArchiveFromStore(rawSession, archiveId) {
+function deleteArchive(data, rawSession, archiveId) {
+  const session = getBotSessionRecord(data, rawSession);
+  if (!session) {
+    throw new Error("You need to sign in first.");
+  }
   const normalizedId = safeText(archiveId);
   if (!normalizedId) {
     throw new Error("Select an archive to delete.");
   }
-  const snapshot = await withPrimaryDatabaseTransaction((data) => {
-    const session = getBotSessionRecord(data, rawSession);
-    if (!session) {
-      return {
-        sessionUserId: null,
-        hasCloudArchive: false
-      };
-    }
-    return {
-      sessionUserId: session.userId,
-      hasCloudArchive: data.cloudArchives.some(
-        (candidate) => candidate.id === normalizedId && candidate.userId === session.userId
-      )
-    };
-  });
-  if (!snapshot.sessionUserId) {
-    throw new Error("You need to sign in first.");
+  const mentionIndex = data.botArchives.findIndex(
+    (candidate) => candidate.id === normalizedId && candidate.userId === session.userId
+  );
+  if (mentionIndex >= 0) {
+    data.botArchives.splice(mentionIndex, 1);
+    clearArchiveReferences(data, session.userId, normalizedId);
+    return getBotSessionState(data, rawSession);
   }
-  const mentionArchive = await findBotArchiveById(snapshot.sessionUserId, normalizedId);
-  if (mentionArchive) {
-    await deleteBotArchiveRecord(snapshot.sessionUserId, normalizedId);
-    await withPrimaryDatabaseTransaction((data) => {
-      clearArchiveReferences(data, snapshot.sessionUserId, normalizedId);
-    });
-    return getBotSessionStateFromStore(rawSession);
-  }
-  if (snapshot.hasCloudArchive) {
-    await withPrimaryDatabaseTransaction((data) => {
-      const index = data.cloudArchives.findIndex(
-        (candidate) => candidate.id === normalizedId && candidate.userId === snapshot.sessionUserId
-      );
-      if (index < 0) {
-        throw new Error("The requested archive could not be found.");
-      }
-      data.cloudArchives.splice(index, 1);
-      clearArchiveReferences(data, snapshot.sessionUserId, normalizedId);
-    });
-    return getBotSessionStateFromStore(rawSession);
+  const cloudIndex = data.cloudArchives.findIndex(
+    (candidate) => candidate.id === normalizedId && candidate.userId === session.userId
+  );
+  if (cloudIndex >= 0) {
+    data.cloudArchives.splice(cloudIndex, 1);
+    clearArchiveReferences(data, session.userId, normalizedId);
+    return getBotSessionState(data, rawSession);
   }
   throw new Error("The requested archive could not be found.");
+}
+async function deleteArchiveFromStore(rawSession, archiveId) {
+  return withBotSessionDatabaseTransaction(rawSession, (data) => deleteArchive(data, rawSession, archiveId));
 }
 function getBotSessionUserRecord(data, rawSession) {
   const session = getBotSessionRecord(data, rawSession);
@@ -17234,6 +18779,11 @@ async function getBotSessionAuthContext(data, rawSession) {
     throw new Error("Reconnect with Threads to use advanced scrapbook features.");
   }
   return { user, accessToken };
+}
+async function revokeBotSessionFromStore(rawSession) {
+  await withBotAuthDatabaseTransaction((data) => {
+    revokeBotSession(data, rawSession);
+  });
 }
 async function getBotAccessTokenForThreadsUserId(data, rawThreadsUserId) {
   const threadsUserId = safeText(rawThreadsUserId);
@@ -17683,6 +19233,13 @@ function upsertArchiveFromPost(data, user, sourceKind, sourceLabel, item) {
   const existing = data.botArchives.find(
     (candidate) => candidate.userId === user.id && candidate.targetUrl === item.canonicalUrl
   );
+  const creationPermission = canCreateScrapbookArchive(data, user, existing);
+  if (!creationPermission.allowed) {
+    return {
+      archive: null,
+      plan: creationPermission.plan
+    };
+  }
   const rawPayloadJson = JSON.stringify({
     sourceKind,
     sourceLabel,
@@ -17700,7 +19257,10 @@ function upsertArchiveFromPost(data, user, sourceKind, sourceLabel, item) {
     existing.rawPayloadJson = rawPayloadJson;
     existing.updatedAt = now;
     upsertBotArchive(data, existing);
-    return existing;
+    return {
+      archive: existing,
+      plan: creationPermission.plan
+    };
   }
   const archive = {
     id: crypto.randomUUID(),
@@ -17723,7 +19283,10 @@ function upsertArchiveFromPost(data, user, sourceKind, sourceLabel, item) {
     status: "saved"
   };
   upsertBotArchive(data, archive);
-  return archive;
+  return {
+    archive,
+    plan: creationPermission.plan
+  };
 }
 function ensureWatchlistBelongsToUser(data, userId, watchlistId) {
   const watchlist = data.watchlists.find((candidate) => candidate.id === watchlistId && candidate.userId === userId);
@@ -17784,9 +19347,11 @@ function buildSearchMonitorView(data, monitor) {
 function readScrapbookPlusState(data, rawSession, userId = null) {
   const user = userId ? data.botUsers.find((candidate) => candidate.id === userId && candidate.status === "active") ?? null : getBotSessionUserRecord(data, rawSession);
   const scopes = createScopeState(user);
+  const plan = readScrapbookPlanState(data, user);
   if (!user) {
     return {
       authenticated: false,
+      plan,
       scopes,
       watchlists: [],
       searches: [],
@@ -17834,6 +19399,7 @@ function readScrapbookPlusState(data, rawSession, userId = null) {
   });
   return {
     authenticated: true,
+    plan,
     scopes,
     watchlists,
     searches,
@@ -17852,9 +19418,6 @@ function readScrapbookPlusState(data, rawSession, userId = null) {
       posts: insightPosts
     }
   };
-}
-async function resolveStateForCurrentUser(data, rawSession) {
-  return readScrapbookPlusState(data, rawSession);
 }
 async function createWatchlist(data, rawSession, input) {
   const { user } = await requireAdvancedContext(data, rawSession);
@@ -17954,7 +19517,7 @@ async function syncWatchlist(data, rawSession, watchlistId) {
       tracked.updatedAt = now;
       tracked.rawPayloadJson = JSON.stringify(post.raw);
       if (watchlist.autoArchive) {
-        const archive = upsertArchiveFromPost(data, user, "watchlist", `@${watchlist.targetHandle}`, {
+        const archiveResult = upsertArchiveFromPost(data, user, "watchlist", `@${watchlist.targetHandle}`, {
           canonicalUrl: tracked.canonicalUrl,
           authorHandle: tracked.authorHandle,
           authorDisplayName: tracked.authorDisplayName,
@@ -17966,8 +19529,10 @@ async function syncWatchlist(data, rawSession, watchlistId) {
             watchlistId: watchlist.id
           }
         });
-        tracked.archiveId = archive.id;
-        tracked.archivedAt = archive.archivedAt;
+        if (archiveResult.archive) {
+          tracked.archiveId = archiveResult.archive.id;
+          tracked.archivedAt = archiveResult.archive.archivedAt;
+        }
       }
       upsertTrackedPost(data, tracked);
     }
@@ -18068,7 +19633,7 @@ async function runSearchMonitor(data, rawSession, monitorId) {
       result.updatedAt = now;
       result.rawPayloadJson = JSON.stringify(post.raw);
       if (monitor.autoArchive && !result.archiveId) {
-        const archive = upsertArchiveFromPost(data, user, "search", monitor.query, {
+        const archiveResult = upsertArchiveFromPost(data, user, "search", monitor.query, {
           canonicalUrl: result.canonicalUrl,
           authorHandle: result.authorHandle,
           authorDisplayName: result.authorDisplayName,
@@ -18081,9 +19646,11 @@ async function runSearchMonitor(data, rawSession, monitorId) {
             matchedTerms: result.matchedTerms
           }
         });
-        result.archiveId = archive.id;
-        result.archivedAt = archive.archivedAt;
-        result.status = "archived";
+        if (archiveResult.archive) {
+          result.archiveId = archiveResult.archive.id;
+          result.archivedAt = archiveResult.archive.archivedAt;
+          result.status = "archived";
+        }
       }
       upsertSearchResult(data, result);
     }
@@ -18103,21 +19670,30 @@ async function runSearchMonitor(data, rawSession, monitorId) {
 async function archiveSearchResult(data, rawSession, resultId) {
   const { user } = await requireAdvancedContext(data, rawSession);
   const result = ensureSearchResultBelongsToUser(data, user.id, resultId);
-  const archive = upsertArchiveFromPost(data, user, "search", result.matchedTerms.join(", ") || result.authorHandle, {
-    canonicalUrl: result.canonicalUrl,
-    authorHandle: result.authorHandle,
-    authorDisplayName: result.authorDisplayName,
-    text: result.text,
-    publishedAt: result.publishedAt,
-    mediaType: result.mediaType,
-    mediaUrls: result.mediaUrls,
-    metadata: {
-      monitorId: result.monitorId,
-      resultId: result.id
+  const archiveResult = upsertArchiveFromPost(
+    data,
+    user,
+    "search",
+    result.matchedTerms.join(", ") || result.authorHandle,
+    {
+      canonicalUrl: result.canonicalUrl,
+      authorHandle: result.authorHandle,
+      authorDisplayName: result.authorDisplayName,
+      text: result.text,
+      publishedAt: result.publishedAt,
+      mediaType: result.mediaType,
+      mediaUrls: result.mediaUrls,
+      metadata: {
+        monitorId: result.monitorId,
+        resultId: result.id
+      }
     }
-  });
-  result.archiveId = archive.id;
-  result.archivedAt = archive.archivedAt;
+  );
+  if (!archiveResult.archive) {
+    throw new Error(getScrapbookArchiveLimitError(archiveResult.plan));
+  }
+  result.archiveId = archiveResult.archive.id;
+  result.archivedAt = archiveResult.archive.archivedAt;
   result.status = "archived";
   result.updatedAt = (/* @__PURE__ */ new Date()).toISOString();
   upsertSearchResult(data, result);
@@ -18215,7 +19791,7 @@ async function archiveTrackedInsightPost(data, rawSession, externalPostId) {
   if (!tracked) {
     throw new Error("The requested insight post could not be found.");
   }
-  const archive = upsertArchiveFromPost(data, user, "insight", "own-post", {
+  const archiveResult = upsertArchiveFromPost(data, user, "insight", "own-post", {
     canonicalUrl: tracked.canonicalUrl,
     authorHandle: tracked.authorHandle,
     authorDisplayName: tracked.authorDisplayName,
@@ -18227,8 +19803,11 @@ async function archiveTrackedInsightPost(data, rawSession, externalPostId) {
       externalPostId
     }
   });
-  tracked.archiveId = archive.id;
-  tracked.archivedAt = archive.archivedAt;
+  if (!archiveResult.archive) {
+    throw new Error(getScrapbookArchiveLimitError(archiveResult.plan));
+  }
+  tracked.archiveId = archiveResult.archive.id;
+  tracked.archivedAt = archiveResult.archive.archivedAt;
   tracked.updatedAt = (/* @__PURE__ */ new Date()).toISOString();
   upsertTrackedPost(data, tracked);
   return readScrapbookPlusState(data, rawSession, user.id);
@@ -18237,7 +19816,7 @@ async function archiveTrackedPost(data, rawSession, trackedPostId) {
   const { user } = await requireAdvancedContext(data, rawSession);
   const tracked = ensureTrackedPostBelongsToUser(data, user.id, trackedPostId);
   const sourceLabel = tracked.origin === "watchlist" ? data.watchlists.find((candidate) => candidate.id === tracked.sourceId)?.targetHandle ?? tracked.authorHandle : "own-post";
-  const archive = upsertArchiveFromPost(data, user, tracked.origin, sourceLabel, {
+  const archiveResult = upsertArchiveFromPost(data, user, tracked.origin, sourceLabel, {
     canonicalUrl: tracked.canonicalUrl,
     authorHandle: tracked.authorHandle,
     authorDisplayName: tracked.authorDisplayName,
@@ -18250,14 +19829,78 @@ async function archiveTrackedPost(data, rawSession, trackedPostId) {
       origin: tracked.origin
     }
   });
-  tracked.archiveId = archive.id;
-  tracked.archivedAt = archive.archivedAt;
+  if (!archiveResult.archive) {
+    throw new Error(getScrapbookArchiveLimitError(archiveResult.plan));
+  }
+  tracked.archiveId = archiveResult.archive.id;
+  tracked.archivedAt = archiveResult.archive.archivedAt;
   tracked.updatedAt = (/* @__PURE__ */ new Date()).toISOString();
   upsertTrackedPost(data, tracked);
   return readScrapbookPlusState(data, rawSession, user.id);
 }
-async function readAuthenticatedScrapbookPlusState(data, rawSession) {
-  return resolveStateForCurrentUser(data, rawSession);
+async function readScrapbookPlusStateFromStore(rawSession) {
+  return withBotSessionDatabaseTransaction(rawSession, (data) => readScrapbookPlusState(data, rawSession));
+}
+async function activateScrapbookPlusForSession(data, rawSession, token) {
+  const user = getBotSessionUserRecord(data, rawSession);
+  if (!user) {
+    throw new Error("Sign in to Threads scrapbook first.");
+  }
+  await activateScrapbookPlus(data, user, token);
+  return readScrapbookPlusState(data, rawSession, user.id);
+}
+async function activateScrapbookPlusForSessionFromStore(rawSession, token) {
+  return withBotSessionDatabaseTransaction(
+    rawSession,
+    (data) => activateScrapbookPlusForSession(data, rawSession, token)
+  );
+}
+async function clearScrapbookPlusForSession(data, rawSession) {
+  const user = getBotSessionUserRecord(data, rawSession);
+  if (!user) {
+    throw new Error("Sign in to Threads scrapbook first.");
+  }
+  clearScrapbookPlus(data, user);
+  return readScrapbookPlusState(data, rawSession, user.id);
+}
+async function clearScrapbookPlusForSessionFromStore(rawSession) {
+  return withBotSessionDatabaseTransaction(rawSession, (data) => clearScrapbookPlusForSession(data, rawSession));
+}
+async function createWatchlistFromStore(rawSession, input) {
+  return withBotSessionDatabaseTransaction(rawSession, (data) => createWatchlist(data, rawSession, input));
+}
+async function deleteWatchlistFromStore(rawSession, watchlistId) {
+  return withBotSessionDatabaseTransaction(rawSession, (data) => deleteWatchlist(data, rawSession, watchlistId));
+}
+async function syncWatchlistFromStore(rawSession, watchlistId) {
+  return withBotSessionDatabaseTransaction(rawSession, (data) => syncWatchlist(data, rawSession, watchlistId));
+}
+async function createSearchMonitorFromStore(rawSession, input) {
+  return withBotSessionDatabaseTransaction(rawSession, (data) => createSearchMonitor(data, rawSession, input));
+}
+async function deleteSearchMonitorFromStore(rawSession, monitorId) {
+  return withBotSessionDatabaseTransaction(rawSession, (data) => deleteSearchMonitor(data, rawSession, monitorId));
+}
+async function runSearchMonitorFromStore(rawSession, monitorId) {
+  return withBotSessionDatabaseTransaction(rawSession, (data) => runSearchMonitor(data, rawSession, monitorId));
+}
+async function archiveSearchResultFromStore(rawSession, resultId) {
+  return withBotSessionDatabaseTransaction(rawSession, (data) => archiveSearchResult(data, rawSession, resultId));
+}
+async function dismissSearchResultFromStore(rawSession, resultId) {
+  return withBotSessionDatabaseTransaction(rawSession, (data) => dismissSearchResult(data, rawSession, resultId));
+}
+async function refreshInsightsFromStore(rawSession) {
+  return withBotSessionDatabaseTransaction(rawSession, (data) => refreshInsights(data, rawSession));
+}
+async function archiveTrackedInsightPostFromStore(rawSession, externalPostId) {
+  return withBotSessionDatabaseTransaction(
+    rawSession,
+    (data) => archiveTrackedInsightPost(data, rawSession, externalPostId)
+  );
+}
+async function archiveTrackedPostFromStore(rawSession, trackedPostId) {
+  return withBotSessionDatabaseTransaction(rawSession, (data) => archiveTrackedPost(data, rawSession, trackedPostId));
 }
 
 // src/server/bot-mention-service.ts
@@ -19398,7 +21041,14 @@ async function ingestMentionPayload(payload, runTransaction) {
   }
   const user = (payload.mentionAuthorUserId ? await findBotUserByThreadsUserId(payload.mentionAuthorUserId) : null) ?? (payload.mentionAuthorHandle ? await findBotUserByHandle(payload.mentionAuthorHandle) : null);
   const existingArchive = user && payload.mentionUrl ? await findBotArchiveByMention(user.id, payload.mentionId ?? null, safeText4(payload.mentionUrl)) : null;
-  const materialized = materializeBotMentionArchive(user, existingArchive, payload);
+  const resolvedAllowance = user ? await loadDatabase().then((database) => {
+    const permission = canCreateScrapbookArchive(database, user, existingArchive);
+    return {
+      allowed: permission.allowed,
+      reason: permission.allowed ? null : "limit_reached"
+    };
+  }) : { allowed: true, reason: null };
+  const materialized = materializeBotMentionArchive(user, existingArchive, payload, resolvedAllowance);
   if (materialized.archive) {
     await saveBotArchiveRecord(materialized.archive);
   }
@@ -20227,6 +21877,8 @@ var PROVIDER_ACTION_URL_PATTERNS = {
 var DEFAULT_PUBLIC_ORIGIN2 = "https://ss-threads.dahanda.dev";
 var LEGACY_PUBLIC_HOSTS = /* @__PURE__ */ new Set(["threads-obsidian.dahanda.dev"]);
 var LEGACY_PUBLIC_PAGE_PATHS = /* @__PURE__ */ new Set(["/", "/landing", "/landing/", "/scrapbook", "/scrapbook/", "/checkout", "/checkout/"]);
+var SCRAPBOOK_HANDLE_PATH_RE = /^\/scrapbook\/@[^/.?#/]+\/?$/;
+var SCRAPBOOK_ARCHIVE_PATH_RE = /^\/scrapbook(?:\/@[^/.?#/]+)?\/archive\/[^/]+\/?$/;
 function trimEnv3(name) {
   return process.env[name]?.trim();
 }
@@ -20261,6 +21913,26 @@ function parseMaxBodyBytes(raw) {
     );
   }
   return parsed;
+}
+function isProductionRuntime() {
+  return trimEnv3("NODE_ENV") === "production";
+}
+function assertSupportedProductionDatabaseConfig(database, statusCode = 500) {
+  if (!isProductionRuntime()) {
+    return;
+  }
+  if (database.backend !== "postgres") {
+    throw new RequestError(
+      statusCode,
+      "Production requires THREADS_WEB_STORE_BACKEND=postgres and a Supabase/Postgres database."
+    );
+  }
+  if (!database.postgresUrl.trim()) {
+    throw new RequestError(
+      statusCode,
+      "Production requires THREADS_WEB_POSTGRES_URL or THREADS_WEB_DATABASE_URL."
+    );
+  }
 }
 function resolveConfig(portOverride) {
   const adminToken = trimEnv3("THREADS_WEB_ADMIN_TOKEN");
@@ -20508,18 +22180,18 @@ function readAdminSession(request, adminToken) {
 }
 function describeProActivationFailure(reason) {
   if (reason === "activation_required") {
-    return "Pro activation is required.";
+    return "Plus activation is required.";
   }
   if (reason === "seat_limit") {
-    return "This Pro key has reached the device limit.";
+    return "This Plus key has reached the device limit.";
   }
   if (reason === "revoked") {
-    return "This Pro key has been revoked.";
+    return "This Plus key has been revoked.";
   }
   if (reason === "expired") {
-    return "This Pro key has expired.";
+    return "This Plus key has expired.";
   }
-  return "This Pro key is not valid.";
+  return "This Plus key is not valid.";
 }
 function escapeHtml(value) {
   return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#39;");
@@ -21686,7 +23358,8 @@ function shouldRedirectLegacyPublicPage(request, requestUrl) {
   } catch {
     return null;
   }
-  if (!LEGACY_PUBLIC_HOSTS.has(requestHost) || !LEGACY_PUBLIC_PAGE_PATHS.has(requestUrl.pathname)) {
+  const isLegacyPublicPath = LEGACY_PUBLIC_PAGE_PATHS.has(requestUrl.pathname) || SCRAPBOOK_HANDLE_PATH_RE.test(requestUrl.pathname) || SCRAPBOOK_ARCHIVE_PATH_RE.test(requestUrl.pathname);
+  if (!LEGACY_PUBLIC_HOSTS.has(requestHost) || !isLegacyPublicPath) {
     return null;
   }
   const preferredOrigin = resolvePreferredPublicOrigin();
@@ -21699,7 +23372,7 @@ function resolveLandingMeta(_siteHost) {
   const botHandle = getBotPublicConfig().botHandle;
   const publicHost = resolvePreferredPublicOrigin().replace(/^https?:\/\//, "");
   return {
-    title: "Threads Saver",
+    title: "SS Threads",
     description: `Threads \uC800\uC7A5\uC6A9 Chrome extension\uACFC @${botHandle} mention scrapbook\uC744 ${publicHost}\uC5D0\uC11C \uD568\uAED8 \uC81C\uACF5\uD569\uB2C8\uB2E4.`
   };
 }
@@ -21950,6 +23623,9 @@ function getStaticCandidates(urlPath) {
   if (normalizedPath === "/scrapbook" || normalizedPath === "/scrapbook/") {
     return ["scrapbook/index.html"];
   }
+  if (SCRAPBOOK_HANDLE_PATH_RE.test(normalizedPath) || SCRAPBOOK_ARCHIVE_PATH_RE.test(normalizedPath)) {
+    return ["scrapbook/index.html"];
+  }
   if (normalizedPath === "/checkout" || normalizedPath === "/checkout/") {
     return ["checkout/index.html"];
   }
@@ -22177,6 +23853,18 @@ function parseOptionalDate(raw) {
   }
   return new Date(parsed).toISOString();
 }
+function normalizeBillingCycle(value) {
+  return value === "monthly" ? "monthly" : "yearly";
+}
+function deriveLicenseExpiry(billingCycle, issuedAtIso) {
+  const issuedAt = new Date(issuedAtIso);
+  if (normalizeBillingCycle(billingCycle) === "monthly") {
+    issuedAt.setMonth(issuedAt.getMonth() + 1);
+  } else {
+    issuedAt.setFullYear(issuedAt.getFullYear() + 1);
+  }
+  return issuedAt.toISOString();
+}
 async function issueLicenseForOrder(data, order, provider, expiresAt) {
   if (order.status === "key_issued" && order.issuedLicenseId) {
     const existing = data.licenses.find((candidate) => candidate.id === order.issuedLicenseId);
@@ -22193,7 +23881,8 @@ async function issueLicenseForOrder(data, order, provider, expiresAt) {
     order.status = "payment_confirmed";
     order.paidAt = now;
   }
-  const token = await signProLicenseToken(order.buyerEmail, expiresAt);
+  const effectiveExpiresAt = expiresAt ?? deriveLicenseExpiry(order.billingCycle ?? "yearly", now);
+  const token = await signProLicenseToken(order.buyerEmail, effectiveExpiresAt);
   const license = {
     id: crypto.randomUUID(),
     orderId: order.id,
@@ -22202,7 +23891,7 @@ async function issueLicenseForOrder(data, order, provider, expiresAt) {
     token,
     tokenPreview: buildTokenPreview(token),
     issuedAt: now,
-    expiresAt,
+    expiresAt: effectiveExpiresAt,
     revokedAt: null,
     status: "active"
   };
@@ -22217,7 +23906,7 @@ async function issueLicenseForOrder(data, order, provider, expiresAt) {
   upsertLicense(data, license);
   appendHistory(data, {
     kind: "license_issued",
-    message: `Issued Pro key for ${order.buyerEmail}`,
+    message: `Issued Plus key for ${order.buyerEmail}`,
     orderId: order.id,
     paymentMethodId: order.paymentMethodId,
     licenseId: license.id
@@ -22241,6 +23930,7 @@ async function handleCreateOrder(request, response, config) {
   const body = await parseJsonBody(request, config.maxBodyBytes);
   const buyerName = safeText5(body.buyerName);
   const buyerEmail = normalizeEmail(safeText5(body.buyerEmail));
+  const billingCycle = normalizeBillingCycle(body.billingCycle ?? "yearly");
   const paymentMethodId = safeText5(body.paymentMethodId);
   const note = safeText5(body.note);
   if (!buyerName || !buyerEmail || !paymentMethodId) {
@@ -22261,6 +23951,7 @@ async function handleCreateOrder(request, response, config) {
       id: crypto.randomUUID(),
       buyerName,
       buyerEmail,
+      billingCycle,
       paymentMethodId,
       paymentReference: crypto.randomUUID(),
       status: "pending",
@@ -22464,7 +24155,7 @@ async function handlePublicBotRoute(request, response, pathname, config, collect
       return;
     }
     try {
-      const result = await withDatabaseTransaction((data) => startBotOauth(data, publicOrigin));
+      const result = await startBotOauthFromStore(publicOrigin);
       if (requestUrl.searchParams.get("redirect") === "1") {
         response.writeHead(302, {
           location: result.authorizeUrl,
@@ -22485,7 +24176,7 @@ async function handlePublicBotRoute(request, response, pathname, config, collect
       return;
     }
     try {
-      const result = await withDatabaseTransaction((data) => startBotOauth(data, publicOrigin));
+      const result = await startBotOauthFromStore(publicOrigin);
       const bridgeMarkup = renderOauthBridgePage(result.authorizeUrl, result.botHandle, result.pollToken, publicOrigin, locale);
       response.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" });
       response.end(bridgeMarkup);
@@ -22504,7 +24195,7 @@ async function handlePublicBotRoute(request, response, pathname, config, collect
       json(response, 400, { status: "expired" });
       return;
     }
-    const pollResult = await withDatabaseTransaction((data) => pollBotOauthSession(data, rawPollToken));
+    const pollResult = await pollBotOauthSessionFromStore(rawPollToken);
     response.writeHead(200, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
     response.end(JSON.stringify(pollResult));
     return;
@@ -22522,7 +24213,7 @@ async function handlePublicBotRoute(request, response, pathname, config, collect
       response.end();
       return;
     }
-    const activationResult = await withDatabaseTransaction((data) => activateBotOauthSession(data, rawCode));
+    const activationResult = await activateBotOauthSessionFromStore(rawCode);
     if (!activationResult) {
       redirectUrl.searchParams.set("authError", msg.threadsSigninUnexpected);
       response.writeHead(302, { location: redirectUrl.toString() });
@@ -22547,7 +24238,7 @@ async function handlePublicBotRoute(request, response, pathname, config, collect
     const redirectUrl = new URL("/scrapbook", publicOrigin);
     if (providerError) {
       if (rawState) {
-        await withDatabaseTransaction((data) => failBotOauthSession(data, rawState));
+        await failBotOauthSessionFromStore(rawState);
       }
       redirectUrl.searchParams.set("authError", providerErrorDescription || providerError);
       response.writeHead(302, { location: redirectUrl.toString() });
@@ -22561,14 +24252,14 @@ async function handlePublicBotRoute(request, response, pathname, config, collect
       return;
     }
     try {
-      const session = await withDatabaseTransaction((data) => completeBotOauth(data, rawState, code, publicOrigin));
+      const session = await completeBotOauthFromStore(rawState, code, publicOrigin);
       appendSetCookie(response, buildSessionCookie(session.sessionToken, secureCookie));
       redirectUrl.searchParams.set("connected", "1");
       response.writeHead(302, { location: redirectUrl.toString() });
       response.end();
       return;
     } catch (error) {
-      await withDatabaseTransaction((data) => failBotOauthSession(data, rawState));
+      await failBotOauthSessionFromStore(rawState);
       redirectUrl.searchParams.set(
         "authError",
         toPublicErrorMessage(error, msg.threadsSigninUnexpected)
@@ -22593,7 +24284,7 @@ async function handlePublicBotRoute(request, response, pathname, config, collect
       return;
     }
     try {
-      const link = await withDatabaseTransaction((data) => createExtensionLinkCode(data, rawSession, linkState));
+      const link = await createExtensionLinkCodeFromStore(rawSession, linkState);
       redirectUrl.searchParams.set("extensionLinked", "1");
       redirectUrl.hash = new URLSearchParams({
         state: linkState,
@@ -22688,11 +24379,45 @@ async function handlePublicBotRoute(request, response, pathname, config, collect
     }
     const rawSession = readCookie(request.headers, BOT_SESSION_COOKIE);
     try {
-      const state = await readAuthenticatedScrapbookPlusState(await loadDatabase(), rawSession);
+      const state = await readScrapbookPlusStateFromStore(rawSession);
       json(response, 200, state);
-    } catch {
-      const state = readScrapbookPlusState(await loadDatabase(), rawSession);
+    } catch (error) {
+      json(response, 400, {
+        error: toPublicErrorMessage(error, "Could not load scrapbook state.")
+      });
+    }
+    return;
+  }
+  if (pathname === "/api/public/bot/plus/activate") {
+    if ((request.method ?? "GET") !== "POST") {
+      methodNotAllowed(response);
+      return;
+    }
+    const rawSession = readCookie(request.headers, BOT_SESSION_COOKIE);
+    const body = await parseJsonBody(request, config.maxBodyBytes);
+    try {
+      const state = await activateScrapbookPlusForSessionFromStore(rawSession, safeText5(body.token));
       json(response, 200, state);
+    } catch (error) {
+      json(response, 400, {
+        error: toPublicErrorMessage(error, "Could not activate Plus for this scrapbook account.")
+      });
+    }
+    return;
+  }
+  if (pathname === "/api/public/bot/plus/clear") {
+    if ((request.method ?? "GET") !== "POST") {
+      methodNotAllowed(response);
+      return;
+    }
+    const rawSession = readCookie(request.headers, BOT_SESSION_COOKIE);
+    try {
+      const state = await clearScrapbookPlusForSessionFromStore(rawSession);
+      json(response, 200, state);
+    } catch (error) {
+      json(response, 400, {
+        error: toPublicErrorMessage(error, "Could not remove Plus from this scrapbook account.")
+      });
     }
     return;
   }
@@ -22717,9 +24442,7 @@ async function handlePublicBotRoute(request, response, pathname, config, collect
     if ((request.method ?? "GET") === "DELETE" && watchlistDeleteMatch) {
       const rawSession = readCookie(request.headers, BOT_SESSION_COOKIE);
       try {
-        const state = await withDatabaseTransaction(
-          (data) => deleteWatchlist(data, rawSession, decodeURIComponent(watchlistDeleteMatch[1] ?? ""))
-        );
+        const state = await deleteWatchlistFromStore(rawSession, decodeURIComponent(watchlistDeleteMatch[1] ?? ""));
         json(response, 200, state);
       } catch (error) {
         json(response, 400, {
@@ -22732,9 +24455,7 @@ async function handlePublicBotRoute(request, response, pathname, config, collect
     if ((request.method ?? "GET") === "DELETE" && searchDeleteMatch) {
       const rawSession = readCookie(request.headers, BOT_SESSION_COOKIE);
       try {
-        const state = await withDatabaseTransaction(
-          (data) => deleteSearchMonitor(data, rawSession, decodeURIComponent(searchDeleteMatch[1] ?? ""))
-        );
+        const state = await deleteSearchMonitorFromStore(rawSession, decodeURIComponent(searchDeleteMatch[1] ?? ""));
         json(response, 200, state);
       } catch (error) {
         json(response, 400, {
@@ -22766,9 +24487,7 @@ async function handlePublicBotRoute(request, response, pathname, config, collect
   }
   if (pathname === "/api/public/bot/logout") {
     const rawSession = readCookie(request.headers, BOT_SESSION_COOKIE);
-    await withDatabaseTransaction((data) => {
-      revokeBotSession(data, rawSession);
-    });
+    await revokeBotSessionFromStore(rawSession);
     appendSetCookie(response, buildClearedSessionCookie(secureCookie));
     json(response, 200, { ok: true });
     return;
@@ -22777,16 +24496,14 @@ async function handlePublicBotRoute(request, response, pathname, config, collect
     const rawSession = readCookie(request.headers, BOT_SESSION_COOKIE);
     const body = await parseJsonBody(request, config.maxBodyBytes);
     try {
-      const state = await withDatabaseTransaction(
-        (data) => createWatchlist(data, rawSession, {
-          targetHandle: body.targetHandle ?? "",
-          includeText: body.includeText ?? null,
-          excludeText: body.excludeText ?? null,
-          mediaTypes: body.mediaTypes ?? [],
-          autoArchive: body.autoArchive ?? false,
-          digestCadence: body.digestCadence ?? "off"
-        })
-      );
+      const state = await createWatchlistFromStore(rawSession, {
+        targetHandle: body.targetHandle ?? "",
+        includeText: body.includeText ?? null,
+        excludeText: body.excludeText ?? null,
+        mediaTypes: body.mediaTypes ?? [],
+        autoArchive: body.autoArchive ?? false,
+        digestCadence: body.digestCadence ?? "off"
+      });
       json(response, 200, state);
     } catch (error) {
       json(response, 400, {
@@ -22799,9 +24516,7 @@ async function handlePublicBotRoute(request, response, pathname, config, collect
   if (watchlistSyncMatch) {
     const rawSession = readCookie(request.headers, BOT_SESSION_COOKIE);
     try {
-      const state = await withDatabaseTransaction(
-        (data) => syncWatchlist(data, rawSession, decodeURIComponent(watchlistSyncMatch[1] ?? ""))
-      );
+      const state = await syncWatchlistFromStore(rawSession, decodeURIComponent(watchlistSyncMatch[1] ?? ""));
       json(response, 200, state);
     } catch (error) {
       json(response, 400, {
@@ -22815,15 +24530,13 @@ async function handlePublicBotRoute(request, response, pathname, config, collect
     const body = await parseJsonBody(request, config.maxBodyBytes);
     const excludeHandles = Array.isArray(body.excludeHandles) ? body.excludeHandles : typeof body.excludeHandles === "string" ? body.excludeHandles.split(",") : [];
     try {
-      const state = await withDatabaseTransaction(
-        (data) => createSearchMonitor(data, rawSession, {
-          query: body.query ?? "",
-          authorHandle: body.authorHandle ?? null,
-          excludeHandles,
-          autoArchive: body.autoArchive ?? false,
-          searchType: body.searchType ?? "top"
-        })
-      );
+      const state = await createSearchMonitorFromStore(rawSession, {
+        query: body.query ?? "",
+        authorHandle: body.authorHandle ?? null,
+        excludeHandles,
+        autoArchive: body.autoArchive ?? false,
+        searchType: body.searchType ?? "top"
+      });
       json(response, 200, state);
     } catch (error) {
       json(response, 400, {
@@ -22836,9 +24549,7 @@ async function handlePublicBotRoute(request, response, pathname, config, collect
   if (searchRunMatch) {
     const rawSession = readCookie(request.headers, BOT_SESSION_COOKIE);
     try {
-      const state = await withDatabaseTransaction(
-        (data) => runSearchMonitor(data, rawSession, decodeURIComponent(searchRunMatch[1] ?? ""))
-      );
+      const state = await runSearchMonitorFromStore(rawSession, decodeURIComponent(searchRunMatch[1] ?? ""));
       json(response, 200, state);
     } catch (error) {
       json(response, 400, {
@@ -22851,9 +24562,7 @@ async function handlePublicBotRoute(request, response, pathname, config, collect
   if (searchArchiveMatch) {
     const rawSession = readCookie(request.headers, BOT_SESSION_COOKIE);
     try {
-      const state = await withDatabaseTransaction(
-        (data) => archiveSearchResult(data, rawSession, decodeURIComponent(searchArchiveMatch[1] ?? ""))
-      );
+      const state = await archiveSearchResultFromStore(rawSession, decodeURIComponent(searchArchiveMatch[1] ?? ""));
       json(response, 200, state);
     } catch (error) {
       json(response, 400, {
@@ -22866,9 +24575,7 @@ async function handlePublicBotRoute(request, response, pathname, config, collect
   if (searchDismissMatch) {
     const rawSession = readCookie(request.headers, BOT_SESSION_COOKIE);
     try {
-      const state = await withDatabaseTransaction(
-        (data) => dismissSearchResult(data, rawSession, decodeURIComponent(searchDismissMatch[1] ?? ""))
-      );
+      const state = await dismissSearchResultFromStore(rawSession, decodeURIComponent(searchDismissMatch[1] ?? ""));
       json(response, 200, state);
     } catch (error) {
       json(response, 400, {
@@ -22881,9 +24588,7 @@ async function handlePublicBotRoute(request, response, pathname, config, collect
   if (trackedArchiveMatch) {
     const rawSession = readCookie(request.headers, BOT_SESSION_COOKIE);
     try {
-      const state = await withDatabaseTransaction(
-        (data) => archiveTrackedPost(data, rawSession, decodeURIComponent(trackedArchiveMatch[1] ?? ""))
-      );
+      const state = await archiveTrackedPostFromStore(rawSession, decodeURIComponent(trackedArchiveMatch[1] ?? ""));
       json(response, 200, state);
     } catch (error) {
       json(response, 400, {
@@ -22895,7 +24600,7 @@ async function handlePublicBotRoute(request, response, pathname, config, collect
   if (pathname === "/api/public/bot/insights/refresh") {
     const rawSession = readCookie(request.headers, BOT_SESSION_COOKIE);
     try {
-      const state = await withDatabaseTransaction((data) => refreshInsights(data, rawSession));
+      const state = await refreshInsightsFromStore(rawSession);
       json(response, 200, state);
     } catch (error) {
       json(response, 400, {
@@ -22908,9 +24613,7 @@ async function handlePublicBotRoute(request, response, pathname, config, collect
     const rawSession = readCookie(request.headers, BOT_SESSION_COOKIE);
     const body = await parseJsonBody(request, config.maxBodyBytes);
     try {
-      const state = await withDatabaseTransaction(
-        (data) => archiveTrackedInsightPost(data, rawSession, safeText5(body.postId))
-      );
+      const state = await archiveTrackedInsightPostFromStore(rawSession, safeText5(body.postId));
       json(response, 200, state);
     } catch (error) {
       json(response, 400, {
@@ -23142,9 +24845,7 @@ async function handleExtensionRoutes(request, response, pathname, config) {
     }
     const body = await parseJsonBody(request, config.maxBodyBytes);
     try {
-      const result = await withDatabaseTransaction(
-        (data) => Promise.resolve(completeExtensionLinkCode(data, safeText5(body.code), safeText5(body.state)))
-      );
+      const result = await completeExtensionLinkCodeFromStore(safeText5(body.code), safeText5(body.state));
       json(response, 200, result);
     } catch (error) {
       json(response, 400, {
@@ -23158,7 +24859,7 @@ async function handleExtensionRoutes(request, response, pathname, config) {
       methodNotAllowed(response);
       return;
     }
-    const status = getExtensionCloudConnectionStatus(await loadDatabase(), bearerToken);
+    const status = await getExtensionCloudConnectionStatusFromStore(bearerToken);
     json(response, 200, status);
     return;
   }
@@ -23167,9 +24868,7 @@ async function handleExtensionRoutes(request, response, pathname, config) {
       methodNotAllowed(response);
       return;
     }
-    const status = await withDatabaseTransaction(
-      (data) => Promise.resolve(revokeExtensionCloudConnection(data, bearerToken))
-    );
+    const status = await revokeExtensionCloudConnectionFromStore(bearerToken);
     json(response, 200, status);
     return;
   }
@@ -23187,7 +24886,7 @@ async function handleExtensionRoutes(request, response, pathname, config) {
     try {
       const rawLimit = requestUrl.searchParams.get("limit");
       const limit = rawLimit ? Number.parseInt(rawLimit, 10) : 10;
-      const archives = listExtensionCloudArchives(await loadDatabase(), bearerToken, publicOrigin, limit);
+      const archives = await listExtensionCloudArchivesFromStore(bearerToken, publicOrigin, limit);
       json(response, 200, { archives });
     } catch (error) {
       json(response, 401, {
@@ -23209,9 +24908,7 @@ async function handleExtensionRoutes(request, response, pathname, config) {
       return;
     }
     try {
-      await withDatabaseTransaction(
-        (data) => Promise.resolve(deleteExtensionCloudArchive(data, bearerToken, decodeURIComponent(cloudArchiveDeleteMatch[1] ?? "")))
-      );
+      await deleteExtensionCloudArchiveFromStore(bearerToken, decodeURIComponent(cloudArchiveDeleteMatch[1] ?? ""));
       json(response, 200, { ok: true });
     } catch (error) {
       json(response, 401, {
@@ -23238,7 +24935,7 @@ async function handleExtensionRoutes(request, response, pathname, config) {
     }
     if (!token || !deviceId || !deviceLabel) {
       json(response, 403, {
-        error: "A valid Pro activation is required for cloud save."
+        error: "A valid Plus activation is required for cloud save."
       });
       return;
     }
@@ -23247,23 +24944,20 @@ async function handleExtensionRoutes(request, response, pathname, config) {
       return;
     }
     try {
-      const result = await withDatabaseTransaction(async (data) => {
-        const activation = await getLicenseSeatStatus(data, token, deviceId, deviceLabel);
-        if (!activation.ok) {
-          throw new RequestError(403, describeProActivationFailure(activation.reason));
-        }
-        return await saveCloudArchiveWithExtensionToken(
-          data,
-          bearerToken,
-          {
-            post,
-            aiResult: body.aiResult ?? null,
-            aiWarning: typeof body.aiWarning === "string" ? body.aiWarning : null,
-            locale: normalizeLocale(body.locale, "ko")
-          },
-          publicOrigin
-        );
-      });
+      const activation = await withDatabaseTransaction((data) => getLicenseSeatStatus(data, token, deviceId, deviceLabel));
+      if (!activation.ok) {
+        throw new RequestError(403, describeProActivationFailure(activation.reason));
+      }
+      const result = await saveCloudArchiveWithExtensionTokenFromStore(
+        bearerToken,
+        {
+          post,
+          aiResult: body.aiResult ?? null,
+          aiWarning: typeof body.aiWarning === "string" ? body.aiWarning : null,
+          locale: normalizeLocale(body.locale, "ko")
+        },
+        publicOrigin
+      );
       json(response, 200, result);
     } catch (error) {
       const message = toPublicErrorMessage(error, "Could not save this post to cloud scrapbook.");
@@ -23367,6 +25061,7 @@ async function handleAdminRoutes(request, response, pathname, config, collector)
         const currentActiveConfig = getRuntimeConfigSnapshot();
         const currentSavedConfig = getPersistedRuntimeConfigSnapshot();
         const nextSavedConfig = mergeRuntimeConfig(currentSavedConfig, body);
+        assertSupportedProductionDatabaseConfig(nextSavedConfig.database, 400);
         const didDatabaseSettingsChange = databaseConfigRequiresRestart(nextSavedConfig.database, currentSavedConfig.database);
         const restartRequired = databaseConfigRequiresRestart(nextSavedConfig.database, currentActiveConfig.database);
         if (didDatabaseSettingsChange) {
@@ -23403,6 +25098,7 @@ async function handleAdminRoutes(request, response, pathname, config, collector)
     const candidate = mergeRuntimeConfig(getPersistedRuntimeConfigSnapshot(), {
       database: body.database ?? {}
     });
+    assertSupportedProductionDatabaseConfig(candidate.database, 400);
     await testDatabaseConfig(candidate.database);
     const payload = {
       ok: true,
@@ -23599,7 +25295,7 @@ async function handleAdminRoutes(request, response, pathname, config, collector)
           existing.revokedAt = now;
           appendHistory(data, {
             kind: "license_revoked",
-            message: `Revoked Pro key for ${existing.holderEmail} (reissue)`,
+            message: `Revoked Plus key for ${existing.holderEmail} (reissue)`,
             orderId: order.id,
             paymentMethodId: null,
             licenseId: existing.id
@@ -23610,7 +25306,8 @@ async function handleAdminRoutes(request, response, pathname, config, collector)
       order.issuedLicenseId = null;
       order.deliveryStatus = "not_sent";
       order.updatedAt = now;
-      const token = await signProLicenseToken(order.buyerEmail, expiresAt);
+      const effectiveExpiresAt = expiresAt ?? deriveLicenseExpiry(order.billingCycle ?? "yearly", now);
+      const token = await signProLicenseToken(order.buyerEmail, effectiveExpiresAt);
       const license = {
         id: crypto.randomUUID(),
         orderId: order.id,
@@ -23619,7 +25316,7 @@ async function handleAdminRoutes(request, response, pathname, config, collector)
         token,
         tokenPreview: buildTokenPreview(token),
         issuedAt: now,
-        expiresAt,
+        expiresAt: effectiveExpiresAt,
         revokedAt: null,
         status: "active"
       };
@@ -23630,7 +25327,7 @@ async function handleAdminRoutes(request, response, pathname, config, collector)
       upsertLicense(data, license);
       appendHistory(data, {
         kind: "license_issued",
-        message: `Reissued Pro key for ${order.buyerEmail}`,
+        message: `Reissued Plus key for ${order.buyerEmail}`,
         orderId: order.id,
         paymentMethodId: order.paymentMethodId,
         licenseId: license.id
@@ -23704,7 +25401,7 @@ async function handleAdminRoutes(request, response, pathname, config, collector)
         license.revokedAt = (/* @__PURE__ */ new Date()).toISOString();
         appendHistory(data, {
           kind: "license_revoked",
-          message: `Revoked Pro key for ${license.holderEmail}`,
+          message: `Revoked Plus key for ${license.holderEmail}`,
           orderId: license.orderId,
           paymentMethodId: null,
           licenseId: license.id
@@ -23754,7 +25451,7 @@ async function handleRequest(request, response, config, collector) {
       assertAdminIpAllowed(request);
     }
     if (pathname === "/health" && method === "GET") {
-      json(response, 200, { status: "ok", service: "threads-to-obsidian-web" });
+      json(response, 200, { status: "ok", service: "ss-threads-web" });
       return;
     }
     if (pathname === "/ready") {
@@ -23765,7 +25462,7 @@ async function handleRequest(request, response, config, collector) {
       const data = await loadDatabase();
       json(response, 200, {
         status: "ready",
-        service: "threads-to-obsidian-web",
+        service: "ss-threads-web",
         databaseLoaded: Array.isArray(data.orders) && Array.isArray(data.paymentMethods)
       });
       return;
@@ -23835,6 +25532,7 @@ async function handleRequest(request, response, config, collector) {
 }
 function createWebRuntime(port) {
   const config = resolveConfig(port);
+  assertSupportedProductionDatabaseConfig(getRuntimeConfigSnapshot().database);
   const collector = createBotMentionCollector({
     runTransaction: withDatabaseTransaction,
     loadDatabase
@@ -23859,7 +25557,7 @@ function startWebServer(port) {
     void requestHandler(request, response);
   });
   server.listen(config.port, () => {
-    console.log(`Threads Pro web app running at http://127.0.0.1:${config.port}`);
+    console.log(`SS Threads Plus web app running at http://127.0.0.1:${config.port}`);
   });
   collector.start();
   server.on("close", () => {

@@ -94,6 +94,7 @@ function getIdleStatus(supported: boolean): SaveStatus {
 function setSubtitle(message: string): void {
   if (subtitle) {
     subtitle.textContent = message;
+    subtitle.classList.toggle("hidden", message.trim().length === 0);
   }
 }
 
@@ -248,6 +249,7 @@ function renderRecentSaves(items: RecentSave[]): void {
       const displayText = expanded ? preview : truncateText(preview, 50);
       const expandLabel = expanded ? msg.popupCollapse : msg.popupExpand;
       const resaveLabel = msg.popupResave;
+      const canResave = !(item.saveTarget === "cloud" && item.remoteOrigin === "mention");
 
       return `
         <li class="recent-item">
@@ -255,12 +257,15 @@ function renderRecentSaves(items: RecentSave[]): void {
           <div class="recent-meta">@${escapeHtml(item.author)} · ${escapeHtml(new Date(item.downloadedAt).toLocaleString())}</div>
           ${item.warning ? `<div class="recent-warning">${escapeHtml(item.warning)}</div>` : ""}
           <a class="recent-url" href="${escapeAttribute(item.canonicalUrl)}" target="_blank" rel="noreferrer">${escapeHtml(item.canonicalUrl)}</a>
-          ${item.remotePageUrl ? `<a class="recent-url" href="${escapeAttribute(item.remotePageUrl)}" target="_blank" rel="noreferrer">${escapeHtml(msg.popupOpenRemote)}</a>` : ""}
+          ${item.remotePageUrl && item.saveTarget !== "cloud" ? `<a class="recent-url" href="${escapeAttribute(item.remotePageUrl)}" target="_blank" rel="noreferrer">${escapeHtml(msg.popupOpenRemote)}</a>` : ""}
           ${expanded ? `<div class="recent-expanded">${escapeHtml(fullBody)}</div>` : ""}
           <div class="recent-actions-text">
             <button class="recent-text-action" data-toggle-id="${item.id}" type="button">${expandLabel}</button>
-            <span class="recent-divider">·</span>
-            <button class="recent-text-action" data-save-id="${item.id}" type="button">${resaveLabel}</button>
+            ${
+              canResave
+                ? `<span class="recent-divider">·</span><button class="recent-text-action" data-save-id="${item.id}" type="button">${resaveLabel}</button>`
+                : ""
+            }
             <span class="recent-divider">·</span>
             <button class="recent-text-action recent-delete-text" data-delete-id="${item.id}" type="button">${msg.popupDelete}</button>
           </div>
@@ -341,15 +346,7 @@ async function refreshSaveTargetState(): Promise<void> {
     cachedDirectReady = false;
     cachedPermissionState = "unsupported";
     cachedNotionReady = false;
-    if (!cachedCloudConnection || cachedCloudConnection.state === "unlinked") {
-      setSubtitle(msg.statusCloudConnectRequired);
-    } else if (cachedCloudConnection.state === "expired" || cachedCloudConnection.state === "revoked") {
-      setSubtitle(msg.statusCloudSessionExpired);
-    } else if (cachedCloudConnection.state === "offline") {
-      setSubtitle(msg.statusCloudOffline);
-    } else {
-      setSubtitle(msg.popupSubtitleCloud);
-    }
+    setSubtitle("");
     return;
   }
 
@@ -395,15 +392,16 @@ async function refreshPopupState(useIdleStatus = false, overrideStatus?: SaveSta
       (cachedSaveTarget === "cloud" && cachedCloudConnection?.state !== "linked");
   }
   if (cloudLinkButton) {
-    const visible = cachedSaveTarget === "cloud";
+    const connected = cachedCloudConnection?.state === "linked" || cachedCloudConnection?.state === "offline";
+    const visible = cachedSaveTarget === "cloud" && !connected;
     cloudLinkButton.classList.toggle("hidden", !visible);
     if (visible) {
-      const connected = cachedCloudConnection?.state === "linked" || cachedCloudConnection?.state === "offline";
-      cloudLinkButton.textContent = connected ? msg.popupCloudDisconnect : msg.popupCloudConnect;
+      cloudLinkButton.textContent = msg.popupCloudConnect;
     }
   }
   if (openCloudButton) {
-    openCloudButton.classList.toggle("hidden", cachedSaveTarget !== "cloud");
+    const visible = cachedSaveTarget === "cloud" && (cachedCloudConnection?.state === "linked" || cachedCloudConnection?.state === "offline");
+    openCloudButton.classList.toggle("hidden", !visible);
     openCloudButton.textContent = msg.popupOpenRemote;
   }
 
@@ -751,9 +749,10 @@ async function openLocalizedOptionsPage(): Promise<void> {
 }
 
 async function openCloudScrapbookPage(): Promise<void> {
-  const url = buildCloudScrapbookUrl();
+  const url = buildCloudScrapbookUrl(cachedCloudConnection?.userHandle);
+  const fallbackUrl = buildCloudScrapbookUrl();
   const [existingTab] = await chrome.tabs.query({
-    url: [url, `${url}?*`, `${url}#*`]
+    url: [...new Set([url, `${url}?*`, `${url}#*`, fallbackUrl, `${fallbackUrl}?*`, `${fallbackUrl}#*`])]
   });
 
   if (existingTab?.id) {

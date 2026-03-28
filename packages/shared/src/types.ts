@@ -94,6 +94,7 @@ export interface CloudArchiveRecentRecord {
   title: string;
   updatedAt: string;
   warning: string | null;
+  origin?: "mention" | "cloud";
   post: ExtractedPost;
 }
 
@@ -180,6 +181,7 @@ export interface RecentSave {
   savedRelativePath: string | null;
   remotePageId: string | null;
   remotePageUrl: string | null;
+  remoteOrigin?: "mention" | "cloud";
   warning: string | null;
   post: ExtractedPost;
 }

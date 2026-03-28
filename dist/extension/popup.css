@@ -51,43 +51,51 @@ body {
 
 .language-switch {
   position: relative;
-  width: 148px;
+  width: 34px;
+  height: 34px;
   flex: 0 0 auto;
-}
-
-.language-switch::after {
-  content: "";
-  position: absolute;
-  top: 50%;
-  right: 12px;
-  width: 7px;
-  height: 7px;
-  border-right: 1.5px solid var(--muted);
-  border-bottom: 1.5px solid var(--muted);
-  transform: translateY(-65%) rotate(45deg);
-  pointer-events: none;
-}
-
-.language-select {
-  width: 100%;
-  min-height: 34px;
-  padding: 0 30px 0 12px;
   border: 1px solid var(--border);
   border-radius: 999px;
   background: #fafafa;
+  overflow: hidden;
+}
+
+.language-icon {
+  position: absolute;
+  inset: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   color: var(--text);
+  pointer-events: none;
+}
+
+.language-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.language-select {
+  position: absolute;
+  inset: 0;
+  width: 34px;
+  min-height: 34px;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: transparent;
   font: inherit;
-  font-size: 11px;
-  font-weight: 600;
+  font-size: 0;
   appearance: none;
   -webkit-appearance: none;
   cursor: pointer;
+  opacity: 0;
 }
 
-.language-select:hover,
-.language-select:focus {
+.language-switch:hover,
+.language-switch:focus-within {
   border-color: var(--text);
-  outline: none;
 }
 
 .eyebrow {
@@ -111,6 +119,10 @@ body {
   margin: 6px 0 0;
   color: var(--muted);
   font-size: 12px;
+}
+
+.subtitle.hidden {
+  display: none;
 }
 
 .mode-row {
@@ -264,6 +276,12 @@ body {
   gap: 12px;
 }
 
+.card-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .clear-button {
   border: none;
   background: transparent;
@@ -276,6 +294,23 @@ body {
 }
 
 .clear-button:hover {
+  color: var(--text);
+}
+
+.inline-link {
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.inline-link:hover {
   color: var(--text);
 }
 

@@ -1,4 +1,4 @@
-import type { PaymentMethod, PublicStorefrontResponse } from "@threads/web-schema";
+import type { BillingCycle, PaymentMethod, PublicStorefrontResponse } from "@threads/web-schema";
 import {
   getLocale,
   applyTranslations,
@@ -13,12 +13,47 @@ const paymentMethodsEl = document.querySelector<HTMLElement>("#payment-methods")
 const purchaseForm = document.querySelector<HTMLFormElement>("#purchase-form");
 const paymentSelect = document.querySelector<HTMLSelectElement>("select[name='paymentMethodId']");
 const purchaseStatus = document.querySelector<HTMLElement>("#purchase-status");
+const checkoutPriceValue = document.querySelector<HTMLElement>("#checkout-price-value");
+const checkoutPriceNote = document.querySelector<HTMLElement>("#checkout-price-note");
+const billingCycleInput = document.querySelector<HTMLInputElement>("input[name='billingCycle'][type='hidden']");
+const billingCycleOptions = document.querySelectorAll<HTMLInputElement>("input[name='billingCycle'][type='radio']");
 const siteHost = document.body.dataset.siteHost?.trim() ?? "";
 const landingVariant = getLandingVariant(siteHost);
 
 let storefront: PublicStorefrontResponse | null = null;
 let msg: LandingMsg = landingMessages.ko[landingVariant];
 let currentLocale: WebLocale = "ko";
+
+const billingCycleCopy: Record<WebLocale, Record<BillingCycle, { title: string; price: string; note: string }>> = {
+  ko: {
+    yearly: { title: "연간", price: "US$19.99", note: "연간 기본" },
+    monthly: { title: "월간", price: "US$2.99", note: "월간" }
+  },
+  en: {
+    yearly: { title: "Yearly", price: "US$19.99", note: "Yearly default" },
+    monthly: { title: "Monthly", price: "US$2.99", note: "Monthly" }
+  },
+  ja: {
+    yearly: { title: "Yearly", price: "US$19.99", note: "Yearly" },
+    monthly: { title: "Monthly", price: "US$2.99", note: "Monthly" }
+  },
+  "pt-BR": {
+    yearly: { title: "Yearly", price: "US$19.99", note: "Yearly" },
+    monthly: { title: "Monthly", price: "US$2.99", note: "Monthly" }
+  },
+  es: {
+    yearly: { title: "Yearly", price: "US$19.99", note: "Yearly" },
+    monthly: { title: "Monthly", price: "US$2.99", note: "Monthly" }
+  },
+  "zh-TW": {
+    yearly: { title: "Yearly", price: "US$19.99", note: "Yearly" },
+    monthly: { title: "Monthly", price: "US$2.99", note: "Monthly" }
+  },
+  vi: {
+    yearly: { title: "Yearly", price: "US$19.99", note: "Yearly" },
+    monthly: { title: "Monthly", price: "US$2.99", note: "Monthly" }
+  }
+};
 
 function escapeHtml(value: string): string {
   return value
@@ -75,6 +110,38 @@ function renderPaymentMethods(methods: PaymentMethod[]): void {
   }
 }
 
+function getSelectedBillingCycle(): BillingCycle {
+  const selected = [...billingCycleOptions].find((candidate) => candidate.checked)?.value;
+  return selected === "monthly" ? "monthly" : "yearly";
+}
+
+function applyBillingCycleUi(): void {
+  const cycle = getSelectedBillingCycle();
+  const cycleCopy = billingCycleCopy[currentLocale][cycle];
+  if (billingCycleInput) {
+    billingCycleInput.value = cycle;
+  }
+  if (checkoutPriceValue) {
+    checkoutPriceValue.textContent = cycleCopy.price;
+  }
+  if (checkoutPriceNote) {
+    checkoutPriceNote.textContent = cycleCopy.note;
+  }
+
+  for (const option of billingCycleOptions) {
+    const copy = billingCycleCopy[currentLocale][option.value === "monthly" ? "monthly" : "yearly"];
+    const label = option.closest(".checkout-cycle-option");
+    const title = label?.querySelector("span");
+    const price = label?.querySelector("strong");
+    if (title) {
+      title.textContent = copy.title;
+    }
+    if (price) {
+      price.textContent = copy.price;
+    }
+  }
+}
+
 function setStatus(message: string, isError = false): void {
   if (!purchaseStatus) {
     return;
@@ -106,6 +173,7 @@ async function submitPurchaseRequest(event: SubmitEvent): Promise<void> {
   const payload = {
     buyerName: formData.get("buyerName")?.toString() ?? "",
     buyerEmail: formData.get("buyerEmail")?.toString() ?? "",
+    billingCycle: getSelectedBillingCycle(),
     paymentMethodId: formData.get("paymentMethodId")?.toString() ?? "",
     note: formData.get("note")?.toString() ?? ""
   };
@@ -147,6 +215,7 @@ function applyLocale(locale: WebLocale): void {
   msg = landingMessages[locale][landingVariant];
   document.documentElement.lang = locale;
   applyTranslations(buildTranslationDict(msg));
+  applyBillingCycleUi();
 }
 
 void (async () => {
@@ -167,8 +236,16 @@ void (async () => {
   } catch (error) {
     setStatus(error instanceof Error ? error.message : "Could not load checkout.", true);
   }
+
+  applyBillingCycleUi();
 })();
 
 purchaseForm?.addEventListener("submit", (event) => {
   void submitPurchaseRequest(event);
 });
+
+for (const option of billingCycleOptions) {
+  option.addEventListener("change", () => {
+    applyBillingCycleUi();
+  });
+}

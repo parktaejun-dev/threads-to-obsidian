@@ -12,14 +12,16 @@ import {
 } from "./web-i18n-locales";
 
 export type WebLocale = SupportedLocale;
+type SecondaryWebLocale = Exclude<WebLocale, "ko" | "en">;
 
 const LS_KEY = "web-locale";
 const COOKIE_KEY = "threads-web-locale";
-export const EXTENSION_RELEASE_ASSET_NAME = "threads-saver-extension.zip";
+export const EXTENSION_RELEASE_ASSET_NAME = "ss-threads-extension.zip";
 export const EXTENSION_RELEASE_DOWNLOAD_URL = `https://github.com/parktaejun-dev/threads-to-obsidian/releases/latest/download/${EXTENSION_RELEASE_ASSET_NAME}`;
-const EXTENSION_UNPACKED_FOLDER = "threads-saver-extension";
+const EXTENSION_UNPACKED_FOLDER = "ss-threads-extension";
 const LEGACY_EXTENSION_REPO_URL = "https://github.com/parktaejun-dev/threads-to-obsidian";
 const LEGACY_EXTENSION_SOURCE_ZIP_URL = `${LEGACY_EXTENSION_REPO_URL}/archive/refs/heads/main.zip`;
+const LEGACY_PLAN_PATTERN = /\bPro\b/g;
 
 function readLocaleCookie(): WebLocale | null {
   if (typeof document === "undefined") {
@@ -167,6 +169,99 @@ export function applyExtensionInstallCopy<T>(value: T): T {
   return value;
 }
 
+function applyPlanBrandingToString(value: string): string {
+  return value
+    .replaceAll("SS Threads Pro", "SS Threads Plus")
+    .replace(LEGACY_PLAN_PATTERN, "Plus");
+}
+
+function applyPlanBrandingCopy<T>(value: T): T {
+  if (typeof value === "string") {
+    return applyPlanBrandingToString(value) as T;
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((entry) => applyPlanBrandingCopy(entry)) as T;
+  }
+
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, entry]) => [key, applyPlanBrandingCopy(entry)])
+    ) as T;
+  }
+
+  return value;
+}
+
+function normalizeLegacyLandingMessage(message: LandingMsg): LandingMsg {
+  return {
+    ...applyPlanBrandingCopy(message),
+    heroRailLabel2: "Plus",
+    heroRailText2: "1,000 saves + 50 folders",
+    priceNote: "yearly default",
+    priceSummary: "Free 100/5 -> Plus 1000/50",
+    pricePointProDesc: "Raise scrapbook save and folder limits.",
+    flowStep2: "Upgrade to Plus when needed",
+    flowStep3: "Use the same Plus key in scrapbook and the extension",
+    shotSmallCapTitle: "Plus higher limits",
+    shotSmallCapDesc: "Raise scrapbook limits to 1,000 saves and 50 folders, and use the same key in the extension.",
+    compProDesc: "1,000 saves, 50 folders, same key in the extension",
+    step2Title: "Upgrade when needed",
+    step2Desc: "Free includes 100 saved posts and 5 folders. Plus raises it to 1,000 and 50.",
+    step3Title: "Use the same key",
+    step3Desc: "Paste the same Plus key into scrapbook and extension settings.",
+    commerceH2: "Buy Plus",
+    commerceLead: "US$19.99 yearly or US$2.99 monthly. The Plus key is delivered by email after payment confirmation.",
+    formRemark: "The Plus key is emailed after payment confirmation.",
+    compareH2: "Free vs Plus",
+    bundleTag: "Plus",
+    bundleTitle: "SS Threads Plus",
+    bundleDesc: "Free 100/5 -> Plus 1000/50",
+    bundleCta: "Buy Plus",
+    orderFinal: "Your SS Threads Plus key will be emailed after payment confirmation."
+  };
+}
+
+function normalizeLegacyStorefrontCopy(copy: LandingStorefrontCopy): LandingStorefrontCopy {
+  return {
+    ...applyPlanBrandingCopy(copy),
+    priceLabel: "SS Threads Plus",
+    includedUpdates: "US$2.99 monthly · US$19.99 yearly · Free 100/5 -> Plus 1000/50"
+  };
+}
+
+function normalizeLegacyAdminMessage(message: AdminMsg): AdminMsg {
+  return applyPlanBrandingCopy(message);
+}
+
+const secondaryLandingMessages = Object.fromEntries(
+  Object.entries(landingMessageLocales)
+    .filter(([locale]) => locale !== "ko" && locale !== "en")
+    .map(([locale, variants]) => [
+    locale,
+    Object.fromEntries(
+      Object.entries(variants).map(([variant, message]) => [variant, normalizeLegacyLandingMessage(message)])
+    )
+  ])
+) as Partial<Record<SecondaryWebLocale, Record<LandingVariant, LandingMsg>>>;
+
+const secondaryLandingStorefrontCopy = Object.fromEntries(
+  Object.entries(landingStorefrontLocales)
+    .filter(([locale]) => locale !== "ko" && locale !== "en")
+    .map(([locale, variants]) => [
+    locale,
+    Object.fromEntries(
+      Object.entries(variants).map(([variant, copy]) => [variant, normalizeLegacyStorefrontCopy(copy)])
+    )
+  ])
+) as Partial<Record<SecondaryWebLocale, Record<LandingVariant, LandingStorefrontCopy>>>;
+
+const secondaryAdminMessages = Object.fromEntries(
+  Object.entries(adminMessageLocales)
+    .filter(([locale]) => locale !== "ko" && locale !== "en")
+    .map(([locale, message]) => [locale, normalizeLegacyAdminMessage(message)])
+) as Partial<Record<SecondaryWebLocale, AdminMsg>>;
+
 // ─── Landing messages ────────────────────────────────────────────────────────
 
 export type LandingVariant = "obsidian" | "bot";
@@ -293,47 +388,47 @@ const obsidianLandingMessages: { ko: LandingMsg; en: LandingMsg } = {
     siteLabel: "안내 주소",
     heroEyebrow: "Extension + Scrapbook",
     heroGuideCta: "scrapbook 열기",
-    heroPurchaseCta: "Pro 구매",
+    heroPurchaseCta: "Plus 구매",
     heroRailLabel1: "Free",
     heroRailText1: "글·이미지·답글 저장",
-    heroRailLabel2: "Pro",
-    heroRailText2: "파일명 규칙 + AI 정리",
-    priceNote: "1회 결제",
-    priceSummary: "Free로 저장하고, 필요할 때 Pro를 추가하세요.",
+    heroRailLabel2: "Plus",
+    heroRailText2: "저장 1000개 + 폴더 50개",
+    priceNote: "연간 기본",
+    priceSummary: "Free 100/5로 시작하고, 한도에 닿으면 Plus로 넓히세요.",
     pricePointFreeDesc: "핵심 저장은 바로 사용 가능.",
-    pricePointProDesc: "파일명 규칙과 AI 정리를 활성화.",
-    primaryCta: "Pro 구매",
+    pricePointProDesc: "저장 한도와 폴더 한도를 넓힙니다.",
+    primaryCta: "Plus 구매",
     secondaryCta: "scrapbook 열기",
     flowStep1: "Free로 먼저 저장해보기",
-    flowStep2: "필요하면 Pro로 업그레이드",
-    flowStep3: "이메일로 키 전달",
+    flowStep2: "한도에 닿으면 Plus로 업그레이드",
+    flowStep3: "Plus 키를 양쪽에 연결",
     storyEyebrow: "Quick Start",
     storyH2: "설치 → 연결 → 저장, 3단계.",
     storyP: "Free로 바로 시작할 수 있습니다.",
     guideInstallCta: "설치 안내 보기",
-    guideUpgradeCta: "Pro 구매 요청",
+    guideUpgradeCta: "Plus 구매 요청",
     card1Title: "Chrome에 로드",
     card1Desc: "압축을 풀고 Chrome에서 dist/extension 폴더를 언팩드 확장으로 로드합니다.",
     card2Title: "Vault 연결",
     card2Desc: "옵션에서 Obsidian 폴더를 연결하면 마크다운과 미디어를 바로 저장합니다.",
     card3Title: "Threads에서 저장",
-    card3Desc: "Threads 개별 글에서 저장을 누르면 됩니다. Pro에서는 규칙과 AI 정리까지 이어집니다.",
+    card3Desc: "Threads 개별 글에서 저장하면 됩니다. 같은 Plus 키를 scrapbook과 extension 양쪽에 연결할 수 있습니다.",
     showcaseH2: "확장 안에서 실제로 보이는 화면",
-    showcaseCopy: "Free와 Pro의 차이를 직접 확인하세요.",
+    showcaseCopy: "Free와 Plus의 차이를 직접 확인하세요.",
     shotLargeCapTitle: "Free 저장 흐름",
     shotLargeCapDesc: "핵심 저장 경험은 빠르고 단순하게 유지됩니다.",
-    shotSmallCapTitle: "Pro 정리 자동화",
-    shotSmallCapDesc: "원하는 규칙과 내 LLM 키 기반 요약·태그가 함께 적용됩니다.",
+    shotSmallCapTitle: "Plus 확장 한도",
+    shotSmallCapDesc: "저장글 1,000개와 폴더 50개까지 넓히고, 같은 키를 extension에도 연결할 수 있습니다.",
     compFreeDesc: "핵심 저장이 이미 완성된 기본 흐름",
-    compProDesc: "파일명·경로 규칙과 AI 요약·태그·frontmatter를 추가하는 업그레이드",
+    compProDesc: "저장글 1,000개, 폴더 50개, 동일 키 extension 연결",
     step1Title: "Free로 저장 체험",
     step1Desc: "글·이미지·답글 저장이 바로 됩니다.",
-    step2Title: "필요할 때 Pro 업그레이드",
-    step2Desc: "파일명 규칙과 AI 정리가 필요하면 Pro.",
-    step3Title: "키 입력으로 활성화",
-    step3Desc: "옵션 페이지에 Pro 키를 넣으면 끝.",
-    commerceH2: "Pro 구매",
-    commerceLead: "29달러 1회 결제. 이메일로 키를 발송합니다.",
+    step2Title: "한도에 닿으면 Plus로 확장",
+    step2Desc: "Free는 저장글 100개, 폴더 5개까지. Plus는 1,000개와 50개까지 확장됩니다.",
+    step3Title: "같은 키를 두 곳에 연결",
+    step3Desc: "scrapbook과 extension에 같은 Plus 키를 붙여넣으면 됩니다.",
+    commerceH2: "Plus 구매",
+    commerceLead: "연 US$19.99 또는 월 US$2.99. 결제 확인 후 키를 발송합니다.",
     commerceNote: "주문 요청 후 결제를 확인하는 방식으로 운영합니다.",
     commerceRefund: "7일 환불",
     backToHome: "제품 페이지로 돌아가기",
@@ -342,13 +437,13 @@ const obsidianLandingMessages: { ko: LandingMsg; en: LandingMsg } = {
     formMethodLabel: "결제수단",
     formNoteLabel: "메모",
     formSubmitBtn: "구매 요청 보내기",
-    formRemark: "결제 확인 후 Pro 키를 이메일로 보냅니다.",
+    formRemark: "결제 확인 후 Plus 키를 이메일로 보냅니다.",
     faqH2: "구매 전에 가장 많이 묻는 질문",
     phName: "홍길동",
     phNote: "세금계산서, 통화, 팀용 좌석 요청 등이 있으면 적어주세요",
     phMethod: "결제수단을 선택하세요",
     methodBadge: "이용 가능",
-    compareH2: "Free vs Pro",
+    compareH2: "Free vs Plus",
     compareLead: "",
     compareColFeature: "기능",
     compareRowSavePost: "현재 글 저장",
@@ -358,12 +453,12 @@ const obsidianLandingMessages: { ko: LandingMsg; en: LandingMsg } = {
     compareRowAi: "내 LLM 키 요약 / 태그 / frontmatter",
     screenH2: "Preview",
     screenUsageCaption: "실사용 저장 화면",
-    screenProCaption: "Pro 활성화 후 옵션 화면",
+    screenProCaption: "Plus 키 연결 후 옵션 화면",
     productsEyebrow: "Two products",
     productsTitle: "저장하는 두 가지 방식",
     productsCopy: "",
     productATag: "Chrome extension",
-    productATitle: "Threads to Obsidian",
+    productATitle: "SS Threads",
     productADesc: "PC에서 보고 있는 Threads 글을 바로 저장.",
     productACta: "ZIP 다운로드",
     productBTag: "Mention bot",
@@ -373,10 +468,10 @@ const obsidianLandingMessages: { ko: LandingMsg; en: LandingMsg } = {
     pricingEyebrow: "Pricing",
     pricingTitle: "결제는 단순하게.",
     pricingCopy: "",
-    bundleTag: "One-time",
-    bundleTitle: "Threads Saver Pro",
-    bundleDesc: "29달러 1회 결제. Extension Pro와 Scrapbook core 포함.",
-    bundleCta: "Pro 구매",
+    bundleTag: "Plus",
+    bundleTitle: "SS Threads Plus",
+    bundleDesc: "Free 100/5에서 시작하고, Plus에서 1,000/50으로 확장합니다.",
+    bundleCta: "Plus 구매",
     cloudTag: "Cloud Add-on",
     cloudTitle: "Watchlists + Searches + Insights",
     cloudDesc: "지속 동기화가 필요한 기능은 별도 add-on.",
@@ -395,7 +490,7 @@ const obsidianLandingMessages: { ko: LandingMsg; en: LandingMsg } = {
     orderSuccess1: "{email}로 요청이 접수됐습니다.",
     orderNextStep: "다음 단계: {instructions}",
     orderPayLink: "결제 링크: {url}",
-    orderFinal: "결제 확인 후 Threads Saver Pro 키를 이메일로 보내드립니다.",
+    orderFinal: "결제 확인 후 SS Threads Plus 키를 이메일로 보내드립니다.",
     footerPurchaseLink: "",
   },
   en: {
@@ -403,47 +498,47 @@ const obsidianLandingMessages: { ko: LandingMsg; en: LandingMsg } = {
     siteLabel: "Guide URL",
     heroEyebrow: "Extension + Scrapbook",
     heroGuideCta: "Open scrapbook",
-    heroPurchaseCta: "Buy Pro",
+    heroPurchaseCta: "Buy Plus",
     heroRailLabel1: "Free",
     heroRailText1: "Save posts, images, and reply chains",
-    heroRailLabel2: "Pro",
-    heroRailText2: "File/path rules + AI organization",
-    priceNote: "one-time",
-    priceSummary: "Start with Free. Add Pro when you need it.",
+    heroRailLabel2: "Plus",
+    heroRailText2: "1,000 saves + 50 folders",
+    priceNote: "yearly default",
+    priceSummary: "Start on Free 100/5, then move to Plus when you hit the limit.",
     pricePointFreeDesc: "Core saving works right away.",
-    pricePointProDesc: "Unlock file rules and AI organization.",
-    primaryCta: "Buy Pro",
+    pricePointProDesc: "Raise your scrapbook save and folder limits.",
+    primaryCta: "Buy Plus",
     secondaryCta: "Open scrapbook",
     flowStep1: "Try Free first",
-    flowStep2: "Upgrade to Pro when needed",
-    flowStep3: "Key delivered by email",
+    flowStep2: "Upgrade when you hit the limit",
+    flowStep3: "Use the same key in both places",
     storyEyebrow: "Quick Start",
     storyH2: "Install → Connect → Save. Three steps.",
     storyP: "Free is ready to go.",
     guideInstallCta: "Open install guide",
-    guideUpgradeCta: "Request Pro",
+    guideUpgradeCta: "Request Plus",
     card1Title: "Load in Chrome",
     card1Desc: "Unzip the project and load the dist/extension folder as an unpacked Chrome extension.",
     card2Title: "Connect your vault",
     card2Desc: "Connect your Obsidian folder in options so markdown and media save directly.",
     card3Title: "Save from Threads",
-    card3Desc: "Save from any single post page. Pro adds file rules and AI organization on top.",
+    card3Desc: "Save from any single post page. The same Plus key can also be connected in scrapbook and the extension.",
     showcaseH2: "What you actually see in the extension",
-    showcaseCopy: "See the difference between Free and Pro for yourself.",
+    showcaseCopy: "See the difference between Free and Plus for yourself.",
     shotLargeCapTitle: "Free save flow",
     shotLargeCapDesc: "The core saving experience stays fast and simple.",
-    shotSmallCapTitle: "Pro auto-organization",
-    shotSmallCapDesc: "Organized using your chosen rules and your own LLM-powered summary/tag pass.",
+    shotSmallCapTitle: "Plus higher limits",
+    shotSmallCapDesc: "Raise scrapbook limits to 1,000 saves and 50 folders, using the same key across scrapbook and extension.",
     compFreeDesc: "The core save flow that already works well",
-    compProDesc: "An upgrade that adds file/path rules plus AI summaries, tags, and frontmatter",
+    compProDesc: "An upgrade that raises scrapbook limits and keeps the same key usable in the extension",
     step1Title: "Try Free first",
     step1Desc: "Posts, images, and reply chains save immediately.",
     step2Title: "Upgrade when needed",
-    step2Desc: "Pro adds file rules and AI organization.",
-    step3Title: "Paste your key",
-    step3Desc: "Enter the Pro key in options to activate.",
-    commerceH2: "Buy Pro",
-    commerceLead: "$29 one-time. Key delivered by email.",
+    step2Desc: "Free includes 100 saved posts and 5 folders. Plus raises it to 1,000 and 50.",
+    step3Title: "Paste the same key",
+    step3Desc: "Use the same Plus key in scrapbook and in extension settings.",
+    commerceH2: "Buy Plus",
+    commerceLead: "US$19.99 yearly or US$2.99 monthly. The key is delivered by email after payment confirmation.",
     commerceNote: "Orders are reviewed first, then payment is confirmed.",
     commerceRefund: "7-day refund",
     backToHome: "Back to product page",
@@ -452,13 +547,13 @@ const obsidianLandingMessages: { ko: LandingMsg; en: LandingMsg } = {
     formMethodLabel: "Payment method",
     formNoteLabel: "Note",
     formSubmitBtn: "Send purchase request",
-    formRemark: "Your Pro key is emailed after payment confirmation.",
+    formRemark: "Your Plus key is emailed after payment confirmation.",
     faqH2: "Most common questions before buying",
     phName: "John Doe",
     phNote: "Invoice, currency, team seat requests, etc.",
     phMethod: "Select a payment method",
     methodBadge: "Available",
-    compareH2: "Free vs Pro",
+    compareH2: "Free vs Plus",
     compareLead: "",
     compareColFeature: "Feature",
     compareRowSavePost: "Save current post",
@@ -468,12 +563,12 @@ const obsidianLandingMessages: { ko: LandingMsg; en: LandingMsg } = {
     compareRowAi: "BYO LLM summary / tags / frontmatter",
     screenH2: "Preview",
     screenUsageCaption: "Save flow in use",
-    screenProCaption: "Options page with Pro enabled",
+    screenProCaption: "Options page with Plus enabled",
     productsEyebrow: "Two products",
     productsTitle: "Two ways to save",
     productsCopy: "",
     productATag: "Chrome extension",
-    productATitle: "Threads to Obsidian",
+    productATitle: "SS Threads",
     productADesc: "Save the Threads post you are viewing on desktop.",
     productACta: "Download ZIP",
     productBTag: "Mention bot",
@@ -483,10 +578,10 @@ const obsidianLandingMessages: { ko: LandingMsg; en: LandingMsg } = {
     pricingEyebrow: "Pricing",
     pricingTitle: "Simple billing.",
     pricingCopy: "",
-    bundleTag: "One-time",
-    bundleTitle: "Threads Saver Pro",
-    bundleDesc: "$29 one-time. Includes Extension Pro and Scrapbook core.",
-    bundleCta: "Buy Pro",
+    bundleTag: "Plus",
+    bundleTitle: "SS Threads Plus",
+    bundleDesc: "Start on Free 100/5, then raise it to 1,000 saves and 50 folders with Plus.",
+    bundleCta: "Buy Plus",
     cloudTag: "Cloud Add-on",
     cloudTitle: "Watchlists + Searches + Insights",
     cloudDesc: "Always-on sync features as a separate add-on.",
@@ -505,7 +600,7 @@ const obsidianLandingMessages: { ko: LandingMsg; en: LandingMsg } = {
     orderSuccess1: "Your request has been received at {email}.",
     orderNextStep: "Next step: {instructions}",
     orderPayLink: "Payment link: {url}",
-    orderFinal: "Your Threads Saver Pro key will be emailed after payment confirmation.",
+    orderFinal: "Your SS Threads Plus key will be emailed after payment confirmation.",
     footerPurchaseLink: "",
   },
 };
@@ -518,17 +613,17 @@ export const landingMessages: Record<WebLocale, Record<LandingVariant, LandingMs
       topbarCta: "scrapbook 열기",
       heroEyebrow: "Mention Scrapbook SaaS",
       heroGuideCta: "scrapbook 열기",
-      heroPurchaseCta: "확장 Pro 구매",
-      primaryCta: "확장 Pro 구매",
+      heroPurchaseCta: "확장 Plus 구매",
+      primaryCta: "확장 Plus 구매",
       storyEyebrow: "Chrome Extension",
-      storyH2: "Threads to Obsidian 확장도 함께 제공합니다.",
+      storyH2: "SS Threads 확장도 함께 제공합니다.",
       storyP: "댓글 멘션 저장은 bot이 맡고, 브라우저에서 보고 있는 Threads 글을 즉시 Obsidian으로 보내는 흐름은 extension이 맡습니다.",
       card3Title: "Threads에서 바로 저장",
       card3Desc: "브라우저에서 보고 있는 글을 즉시 저장합니다. mention bot와 별도로 쓰거나 함께 쓸 수 있습니다.",
-      commerceH2: "Threads to Obsidian Pro 구매",
-      commerceLead: "이 아래 폼은 Chrome extension Pro 구매용입니다. mention scrapbook bot 안내는 위 섹션에서 확인할 수 있습니다.",
+      commerceH2: "SS Threads Plus 구매",
+      commerceLead: "이 아래 폼은 SS Threads Plus 구매용입니다. 같은 키를 scrapbook과 extension 양쪽에 연결할 수 있습니다.",
       faqH2: "Bot / Extension FAQ",
-      compareH2: "Chrome Extension Free vs Pro",
+      compareH2: "Chrome Extension Free vs Plus",
       screenH2: "Chrome extension preview",
       productsEyebrow: "Two products",
       productsTitle: "Threads에서 저장하는 두 가지 방식",
@@ -538,8 +633,8 @@ export const landingMessages: Record<WebLocale, Record<LandingVariant, LandingMs
       productADesc: "댓글에 @parktaejun만 붙이면 내 private scrapbook으로 저장되고, 나중에 Markdown으로 꺼내 쓸 수 있습니다.",
       productACta: "scrapbook 열기",
       productBTag: "Chrome extension",
-      productBTitle: "Threads to Obsidian",
-      productBDesc: "브라우저에서 보고 있는 Threads 글을 바로 Obsidian으로 저장합니다. 정리 규칙과 AI 후처리는 Pro에서 켭니다.",
+      productBTitle: "SS Threads",
+      productBDesc: "브라우저에서 보고 있는 Threads 글을 바로 Obsidian으로 저장합니다. 같은 Plus 키를 extension에도 연결할 수 있습니다.",
       productBCta: "확장 안내 보기",
       botEyebrow: "How it works",
       botTitle: "공개 댓글로 트리거하고, private scrapbook에 저장합니다.",
@@ -559,17 +654,17 @@ export const landingMessages: Record<WebLocale, Record<LandingVariant, LandingMs
       topbarCta: "Open scrapbook",
       heroEyebrow: "Mention Scrapbook SaaS",
       heroGuideCta: "Open scrapbook",
-      heroPurchaseCta: "Buy extension Pro",
-      primaryCta: "Buy extension Pro",
+      heroPurchaseCta: "Buy extension Plus",
+      primaryCta: "Buy extension Plus",
       storyEyebrow: "Chrome Extension",
-      storyH2: "Threads to Obsidian is also available here.",
+      storyH2: "SS Threads is also available here.",
       storyP: "The bot handles mention-based scrapbook saves, while the extension sends the post you are actively viewing straight into Obsidian.",
       card3Title: "Save directly from Threads",
       card3Desc: "Save the post you are viewing in the browser immediately. You can use it separately from the mention bot or alongside it.",
-      commerceH2: "Buy Threads to Obsidian Pro",
-      commerceLead: "The form below is for the Chrome extension Pro purchase. The mention scrapbook bot is explained in the sections above.",
+      commerceH2: "Buy SS Threads Plus",
+      commerceLead: "The form below is for SS Threads Plus. The same key can be used in both scrapbook and the extension.",
       faqH2: "Bot / Extension FAQ",
-      compareH2: "Chrome Extension Free vs Pro",
+      compareH2: "Chrome Extension Free vs Plus",
       screenH2: "Chrome extension preview",
       productsEyebrow: "Two products",
       productsTitle: "Two ways to save from Threads",
@@ -579,8 +674,8 @@ export const landingMessages: Record<WebLocale, Record<LandingVariant, LandingMs
       productADesc: "Add @parktaejun in a reply and the item lands in your private scrapbook, ready to export as Markdown later.",
       productACta: "Open scrapbook",
       productBTag: "Chrome extension",
-      productBTitle: "Threads to Obsidian",
-      productBDesc: "Save the Threads post you are viewing straight into Obsidian. Rule-based organization and AI post-processing turn on in Pro.",
+      productBTitle: "SS Threads",
+      productBDesc: "Save the Threads post you are viewing straight into Obsidian. The same Plus key can also be used in the extension.",
       productBCta: "See extension guide",
       botEyebrow: "How it works",
       botTitle: "Use a public reply as the trigger and keep the scrapbook private.",
@@ -592,9 +687,10 @@ export const landingMessages: Record<WebLocale, Record<LandingVariant, LandingMs
       botStep3Title: "Review on the web and export",
       botStep3Desc: "The target is to reflect saves within 60 seconds, then let users export as Markdown or plain text for Obsidian, Notion, or note apps."
     }
-  },
-  ...landingMessageLocales
-};
+  }
+} as Record<WebLocale, Record<LandingVariant, LandingMsg>>;
+
+Object.assign(landingMessages, secondaryLandingMessages);
 
 export interface LandingLinkSet {
   topbarSecondaryHref: string;
@@ -623,11 +719,11 @@ export interface LandingStorefrontCopy {
 
 const obsidianLandingStorefrontCopy: { ko: LandingStorefrontCopy; en: LandingStorefrontCopy } = {
   ko: {
-    productName: "Threads Saver",
+    productName: "SS Threads",
     headline: "<span class=\"headline-row\"><span>PC</span><span>extension.</span></span><span class=\"headline-row\"><span>Mobile</span><span>mention.</span></span>",
     subheadline: "지금 보는 글은 Chrome extension으로 저장하고, 모바일에서는 mention scrapbook으로 모읍니다.",
-    priceLabel: "Threads Saver Pro",
-    includedUpdates: "29달러 1회 결제 · Extension Pro + Scrapbook core · 7일 환불",
+    priceLabel: "SS Threads Plus",
+    includedUpdates: "월 US$2.99 · 연 US$19.99 · Free 100/5 -> Plus 1000/50",
     heroNotes: [
       "Chrome extension: 현재 보고 있는 글 저장",
       "scrapbook: 멘션, watchlist, search 결과 정리",
@@ -645,23 +741,23 @@ const obsidianLandingStorefrontCopy: { ko: LandingStorefrontCopy; en: LandingSto
     faqs: [
       {
         id: "faq-1",
-        question: "저장하려면 Pro가 필요한가요?",
-        answer: "아니요. 저장, 이미지 포함, 연속 답글, 중복 건너뜀 모두 Free에서 가능합니다."
+        question: "저장하려면 Plus가 필요한가요?",
+        answer: "아니요. Free에서도 저장, 이미지 포함, 연속 답글, 중복 건너뜀이 가능합니다. 대신 저장글은 100개, 폴더는 5개까지입니다."
       },
       {
         id: "faq-2",
-        question: "누가 Pro를 사면 좋나요?",
-        answer: "저장할 때 파일명·경로 규칙을 직접 제어하고, 자신의 LLM 키로 요약·태그·frontmatter를 붙이고 싶은 분께 맞습니다."
+        question: "누가 Plus를 쓰면 좋나요?",
+        answer: "scrapbook 저장글이 100개를 넘거나, 폴더를 5개 이상 쓰고 싶은 사용자에게 맞습니다. 같은 키를 extension에도 연결할 수 있습니다."
       },
       {
         id: "faq-3",
-        question: "요약이나 태그 같은 AI 정리는 되나요?",
-        answer: "됩니다. Pro에서 OpenAI 호환 엔드포인트와 자신의 키를 넣으면 요약, 태그, 추가 frontmatter를 생성합니다."
+        question: "Plus에서는 뭐가 달라지나요?",
+        answer: "scrapbook 저장글 1,000개, 폴더 50개까지 확장되고, 동일한 키를 extension에도 연결할 수 있습니다."
       },
       {
         id: "faq-4",
-        question: "Pro 키는 어떻게 전달되나요?",
-        answer: "결제가 확인되면 Pro 키를 이메일로 보내드립니다."
+        question: "Plus 키는 어떻게 전달되나요?",
+        answer: "결제가 확인되면 Plus 키를 이메일로 보내드립니다."
       },
       {
         id: "faq-5",
@@ -671,11 +767,11 @@ const obsidianLandingStorefrontCopy: { ko: LandingStorefrontCopy; en: LandingSto
     ]
   },
   en: {
-    productName: "Threads Saver",
+    productName: "SS Threads",
     headline: "<span class=\"headline-row\"><span>PC</span><span>extension.</span></span><span class=\"headline-row\"><span>Mobile</span><span>mention.</span></span>",
     subheadline: "Save the current post using the Chrome extension, or collect it later via mention scrapbook on mobile.",
-    priceLabel: "Threads Saver Pro",
-    includedUpdates: "$29 one-time · extension Pro + scrapbook core · 7-day refund",
+    priceLabel: "SS Threads Plus",
+    includedUpdates: "US$2.99 monthly · US$19.99 yearly · Free 100/5 -> Plus 1000/50",
     heroNotes: [
       "Chrome extension: save the post you are reading now",
       "scrapbook: organize mentions, watchlists, and searches",
@@ -693,23 +789,23 @@ const obsidianLandingStorefrontCopy: { ko: LandingStorefrontCopy; en: LandingSto
     faqs: [
       {
         id: "faq-1",
-        question: "Do I need Pro to save posts?",
-        answer: "No. Saving, image capture, author reply chains, and duplicate skipping all work in Free."
+        question: "Do I need Plus to save posts?",
+        answer: "No. Free already supports saving, image capture, author reply chains, and duplicate skipping. Free is limited to 100 saved posts and 5 folders."
       },
       {
         id: "faq-2",
-        question: "Who should buy Pro?",
-        answer: "It fits people who want direct control over file/path rules and want summaries, tags, and frontmatter generated with their own LLM key."
+        question: "Who should buy Plus?",
+        answer: "It fits users who will go beyond 100 saved posts or need more than 5 folders in scrapbook. The same key can also be used in the extension."
       },
       {
         id: "faq-3",
-        question: "Does it do AI summaries or tagging?",
-        answer: "Yes. In Pro, you can connect an OpenAI-compatible endpoint and your own key to generate summaries, tags, and extra frontmatter."
+        question: "What changes on Plus?",
+        answer: "Plus raises scrapbook limits to 1,000 saved posts and 50 folders, and the same key can be used in the extension."
       },
       {
         id: "faq-4",
-        question: "How is the Pro key delivered?",
-        answer: "After payment is confirmed, the Pro key is sent to your email."
+        question: "How is the Plus key delivered?",
+        answer: "After payment is confirmed, the Plus key is sent to your email."
       },
       {
         id: "faq-5",
@@ -727,8 +823,8 @@ export const landingStorefrontCopy: Record<WebLocale, Record<LandingVariant, Lan
       productName: "Threads Mention Scrapbook",
       headline: "Threads 댓글에 @parktaejun만 붙이면 저장됩니다.",
       subheadline: "공개 댓글을 private scrapbook 저장 트리거로 바꾸고, 나중에 Markdown이나 Obsidian, Notion으로 꺼내 쓰는 SaaS입니다.",
-      priceLabel: "Threads to Obsidian Pro",
-      includedUpdates: "Chrome extension · 1회 결제 · 업데이트 1년",
+      priceLabel: "SS Threads Plus",
+      includedUpdates: "Free 100/5 · Plus 1000/50 · 같은 키를 extension에도 사용",
       heroNotes: [
         "댓글은 공개 트리거입니다. 민감한 메모는 적지 마세요.",
         "Threads 로그인으로 연결된 계정과 댓글 작성 계정을 기준으로 사용자별로 분리 저장합니다.",
@@ -778,8 +874,8 @@ export const landingStorefrontCopy: Record<WebLocale, Record<LandingVariant, Lan
       productName: "Threads Mention Scrapbook",
       headline: "Add @parktaejun in a Threads reply and it gets saved.",
       subheadline: "Turn a public reply into a save trigger for a private scrapbook, then move the result into Markdown, Obsidian, or Notion later.",
-      priceLabel: "Threads to Obsidian Pro",
-      includedUpdates: "Chrome extension · one-time payment · 1 year of updates",
+      priceLabel: "SS Threads Plus",
+      includedUpdates: "Free 100/5 · Plus 1000/50 · use the same key in the extension too",
       heroNotes: [
         "Replies are public triggers, so do not write sensitive notes there.",
         "The system matches the reply author against the Threads account linked through OAuth and stores items per user.",
@@ -822,22 +918,31 @@ export const landingStorefrontCopy: Record<WebLocale, Record<LandingVariant, Lan
         }
       ]
     }
-  },
-  ...landingStorefrontLocales
-};
+  }
+} as Record<WebLocale, Record<LandingVariant, LandingStorefrontCopy>>;
+
+Object.assign(landingStorefrontCopy, secondaryLandingStorefrontCopy);
 
 // ─── Admin messages ───────────────────────────────────────────────────────────
 
 export type AdminMsg = {
   adminH1: string;
   adminLead: string;
+  runtimeSectionEyebrow?: string;
+  runtimeSectionTitle?: string;
   authBannerEyebrow?: string;
   authBannerTitle?: string;
   authBannerCopy?: string;
   authOverlayLabel?: string;
+  authStateLabel?: string;
+  authStateLoggedIn?: string;
+  authStateLoggedOut?: string;
+  authDetailLoggedIn?: string;
+  authDetailLoggedOut?: string;
   tokenLabel: string;
   tokenApply: string;
   tokenLogout?: string;
+  tokenLoggingOut?: string;
   tokenPlaceholder?: string;
   tokenStatusDefault: string;
   statPending: string;
@@ -1059,17 +1164,25 @@ export type AdminMsg = {
 
 export const adminMessages: Record<WebLocale, AdminMsg> = {
   ko: {
-    adminH1: "결제, 발급, 전달 관리",
-    adminLead: "결제 수단 관리, 구매 요청 검토, Pro 키 발급, 수동 이메일 전달을 위한 관리자 패널입니다.",
-    authBannerEyebrow: "운영 권한",
-    authBannerTitle: "먼저 로그인해야 실시간 운영 항목을 수정할 수 있습니다.",
-    authBannerCopy: "매출, 수집기 동기화, 런타임 설정, 결제 수단, 키 발급은 관리자 토큰 검증 전까지 잠금 상태로 유지됩니다.",
-    authOverlayLabel: "관리자 토큰으로 로그인하면 이 섹션을 사용할 수 있습니다.",
+    adminH1: "운영 패널",
+    adminLead: "결제, 키 발급, 전달을 관리합니다.",
+    runtimeSectionEyebrow: "런타임",
+    runtimeSectionTitle: "운영 설정",
+    authBannerEyebrow: "잠금",
+    authBannerTitle: "로그인 필요",
+    authBannerCopy: "운영 변경은 로그인 뒤에만 가능합니다.",
+    authOverlayLabel: "로그인하면 이 섹션이 열립니다.",
+    authStateLabel: "세션",
+    authStateLoggedIn: "로그인됨",
+    authStateLoggedOut: "로그인 필요",
+    authDetailLoggedIn: "운영 변경이 가능합니다.",
+    authDetailLoggedOut: "운영 변경은 잠금 상태입니다.",
     tokenLabel: "관리자 토큰",
     tokenApply: "로그인",
     tokenLogout: "로그아웃",
+    tokenLoggingOut: "로그아웃 중...",
     tokenPlaceholder: "관리자 접근 토큰",
-    tokenStatusDefault: "/api/admin/* 접근을 위해 로그인이 필요합니다",
+    tokenStatusDefault: "관리자 토큰을 입력하세요.",
     statPending: "미결 주문",
     statPaid: "결제 확인, 키 대기",
     statIssued: "발급된 키",
@@ -1170,7 +1283,7 @@ export const adminMessages: Record<WebLocale, AdminMsg> = {
     statDeliveryReady: "발송 대기",
     statDeliverySent: "발송 완료",
     collectorTitle: "멘션 수집기",
-    collectorCopy: "수집기 상태를 점검하고, 폴링 설정을 수정하고, 즉시 동기화를 실행합니다.",
+    collectorCopy: "상태 확인, 폴링 설정, 수동 동기화.",
     collectorSyncBtn: "지금 동기화",
     collectorStateLabel: "상태",
     collectorLastSuccessLabel: "마지막 성공",
@@ -1186,8 +1299,8 @@ export const adminMessages: Record<WebLocale, AdminMsg> = {
     collectorPagesLabel: "최대 페이지",
     collectorPublicHandleLabel: "공개 봇 계정",
     collectorProfileLink: "프로필 열기",
-    collectorHandleCopy: "여기서 변경한 핸들은 공개 scrapbook 안내 문구와 수집기 조회 대상에 함께 반영됩니다.",
-    collectorSaveBtn: "수집기 설정 저장",
+    collectorHandleCopy: "핸들을 바꾸면 공개 안내와 수집 대상이 함께 바뀝니다.",
+    collectorSaveBtn: "수집기 저장",
     collectorStateRunning: "실행 중",
     collectorStateReady: "준비됨",
     collectorStateDisabled: "비활성",
@@ -1196,7 +1309,7 @@ export const adminMessages: Record<WebLocale, AdminMsg> = {
     collectorSyncing: "멘션을 즉시 동기화하는 중...",
     collectorSynced: "수집기 수동 동기화가 완료되었습니다.",
     runtimeTitle: "런타임 설정",
-    runtimeCopy: "서버 파일을 직접 수정하지 않고 public origin, 데이터베이스, SMTP를 변경합니다.",
+    runtimeCopy: "public origin, DB, SMTP를 변경합니다.",
     publicOriginLabel: "Public origin",
     publicOriginPlaceholder: "https://ss-threads.dahanda.dev",
     databaseTitle: "데이터베이스",
@@ -1215,9 +1328,9 @@ export const adminMessages: Record<WebLocale, AdminMsg> = {
     databaseClearUrlLabel: "저장된 Postgres URL을 저장 시 제거",
     databaseUrlConfiguredPlaceholder: "이미 저장되어 있습니다. 교체할 새 URL만 입력하세요.",
     databaseTesting: "DB 연결을 테스트하는 중...",
-    databaseTestBtn: "DB 연결 테스트",
+    databaseTestBtn: "DB 테스트",
     runtimeSaving: "런타임 설정 저장 중...",
-    runtimeSaveBtn: "런타임 설정 저장",
+    runtimeSaveBtn: "저장",
     runtimeSaved: "런타임 설정이 저장되었습니다.",
     runtimeMigrated: "런타임 설정이 저장되었고 데이터가 새 데이터베이스로 이전되었습니다.",
     runtimeRestartRequired: "데이터베이스 설정이 저장되었습니다. 새 백엔드를 쓰기 전에 서버를 재시작하세요.",
@@ -1250,7 +1363,7 @@ export const adminMessages: Record<WebLocale, AdminMsg> = {
     storefrontFaqsLabel: "FAQ",
     storefrontFaqsPlaceholder: "질문 :: 답변",
     storefrontSaving: "스토어프론트 설정 저장 중...",
-    storefrontSaveBtn: "스토어프론트 저장",
+    storefrontSaveBtn: "문구 저장",
     storefrontSaved: "스토어프론트 설정이 저장되었습니다.",
     methodEditBtn: "수정",
     methodSaveBtn: "결제 수단 저장",
@@ -1287,17 +1400,25 @@ export const adminMessages: Record<WebLocale, AdminMsg> = {
     issueExpiryInvalid: "만료일은 YYYY-MM-DD 형식의 유효한 날짜여야 합니다.",
   },
   en: {
-    adminH1: "Payments, issuance, and delivery",
-    adminLead: "Manage accepted payment methods, review purchase requests, issue signed Pro keys, and keep an auditable history for manual email delivery.",
-    authBannerEyebrow: "Admin access",
-    authBannerTitle: "Sign in first to unlock live operations.",
-    authBannerCopy: "Revenue, collector sync, runtime settings, payment methods, and key issuance stay locked until the admin token is verified.",
-    authOverlayLabel: "Sign in with the admin token to unlock this section.",
+    adminH1: "Admin panel",
+    adminLead: "Manage payments, keys, and delivery.",
+    runtimeSectionEyebrow: "Runtime",
+    runtimeSectionTitle: "Operations",
+    authBannerEyebrow: "Locked",
+    authBannerTitle: "Sign in required",
+    authBannerCopy: "Live changes stay locked until you sign in.",
+    authOverlayLabel: "Sign in to unlock this section.",
+    authStateLabel: "Session",
+    authStateLoggedIn: "Signed in",
+    authStateLoggedOut: "Sign in required",
+    authDetailLoggedIn: "Live changes are enabled.",
+    authDetailLoggedOut: "Live changes are locked.",
     tokenLabel: "Admin token",
     tokenApply: "Sign in",
     tokenLogout: "Sign out",
+    tokenLoggingOut: "Signing out...",
     tokenPlaceholder: "Admin access token",
-    tokenStatusDefault: "Sign in required for /api/admin/*",
+    tokenStatusDefault: "Enter the admin token.",
     statPending: "Pending orders",
     statPaid: "Paid, awaiting key",
     statIssued: "Issued keys",
@@ -1398,7 +1519,7 @@ export const adminMessages: Record<WebLocale, AdminMsg> = {
     statDeliveryReady: "Awaiting delivery",
     statDeliverySent: "Delivered",
     collectorTitle: "Mention collector",
-    collectorCopy: "Review collector health, update polling settings, and run a manual sync.",
+    collectorCopy: "Health, polling, and manual sync.",
     collectorSyncBtn: "Sync now",
     collectorStateLabel: "State",
     collectorLastSuccessLabel: "Last success",
@@ -1414,8 +1535,8 @@ export const adminMessages: Record<WebLocale, AdminMsg> = {
     collectorPagesLabel: "Max pages",
     collectorPublicHandleLabel: "Public bot account",
     collectorProfileLink: "Open profile",
-    collectorHandleCopy: "Changing this updates both the public scrapbook mention target and the collector lookup handle.",
-    collectorSaveBtn: "Save collector settings",
+    collectorHandleCopy: "This handle is used for both the public mention target and collector lookup.",
+    collectorSaveBtn: "Save collector",
     collectorStateRunning: "Running",
     collectorStateReady: "Ready",
     collectorStateDisabled: "Disabled",
@@ -1424,7 +1545,7 @@ export const adminMessages: Record<WebLocale, AdminMsg> = {
     collectorSyncing: "Syncing mentions now...",
     collectorSynced: "Collector sync completed.",
     runtimeTitle: "Runtime settings",
-    runtimeCopy: "Change public origin, database, and SMTP without editing the server manually.",
+    runtimeCopy: "Public origin, DB, and SMTP.",
     publicOriginLabel: "Public origin",
     publicOriginPlaceholder: "https://ss-threads.dahanda.dev",
     databaseTitle: "Database",
@@ -1443,9 +1564,9 @@ export const adminMessages: Record<WebLocale, AdminMsg> = {
     databaseClearUrlLabel: "Clear saved Postgres URL on save",
     databaseUrlConfiguredPlaceholder: "Already configured. Enter a new URL only if you want to replace it.",
     databaseTesting: "Testing database connection...",
-    databaseTestBtn: "Test database",
+    databaseTestBtn: "Test DB",
     runtimeSaving: "Saving runtime settings...",
-    runtimeSaveBtn: "Save runtime settings",
+    runtimeSaveBtn: "Save",
     runtimeSaved: "Runtime settings saved.",
     runtimeMigrated: "Runtime settings saved and data migrated to the new database.",
     runtimeRestartRequired: "Database settings were saved. Restart the server before using the new backend.",
@@ -1478,7 +1599,7 @@ export const adminMessages: Record<WebLocale, AdminMsg> = {
     storefrontFaqsLabel: "FAQs",
     storefrontFaqsPlaceholder: "Question :: Answer",
     storefrontSaving: "Saving storefront settings...",
-    storefrontSaveBtn: "Save storefront settings",
+    storefrontSaveBtn: "Save copy",
     storefrontSaved: "Storefront settings saved.",
     methodEditBtn: "Edit",
     methodSaveBtn: "Save method",
@@ -1513,9 +1634,10 @@ export const adminMessages: Record<WebLocale, AdminMsg> = {
     issueExpiryHint: "Applied when you use Issue key or Reissue. Leave it empty for a key without expiry.",
     issueExpiryClear: "Clear expiry",
     issueExpiryInvalid: "Expiry must be a valid YYYY-MM-DD date.",
-  },
-  ...adminMessageLocales
-};
+  }
+} as Record<WebLocale, AdminMsg>;
+
+Object.assign(adminMessages, secondaryAdminMessages);
 
 // ─── Scrapbook messages ──────────────────────────────────────────────────────
 
@@ -1568,13 +1690,13 @@ export const scrapbookMessages = {
     scrapbookHowStep3Title: "웹에서 검토하고 내보내기",
     scrapbookHowStep3Desc: "웹 scrapbook에서 저장 상태를 확인하고 Markdown 복사나 다운로드로 다음 툴로 넘깁니다.",
     scrapbookInboxEyebrow: "Inbox",
-    scrapbookInboxTitle: "멘션으로 모은 inbox",
+    scrapbookInboxTitle: "Inbox",
     scrapbookInboxCopy: "저장된 항목은 게시판처럼 한 줄씩 정리되며, 행을 클릭하면 본문과 내보내기 메뉴가 열립니다.",
     scrapbookSelectAll: "전체 선택",
     scrapbookExportSelected: "선택 ZIP 내보내기",
     scrapbookExportAll: "전체 ZIP 내보내기",
     scrapbookArchiveLoginTitle: "로그인이 필요합니다.",
-    scrapbookArchiveLoginCopy: "Threads 계정을 연결하면 저장된 멘션이 여기에 나타납니다.",
+    scrapbookArchiveLoginCopy: "Threads 계정을 연결하면 inbox와 cloud 저장 항목이 여기에 나타납니다.",
     scrapbookArchiveTableTitle: "제목",
     scrapbookArchiveTableDate: "수집일자",
     scrapbookArchiveTableSource: "출처",
@@ -1661,9 +1783,9 @@ export const scrapbookMessages = {
     scrapbookDownloadMarkdown: "Markdown 다운로드",
     scrapbookDownloadZip: "ZIP 다운로드",
     scrapbookArchiveLoginRequiredCopy:
-      "Threads 계정을 연결하면 멘션 inbox와 extension cloud 저장 항목이 여기에 함께 나타납니다.",
+      "Threads 계정을 연결하면 inbox와 cloud 저장 항목이 여기에 함께 나타납니다.",
     scrapbookArchiveEmptyTitle: "아직 저장된 항목이 없습니다.",
-    scrapbookArchiveEmptyCopy: "멘션 inbox, extension cloud 저장, watchlist auto-archive, search archive가 여기에 모입니다.",
+    scrapbookArchiveEmptyCopy: "inbox, cloud 저장, watchlist auto-archive, search archive가 여기에 모입니다.",
     scrapbookVerified: "인증됨",
     scrapbookLastLogin: "마지막 로그인 {date}",
     scrapbookProfilePictureAlt: "{name} profile picture",
@@ -1780,13 +1902,13 @@ export const scrapbookMessages = {
     scrapbookHowStep3Title: "Review and export on the web",
     scrapbookHowStep3Desc: "Check the saved result in the scrapbook UI, then copy or download it as Markdown for your next tool.",
     scrapbookInboxEyebrow: "Inbox",
-    scrapbookInboxTitle: "Inbox collected from mentions",
+    scrapbookInboxTitle: "Inbox",
     scrapbookInboxCopy: "Saved items are organized in a board-style list. Click any row to open the body and export actions.",
     scrapbookSelectAll: "Select all",
     scrapbookExportSelected: "Export selected ZIP",
     scrapbookExportAll: "Export all ZIP",
     scrapbookArchiveLoginTitle: "Sign-in required.",
-    scrapbookArchiveLoginCopy: "Connect your Threads account to see saved mentions here.",
+    scrapbookArchiveLoginCopy: "Connect your Threads account to see inbox items and cloud saves here.",
     scrapbookArchiveTableTitle: "Title",
     scrapbookArchiveTableDate: "Saved at",
     scrapbookArchiveTableSource: "Source",
@@ -1873,10 +1995,10 @@ export const scrapbookMessages = {
     scrapbookDownloadMarkdown: "Download Markdown",
     scrapbookDownloadZip: "Download ZIP",
     scrapbookArchiveLoginRequiredCopy:
-      "Connect your Threads account to see mention inbox items and extension cloud saves together here.",
+      "Connect your Threads account to see inbox items and cloud saves together here.",
     scrapbookArchiveEmptyTitle: "No saved items yet.",
     scrapbookArchiveEmptyCopy:
-      "Mention inbox items, extension cloud saves, watchlist auto-archives, and search archives all gather here.",
+      "Inbox items, cloud saves, watchlist auto-archives, and search archives all gather here.",
     scrapbookVerified: "verified",
     scrapbookLastLogin: "last login {date}",
     scrapbookProfilePictureAlt: "{name} profile picture",
@@ -1993,13 +2115,13 @@ export const scrapbookMessages = {
     scrapbookHowStep3Title: "Web で確認してエクスポート",
     scrapbookHowStep3Desc: "scrapbook 画面で保存状態を確認し、Markdown のコピーやダウンロードで次のツールへ渡します。",
     scrapbookInboxEyebrow: "Inbox",
-    scrapbookInboxTitle: "メンションから集まる inbox",
+    scrapbookInboxTitle: "Inbox",
     scrapbookInboxCopy: "保存項目はボード形式で並び、行を押すと本文とエクスポートメニューが開きます。",
     scrapbookSelectAll: "すべて選択",
     scrapbookExportSelected: "選択した ZIP を書き出し",
     scrapbookExportAll: "すべて ZIP を書き出し",
     scrapbookArchiveLoginTitle: "ログインが必要です。",
-    scrapbookArchiveLoginCopy: "Threads アカウントを接続すると、保存済みメンションがここに表示されます。",
+    scrapbookArchiveLoginCopy: "Threads アカウントを接続すると、inbox と cloud 保存がここに表示されます。",
     scrapbookArchiveTableTitle: "タイトル",
     scrapbookArchiveTableDate: "保存日時",
     scrapbookArchiveTableSource: "ソース",
@@ -2086,10 +2208,10 @@ export const scrapbookMessages = {
     scrapbookDownloadMarkdown: "Markdown をダウンロード",
     scrapbookDownloadZip: "ZIP をダウンロード",
     scrapbookArchiveLoginRequiredCopy:
-      "Threads アカウントを接続すると、メンション inbox と extension cloud 保存がここに一緒に表示されます。",
+      "Threads アカウントを接続すると、inbox と cloud 保存がここに一緒に表示されます。",
     scrapbookArchiveEmptyTitle: "保存された項目はまだありません。",
     scrapbookArchiveEmptyCopy:
-      "メンション inbox、extension cloud 保存、watchlist の自動アーカイブ、search アーカイブがここに集まります。",
+      "inbox、cloud 保存、watchlist の自動アーカイブ、search アーカイブがここに集まります。",
     scrapbookVerified: "認証済み",
     scrapbookLastLogin: "最終ログイン {date}",
     scrapbookProfilePictureAlt: "{name} のプロフィール画像",
@@ -2206,13 +2328,13 @@ export const scrapbookMessages = {
     scrapbookHowStep3Title: "Revise e exporte na web",
     scrapbookHowStep3Desc: "Confira o resultado salvo na interface do scrapbook e copie ou baixe em Markdown para usar na próxima ferramenta.",
     scrapbookInboxEyebrow: "Caixa de entrada",
-    scrapbookInboxTitle: "Inbox coletada por menções",
+    scrapbookInboxTitle: "Inbox",
     scrapbookInboxCopy: "Os itens salvos aparecem em formato de quadro. Clique em uma linha para abrir o conteúdo e as ações de exportação.",
     scrapbookSelectAll: "Selecionar tudo",
     scrapbookExportSelected: "Exportar ZIP selecionado",
     scrapbookExportAll: "Exportar ZIP completo",
     scrapbookArchiveLoginTitle: "É necessário entrar.",
-    scrapbookArchiveLoginCopy: "Conecte sua conta do Threads para ver aqui as menções salvas.",
+    scrapbookArchiveLoginCopy: "Conecte sua conta do Threads para ver aqui a inbox e os salvamentos em nuvem.",
     scrapbookArchiveTableTitle: "Título",
     scrapbookArchiveTableDate: "Salvo em",
     scrapbookArchiveTableSource: "Origem",
@@ -2299,10 +2421,10 @@ export const scrapbookMessages = {
     scrapbookDownloadMarkdown: "Baixar Markdown",
     scrapbookDownloadZip: "Baixar ZIP",
     scrapbookArchiveLoginRequiredCopy:
-      "Conecte sua conta do Threads para ver aqui juntos a inbox de menções e os salvamentos cloud da extensão.",
+      "Conecte sua conta do Threads para ver aqui juntos a inbox e os salvamentos em nuvem.",
     scrapbookArchiveEmptyTitle: "Ainda não há itens salvos.",
     scrapbookArchiveEmptyCopy:
-      "Inbox de menções, salvamentos cloud da extensão, auto-arquivos de watchlist e arquivos de busca aparecem todos aqui.",
+      "Inbox, salvamentos em nuvem, auto-arquivos de watchlist e arquivos de busca aparecem todos aqui.",
     scrapbookVerified: "verificado",
     scrapbookLastLogin: "último login {date}",
     scrapbookProfilePictureAlt: "foto de perfil de {name}",
@@ -2419,13 +2541,13 @@ export const scrapbookMessages = {
     scrapbookHowStep3Title: "Revisa y exporta en la web",
     scrapbookHowStep3Desc: "Consulta el resultado guardado en la interfaz del scrapbook y luego cópialo o descárgalo en Markdown para tu siguiente herramienta.",
     scrapbookInboxEyebrow: "Bandeja",
-    scrapbookInboxTitle: "Inbox reunida por menciones",
+    scrapbookInboxTitle: "Inbox",
     scrapbookInboxCopy: "Los elementos guardados se muestran en una lista tipo tablero. Haz clic en una fila para abrir el contenido y las acciones de exportación.",
     scrapbookSelectAll: "Seleccionar todo",
     scrapbookExportSelected: "Exportar ZIP seleccionado",
     scrapbookExportAll: "Exportar todo en ZIP",
     scrapbookArchiveLoginTitle: "Se requiere iniciar sesión.",
-    scrapbookArchiveLoginCopy: "Conecta tu cuenta de Threads para ver aquí las menciones guardadas.",
+    scrapbookArchiveLoginCopy: "Conecta tu cuenta de Threads para ver aquí la inbox y los guardados en la nube.",
     scrapbookArchiveTableTitle: "Título",
     scrapbookArchiveTableDate: "Guardado el",
     scrapbookArchiveTableSource: "Origen",
@@ -2512,10 +2634,10 @@ export const scrapbookMessages = {
     scrapbookDownloadMarkdown: "Descargar Markdown",
     scrapbookDownloadZip: "Descargar ZIP",
     scrapbookArchiveLoginRequiredCopy:
-      "Conecta tu cuenta de Threads para ver aquí juntos la inbox de menciones y los guardados cloud de la extensión.",
+      "Conecta tu cuenta de Threads para ver aquí juntos la inbox y los guardados en la nube.",
     scrapbookArchiveEmptyTitle: "Todavía no hay elementos guardados.",
     scrapbookArchiveEmptyCopy:
-      "Aquí se reúnen la inbox de menciones, los guardados cloud de la extensión, los autoarchivados de watchlist y los archivos de búsqueda.",
+      "Aquí se reúnen la inbox, los guardados en la nube, los autoarchivados de watchlist y los archivos de búsqueda.",
     scrapbookVerified: "verificado",
     scrapbookLastLogin: "último acceso {date}",
     scrapbookProfilePictureAlt: "foto de perfil de {name}",
@@ -2632,13 +2754,13 @@ export const scrapbookMessages = {
     scrapbookHowStep3Title: "在網頁上檢查並匯出",
     scrapbookHowStep3Desc: "在 scrapbook 介面確認保存內容，然後用 Markdown 複製或下載到下一個工具。",
     scrapbookInboxEyebrow: "收件匣",
-    scrapbookInboxTitle: "由提及收集的 inbox",
+    scrapbookInboxTitle: "Inbox",
     scrapbookInboxCopy: "保存的項目會以看板清單呈現，點擊任一列即可開啟內容與匯出操作。",
     scrapbookSelectAll: "全選",
     scrapbookExportSelected: "匯出所選 ZIP",
     scrapbookExportAll: "匯出全部 ZIP",
     scrapbookArchiveLoginTitle: "需要登入。",
-    scrapbookArchiveLoginCopy: "連線 Threads 帳號後，保存的提及就會顯示在這裡。",
+    scrapbookArchiveLoginCopy: "連線 Threads 帳號後，inbox 與雲端保存內容就會顯示在這裡。",
     scrapbookArchiveTableTitle: "標題",
     scrapbookArchiveTableDate: "保存時間",
     scrapbookArchiveTableSource: "來源",
@@ -2725,10 +2847,10 @@ export const scrapbookMessages = {
     scrapbookDownloadMarkdown: "下載 Markdown",
     scrapbookDownloadZip: "下載 ZIP",
     scrapbookArchiveLoginRequiredCopy:
-      "連線 Threads 帳號後，這裡會同時顯示提及 inbox 與 extension cloud 保存內容。",
+      "連線 Threads 帳號後，這裡會同時顯示 inbox 與雲端保存內容。",
     scrapbookArchiveEmptyTitle: "目前還沒有保存的項目。",
     scrapbookArchiveEmptyCopy:
-      "提及 inbox、extension cloud 保存、watchlist 自動封存與 search archive 都會集中在這裡。",
+      "inbox、雲端保存、watchlist 自動封存與 search archive 都會集中在這裡。",
     scrapbookVerified: "已驗證",
     scrapbookLastLogin: "上次登入 {date}",
     scrapbookProfilePictureAlt: "{name} 的個人頭像",
@@ -2845,13 +2967,13 @@ export const scrapbookMessages = {
     scrapbookHowStep3Title: "Xem lại và xuất trên web",
     scrapbookHowStep3Desc: "Kiểm tra kết quả đã lưu trong giao diện scrapbook rồi sao chép hoặc tải Markdown sang công cụ tiếp theo.",
     scrapbookInboxEyebrow: "Hộp thư",
-    scrapbookInboxTitle: "Inbox được gom từ mention",
+    scrapbookInboxTitle: "Inbox",
     scrapbookInboxCopy: "Các mục đã lưu được sắp thành danh sách kiểu bảng. Bấm vào từng dòng để mở nội dung và thao tác xuất.",
     scrapbookSelectAll: "Chọn tất cả",
     scrapbookExportSelected: "Xuất ZIP đã chọn",
     scrapbookExportAll: "Xuất toàn bộ ZIP",
     scrapbookArchiveLoginTitle: "Cần đăng nhập.",
-    scrapbookArchiveLoginCopy: "Kết nối tài khoản Threads để xem các mention đã lưu tại đây.",
+    scrapbookArchiveLoginCopy: "Kết nối tài khoản Threads để xem inbox và các mục lưu đám mây tại đây.",
     scrapbookArchiveTableTitle: "Tiêu đề",
     scrapbookArchiveTableDate: "Thời điểm lưu",
     scrapbookArchiveTableSource: "Nguồn",
@@ -2938,10 +3060,10 @@ export const scrapbookMessages = {
     scrapbookDownloadMarkdown: "Tải Markdown",
     scrapbookDownloadZip: "Tải ZIP",
     scrapbookArchiveLoginRequiredCopy:
-      "Kết nối tài khoản Threads để xem cùng lúc inbox mention và các mục cloud save từ extension tại đây.",
+      "Kết nối tài khoản Threads để xem cùng lúc inbox và các mục lưu đám mây tại đây.",
     scrapbookArchiveEmptyTitle: "Chưa có mục nào được lưu.",
     scrapbookArchiveEmptyCopy:
-      "Inbox mention, cloud save từ extension, auto-archive của watchlist và search archive đều tập trung tại đây.",
+      "Inbox, mục lưu đám mây, auto-archive của watchlist và search archive đều tập trung tại đây.",
     scrapbookVerified: "đã xác minh",
     scrapbookLastLogin: "đăng nhập gần nhất {date}",
     scrapbookProfilePictureAlt: "ảnh hồ sơ của {name}",

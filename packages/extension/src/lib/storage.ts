@@ -53,10 +53,23 @@ export interface ServerAuthContext {
   deviceLabel: string;
 }
 
+function normalizeStoredSaveTarget(value: unknown): SaveTarget | undefined {
+  if (value === "threads_cloud") {
+    return "cloud";
+  }
+
+  if (value === "obsidian" || value === "notion" || value === "cloud") {
+    return value;
+  }
+
+  return undefined;
+}
+
 function mergeOptionsWithDefaults(options: Partial<ExtensionOptions> | undefined): ExtensionOptions {
   return {
     ...DEFAULT_OPTIONS,
     ...options,
+    saveTarget: normalizeStoredSaveTarget((options as { saveTarget?: unknown } | undefined)?.saveTarget) ?? DEFAULT_OPTIONS.saveTarget,
     notion: {
       ...DEFAULT_OPTIONS.notion,
       ...(options?.notion ?? {})
@@ -92,6 +105,7 @@ function normalizeRecentSave(item: RecentSave & { zipFilename?: string }): Recen
     savedRelativePath: item.savedRelativePath ?? null,
     remotePageId: item.remotePageId ?? null,
     remotePageUrl: item.remotePageUrl ?? null,
+    remoteOrigin: item.remoteOrigin ?? (saveTarget === "cloud" ? "cloud" : undefined),
     warning: item.warning ?? null,
     post,
     title: decodeEscapedJsonString(item.title)
@@ -103,6 +117,7 @@ export async function getOptions(): Promise<ExtensionOptions> {
   const storedOptions = stored[OPTIONS_KEY] as Partial<ExtensionOptions> | undefined;
   const merged = mergeOptionsWithDefaults(storedOptions);
   let shouldPersist = false;
+  const normalizedStoredSaveTarget = normalizeStoredSaveTarget((storedOptions as { saveTarget?: unknown } | undefined)?.saveTarget);
 
   if (
     !merged.filenamePattern ||
@@ -122,6 +137,10 @@ export async function getOptions(): Promise<ExtensionOptions> {
 
   if (merged.saveTarget === undefined) {
     merged.saveTarget = DEFAULT_OPTIONS.saveTarget;
+    shouldPersist = true;
+  }
+
+  if (normalizedStoredSaveTarget !== (storedOptions as { saveTarget?: unknown } | undefined)?.saveTarget) {
     shouldPersist = true;
   }
 
@@ -461,6 +480,7 @@ export function buildRecentSaveFromCloudArchive(record: CloudArchiveRecentRecord
     savedRelativePath: null,
     remotePageId: record.archiveId,
     remotePageUrl: record.archiveUrl,
+    remoteOrigin: record.origin ?? "cloud",
     warning: record.warning,
     post: record.post
   };

@@ -29,7 +29,7 @@
               <img src="/assets/icons/icon-32.png" alt="" />
             </span>
             <div class="brand-copy">
-              <p class="brand-name">Threads Saver</p>
+              <p class="brand-name">SS Threads</p>
               <p class="brand-mark" data-site-host>ss-threads.dahanda.dev</p>
             </div>
           </div>
@@ -40,19 +40,43 @@
             <select id="scrapbook-locale-select" class="web-lang-select" aria-label="Language"></select>
           </div>
           <a class="topbar-link" href="/" data-i18n="scrapbookNavHome">홈으로</a>
-          <a class="topbar-link topbar-link-strong" href="#archives-section" data-i18n="scrapbookNavCurrent">내 scrapbook</a>
+          <a id="topbar-current-link" class="topbar-link topbar-link-strong" href="/scrapbook" data-i18n="scrapbookNavCurrent">내 scrapbook</a>
           
           <div id="session-panel" class="topbar-profile hidden">
-            <a id="session-profile-link" class="profile-avatar-small" href="#" target="_blank" rel="noreferrer" title="Threads 프로필">
+            <button
+              id="session-trigger"
+              class="profile-avatar-small"
+              type="button"
+              aria-label="Scrapbook account menu"
+              aria-expanded="false"
+              aria-haspopup="menu"
+            >
               <img id="profile-avatar-image" class="hidden" alt="" />
               <span id="profile-avatar-fallback">T</span>
-            </a>
-            <button id="logout" class="topbar-logout" type="button" data-i18n="scrapbookLogout">로그아웃</button>
-            <span id="session-name" class="hidden"></span>
-            <span id="session-meta" class="hidden"></span>
-            <span id="session-bio" class="hidden"></span>
-            <span id="session-routing" class="hidden"></span>
-            <span id="scope-status" class="hidden"></span>
+            </button>
+            <div id="session-menu" class="session-menu hidden" role="menu">
+              <div class="session-menu-head">
+                <div class="session-menu-copy">
+                  <p id="session-name" class="session-menu-title"></p>
+                  <p id="session-meta" class="session-menu-meta"></p>
+                </div>
+                <a
+                  id="session-profile-link"
+                  class="session-menu-link"
+                  href="#"
+                  target="_blank"
+                  rel="noreferrer"
+                  role="menuitem"
+                >Threads</a>
+              </div>
+              <p id="session-bio" class="session-menu-bio hidden"></p>
+              <p id="session-routing" class="session-menu-note hidden"></p>
+              <p id="scope-status" class="session-menu-note hidden"></p>
+              <div class="session-menu-actions">
+                <a id="session-scrapbook-link" class="topbar-link" href="/scrapbook" role="menuitem" data-i18n="scrapbookNavCurrent">내 scrapbook</a>
+                <button id="logout" class="disconnect-cta" type="button" role="menuitem" data-i18n="scrapbookLogout">로그아웃</button>
+              </div>
+            </div>
           </div>
         </div>
       </header>
@@ -72,17 +96,42 @@
           </div>
         </section>
 
-        <section class="section">
+        <section class="section section-status">
           <p id="page-status" class="status-panel hidden"></p>
-          <div class="auth-grid customer-hidden">
-            <article id="auth-panel" class="panel panel-prominent">
-              <p class="status-panel status-panel-warning hidden" data-mobile-oauth-note data-i18n="scrapbookMobileOauthNote">
-                모바일에서는 브라우저용 연결 페이지에서 <strong>로그인 링크 복사</strong>를 누른 뒤, 새 탭 주소창에 붙여넣는 방식으로 진행해 주세요.
-              </p>
-              <button class="primary-cta primary-cta-block" type="button" data-bot-connect data-i18n="scrapbookConnectButton">Threads로 로그인</button>
-            </article>
+          <div id="auth-panel" class="hidden"></div>
+        </section>
 
-
+        <section class="section section-plan">
+          <div id="plan-panel" class="plan-panel panel">
+            <div class="plan-panel-head">
+              <div>
+                <p class="eyebrow">Plan</p>
+                <h2 id="plan-title">Free 100 / 5</h2>
+                <p id="plan-copy" class="section-copy">로그인하면 저장글 한도와 Plus 연결 상태를 확인할 수 있습니다.</p>
+              </div>
+              <span id="plan-tier-badge" class="plan-tier-badge">Free</span>
+            </div>
+            <div class="plan-usage-grid">
+              <div class="plan-usage-card">
+                <span class="plan-usage-label">Saved posts</span>
+                <strong id="plan-archive-usage">0 / 100</strong>
+              </div>
+              <div class="plan-usage-card">
+                <span class="plan-usage-label">Folders</span>
+                <strong id="plan-folder-usage">0 / 5</strong>
+              </div>
+            </div>
+            <p id="plan-license-status" class="session-menu-note"></p>
+            <form id="plan-key-form" class="plan-key-form">
+              <label class="plan-key-field">
+                <span id="plan-key-label">Plus key</span>
+                <input id="plan-key-input" type="text" autocomplete="off" placeholder="Paste your Plus key" />
+              </label>
+              <div class="plan-key-actions">
+                <button id="plan-key-submit" class="primary-cta" type="submit">Activate Plus</button>
+                <button id="plan-key-clear" class="secondary-cta" type="button">Remove key</button>
+              </div>
+            </form>
           </div>
         </section>
 
@@ -128,7 +177,7 @@
         <section id="archives-section" class="section tab-panel" data-tab-panel="inbox">
           <div class="section-head">
             <p class="eyebrow" data-i18n="scrapbookInboxEyebrow">Inbox</p>
-            <h2 data-i18n="scrapbookInboxTitle">멘션으로 모은 inbox</h2>
+            <h2 data-i18n="scrapbookInboxTitle">Inbox</h2>
           </div>
 
           <div id="archives-toolbar" class="archives-toolbar hidden">
@@ -138,6 +187,8 @@
                 <input id="archives-select-all" type="checkbox" />
                 <span data-i18n="scrapbookSelectAll">전체 선택</span>
               </label>
+              <button id="archives-move-selected" class="secondary-cta" type="button">폴더 이동</button>
+              <button id="archives-delete-selected" class="secondary-cta" type="button">선택 삭제</button>
               <button id="archives-export-selected" class="secondary-cta" type="button" data-i18n="scrapbookExportSelected">선택 ZIP 내보내기</button>
               <button id="archives-export-all" class="primary-cta" type="button" data-i18n="scrapbookExportAll">전체 ZIP 내보내기</button>
             </div>
@@ -152,7 +203,7 @@
 
           <div id="archives-empty" class="empty-state">
             <strong data-i18n="scrapbookArchiveLoginTitle">로그인이 필요합니다.</strong>
-            <span data-i18n="scrapbookArchiveLoginCopy">Threads 계정을 연결하면 저장된 멘션이 여기에 나타납니다.</span>
+            <span data-i18n="scrapbookArchiveLoginCopy">Threads 계정을 연결하면 inbox와 cloud 저장 항목이 여기에 나타납니다.</span>
           </div>
 
           <div id="archives-board" class="archive-board hidden">
@@ -162,7 +213,6 @@
                   <th class="archive-table-select" scope="col"></th>
                   <th scope="col" data-i18n="scrapbookArchiveTableTitle">제목</th>
                   <th scope="col" data-i18n="scrapbookArchiveTableDate">수집일자</th>
-                  <th scope="col" data-i18n="scrapbookArchiveTableSource">출처</th>
                   <th scope="col" data-i18n="scrapbookArchiveTableTags">태그</th>
                 </tr>
               </thead>

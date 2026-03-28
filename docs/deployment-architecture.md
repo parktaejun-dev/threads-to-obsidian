@@ -324,7 +324,9 @@ mention collector는 별도 서버나 큐 워커가 아니다.
 
 ## 13. 배포 절차
 
-현재 기준 표준 배포 절차:
+현재 기준 배포 절차는 `웹 서버 재배포`와 `익스텐션 ZIP 릴리스`를 분리해서 본다.
+
+### 13.1 웹 서버 재배포
 
 1. 서버에 최신 코드 반영
 2. `npm run build`
@@ -340,6 +342,13 @@ mention collector는 별도 서버나 큐 워커가 아니다.
 - `GET /scrapbook`
 - `GET /api/public/bot/config`
 - `GET /admin`
+
+### 13.2 익스텐션 ZIP 릴리스
+
+1. 로컬에서 `npm run build`
+2. `node scripts/package-extension-zip.mjs`
+3. 생성된 `output/release-assets/ss-threads-extension.zip`를 GitHub Release 자산에 업로드
+4. `releases/latest/download/ss-threads-extension.zip`가 `200`을 반환하는지 확인
 
 ## 14. 백업과 복구
 

@@ -3,23 +3,27 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Threads to Obsidian Pro Admin</title>
+    <title>SS Threads Plus Admin</title>
     <link rel="stylesheet" href="/admin/styles.css" />
   </head>
   <body>
     <main class="admin-shell">
       <header class="admin-hero">
-        <div>
+        <div class="admin-hero-copy">
           <p class="eyebrow">Admin Portal</p>
-          <h1 data-i18n="adminH1">Payments, issuance, and delivery</h1>
+          <h1 data-i18n="adminH1">Admin panel</h1>
           <p class="lead" data-i18n="adminLead">
-            Manage accepted payment methods, review purchase requests, issue signed Pro keys, and
-            keep an auditable history for manual email delivery.
+            Manage payments, keys, and delivery.
           </p>
         </div>
         <div class="token-widget">
-          <label for="admin-token" data-i18n="tokenLabel">Admin token</label>
-          <div class="token-input">
+          <div class="auth-session">
+            <p class="eyebrow" data-i18n="authStateLabel">Session</p>
+            <p id="admin-auth-state" class="auth-state-pill" data-state="warning">Sign in required</p>
+            <p id="admin-auth-detail" class="token-status">Live changes are locked.</p>
+          </div>
+          <label id="admin-token-label" for="admin-token" data-i18n="tokenLabel">Admin token</label>
+          <div id="token-login-row" class="token-input">
             <input
               id="admin-token"
               type="password"
@@ -28,9 +32,9 @@
               data-i18n-ph="tokenPlaceholder"
             />
             <button id="token-apply" type="button" data-i18n="tokenApply">Sign in</button>
-            <button id="token-logout" type="button" class="ghost" data-i18n="tokenLogout">Sign out</button>
           </div>
-          <p id="token-status" class="token-status" data-i18n="tokenStatusDefault">Sign in required for /api/admin/*</p>
+          <button id="token-logout" type="button" class="ghost" hidden data-i18n="tokenLogout">Sign out</button>
+          <p id="token-status" class="token-status" hidden></p>
           <div class="admin-utilities">
             <label class="web-lang-field">
               <span class="sr-only">Language</span>
@@ -255,7 +259,7 @@
             </header>
             <div class="panel-content panel-content--split">
               <div class="table-wrapper responsive-table">
-                <table>
+                <table class="methods-table">
                   <thead>
                     <tr>
                       <th data-i18n="colName">Name</th>
@@ -378,8 +382,8 @@
       <section id="admin-runtime" class="admin-section">
         <div class="admin-section-header">
           <div>
-            <p class="eyebrow">Runtime</p>
-            <h2 class="section-title">Collector, delivery, and storefront</h2>
+            <p class="eyebrow" data-i18n="runtimeSectionEyebrow">Runtime</p>
+            <h2 class="section-title" data-i18n="runtimeSectionTitle">Operations</h2>
           </div>
         </div>
 

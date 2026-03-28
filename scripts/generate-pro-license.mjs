@@ -51,19 +51,24 @@ function sanitizeFileStem(value) {
   return value.replace(/[^a-zA-Z0-9._-]+/g, "-").replace(/-+/g, "-").replace(/^-+|-+$/g, "");
 }
 
+const PRIVATE_KEY_ENV_NAME = "SS_THREADS_PRO_PRIVATE_JWK";
+const PRIVATE_KEY_FILE_ENV_NAME = "SS_THREADS_PRO_PRIVATE_JWK_FILE";
+const LEGACY_PRIVATE_KEY_ENV_NAME = "THREADS_TO_OBSIDIAN_PRO_PRIVATE_JWK";
+const LEGACY_PRIVATE_KEY_FILE_ENV_NAME = "THREADS_TO_OBSIDIAN_PRO_PRIVATE_JWK_FILE";
+
 async function readPrivateKeyJson() {
-  const inline = process.env.THREADS_TO_OBSIDIAN_PRO_PRIVATE_JWK?.trim();
+  const inline = process.env[PRIVATE_KEY_ENV_NAME]?.trim() || process.env[LEGACY_PRIVATE_KEY_ENV_NAME]?.trim();
   if (inline) {
     return inline;
   }
 
-  const filePath = process.env.THREADS_TO_OBSIDIAN_PRO_PRIVATE_JWK_FILE?.trim();
+  const filePath = process.env[PRIVATE_KEY_FILE_ENV_NAME]?.trim() || process.env[LEGACY_PRIVATE_KEY_FILE_ENV_NAME]?.trim();
   if (filePath) {
     return await readFile(filePath, "utf8");
   }
 
   console.error(
-    "Missing license private key. Set THREADS_TO_OBSIDIAN_PRO_PRIVATE_JWK or THREADS_TO_OBSIDIAN_PRO_PRIVATE_JWK_FILE."
+    `Missing license private key. Set ${PRIVATE_KEY_ENV_NAME} or ${PRIVATE_KEY_FILE_ENV_NAME}. Legacy THREADS_TO_OBSIDIAN_* names are still accepted.`
   );
   process.exit(1);
 }

@@ -14,6 +14,7 @@ import type {
 import {
   getBotRequiredScopes,
   getBotScopeVersion,
+  withBotSessionDatabaseTransaction,
   getBotSessionUserRecord,
   getBotSessionAuthContext
 } from "./bot-service";
@@ -36,6 +37,14 @@ import {
   upsertTrackedPost,
   upsertWatchlist
 } from "./store";
+import {
+  activateScrapbookPlus as activateScrapbookPlan,
+  canCreateScrapbookArchive,
+  clearScrapbookPlus as clearScrapbookPlan,
+  getScrapbookArchiveLimitError,
+  type ScrapbookPlanState,
+  readScrapbookPlanState
+} from "./scrapbook-plan-service";
 
 export interface ScrapbookMetricValue {
   value: number | null;
@@ -167,10 +176,16 @@ export interface ScrapbookScopeState {
 
 export interface ScrapbookPlusState {
   authenticated: boolean;
+  plan: ScrapbookPlanState;
   scopes: ScrapbookScopeState;
   watchlists: ScrapbookWatchlistView[];
   searches: ScrapbookSearchView[];
   insights: ScrapbookInsightsView;
+}
+
+interface UpsertArchiveFromPostResult {
+  archive: BotArchiveRecord | null;
+  plan: ScrapbookPlanState;
 }
 
 export interface CreateWatchlistInput {
@@ -469,11 +484,18 @@ function upsertArchiveFromPost(
     mediaUrls: string[];
     metadata: Record<string, unknown>;
   }
-): BotArchiveRecord {
+): UpsertArchiveFromPostResult {
   const now = new Date().toISOString();
   const existing = data.botArchives.find(
     (candidate) => candidate.userId === user.id && candidate.targetUrl === item.canonicalUrl
   );
+  const creationPermission = canCreateScrapbookArchive(data, user, existing);
+  if (!creationPermission.allowed) {
+    return {
+      archive: null,
+      plan: creationPermission.plan
+    };
+  }
 
   const rawPayloadJson = JSON.stringify({
     sourceKind,
@@ -493,7 +515,10 @@ function upsertArchiveFromPost(
     existing.rawPayloadJson = rawPayloadJson;
     existing.updatedAt = now;
     upsertBotArchive(data, existing);
-    return existing;
+    return {
+      archive: existing,
+      plan: creationPermission.plan
+    };
   }
 
   const archive: BotArchiveRecord = {
@@ -517,7 +542,10 @@ function upsertArchiveFromPost(
     status: "saved"
   };
   upsertBotArchive(data, archive);
-  return archive;
+  return {
+    archive,
+    plan: creationPermission.plan
+  };
 }
 
 function ensureWatchlistBelongsToUser(data: WebDatabase, userId: string, watchlistId: string): WatchlistRecord {
@@ -594,9 +622,11 @@ export function readScrapbookPlusState(
       ? data.botUsers.find((candidate) => candidate.id === userId && candidate.status === "active") ?? null
       : getBotSessionUserRecord(data, rawSession);
   const scopes = createScopeState(user);
+  const plan = readScrapbookPlanState(data, user);
   if (!user) {
     return {
       authenticated: false,
+      plan,
       scopes,
       watchlists: [],
       searches: [],
@@ -657,6 +687,7 @@ export function readScrapbookPlusState(
 
   return {
     authenticated: true,
+    plan,
     scopes,
     watchlists,
     searches,
@@ -801,7 +832,7 @@ export async function syncWatchlist(
       tracked.rawPayloadJson = JSON.stringify(post.raw);
 
       if (watchlist.autoArchive) {
-        const archive = upsertArchiveFromPost(data, user, "watchlist", `@${watchlist.targetHandle}`, {
+        const archiveResult = upsertArchiveFromPost(data, user, "watchlist", `@${watchlist.targetHandle}`, {
           canonicalUrl: tracked.canonicalUrl,
           authorHandle: tracked.authorHandle,
           authorDisplayName: tracked.authorDisplayName,
@@ -813,8 +844,10 @@ export async function syncWatchlist(
             watchlistId: watchlist.id
           }
         });
-        tracked.archiveId = archive.id;
-        tracked.archivedAt = archive.archivedAt;
+        if (archiveResult.archive) {
+          tracked.archiveId = archiveResult.archive.id;
+          tracked.archivedAt = archiveResult.archive.archivedAt;
+        }
       }
 
       upsertTrackedPost(data, tracked);
@@ -941,7 +974,7 @@ export async function runSearchMonitor(
       result.rawPayloadJson = JSON.stringify(post.raw);
 
       if (monitor.autoArchive && !result.archiveId) {
-        const archive = upsertArchiveFromPost(data, user, "search", monitor.query, {
+        const archiveResult = upsertArchiveFromPost(data, user, "search", monitor.query, {
           canonicalUrl: result.canonicalUrl,
           authorHandle: result.authorHandle,
           authorDisplayName: result.authorDisplayName,
@@ -954,9 +987,11 @@ export async function runSearchMonitor(
             matchedTerms: result.matchedTerms
           }
         });
-        result.archiveId = archive.id;
-        result.archivedAt = archive.archivedAt;
-        result.status = "archived";
+        if (archiveResult.archive) {
+          result.archiveId = archiveResult.archive.id;
+          result.archivedAt = archiveResult.archive.archivedAt;
+          result.status = "archived";
+        }
       }
 
       upsertSearchResult(data, result);
@@ -984,7 +1019,12 @@ export async function archiveSearchResult(
 ): Promise<ScrapbookPlusState> {
   const { user } = await requireAdvancedContext(data, rawSession);
   const result = ensureSearchResultBelongsToUser(data, user.id, resultId);
-  const archive = upsertArchiveFromPost(data, user, "search", result.matchedTerms.join(", ") || result.authorHandle, {
+  const archiveResult = upsertArchiveFromPost(
+    data,
+    user,
+    "search",
+    result.matchedTerms.join(", ") || result.authorHandle,
+    {
     canonicalUrl: result.canonicalUrl,
     authorHandle: result.authorHandle,
     authorDisplayName: result.authorDisplayName,
@@ -997,8 +1037,11 @@ export async function archiveSearchResult(
       resultId: result.id
     }
   });
-  result.archiveId = archive.id;
-  result.archivedAt = archive.archivedAt;
+  if (!archiveResult.archive) {
+    throw new Error(getScrapbookArchiveLimitError(archiveResult.plan));
+  }
+  result.archiveId = archiveResult.archive.id;
+  result.archivedAt = archiveResult.archive.archivedAt;
   result.status = "archived";
   result.updatedAt = new Date().toISOString();
   upsertSearchResult(data, result);
@@ -1116,7 +1159,7 @@ export async function archiveTrackedInsightPost(
     throw new Error("The requested insight post could not be found.");
   }
 
-  const archive = upsertArchiveFromPost(data, user, "insight", "own-post", {
+  const archiveResult = upsertArchiveFromPost(data, user, "insight", "own-post", {
     canonicalUrl: tracked.canonicalUrl,
     authorHandle: tracked.authorHandle,
     authorDisplayName: tracked.authorDisplayName,
@@ -1128,8 +1171,11 @@ export async function archiveTrackedInsightPost(
       externalPostId
     }
   });
-  tracked.archiveId = archive.id;
-  tracked.archivedAt = archive.archivedAt;
+  if (!archiveResult.archive) {
+    throw new Error(getScrapbookArchiveLimitError(archiveResult.plan));
+  }
+  tracked.archiveId = archiveResult.archive.id;
+  tracked.archivedAt = archiveResult.archive.archivedAt;
   tracked.updatedAt = new Date().toISOString();
   upsertTrackedPost(data, tracked);
   return readScrapbookPlusState(data, rawSession, user.id);
@@ -1146,7 +1192,7 @@ export async function archiveTrackedPost(
     tracked.origin === "watchlist"
       ? data.watchlists.find((candidate) => candidate.id === tracked.sourceId)?.targetHandle ?? tracked.authorHandle
       : "own-post";
-  const archive = upsertArchiveFromPost(data, user, tracked.origin, sourceLabel, {
+  const archiveResult = upsertArchiveFromPost(data, user, tracked.origin, sourceLabel, {
     canonicalUrl: tracked.canonicalUrl,
     authorHandle: tracked.authorHandle,
     authorDisplayName: tracked.authorDisplayName,
@@ -1159,8 +1205,11 @@ export async function archiveTrackedPost(
       origin: tracked.origin
     }
   });
-  tracked.archiveId = archive.id;
-  tracked.archivedAt = archive.archivedAt;
+  if (!archiveResult.archive) {
+    throw new Error(getScrapbookArchiveLimitError(archiveResult.plan));
+  }
+  tracked.archiveId = archiveResult.archive.id;
+  tracked.archivedAt = archiveResult.archive.archivedAt;
   tracked.updatedAt = new Date().toISOString();
   upsertTrackedPost(data, tracked);
   return readScrapbookPlusState(data, rawSession, user.id);
@@ -1171,4 +1220,136 @@ export async function readAuthenticatedScrapbookPlusState(
   rawSession: string | null | undefined
 ): Promise<ScrapbookPlusState> {
   return resolveStateForCurrentUser(data, rawSession);
+}
+
+export async function readScrapbookPlusStateFromStore(
+  rawSession: string | null | undefined
+): Promise<ScrapbookPlusState> {
+  return withBotSessionDatabaseTransaction(rawSession, (data) => readScrapbookPlusState(data, rawSession));
+}
+
+export async function readAuthenticatedScrapbookPlusStateFromStore(
+  rawSession: string | null | undefined
+): Promise<ScrapbookPlusState> {
+  return withBotSessionDatabaseTransaction(rawSession, (data) => readAuthenticatedScrapbookPlusState(data, rawSession));
+}
+
+export async function activateScrapbookPlusForSession(
+  data: WebDatabase,
+  rawSession: string | null | undefined,
+  token: string
+): Promise<ScrapbookPlusState> {
+  const user = getBotSessionUserRecord(data, rawSession);
+  if (!user) {
+    throw new Error("Sign in to Threads scrapbook first.");
+  }
+
+  await activateScrapbookPlan(data, user, token);
+  return readScrapbookPlusState(data, rawSession, user.id);
+}
+
+export async function activateScrapbookPlusForSessionFromStore(
+  rawSession: string | null | undefined,
+  token: string
+): Promise<ScrapbookPlusState> {
+  return withBotSessionDatabaseTransaction(rawSession, (data) =>
+    activateScrapbookPlusForSession(data, rawSession, token)
+  );
+}
+
+export async function clearScrapbookPlusForSession(
+  data: WebDatabase,
+  rawSession: string | null | undefined
+): Promise<ScrapbookPlusState> {
+  const user = getBotSessionUserRecord(data, rawSession);
+  if (!user) {
+    throw new Error("Sign in to Threads scrapbook first.");
+  }
+
+  clearScrapbookPlan(data, user);
+  return readScrapbookPlusState(data, rawSession, user.id);
+}
+
+export async function clearScrapbookPlusForSessionFromStore(
+  rawSession: string | null | undefined
+): Promise<ScrapbookPlusState> {
+  return withBotSessionDatabaseTransaction(rawSession, (data) => clearScrapbookPlusForSession(data, rawSession));
+}
+
+export async function createWatchlistFromStore(
+  rawSession: string | null | undefined,
+  input: CreateWatchlistInput
+): Promise<ScrapbookPlusState> {
+  return withBotSessionDatabaseTransaction(rawSession, (data) => createWatchlist(data, rawSession, input));
+}
+
+export async function deleteWatchlistFromStore(
+  rawSession: string | null | undefined,
+  watchlistId: string
+): Promise<ScrapbookPlusState> {
+  return withBotSessionDatabaseTransaction(rawSession, (data) => deleteWatchlist(data, rawSession, watchlistId));
+}
+
+export async function syncWatchlistFromStore(
+  rawSession: string | null | undefined,
+  watchlistId: string
+): Promise<ScrapbookPlusState> {
+  return withBotSessionDatabaseTransaction(rawSession, (data) => syncWatchlist(data, rawSession, watchlistId));
+}
+
+export async function createSearchMonitorFromStore(
+  rawSession: string | null | undefined,
+  input: CreateSearchMonitorInput
+): Promise<ScrapbookPlusState> {
+  return withBotSessionDatabaseTransaction(rawSession, (data) => createSearchMonitor(data, rawSession, input));
+}
+
+export async function deleteSearchMonitorFromStore(
+  rawSession: string | null | undefined,
+  monitorId: string
+): Promise<ScrapbookPlusState> {
+  return withBotSessionDatabaseTransaction(rawSession, (data) => deleteSearchMonitor(data, rawSession, monitorId));
+}
+
+export async function runSearchMonitorFromStore(
+  rawSession: string | null | undefined,
+  monitorId: string
+): Promise<ScrapbookPlusState> {
+  return withBotSessionDatabaseTransaction(rawSession, (data) => runSearchMonitor(data, rawSession, monitorId));
+}
+
+export async function archiveSearchResultFromStore(
+  rawSession: string | null | undefined,
+  resultId: string
+): Promise<ScrapbookPlusState> {
+  return withBotSessionDatabaseTransaction(rawSession, (data) => archiveSearchResult(data, rawSession, resultId));
+}
+
+export async function dismissSearchResultFromStore(
+  rawSession: string | null | undefined,
+  resultId: string
+): Promise<ScrapbookPlusState> {
+  return withBotSessionDatabaseTransaction(rawSession, (data) => dismissSearchResult(data, rawSession, resultId));
+}
+
+export async function refreshInsightsFromStore(
+  rawSession: string | null | undefined
+): Promise<ScrapbookPlusState> {
+  return withBotSessionDatabaseTransaction(rawSession, (data) => refreshInsights(data, rawSession));
+}
+
+export async function archiveTrackedInsightPostFromStore(
+  rawSession: string | null | undefined,
+  externalPostId: string
+): Promise<ScrapbookPlusState> {
+  return withBotSessionDatabaseTransaction(rawSession, (data) =>
+    archiveTrackedInsightPost(data, rawSession, externalPostId)
+  );
+}
+
+export async function archiveTrackedPostFromStore(
+  rawSession: string | null | undefined,
+  trackedPostId: string
+): Promise<ScrapbookPlusState> {
+  return withBotSessionDatabaseTransaction(rawSession, (data) => archiveTrackedPost(data, rawSession, trackedPostId));
 }

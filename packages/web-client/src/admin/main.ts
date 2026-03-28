@@ -33,9 +33,13 @@ const copyEmailButton = document.getElementById("copy-email") as HTMLButtonEleme
 const issueExpiryInput = document.getElementById("license-expiry-date") as HTMLInputElement | null;
 const issueExpiryClearButton = document.getElementById("license-expiry-clear") as HTMLButtonElement | null;
 const tokenInput = document.getElementById("admin-token") as HTMLInputElement | null;
+const tokenLabel = document.getElementById("admin-token-label") as HTMLLabelElement | null;
+const tokenLoginRow = document.getElementById("token-login-row") as HTMLDivElement | null;
 const tokenStatus = document.getElementById("token-status") as HTMLParagraphElement | null;
 const applyTokenButton = document.getElementById("token-apply") as HTMLButtonElement | null;
 const logoutButton = document.getElementById("token-logout") as HTMLButtonElement | null;
+const authState = document.getElementById("admin-auth-state") as HTMLParagraphElement | null;
+const authDetail = document.getElementById("admin-auth-detail") as HTMLParagraphElement | null;
 const authBanner = document.getElementById("admin-auth-banner") as HTMLElement | null;
 const authBannerStatus = document.getElementById("admin-auth-banner-status") as HTMLParagraphElement | null;
 const reloadButton = document.getElementById("reload-all") as HTMLButtonElement | null;
@@ -48,6 +52,7 @@ const methodCancelButton = document.getElementById("method-cancel") as HTMLButto
 const methodStatus = document.getElementById("method-status") as HTMLParagraphElement | null;
 const collectorForm = document.getElementById("collector-form") as HTMLFormElement | null;
 const collectorSyncButton = document.getElementById("collector-sync") as HTMLButtonElement | null;
+const collectorSaveButton = document.getElementById("collector-save") as HTMLButtonElement | null;
 const collectorStatusText = document.getElementById("collector-status") as HTMLParagraphElement | null;
 const collectorState = document.getElementById("collector-state");
 const collectorLastSuccess = document.getElementById("collector-last-success");
@@ -58,9 +63,11 @@ const runtimeForm = document.getElementById("runtime-form") as HTMLFormElement |
 const runtimeStatus = document.getElementById("runtime-status") as HTMLParagraphElement | null;
 const runtimeActiveDatabase = document.getElementById("runtime-active-database") as HTMLParagraphElement | null;
 const databaseTestButton = document.getElementById("database-test") as HTMLButtonElement | null;
+const runtimeSaveButton = document.getElementById("runtime-save") as HTMLButtonElement | null;
 const smtpTestButton = document.getElementById("smtp-test") as HTMLButtonElement | null;
 const smtpStatus = document.getElementById("smtp-status") as HTMLParagraphElement | null;
 const storefrontForm = document.getElementById("storefront-form") as HTMLFormElement | null;
+const storefrontSaveButton = document.getElementById("storefront-save") as HTMLButtonElement | null;
 const storefrontStatus = document.getElementById("storefront-status") as HTMLParagraphElement | null;
 const ordersStatus = document.getElementById("orders-status") as HTMLParagraphElement | null;
 const licensesStatus = document.getElementById("licenses-status") as HTMLParagraphElement | null;
@@ -155,6 +162,52 @@ function clearStatus(element: HTMLParagraphElement | null, placeholder = "—"):
   delete element.dataset.state;
 }
 
+function setTokenFeedback(text: string, state: "neutral" | "success" | "warning" | "error" = "neutral"): void {
+  if (!tokenStatus) {
+    return;
+  }
+
+  tokenStatus.hidden = false;
+  setStatus(tokenStatus, text, state);
+}
+
+function clearTokenFeedback(): void {
+  if (!tokenStatus) {
+    return;
+  }
+
+  tokenStatus.hidden = true;
+  tokenStatus.textContent = "";
+  delete tokenStatus.dataset.state;
+}
+
+type BusyButtonState = {
+  button: HTMLButtonElement | null;
+  label?: string;
+};
+
+function setButtonBusyState(button: HTMLButtonElement | null, busy: boolean, label?: string): void {
+  if (!button) {
+    return;
+  }
+
+  if (busy) {
+    button.dataset.idleLabel = button.textContent?.trim() ?? "";
+    button.dataset.busy = "true";
+    button.setAttribute("aria-busy", "true");
+    if (label) {
+      button.textContent = label;
+    }
+    return;
+  }
+
+  if (button.dataset.idleLabel) {
+    button.textContent = button.dataset.idleLabel;
+  }
+  delete button.dataset.busy;
+  button.removeAttribute("aria-busy");
+}
+
 function setBusy(target: HTMLElement | HTMLFormElement | null, busy: boolean): void {
   if (!target) {
     return;
@@ -240,12 +293,14 @@ async function runWithFeedback<T>(
   options: {
     statusEl?: HTMLParagraphElement | null;
     busyTargets?: Array<HTMLElement | HTMLFormElement | null>;
+    busyButtons?: BusyButtonState[];
     pendingText?: string;
     errorFallback?: string;
   } = {}
 ): Promise<T | null> {
   const statusEl = options.statusEl ?? null;
   const busyTargets = options.busyTargets ?? [];
+  const busyButtons = options.busyButtons ?? [];
   const previousDisabled = busyTargets.map((target) =>
     target instanceof HTMLButtonElement ||
     target instanceof HTMLInputElement ||
@@ -258,8 +313,14 @@ async function runWithFeedback<T>(
   for (const target of busyTargets) {
     setBusy(target, true);
   }
+  for (const { button, label } of busyButtons) {
+    setButtonBusyState(button, true, label);
+  }
 
   if (options.pendingText) {
+    if (statusEl === tokenStatus && tokenStatus) {
+      tokenStatus.hidden = false;
+    }
     setStatus(statusEl, options.pendingText, "warning");
   }
 
@@ -267,9 +328,12 @@ async function runWithFeedback<T>(
     return await work();
   } catch (error) {
     const message = error instanceof Error ? error.message : options.errorFallback ?? msg.dashboardError;
+    if (statusEl === tokenStatus && tokenStatus) {
+      tokenStatus.hidden = false;
+    }
     setStatus(statusEl, message, "error");
-    if (statusEl !== tokenStatus && !adminAuthenticated && tokenStatus) {
-      setStatus(tokenStatus, message, "error");
+    if (statusEl !== tokenStatus && !adminAuthenticated) {
+      setTokenFeedback(message, "error");
     }
     return null;
   } finally {
@@ -295,6 +359,9 @@ async function runWithFeedback<T>(
         setBusy(target, false);
       }
     });
+    for (const { button } of busyButtons) {
+      setButtonBusyState(button, false);
+    }
     updateAdminSessionUi();
   }
 }
@@ -440,6 +507,19 @@ function updateAdminSessionUi(): void {
   document.body.classList.toggle("admin-authenticated", adminAuthenticated);
   authBanner?.toggleAttribute("hidden", adminAuthenticated);
 
+  if (authState) {
+    authState.textContent = adminAuthenticated
+      ? (msg.authStateLoggedIn ?? "Signed in")
+      : (msg.authStateLoggedOut ?? "Sign in required");
+    authState.dataset.state = adminAuthenticated ? "success" : "warning";
+  }
+
+  if (authDetail) {
+    authDetail.textContent = adminAuthenticated
+      ? (msg.authDetailLoggedIn ?? "Live changes are enabled.")
+      : (msg.authDetailLoggedOut ?? "Live changes are locked.");
+  }
+
   const lockLabel = msg.authOverlayLabel ?? "Sign in to unlock this section.";
   for (const section of protectedSections) {
     section.classList.toggle("is-locked", !adminAuthenticated);
@@ -461,17 +541,20 @@ function updateAdminSessionUi(): void {
       tokenInput.value = "";
     }
   }
+  if (tokenLabel) {
+    tokenLabel.hidden = adminAuthenticated;
+  }
+  if (tokenLoginRow) {
+    tokenLoginRow.hidden = adminAuthenticated;
+  }
   if (applyTokenButton) {
     applyTokenButton.disabled = adminAuthenticated;
   }
   if (logoutButton) {
     logoutButton.hidden = !adminAuthenticated;
   }
-  if (!adminAuthenticated) {
-    setStatus(tokenStatus, msg.tokenStatusDefault, "warning");
-    if (authBannerStatus) {
-      setStatus(authBannerStatus, msg.authBannerCopy ?? "Sign in before changing live settings or issuing keys.");
-    }
+  if (authBannerStatus) {
+    setStatus(authBannerStatus, msg.authBannerCopy ?? "Sign in before changing live settings or issuing keys.");
   }
 }
 
@@ -1074,7 +1157,7 @@ async function refreshDashboard(): Promise<void> {
   dashboard = await requestAdmin<AdminDashboardResponse>("/api/admin/dashboard");
   collector = dashboard.collectorStatus ?? collector;
   renderAll();
-  setStatus(tokenStatus, msg.dashboardLoaded, "success");
+  clearTokenFeedback();
 }
 
 async function refreshAdminData(): Promise<void> {
@@ -1088,7 +1171,7 @@ async function refreshAdminData(): Promise<void> {
   activeRuntimeDatabase = runtimeResponse.activeDatabase;
   collector = nextDashboard.collectorStatus ?? collector;
   renderAll();
-  setStatus(tokenStatus, msg.dashboardLoaded, "success");
+  clearTokenFeedback();
 }
 
 async function refreshAdminSession(): Promise<boolean> {
@@ -1105,9 +1188,7 @@ async function refreshAdminSession(): Promise<boolean> {
 async function loginAdminSession(): Promise<void> {
   const token = tokenInput?.value.trim() ?? "";
   if (!token) {
-    if (tokenStatus) {
-      tokenStatus.textContent = msg.tokenStatusDefault;
-    }
+    setTokenFeedback(msg.tokenStatusDefault, "warning");
     return;
   }
 
@@ -1120,6 +1201,7 @@ async function loginAdminSession(): Promise<void> {
     {
       statusEl: tokenStatus,
       busyTargets: [applyTokenButton, tokenInput],
+      busyButtons: [{ button: applyTokenButton, label: msg.tokenSaving }],
       pendingText: msg.tokenSaving,
       errorFallback: msg.dashboardError
     }
@@ -1143,7 +1225,8 @@ async function logoutAdminSession(): Promise<void> {
     {
       statusEl: tokenStatus,
       busyTargets: [logoutButton],
-      pendingText: msg.tokenCleared
+      busyButtons: [{ button: logoutButton, label: msg.tokenLoggingOut ?? "Signing out..." }],
+      pendingText: msg.tokenLoggingOut ?? "Signing out..."
     }
   );
   if (!result) {
@@ -1154,7 +1237,7 @@ async function logoutAdminSession(): Promise<void> {
   clearAdminState();
   renderAll();
   updateAdminSessionUi();
-  setStatus(tokenStatus, msg.tokenCleared, "success");
+  setTokenFeedback(msg.tokenCleared, "success");
 }
 
 async function handleMethodSubmit(event: SubmitEvent): Promise<void> {
@@ -1183,6 +1266,7 @@ async function handleMethodSubmit(event: SubmitEvent): Promise<void> {
     {
       statusEl: methodStatus,
       busyTargets: [methodForm],
+      busyButtons: [{ button: methodSubmitButton, label: msg.methodSaving ?? "Saving payment method..." }],
       pendingText: msg.methodSaving ?? "Saving payment method...",
       errorFallback: msg.dashboardError
     }
@@ -1196,7 +1280,7 @@ async function handleMethodSubmit(event: SubmitEvent): Promise<void> {
   await refreshDashboard();
 }
 
-async function togglePaymentMethod(methodId: string): Promise<void> {
+async function togglePaymentMethod(methodId: string, actionButton?: HTMLButtonElement | null): Promise<void> {
   if (!dashboard) {
     return;
   }
@@ -1217,6 +1301,8 @@ async function togglePaymentMethod(methodId: string): Promise<void> {
       }),
     {
       statusEl: methodStatus,
+      busyTargets: actionButton ? [actionButton] : [],
+      busyButtons: actionButton ? [{ button: actionButton, label: msg.methodSaving ?? "Updating payment method..." }] : [],
       pendingText: msg.methodSaving ?? "Updating payment method...",
       errorFallback: msg.dashboardError
     }
@@ -1243,6 +1329,7 @@ async function saveCollectorSettings(event: SubmitEvent): Promise<void> {
     {
       statusEl: collectorStatusText,
       busyTargets: [collectorForm, collectorSyncButton],
+      busyButtons: [{ button: collectorSaveButton, label: msg.collectorSaving ?? "Saving collector settings..." }],
       pendingText: msg.collectorSaving ?? "Saving collector settings...",
       errorFallback: msg.dashboardError
     }
@@ -1270,6 +1357,7 @@ async function syncCollectorNow(): Promise<void> {
     {
       statusEl: collectorStatusText,
       busyTargets: [collectorSyncButton, collectorForm],
+      busyButtons: [{ button: collectorSyncButton, label: msg.collectorSyncing ?? "Syncing mentions now..." }],
       pendingText: msg.collectorSyncing ?? "Syncing mentions now...",
       errorFallback: msg.dashboardError
     }
@@ -1297,6 +1385,7 @@ async function saveRuntimeSettings(event: SubmitEvent): Promise<void> {
     {
       statusEl: runtimeStatus,
       busyTargets: [runtimeForm, databaseTestButton, smtpTestButton],
+      busyButtons: [{ button: runtimeSaveButton, label: msg.runtimeSaving ?? "Saving runtime settings..." }],
       pendingText: msg.runtimeSaving ?? "Saving runtime settings...",
       errorFallback: msg.dashboardError
     }
@@ -1335,6 +1424,7 @@ async function testRuntimeDatabase(): Promise<void> {
     {
       statusEl: runtimeStatus,
       busyTargets: [databaseTestButton],
+      busyButtons: [{ button: databaseTestButton, label: msg.databaseTesting ?? "Testing database connection..." }],
       pendingText: msg.databaseTesting ?? "Testing database connection...",
       errorFallback: msg.dashboardError
     }
@@ -1358,6 +1448,7 @@ async function testRuntimeSmtp(): Promise<void> {
     {
       statusEl: smtpStatus,
       busyTargets: [smtpTestButton],
+      busyButtons: [{ button: smtpTestButton, label: msg.smtpTesting ?? "Testing SMTP connection..." }],
       pendingText: msg.smtpTesting ?? "Testing SMTP connection...",
       errorFallback: msg.dashboardError
     }
@@ -1380,6 +1471,7 @@ async function saveStorefrontSettings(event: SubmitEvent): Promise<void> {
     {
       statusEl: storefrontStatus,
       busyTargets: [storefrontForm],
+      busyButtons: [{ button: storefrontSaveButton, label: msg.storefrontSaving ?? "Saving storefront settings..." }],
       pendingText: msg.storefrontSaving ?? "Saving storefront settings...",
       errorFallback: msg.dashboardError
     }
@@ -1442,6 +1534,7 @@ async function handleOrderAction(target: HTMLElement): Promise<void> {
       {
         statusEl: ordersStatus,
         busyTargets: [actionButton],
+        busyButtons: [{ button: actionButton, label: msg.orderMarkingPaid ?? "Marking the order as paid..." }],
         pendingText: msg.orderMarkingPaid ?? "Marking the order as paid...",
         errorFallback: msg.dashboardError
       }
@@ -1481,6 +1574,14 @@ async function handleOrderAction(target: HTMLElement): Promise<void> {
       {
         statusEl: ordersStatus,
         busyTargets: [actionButton, copyEmailButton],
+        busyButtons: [
+          {
+            button: actionButton,
+            label: isReissue
+              ? msg.keyReissuing ?? "Reissuing a key..."
+              : msg.keyIssuing ?? "Issuing a key..."
+          }
+        ],
         pendingText: isReissue
           ? msg.keyReissuing ?? "Reissuing a key..."
           : msg.keyIssuing ?? "Issuing a key...",
@@ -1523,6 +1624,7 @@ async function handleOrderAction(target: HTMLElement): Promise<void> {
       {
         statusEl: ordersStatus,
         busyTargets: [actionButton, copyEmailButton],
+        busyButtons: [{ button: actionButton, label: msg.emailSending ?? "Sending email..." }],
         pendingText: msg.emailSending ?? "Sending email...",
         errorFallback: msg.dashboardError
       }
@@ -1572,6 +1674,7 @@ async function handleLicenseAction(target: HTMLElement): Promise<void> {
     {
       statusEl: licensesStatus,
       busyTargets: [actionButton],
+      busyButtons: [{ button: actionButton, label: msg.licenseRevoking ?? "Revoking the key..." }],
       pendingText: msg.licenseRevoking ?? "Revoking the key...",
       errorFallback: msg.dashboardError
     }
@@ -1605,17 +1708,13 @@ function bindEvents(): void {
 
   applyTokenButton?.addEventListener("click", () => {
     void loginAdminSession().catch((error) => {
-      if (tokenStatus) {
-        tokenStatus.textContent = error instanceof Error ? error.message : msg.dashboardError;
-      }
+      setTokenFeedback(error instanceof Error ? error.message : msg.dashboardError, "error");
     });
   });
 
   logoutButton?.addEventListener("click", () => {
     void logoutAdminSession().catch((error) => {
-      if (tokenStatus) {
-        tokenStatus.textContent = error instanceof Error ? error.message : msg.dashboardError;
-      }
+      setTokenFeedback(error instanceof Error ? error.message : msg.dashboardError, "error");
     });
   });
 
@@ -1626,17 +1725,13 @@ function bindEvents(): void {
 
     event.preventDefault();
     void loginAdminSession().catch((error) => {
-      if (tokenStatus) {
-        tokenStatus.textContent = error instanceof Error ? error.message : msg.dashboardError;
-      }
+      setTokenFeedback(error instanceof Error ? error.message : msg.dashboardError, "error");
     });
   });
 
   reloadButton?.addEventListener("click", () => {
     void refreshAdminData().catch((error) => {
-      if (tokenStatus) {
-        tokenStatus.textContent = error instanceof Error ? error.message : msg.dashboardError;
-      }
+      setTokenFeedback(error instanceof Error ? error.message : msg.dashboardError, "error");
     });
   });
 
@@ -1668,7 +1763,7 @@ function bindEvents(): void {
 
     const methodId = target.getAttribute("data-toggle-method");
     if (methodId) {
-      void togglePaymentMethod(methodId);
+      void togglePaymentMethod(methodId, target.closest("button"));
     }
   });
 
@@ -1789,9 +1884,7 @@ void (async () => {
   try {
     authenticated = await refreshAdminSession();
   } catch (error) {
-    if (tokenStatus) {
-      tokenStatus.textContent = error instanceof Error ? error.message : msg.dashboardError;
-    }
+    setTokenFeedback(error instanceof Error ? error.message : msg.dashboardError, "error");
   }
 
   if (!authenticated) {
@@ -1801,8 +1894,6 @@ void (async () => {
   try {
     await refreshAdminData();
   } catch (error) {
-    if (tokenStatus) {
-      tokenStatus.textContent = error instanceof Error ? error.message : msg.dashboardError;
-    }
+    setTokenFeedback(error instanceof Error ? error.message : msg.dashboardError, "error");
   }
 })();

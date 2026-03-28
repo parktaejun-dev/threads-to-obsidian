@@ -260,7 +260,7 @@ test("admin can update storefront settings", async () => {
         "content-type": "application/json"
       },
       body: JSON.stringify({
-        productName: "Threads Saver Max",
+        productName: "SS Threads Max",
         headline: "Archive Threads with one click.",
         heroNotes: ["One line", "Second line"],
         faqs: [
@@ -289,7 +289,7 @@ test("admin can update storefront settings", async () => {
       };
     };
 
-    assert.equal(dashboardPayload.settings?.productName, "Threads Saver Max");
+    assert.equal(dashboardPayload.settings?.productName, "SS Threads Max");
     assert.equal(dashboardPayload.settings?.headline, "Archive Threads with one click.");
     assert.deepEqual(dashboardPayload.settings?.heroNotes, ["One line", "Second line"]);
     assert.deepEqual(dashboardPayload.settings?.faqs, [

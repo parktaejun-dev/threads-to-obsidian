@@ -809,12 +809,34 @@ const dictionaries: Record<Locale, Messages> = {
   ...localizedMessages
 };
 
+const PLAN_BRAND_PATTERN = /\bPro\b/g;
+const brandedDictionaryCache = new WeakMap<Messages, Messages>();
+
+function applyPlanBrandingToString(value: string): string {
+  return value
+    .replaceAll("SS Threads Pro", "SS Threads Plus")
+    .replace(PLAN_BRAND_PATTERN, "Plus");
+}
+
+function brandMessages(messages: Messages): Messages {
+  const cached = brandedDictionaryCache.get(messages);
+  if (cached) {
+    return cached;
+  }
+
+  const branded = Object.fromEntries(
+    Object.entries(messages).map(([key, value]) => [key, applyPlanBrandingToString(value)])
+  ) as unknown as Messages;
+  brandedDictionaryCache.set(messages, branded);
+  return branded;
+}
+
 export function detectDefaultLocale(): Locale {
   return detectLocaleFromNavigator(typeof navigator !== "undefined" ? navigator.language : null, "en");
 }
 
 export function resolveMessages(locale?: Locale): Messages {
-  return dictionaries[locale ?? detectDefaultLocale()];
+  return brandMessages(dictionaries[locale ?? detectDefaultLocale()]);
 }
 
 export async function t(locale?: Locale): Promise<Messages> {
@@ -822,5 +844,5 @@ export async function t(locale?: Locale): Promise<Messages> {
 }
 
 export function tSync(locale: Locale): Messages {
-  return dictionaries[locale];
+  return brandMessages(dictionaries[locale]);
 }

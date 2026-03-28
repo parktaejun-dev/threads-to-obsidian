@@ -30,10 +30,11 @@ function buildPost(overrides: Partial<ExtractedPost> = {}): ExtractedPost {
 function buildCloudArchive(overrides: Partial<CloudArchiveRecentRecord> = {}): CloudArchiveRecentRecord {
   return {
     archiveId: "cloud-1",
-    archiveUrl: "https://ss-threads.dahanda.dev/scrapbook?archive=cloud-1",
+    archiveUrl: "https://ss-threads.dahanda.dev/scrapbook/@writer/archive/cloud-1",
     title: "Cloud archive title",
     updatedAt: "2026-03-28T10:05:00.000Z",
     warning: null,
+    origin: "cloud",
     post: buildPost(),
     ...overrides
   };
@@ -74,6 +75,7 @@ test("buildRecentSaveFromCloudArchive maps cloud archive metadata into a popup r
   assert.equal(recent.savedVia, "cloud");
   assert.equal(recent.remotePageId, "cloud-1");
   assert.equal(recent.remotePageUrl, archive.archiveUrl);
+  assert.equal(recent.remoteOrigin, "cloud");
   assert.equal(recent.downloadedAt, archive.updatedAt);
 });
 
@@ -89,7 +91,7 @@ test("mergeRecentSavesWithCloudArchives replaces cloud cache with server archive
     archiveName: "Old cloud cache",
     contentHash: "old-hash",
     remotePageId: "old-cloud-id",
-    remotePageUrl: "https://ss-threads.dahanda.dev/scrapbook?archive=old-cloud-id",
+    remotePageUrl: "https://ss-threads.dahanda.dev/scrapbook/@writer/archive/old-cloud-id",
     post: buildPost({
       contentHash: "old-hash"
     })

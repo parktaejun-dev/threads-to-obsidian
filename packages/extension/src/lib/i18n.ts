@@ -311,8 +311,8 @@ const ko: Messages = {
     popupTitle: "현재 글 저장",
     popupSave: "현재 글 저장",
     popupSettings: "설정",
-    popupPromoTitle: "향후 확장 영역",
-    popupPromoDescription: "추후 안내와 추천이 들어갈 자리를 미리 확보해 두었습니다.",
+    popupPromoTitle: "광고 슬롯",
+    popupPromoDescription: "향후 광고 영역",
     popupSubtitleDirect: "연결된 Obsidian 폴더에 바로 저장합니다.",
     popupSubtitleDownload: "저장 폴더가 없어 파일로 다운로드합니다. 설정에서 폴더를 연결하세요.",
     popupSubtitleConnected: "연결된 Obsidian 폴더에 바로 저장합니다.",
@@ -321,7 +321,7 @@ const ko: Messages = {
     popupSubtitleUnsupported: "이 브라우저에서는 파일로 다운로드합니다.",
     popupSubtitleNotion: "설정한 Notion 대상에 새 페이지로 저장합니다.",
     popupSubtitleNotionSetup: "Notion 저장을 쓰려면 설정에서 토큰과 저장 대상을 먼저 입력하세요.",
-    popupSubtitleCloud: "Threads Archive scrapbook 클라우드에 저장합니다. 먼저 웹에서 로그인되어 있어야 합니다.",
+    popupSubtitleCloud: "",
     popupRecentSaves: "최근 저장",
     popupClearAll: "전체 삭제",
     popupEmpty: "아직 저장한 글이 없습니다.",
@@ -599,8 +599,8 @@ const en: Messages = {
     popupTitle: "Save Current Post",
     popupSave: "Save Current Post",
     popupSettings: "Settings",
-    popupPromoTitle: "Reserved Area",
-    popupPromoDescription: "This space is reserved for future guidance and recommendations.",
+    popupPromoTitle: "Ad Slot",
+    popupPromoDescription: "Reserved for ads.",
     popupSubtitleDirect: "Saving directly to your connected Obsidian folder.",
     popupSubtitleDownload: "No folder connected. Saving as a download. Connect a folder in settings.",
     popupSubtitleConnected: "Saving directly to your connected Obsidian folder.",
@@ -609,7 +609,7 @@ const en: Messages = {
     popupSubtitleUnsupported: "This browser only supports file downloads.",
     popupSubtitleNotion: "Saving to your configured Notion destination.",
     popupSubtitleNotionSetup: "To use Notion saving, enter your token and destination in settings first.",
-    popupSubtitleCloud: "Saving to your Threads Archive cloud scrapbook. Make sure you are signed in on the web first.",
+    popupSubtitleCloud: "",
     popupRecentSaves: "Recent Saves",
     popupClearAll: "Clear All",
     popupEmpty: "No saved posts yet.",
@@ -886,8 +886,8 @@ const ja: Messages = {
     popupTitle: "現在の投稿を保存",
     popupSave: "現在の投稿を保存",
     popupSettings: "設定",
-    popupPromoTitle: "予約済みエリア",
-    popupPromoDescription: "今後の案内やおすすめを表示するための領域です。",
+    popupPromoTitle: "広告枠",
+    popupPromoDescription: "今後の広告枠です。",
     popupSubtitleDirect: "接続済みの Obsidian フォルダに直接保存します。",
     popupSubtitleDownload: "フォルダが接続されていないため、ファイルとしてダウンロードします。設定でフォルダを接続してください。",
     popupSubtitleConnected: "接続済みの Obsidian フォルダに直接保存します。",
@@ -896,7 +896,7 @@ const ja: Messages = {
     popupSubtitleUnsupported: "このブラウザではファイルのダウンロードのみ利用できます。",
     popupSubtitleNotion: "設定済みの Notion 保存先に保存します。",
     popupSubtitleNotionSetup: "Notion 保存を使うには、先に設定でトークンと保存先を指定してください。",
-    popupSubtitleCloud: "Threads Archive のクラウド scrapbook に保存します。先に Web でサインインしてください。",
+    popupSubtitleCloud: "",
     popupRecentSaves: "最近の保存",
     popupClearAll: "すべて削除",
     popupEmpty: "まだ保存した投稿はありません。",
@@ -1142,8 +1142,8 @@ const ptBR: Messages = {
     popupTitle: "Salvar post atual",
     popupSave: "Salvar post atual",
     popupSettings: "Configurações",
-    popupPromoTitle: "Área reservada",
-    popupPromoDescription: "Este espaço está reservado para futuras orientações e recomendações.",
+    popupPromoTitle: "Espaço de anúncio",
+    popupPromoDescription: "Reservado para anúncios.",
     popupSubtitleDirect: "Salvando diretamente na pasta do Obsidian conectada.",
     popupSubtitleDownload: "Nenhuma pasta conectada. O conteúdo será baixado como arquivo. Conecte uma pasta nas configurações.",
     popupSubtitleConnected: "Salvando diretamente na pasta do Obsidian conectada.",
@@ -1152,7 +1152,7 @@ const ptBR: Messages = {
     popupSubtitleUnsupported: "Este navegador só oferece suporte a download de arquivos.",
     popupSubtitleNotion: "Salvando no destino do Notion configurado.",
     popupSubtitleNotionSetup: "Para usar o salvamento no Notion, informe primeiro o token e o destino nas configurações.",
-    popupSubtitleCloud: "Salvando no seu scrapbook em nuvem do Threads Archive. Primeiro faça login na web.",
+    popupSubtitleCloud: "",
     popupRecentSaves: "Salvos recentes",
     popupClearAll: "Limpar tudo",
     popupEmpty: "Ainda não há posts salvos.",
@@ -1393,8 +1393,8 @@ const es: Messages = {
     popupTitle: "Guardar publicación actual",
     popupSave: "Guardar publicación actual",
     popupSettings: "Configuración",
-    popupPromoTitle: "Área reservada",
-    popupPromoDescription: "Este espacio queda reservado para futuras guías y recomendaciones.",
+    popupPromoTitle: "Espacio publicitario",
+    popupPromoDescription: "Reservado para anuncios.",
     popupSubtitleDirect: "Guardando directamente en tu carpeta conectada de Obsidian.",
     popupSubtitleDownload: "No hay carpeta conectada. Se descargará como archivo. Conecta una carpeta en la configuración.",
     popupSubtitleConnected: "Guardando directamente en tu carpeta conectada de Obsidian.",
@@ -1403,7 +1403,7 @@ const es: Messages = {
     popupSubtitleUnsupported: "Este navegador solo admite descargas de archivos.",
     popupSubtitleNotion: "Guardando en tu destino de Notion configurado.",
     popupSubtitleNotionSetup: "Para usar el guardado en Notion, primero configura el token y el destino.",
-    popupSubtitleCloud: "Guardando en tu scrapbook en la nube de Threads Archive. Primero inicia sesión en la web.",
+    popupSubtitleCloud: "",
     popupRecentSaves: "Guardados recientes",
     popupClearAll: "Borrar todo",
     popupEmpty: "Todavía no hay publicaciones guardadas.",
@@ -1644,8 +1644,8 @@ const zhTW: Messages = {
     popupTitle: "儲存目前貼文",
     popupSave: "儲存目前貼文",
     popupSettings: "設定",
-    popupPromoTitle: "保留區域",
-    popupPromoDescription: "這個區域保留給之後的說明與推薦內容。",
+    popupPromoTitle: "廣告欄位",
+    popupPromoDescription: "保留作為廣告區域。",
     popupSubtitleDirect: "正在直接儲存到你已連接的 Obsidian 資料夾。",
     popupSubtitleDownload: "尚未連接資料夾。將以檔案形式下載。請在設定中連接資料夾。",
     popupSubtitleConnected: "正在直接儲存到你已連接的 Obsidian 資料夾。",
@@ -1654,7 +1654,7 @@ const zhTW: Messages = {
     popupSubtitleUnsupported: "此瀏覽器僅支援檔案下載。",
     popupSubtitleNotion: "正在儲存到你設定的 Notion 目的地。",
     popupSubtitleNotionSetup: "若要使用 Notion 儲存，請先在設定中填入 token 與目的地。",
-    popupSubtitleCloud: "正在儲存到你的 Threads Archive 雲端 scrapbook。請先在網頁上登入。",
+    popupSubtitleCloud: "",
     popupRecentSaves: "最近儲存",
     popupClearAll: "全部清除",
     popupEmpty: "目前還沒有儲存的貼文。",
@@ -1895,8 +1895,8 @@ const vi: Messages = {
     popupTitle: "Lưu bài viết hiện tại",
     popupSave: "Lưu bài viết hiện tại",
     popupSettings: "Cài đặt",
-    popupPromoTitle: "Khu vực dự trữ",
-    popupPromoDescription: "Khu vực này được dành sẵn cho hướng dẫn và gợi ý trong tương lai.",
+    popupPromoTitle: "Vị trí quảng cáo",
+    popupPromoDescription: "Dành cho quảng cáo sau này.",
     popupSubtitleDirect: "Đang lưu trực tiếp vào thư mục Obsidian đã kết nối.",
     popupSubtitleDownload: "Chưa kết nối thư mục. Bài viết sẽ được tải xuống dưới dạng tệp. Hãy kết nối thư mục trong phần cài đặt.",
     popupSubtitleConnected: "Đang lưu trực tiếp vào thư mục Obsidian đã kết nối.",
@@ -1905,7 +1905,7 @@ const vi: Messages = {
     popupSubtitleUnsupported: "Trình duyệt này chỉ hỗ trợ tải tệp xuống.",
     popupSubtitleNotion: "Đang lưu vào đích Notion đã cấu hình.",
     popupSubtitleNotionSetup: "Để dùng lưu vào Notion, trước tiên hãy nhập token và đích lưu trong phần cài đặt.",
-    popupSubtitleCloud: "Đang lưu vào scrapbook đám mây của Threads Archive. Hãy đăng nhập trên web trước.",
+    popupSubtitleCloud: "",
     popupRecentSaves: "Lần lưu gần đây",
     popupClearAll: "Xóa tất cả",
     popupEmpty: "Chưa có bài viết nào được lưu.",
@@ -2150,6 +2150,28 @@ const dictionaries: Record<Locale, Messages> = {
     vi
 };
 
+const PLAN_BRAND_PATTERN = /\bPro\b/g;
+const brandedDictionaryCache = new WeakMap<Messages, Messages>();
+
+function applyPlanBrandingToString(value: string): string {
+    return value
+        .replaceAll("SS Threads Pro", "SS Threads Plus")
+        .replace(PLAN_BRAND_PATTERN, "Plus");
+}
+
+function brandMessages(messages: Messages): Messages {
+    const cached = brandedDictionaryCache.get(messages);
+    if (cached) {
+        return cached;
+    }
+
+    const branded = Object.fromEntries(
+        Object.entries(messages).map(([key, value]) => [key, applyPlanBrandingToString(value)])
+    ) as unknown as Messages;
+    brandedDictionaryCache.set(messages, branded);
+    return branded;
+}
+
 let currentLocale: Locale | null = null;
 
 function detectDefaultLocale(): Locale {
@@ -2183,9 +2205,9 @@ export async function setLocale(locale: Locale): Promise<void> {
 
 export async function t(): Promise<Messages> {
     const locale = await getLocale();
-    return dictionaries[locale];
+    return brandMessages(dictionaries[locale]);
 }
 
 export function tSync(locale: Locale): Messages {
-    return dictionaries[locale];
+    return brandMessages(dictionaries[locale]);
 }
