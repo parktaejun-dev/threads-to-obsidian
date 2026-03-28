@@ -82,6 +82,19 @@ let releaseDatabaseReconfigurationBarrier: (() => void) | null = null;
 let databaseReconfigurationChain: Promise<void> = Promise.resolve();
 const databaseIdleWaiters = new Set<() => void>();
 
+function trimEnv(name: string): string | undefined {
+  return process.env[name]?.trim();
+}
+
+function parsePositiveInteger(raw: string | undefined, fallback: number): number {
+  if (!raw) {
+    return fallback;
+  }
+
+  const parsed = Number.parseInt(raw, 10);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
+
 async function withDatabaseLock<T>(operation: () => Promise<T>): Promise<T> {
   let operationResult: Promise<T>;
   operationResult = databaseOperationChain.then(() => operation());
@@ -287,14 +300,40 @@ async function getPostgresPool(connectionString: string): Promise<PgPool> {
   }
 
   if (postgresPool) {
-    await postgresPool.end().catch(() => undefined);
+    await closeDatabaseConnections();
   }
 
   postgresPool = new Pool({
-    connectionString
+    connectionString,
+    allowExitOnIdle: true,
+    connectionTimeoutMillis: parsePositiveInteger(trimEnv("THREADS_WEB_POSTGRES_CONNECTION_TIMEOUT_MS"), 10_000),
+    idleTimeoutMillis: parsePositiveInteger(trimEnv("THREADS_WEB_POSTGRES_IDLE_TIMEOUT_MS"), 30_000),
+    max: parsePositiveInteger(trimEnv("THREADS_WEB_POSTGRES_MAX"), 10),
+    query_timeout: parsePositiveInteger(trimEnv("THREADS_WEB_POSTGRES_QUERY_TIMEOUT_MS"), 15_000),
+    statement_timeout: parsePositiveInteger(trimEnv("THREADS_WEB_POSTGRES_STATEMENT_TIMEOUT_MS"), 15_000)
+  });
+  postgresPool.on("error", (error) => {
+    console.error("[threads-web] postgres pool error", error);
   });
   postgresPoolConnectionString = connectionString;
   return postgresPool;
+}
+
+export async function closeDatabaseConnections(): Promise<void> {
+  if (postgresPool) {
+    await postgresPool.end().catch(() => undefined);
+    postgresPool = null;
+  }
+
+  postgresPoolConnectionString = null;
+  ensuredPostgresStores.clear();
+  ensuredPostgresMentionJobStores.clear();
+  ensuredPostgresBotUserStores.clear();
+  ensuredPostgresBotArchiveStores.clear();
+  ensuredPostgresRelationalStores.clear();
+  seededPostgresBotUserStores.clear();
+  seededPostgresBotArchiveStores.clear();
+  seededPostgresRelationalStores.clear();
 }
 
 async function ensurePostgresStore(client: PgPool | PoolClient, tableName: string): Promise<void> {

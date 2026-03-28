@@ -108,7 +108,7 @@ cp .env.example .env
 - `SS_THREADS_PRO_PRIVATE_JWK_FILE` 또는 `SS_THREADS_PRO_PRIVATE_JWK`
 - `THREADS_WEBHOOK_SECRET_STABLEORDER`
 - `THREADS_WEBHOOK_SECRET_STRIPE`
-- `THREADS_WEBHOOK_SECRET_PAYPAL`
+- `THREADS_PAYPAL_CLIENT_ID`, `THREADS_PAYPAL_CLIENT_SECRET`, `THREADS_PAYPAL_WEBHOOK_ID`
 - `THREADS_WEB_DB_FILE` (선택: 기본값 `output/web-admin-data.json`)
 - `THREADS_WEB_PORT` (선택: 기본값 `4173`)
 - `THREADS_WEB_MAX_BODY_BYTES` (선택: 기본값 `1_000_000`, 최대 `2_000_000`)
@@ -250,26 +250,26 @@ cp "$THREADS_WEB_DB_FILE" "$THREADS_WEB_DB_FILE.backup-$(date +%F_%H%M%S)"
   - 대시보드에 웹훅 처리/무시/거부/중복(재시도) 집계 수치 표시
   - 히스토리에서 이벤트 종류/결제사/provider/사유(reason) 필터로 빠르게 추적
 
-⚠️ 현재 웹훅 엔드포인트는 각 `THREADS_WEBHOOK_SECRET_*` 값과 요청 헤더가 정확히 일치할 때만 수락합니다.  
-프로덕션 안정화를 위해 Stripe/PayPal/Stableorder의 정식 서명 검증으로 대체하는 것을 권장합니다.
+웹훅 검증 방식:
 
-로컬 테스트 시에는 해당 provider의 `THREADS_WEBHOOK_SECRET_*` 값을 예시 헤더와 동일하게 `test`로 맞추면 됩니다.
+- `stableorder`: `x-stableorder-signature` 헤더를 검증합니다. 운영에서는 provider가 안내한 서명 포맷이 있으면 그 값을 그대로 전달하세요.
+- `stripe`: `stripe-signature` 헤더의 `t=...,v1=...` 서명을 raw body 기준으로 검증합니다.
+- `paypal`: `paypal-transmission-*` 헤더와 `THREADS_PAYPAL_CLIENT_ID`, `THREADS_PAYPAL_CLIENT_SECRET`, `THREADS_PAYPAL_WEBHOOK_ID`를 사용해 PayPal `verify-webhook-signature` API로 검증합니다.
 
-웹훅 테스트 예시:
+Stripe 로컬 테스트 예시:
 
 ```bash
+PAYLOAD='{"id":"evt_test","type":"checkout.session.completed","data":{"object":{"id":"cs_test","customer_email":"buyer@example.com","metadata":{"threads_order_id":"ORDER_ID"}}}}'
+STRIPE_SIGNATURE=$(node -e 'const crypto = require("node:crypto"); const secret = process.env.THREADS_WEBHOOK_SECRET_STRIPE || "whsec_test"; const payload = process.argv[1]; const ts = Math.floor(Date.now() / 1000); const v1 = crypto.createHmac("sha256", secret).update(`${ts}.${payload}`).digest("hex"); process.stdout.write(`t=${ts},v1=${v1}`);' "$PAYLOAD")
 curl -X POST "http://127.0.0.1:4173/api/public/webhooks/stripe" \
   -H "Content-Type: application/json" \
-  -H "stripe-signature: test" \
-  -d '{"id":"evt_test","type":"checkout.session.completed","data":{"object":{"id":"cs_test","customer_email":"buyer@example.com","metadata":{"threads_order_id":"ORDER_ID"}}}}'
+  -H "stripe-signature: ${STRIPE_SIGNATURE}" \
+  -d "$PAYLOAD"
 ```
 
-```bash
-curl -X POST "http://127.0.0.1:4173/api/public/webhooks/paypal" \
-  -H "Content-Type: application/json" \
-  -H "paypal-transmission-sig: test" \
-  -d '{"id":"WH-000","event_type":"PAYMENT.CAPTURE.COMPLETED","resource":{"id":"capture-1","invoice_id":"ORDER_ID","payer":{"email_address":"buyer@example.com"}}}'
-```
+PayPal은 단순 `curl` 헤더 비교로는 검증되지 않습니다. PayPal webhook simulator 또는 실제 sandbox/live webhook을 사용해 테스트하세요.
+
+Stableorder 테스트 예시:
 
 ```bash
 curl -X POST "http://127.0.0.1:4173/api/public/webhooks/stableorder" \
@@ -291,7 +291,7 @@ THREADS_WEB_ADMIN_TOKEN=... SS_THREADS_PRO_PRIVATE_JWK_FILE=... npm run web:star
 
 1. `THREADS_WEB_ADMIN_TOKEN`은 충분히 긴 랜덤 문자열로 설정
 2. `SS_THREADS_PRO_PRIVATE_JWK_FILE` 또는 `SS_THREADS_PRO_PRIVATE_JWK`에 운영 비밀키 등록
-3. `THREADS_WEBHOOK_SECRET_STABLEORDER`, `THREADS_WEBHOOK_SECRET_STRIPE`, `THREADS_WEBHOOK_SECRET_PAYPAL`를 각 결제사 웹훅 시크릿으로 등록
+3. `THREADS_WEBHOOK_SECRET_STABLEORDER`, `THREADS_WEBHOOK_SECRET_STRIPE`를 설정하고, PayPal 사용 시 `THREADS_PAYPAL_CLIENT_ID`, `THREADS_PAYPAL_CLIENT_SECRET`, `THREADS_PAYPAL_WEBHOOK_ID`까지 함께 등록
 4. Notion OAuth를 쓸 경우 `THREADS_NOTION_CLIENT_ID`, `THREADS_NOTION_CLIENT_SECRET`, `THREADS_NOTION_ENCRYPTION_SECRET` 설정
 5. Notion public integration redirect URI를 `/api/public/notion/oauth/callback` 으로 정확히 등록
 6. 주문 DB(`THREADS_WEB_DB_FILE`)는 주기 백업 (`cp $PATH $PATH.backup-$(date +%F)`)
@@ -300,7 +300,7 @@ THREADS_WEB_ADMIN_TOKEN=... SS_THREADS_PRO_PRIVATE_JWK_FILE=... npm run web:star
    - `/api/public/webhooks/stableorder`
    - `/api/public/webhooks/stripe`
    - `/api/public/webhooks/paypal`
-   - 권장 검증 헤더(시크릿 설정 시): `x-stableorder-signature`, `stripe-signature`, `paypal-transmission-sig`
+   - 검증 헤더: `x-stableorder-signature`, `stripe-signature`, `paypal-transmission-*`
 9. 키 전달 SLA(예: 30분 이내)와 환불 규칙을 정책 문서에 고정
 
 ---
@@ -399,7 +399,7 @@ Required `.env` values:
 - `SS_THREADS_PRO_PRIVATE_JWK_FILE` or `SS_THREADS_PRO_PRIVATE_JWK`
 - `THREADS_WEBHOOK_SECRET_STABLEORDER` (required for Stableorder webhook acceptance)
 - `THREADS_WEBHOOK_SECRET_STRIPE` (required for Stripe webhook acceptance)
-- `THREADS_WEBHOOK_SECRET_PAYPAL` (required for PayPal webhook acceptance)
+- `THREADS_PAYPAL_CLIENT_ID`, `THREADS_PAYPAL_CLIENT_SECRET`, `THREADS_PAYPAL_WEBHOOK_ID` (required for PayPal webhook verification)
 - `THREADS_WEB_DB_FILE` (optional, default: `output/web-admin-data.json`)
 - `THREADS_WEB_PORT` (optional, default: `4173`)
 - `THREADS_WEB_MAX_BODY_BYTES` (optional, default: `1_000_000`, max `2_000_000`)
@@ -467,8 +467,8 @@ Orders are created on the public storefront and automatically move to key issuan
 - Admin history shows webhook success/failure/duplicate events for troubleshooting.
   - Dashboard exposes webhook processed/ignored/rejected/retry counters.
   - Event filtering is available by kind/provider/reason in the history table.
-- Webhook acceptance currently requires an exact header match against the corresponding `THREADS_WEBHOOK_SECRET_*` value.
-- Replace the current token-style check with official provider signature verification for production hardening.
+- Stripe webhooks are verified against the raw request body using `stripe-signature`.
+- PayPal webhooks are verified through PayPal's `verify-webhook-signature` API.
 
 ---
 

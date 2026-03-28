@@ -71,8 +71,11 @@ export async function waitForReplySurface(document: Document, expectedUrl: strin
   }
 
   const initialPermalinkCount = countUniquePermalinkUrls(document);
-  const deadline = Date.now() + timeoutMs;
+  let deadline = Date.now() + Math.min(timeoutMs, 900);
   let sawLoadingMarker = getLoadingMarkerCount(document) > 0;
+  if (sawLoadingMarker) {
+    deadline = Date.now() + timeoutMs;
+  }
   const setTimer = document.defaultView?.setTimeout.bind(document.defaultView) ?? globalThis.setTimeout;
 
   while (Date.now() < deadline) {
@@ -83,7 +86,10 @@ export async function waitForReplySurface(document: Document, expectedUrl: strin
 
     const loadingMarkerCount = getLoadingMarkerCount(document);
     if (loadingMarkerCount > 0) {
-      sawLoadingMarker = true;
+      if (!sawLoadingMarker) {
+        sawLoadingMarker = true;
+        deadline = Math.max(deadline, Date.now() + timeoutMs);
+      }
     } else if (sawLoadingMarker) {
       return;
     }

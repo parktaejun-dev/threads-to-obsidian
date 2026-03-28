@@ -57,6 +57,10 @@ interface BotSessionState {
   archives: BotArchiveView[];
 }
 
+interface BotSyncState extends BotSessionState {
+  workspace?: ScrapbookPlusState;
+}
+
 interface BotOauthStartResult {
   authorizeUrl: string;
   botHandle: string;
@@ -2094,6 +2098,49 @@ async function refreshSession(): Promise<void> {
   });
 }
 
+async function initializeScrapbook(): Promise<void> {
+  const [config, state] = await Promise.all([
+    requestJson<BotPublicConfig>("/api/public/bot/config"),
+    requestJson<BotSessionState>("/api/public/bot/session")
+  ]);
+  latestConfig = config;
+  if (state.authenticated && state.user) {
+    try {
+      const synced = await requestJson<BotSyncState>("/api/public/bot/sync", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: "{}"
+      });
+      applySessionState(config, {
+        ...synced,
+        botHandle: config.botHandle,
+        oauthConfigured: config.oauthConfigured
+      });
+      if (synced.workspace) {
+        applyWorkspaceState(synced.workspace);
+      } else {
+        await refreshWorkspace();
+      }
+      return;
+    } catch (error) {
+      applySessionState(config, {
+        ...state,
+        botHandle: config.botHandle,
+        oauthConfigured: config.oauthConfigured
+      });
+      await refreshWorkspace();
+      throw error;
+    }
+  }
+
+  applySessionState(config, {
+    ...state,
+    botHandle: config.botHandle,
+    oauthConfigured: config.oauthConfigured
+  });
+  await refreshWorkspace();
+}
+
 async function refreshWorkspace(): Promise<void> {
   const workspace = await requestJson<ScrapbookPlusState>("/api/public/bot/plus");
   applyWorkspaceState(workspace);
@@ -2178,7 +2225,7 @@ async function syncLatestMentions(): Promise<void> {
   if (!latestConfig) {
     return;
   }
-  const state = await requestJson<BotSessionState>("/api/public/bot/sync", {
+  const state = await requestJson<BotSyncState>("/api/public/bot/sync", {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: "{}"
@@ -2188,6 +2235,9 @@ async function syncLatestMentions(): Promise<void> {
     botHandle: latestConfig.botHandle,
     oauthConfigured: latestConfig.oauthConfigured
   });
+  if (state.workspace) {
+    applyWorkspaceState(state.workspace);
+  }
 }
 
 async function startOauth(): Promise<void> {
@@ -2511,12 +2561,7 @@ setActiveTab("inbox");
 
 void (async () => {
   try {
-    await refreshEverything();
-    const sessionState = latestState as BotSessionState | null;
-    if (sessionState && sessionState.authenticated && sessionState.user) {
-      await syncLatestMentions();
-      await refreshWorkspace();
-    }
+    await initializeScrapbook();
   } catch (error) {
     setStatus(error instanceof Error ? error.message : t("scrapbookStatusLoadFailed"), true);
   } finally {

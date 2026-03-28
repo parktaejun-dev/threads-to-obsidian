@@ -4987,10 +4987,18 @@ async function fetchCloudConnectionStatus() {
     };
   }
   try {
+    const auth = await getServerAuthContext();
+    const headers = new Headers();
+    if (auth) {
+      headers.set("x-threads-license-token", auth.token);
+      headers.set("x-threads-device-id", auth.deviceId);
+      headers.set("x-threads-device-label", auth.deviceLabel);
+    }
     const status = await requestJsonFromOrigins(
       `${EXTENSION_API_PATH}/cloud/status`,
       {
-        method: "GET"
+        method: "GET",
+        headers
       },
       {
         authToken: record.token,

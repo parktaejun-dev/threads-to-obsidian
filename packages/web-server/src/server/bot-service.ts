@@ -36,10 +36,12 @@ import {
   upsertBotSession,
   upsertBotUser
 } from "./store";
+import { fetchWithTimeout } from "./http-client";
 import { getRuntimeConfigSnapshot } from "./runtime-config";
 import {
   canCreateScrapbookArchive,
-  getScrapbookArchiveLimitError
+  getScrapbookArchiveLimitError,
+  syncScrapbookPlusLicenseLink
 } from "./scrapbook-plan-service";
 
 const BOT_OAUTH_TTL_MS = 10 * 60_000;
@@ -352,7 +354,7 @@ async function assertSafeArchiveMediaUrl(mediaUrl: string): Promise<URL> {
 
 async function fetchArchiveAsset(mediaUrl: string): Promise<Response> {
   const safeUrl = await assertSafeArchiveMediaUrl(mediaUrl);
-  const response = await fetch(safeUrl, {
+  const response = await fetchWithTimeout(safeUrl, {
     cache: "no-store",
     redirect: "manual"
   });
@@ -1524,7 +1526,7 @@ function findBotExtensionAccessTokenRecord(
 
 async function exchangeAuthorizationCode(code: string, publicOrigin: string): Promise<ThreadsTokenResponse> {
   const { appId, appSecret } = readThreadsOauthConfig();
-  const response = await fetch(`${buildThreadsApiBaseUrl()}oauth/access_token`, {
+  const response = await fetchWithTimeout(`${buildThreadsApiBaseUrl()}oauth/access_token`, {
     method: "POST",
     headers: {
       "content-type": "application/x-www-form-urlencoded"
@@ -1552,7 +1554,7 @@ async function exchangeLongLivedToken(accessToken: string): Promise<ThreadsToken
   url.searchParams.set("grant_type", "th_exchange_token");
   url.searchParams.set("client_secret", appSecret);
   url.searchParams.set("access_token", accessToken);
-  const response = await fetch(url);
+  const response = await fetchWithTimeout(url);
   const body = (await response.json().catch(() => null)) as { error_message?: string } & ThreadsTokenResponse | null;
   if (!response.ok) {
     throw new Error(body?.error_message?.trim() || "Threads long-lived token exchange failed.");
@@ -1568,7 +1570,7 @@ async function fetchThreadsProfile(accessToken: string): Promise<ThreadsProfileR
     ["id", "username", "name", "threads_profile_picture_url", "threads_biography", "is_verified"].join(",")
   );
   url.searchParams.set("access_token", accessToken);
-  const response = await fetch(url);
+  const response = await fetchWithTimeout(url);
   const body = (await response.json().catch(() => null)) as { error_message?: string } & ThreadsProfileResponse | null;
   if (!response.ok) {
     throw new Error(body?.error_message?.trim() || "Threads profile lookup failed.");
@@ -1582,7 +1584,7 @@ async function refreshThreadsAccessToken(accessToken: string): Promise<ThreadsTo
   url.searchParams.set("grant_type", "th_refresh_token");
   url.searchParams.set("access_token", accessToken);
 
-  const response = await fetch(url);
+  const response = await fetchWithTimeout(url);
   const body = (await response.json().catch(() => null)) as { error_message?: string } & ThreadsTokenResponse | null;
   if (!response.ok) {
     throw new Error(body?.error_message?.trim() || "Threads access token refresh failed.");
@@ -2002,6 +2004,16 @@ function requireExtensionLinkUser(
   return { user, tokenRecord };
 }
 
+export function syncExtensionCloudLicenseLink(
+  data: WebDatabase,
+  rawToken: string | null | undefined,
+  licenseId: string | null | undefined,
+  linkedAt?: string | null
+): boolean {
+  const { user } = requireExtensionLinkUser(data, rawToken);
+  return syncScrapbookPlusLicenseLink(data, user, licenseId, linkedAt);
+}
+
 export function revokeExtensionCloudConnection(
   data: WebDatabase,
   rawToken: string | null | undefined
@@ -2165,6 +2177,16 @@ export async function revokeExtensionCloudConnectionFromStore(
   rawToken: string | null | undefined
 ): Promise<CloudConnectionStatus> {
   return withBotAuthDatabaseTransaction((data) => revokeExtensionCloudConnection(data, rawToken));
+}
+
+export async function syncExtensionCloudLicenseLinkFromStore(
+  rawToken: string | null | undefined,
+  licenseId: string | null | undefined,
+  linkedAt?: string | null
+): Promise<boolean> {
+  return withBotAuthDatabaseTransaction((data) =>
+    syncExtensionCloudLicenseLink(data, rawToken, licenseId, linkedAt)
+  );
 }
 
 export async function getBotSessionStateFromStore(

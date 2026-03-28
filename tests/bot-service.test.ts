@@ -22,6 +22,7 @@ import {
   saveCloudArchive,
   saveCloudArchiveWithExtensionToken,
   startBotOauth,
+  syncExtensionCloudLicenseLink,
   validateBotIngestRequest
 } from "../packages/web-server/src/server/bot-service";
 
@@ -49,9 +50,10 @@ test("bot Threads OAuth sign-in and mention ingest create a scrapbook archive", 
   process.env.THREADS_WEB_ADMIN_TOKEN = "bot-test-admin-secret";
 
   let fetchCallCount = 0;
-  globalThis.fetch = (async (input: RequestInfo | URL) => {
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = typeof input === "string" ? input : input.toString();
     fetchCallCount += 1;
+    assert.ok(init?.signal instanceof AbortSignal);
 
     if (url.includes("/oauth/access_token")) {
       return createJsonResponse({
@@ -611,6 +613,66 @@ test("extension cloud link issues a scoped token, saves archives, and can be rev
       ),
     /Reconnect the extension/i
   );
+});
+
+test("extension cloud link can sync the linked user's Plus license", () => {
+  const data = buildDefaultDatabase("2026-03-25T00:00:00.000Z");
+  data.botUsers.push({
+    id: "user-ext-plus-1",
+    threadsUserId: "threads-user-ext-plus-1",
+    threadsHandle: "writer",
+    displayName: "Writer",
+    profilePictureUrl: null,
+    biography: null,
+    isVerified: false,
+    accessTokenCiphertext: null,
+    tokenExpiresAt: null,
+    email: null,
+    grantedScopes: [],
+    scopeVersion: 0,
+    lastScopeUpgradeAt: null,
+    plusLicenseId: null,
+    plusActivatedAt: null,
+    createdAt: "2026-03-25T00:00:00.000Z",
+    updatedAt: "2026-03-25T00:00:00.000Z",
+    lastLoginAt: "2026-03-25T00:00:00.000Z",
+    status: "active"
+  });
+  data.botSessions.push({
+    id: "session-ext-plus-1",
+    userId: "user-ext-plus-1",
+    sessionHash: createHash("sha256").update("session-token-ext-plus-1").digest("hex"),
+    createdAt: "2026-03-25T00:00:00.000Z",
+    expiresAt: "2026-04-25T00:00:00.000Z",
+    lastSeenAt: "2026-03-25T00:00:00.000Z",
+    revokedAt: null,
+    status: "active"
+  });
+  data.licenses.push({
+    id: "license-ext-plus-1",
+    orderId: "order-ext-plus-1",
+    holderName: "Writer",
+    holderEmail: "writer@example.com",
+    token: "signed.token.value",
+    tokenPreview: "signed...value",
+    issuedAt: "2026-03-25T00:00:00.000Z",
+    expiresAt: "2027-03-25T00:00:00.000Z",
+    revokedAt: null,
+    status: "active"
+  });
+
+  const link = createExtensionLinkCode(data, "session-token-ext-plus-1", "state-plus");
+  const completed = completeExtensionLinkCode(data, link.code, "state-plus");
+  const synced = syncExtensionCloudLicenseLink(
+    data,
+    completed.token,
+    "license-ext-plus-1",
+    "2026-03-25T01:00:00.000Z"
+  );
+
+  assert.equal(synced, true);
+  assert.equal(data.botUsers[0]?.plusLicenseId, "license-ext-plus-1");
+  assert.equal(data.botUsers[0]?.plusActivatedAt, "2026-03-25T01:00:00.000Z");
 });
 
 test("deleting an archive removes linked search and tracked references", () => {

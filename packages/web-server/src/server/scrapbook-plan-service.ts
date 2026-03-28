@@ -39,6 +39,10 @@ function findUserPlusLicense(data: WebDatabase, user: BotUserRecord | null): Lic
   return data.licenses.find((candidate) => candidate.id === user.plusLicenseId) ?? null;
 }
 
+function isActivePlusLicense(license: LicenseRecord | null): boolean {
+  return Boolean(license && license.status !== "revoked" && !hasLicenseExpired(license));
+}
+
 export function countScrapbookArchivesForUser(data: WebDatabase, userId: string): number {
   return (
     data.botArchives.filter((candidate) => candidate.userId === userId).length +
@@ -151,6 +155,50 @@ export async function activateScrapbookPlus(
   user.updatedAt = user.plusActivatedAt;
   upsertBotUser(data, user);
   return readScrapbookPlanState(data, user);
+}
+
+export function syncScrapbookPlusLicenseLink(
+  data: WebDatabase,
+  user: BotUserRecord,
+  licenseId: string | null | undefined,
+  linkedAt?: string | null
+): boolean {
+  const normalizedLicenseId = `${licenseId ?? ""}`.trim();
+  if (!normalizedLicenseId) {
+    return false;
+  }
+
+  const license = data.licenses.find((candidate) => candidate.id === normalizedLicenseId) ?? null;
+  if (!license || !isActivePlusLicense(license)) {
+    return false;
+  }
+  const activeLicense: LicenseRecord = license;
+
+  const otherUser = data.botUsers.find(
+    (candidate) =>
+      candidate.id !== user.id &&
+      candidate.status === "active" &&
+      candidate.plusLicenseId === activeLicense.id
+  );
+  if (otherUser) {
+    return false;
+  }
+
+  const currentLicense = findUserPlusLicense(data, user);
+  if (user.plusLicenseId && user.plusLicenseId !== activeLicense.id && isActivePlusLicense(currentLicense)) {
+    return false;
+  }
+
+  if (user.plusLicenseId === activeLicense.id && user.plusActivatedAt) {
+    return true;
+  }
+
+  const syncedAt = `${linkedAt ?? ""}`.trim() || new Date().toISOString();
+  user.plusLicenseId = activeLicense.id;
+  user.plusActivatedAt = user.plusActivatedAt ?? syncedAt;
+  user.updatedAt = syncedAt;
+  upsertBotUser(data, user);
+  return true;
 }
 
 export function clearScrapbookPlus(data: WebDatabase, user: BotUserRecord): ScrapbookPlanState {

@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHmac } from "node:crypto";
 import { createServer, type Server } from "node:http";
 import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -7,6 +8,8 @@ import test from "node:test";
 
 import { createWebRequestHandler } from "../packages/web-server/src/server";
 import { replaceRuntimeConfigForTests } from "../packages/web-server/src/server/runtime-config";
+
+const privateKeyFile = path.resolve(process.cwd(), "output", "dev-pro-license-private.jwk");
 
 async function startTestServer(): Promise<{ server: Server; origin: string }> {
   replaceRuntimeConfigForTests(null);
@@ -64,6 +67,11 @@ async function loginAdminSession(
   const cookie = response.headers.get("set-cookie");
   assert.ok(cookie);
   return cookie.split(";")[0] ?? cookie;
+}
+
+function createStripeSignature(secret: string, payload: string, timestamp = Math.floor(Date.now() / 1000)): string {
+  const signature = createHmac("sha256", secret).update(`${timestamp}.${payload}`).digest("hex");
+  return `t=${timestamp},v1=${signature}`;
 }
 
 test("mutating public routes reject requests without an Origin header", async () => {
@@ -513,6 +521,264 @@ test("legacy public cloud save route is retired", async () => {
       process.env.THREADS_WEB_DB_FILE = previousDbFile;
     } else {
       delete process.env.THREADS_WEB_DB_FILE;
+    }
+  }
+});
+
+test("stripe webhooks require a signed payload instead of plain secret equality", async () => {
+  const previousAdminToken = process.env.THREADS_WEB_ADMIN_TOKEN;
+  const previousDbFile = process.env.THREADS_WEB_DB_FILE;
+  const previousPrivateJwkFile = process.env.SS_THREADS_PRO_PRIVATE_JWK_FILE;
+  const previousStripeWebhookSecret = process.env.THREADS_WEBHOOK_SECRET_STRIPE;
+  const tempDir = await mkdtemp(path.join(tmpdir(), "threads-server-hardening-"));
+  const dbFile = path.join(tempDir, "web-admin-data.json");
+
+  process.env.THREADS_WEB_ADMIN_TOKEN = "threads-admin-secret";
+  process.env.THREADS_WEB_DB_FILE = dbFile;
+  process.env.SS_THREADS_PRO_PRIVATE_JWK_FILE = privateKeyFile;
+  process.env.THREADS_WEBHOOK_SECRET_STRIPE = "whsec_test";
+
+  const { server, origin } = await startTestServer();
+
+  try {
+    const createOrder = await fetch(`${origin}/api/public/orders`, {
+      method: "POST",
+      headers: {
+        origin,
+        "content-type": "application/json"
+      },
+      body: JSON.stringify({
+        buyerName: "Alice",
+        buyerEmail: "alice@example.com",
+        paymentMethodId: "pm-stripe"
+      })
+    });
+    assert.equal(createOrder.status, 201);
+    const created = await createOrder.json() as { order: { id: string } };
+    const payload = JSON.stringify({
+      id: "evt_1",
+      type: "checkout.session.completed",
+      data: {
+        object: {
+          id: "cs_test_1",
+          customer_email: "alice@example.com",
+          metadata: {
+            threads_order_id: created.order.id
+          }
+        }
+      }
+    });
+
+    const rejected = await fetch(`${origin}/api/public/webhooks/stripe`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "stripe-signature": "whsec_test"
+      },
+      body: payload
+    });
+    assert.equal(rejected.status, 401);
+    assert.deepEqual(await rejected.json(), { error: "Invalid webhook signature." });
+
+    const accepted = await fetch(`${origin}/api/public/webhooks/stripe`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "stripe-signature": createStripeSignature("whsec_test", payload)
+      },
+      body: payload
+    });
+    assert.equal(accepted.status, 200);
+    const acceptedBody = await accepted.json() as {
+      reason: string;
+      status: string;
+      order?: { id: string; status: string };
+      license?: { id: string } | null;
+    };
+    assert.equal(acceptedBody.status, "ok");
+    assert.equal(acceptedBody.reason, "issued");
+    assert.equal(acceptedBody.order?.id, created.order.id);
+    assert.equal(acceptedBody.order?.status, "key_issued");
+    assert.ok(acceptedBody.license?.id);
+  } finally {
+    await stopTestServer(server);
+    if (typeof previousAdminToken === "string") {
+      process.env.THREADS_WEB_ADMIN_TOKEN = previousAdminToken;
+    } else {
+      delete process.env.THREADS_WEB_ADMIN_TOKEN;
+    }
+    if (typeof previousDbFile === "string") {
+      process.env.THREADS_WEB_DB_FILE = previousDbFile;
+    } else {
+      delete process.env.THREADS_WEB_DB_FILE;
+    }
+    if (typeof previousPrivateJwkFile === "string") {
+      process.env.SS_THREADS_PRO_PRIVATE_JWK_FILE = previousPrivateJwkFile;
+    } else {
+      delete process.env.SS_THREADS_PRO_PRIVATE_JWK_FILE;
+    }
+    if (typeof previousStripeWebhookSecret === "string") {
+      process.env.THREADS_WEBHOOK_SECRET_STRIPE = previousStripeWebhookSecret;
+    } else {
+      delete process.env.THREADS_WEBHOOK_SECRET_STRIPE;
+    }
+  }
+});
+
+test("paypal webhooks are verified through paypal's verification API", async () => {
+  const previousAdminToken = process.env.THREADS_WEB_ADMIN_TOKEN;
+  const previousDbFile = process.env.THREADS_WEB_DB_FILE;
+  const previousPrivateJwkFile = process.env.SS_THREADS_PRO_PRIVATE_JWK_FILE;
+  const previousPaypalClientId = process.env.THREADS_PAYPAL_CLIENT_ID;
+  const previousPaypalClientSecret = process.env.THREADS_PAYPAL_CLIENT_SECRET;
+  const previousPaypalWebhookId = process.env.THREADS_PAYPAL_WEBHOOK_ID;
+  const previousPaypalApiBaseUrl = process.env.THREADS_PAYPAL_API_BASE_URL;
+  const previousFetch = globalThis.fetch;
+  const tempDir = await mkdtemp(path.join(tmpdir(), "threads-server-hardening-"));
+  const dbFile = path.join(tempDir, "web-admin-data.json");
+
+  process.env.THREADS_WEB_ADMIN_TOKEN = "threads-admin-secret";
+  process.env.THREADS_WEB_DB_FILE = dbFile;
+  process.env.SS_THREADS_PRO_PRIVATE_JWK_FILE = privateKeyFile;
+  process.env.THREADS_PAYPAL_CLIENT_ID = "paypal-client-id";
+  process.env.THREADS_PAYPAL_CLIENT_SECRET = "paypal-client-secret";
+  process.env.THREADS_PAYPAL_WEBHOOK_ID = "paypal-webhook-id";
+  process.env.THREADS_PAYPAL_API_BASE_URL = "https://api-m.paypal.com";
+
+  const { server, origin } = await startTestServer();
+  const nativeFetch = previousFetch;
+
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = typeof input === "string" ? input : input.toString();
+    if (url.startsWith(origin)) {
+      return nativeFetch(input, init);
+    }
+
+    if (url === "https://api-m.paypal.com/v1/oauth2/token") {
+      return new Response(JSON.stringify({ access_token: "paypal-access-token" }), {
+        status: 200,
+        headers: { "content-type": "application/json" }
+      });
+    }
+
+    if (url === "https://api-m.paypal.com/v1/notifications/verify-webhook-signature") {
+      const body = JSON.parse(typeof init?.body === "string" ? init.body : "{}") as { transmission_sig?: string };
+      return new Response(
+        JSON.stringify({
+          verification_status: body.transmission_sig === "signed-paypal" ? "SUCCESS" : "FAILURE"
+        }),
+        {
+          status: 200,
+          headers: { "content-type": "application/json" }
+        }
+      );
+    }
+
+    throw new Error(`Unexpected fetch URL: ${url}`);
+  }) as typeof fetch;
+
+  try {
+    const createOrder = await fetch(`${origin}/api/public/orders`, {
+      method: "POST",
+      headers: {
+        origin,
+        "content-type": "application/json"
+      },
+      body: JSON.stringify({
+        buyerName: "Bob",
+        buyerEmail: "bob@example.com",
+        paymentMethodId: "pm-paypal"
+      })
+    });
+    assert.equal(createOrder.status, 201);
+    const created = await createOrder.json() as { order: { id: string } };
+    const payload = JSON.stringify({
+      id: "WH-123",
+      event_type: "PAYMENT.CAPTURE.COMPLETED",
+      resource: {
+        id: "capture-1",
+        invoice_id: created.order.id,
+        payer: {
+          email_address: "bob@example.com"
+        }
+      }
+    });
+    const headers = {
+      "content-type": "application/json",
+      "paypal-auth-algo": "SHA256withRSA",
+      "paypal-cert-url": "https://api-m.paypal.com/certs/cert.pem",
+      "paypal-transmission-id": "transmission-1",
+      "paypal-transmission-time": "2026-03-28T12:00:00Z"
+    };
+
+    const rejected = await fetch(`${origin}/api/public/webhooks/paypal`, {
+      method: "POST",
+      headers: {
+        ...headers,
+        "paypal-transmission-sig": "legacy-secret"
+      },
+      body: payload
+    });
+    assert.equal(rejected.status, 401);
+    assert.deepEqual(await rejected.json(), { error: "Invalid webhook signature." });
+
+    const accepted = await fetch(`${origin}/api/public/webhooks/paypal`, {
+      method: "POST",
+      headers: {
+        ...headers,
+        "paypal-transmission-sig": "signed-paypal"
+      },
+      body: payload
+    });
+    assert.equal(accepted.status, 200);
+    const acceptedBody = await accepted.json() as {
+      reason: string;
+      status: string;
+      order?: { id: string; status: string };
+      license?: { id: string } | null;
+    };
+    assert.equal(acceptedBody.status, "ok");
+    assert.equal(acceptedBody.reason, "issued");
+    assert.equal(acceptedBody.order?.id, created.order.id);
+    assert.equal(acceptedBody.order?.status, "key_issued");
+    assert.ok(acceptedBody.license?.id);
+  } finally {
+    globalThis.fetch = previousFetch;
+    await stopTestServer(server);
+    if (typeof previousAdminToken === "string") {
+      process.env.THREADS_WEB_ADMIN_TOKEN = previousAdminToken;
+    } else {
+      delete process.env.THREADS_WEB_ADMIN_TOKEN;
+    }
+    if (typeof previousDbFile === "string") {
+      process.env.THREADS_WEB_DB_FILE = previousDbFile;
+    } else {
+      delete process.env.THREADS_WEB_DB_FILE;
+    }
+    if (typeof previousPrivateJwkFile === "string") {
+      process.env.SS_THREADS_PRO_PRIVATE_JWK_FILE = previousPrivateJwkFile;
+    } else {
+      delete process.env.SS_THREADS_PRO_PRIVATE_JWK_FILE;
+    }
+    if (typeof previousPaypalClientId === "string") {
+      process.env.THREADS_PAYPAL_CLIENT_ID = previousPaypalClientId;
+    } else {
+      delete process.env.THREADS_PAYPAL_CLIENT_ID;
+    }
+    if (typeof previousPaypalClientSecret === "string") {
+      process.env.THREADS_PAYPAL_CLIENT_SECRET = previousPaypalClientSecret;
+    } else {
+      delete process.env.THREADS_PAYPAL_CLIENT_SECRET;
+    }
+    if (typeof previousPaypalWebhookId === "string") {
+      process.env.THREADS_PAYPAL_WEBHOOK_ID = previousPaypalWebhookId;
+    } else {
+      delete process.env.THREADS_PAYPAL_WEBHOOK_ID;
+    }
+    if (typeof previousPaypalApiBaseUrl === "string") {
+      process.env.THREADS_PAYPAL_API_BASE_URL = previousPaypalApiBaseUrl;
+    } else {
+      delete process.env.THREADS_PAYPAL_API_BASE_URL;
     }
   }
 });

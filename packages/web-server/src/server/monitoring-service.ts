@@ -303,6 +303,14 @@ export function configureMonitoringService(options: {
   autoRunTimer.unref?.();
 }
 
+export function stopMonitoringService(): void {
+  if (autoRunTimer) {
+    clearInterval(autoRunTimer);
+    autoRunTimer = null;
+  }
+  collectorStatusReader = null;
+}
+
 export async function getMonitoringOverview(): Promise<AdminMonitoringOverviewResponse> {
   const data = await loadDatabase();
   return buildOverviewFromData(data);

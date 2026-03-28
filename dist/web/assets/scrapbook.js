@@ -6370,6 +6370,47 @@ async function refreshSession() {
     oauthConfigured: config.oauthConfigured
   });
 }
+async function initializeScrapbook() {
+  const [config, state] = await Promise.all([
+    requestJson("/api/public/bot/config"),
+    requestJson("/api/public/bot/session")
+  ]);
+  latestConfig = config;
+  if (state.authenticated && state.user) {
+    try {
+      const synced = await requestJson("/api/public/bot/sync", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: "{}"
+      });
+      applySessionState(config, {
+        ...synced,
+        botHandle: config.botHandle,
+        oauthConfigured: config.oauthConfigured
+      });
+      if (synced.workspace) {
+        applyWorkspaceState(synced.workspace);
+      } else {
+        await refreshWorkspace();
+      }
+      return;
+    } catch (error) {
+      applySessionState(config, {
+        ...state,
+        botHandle: config.botHandle,
+        oauthConfigured: config.oauthConfigured
+      });
+      await refreshWorkspace();
+      throw error;
+    }
+  }
+  applySessionState(config, {
+    ...state,
+    botHandle: config.botHandle,
+    oauthConfigured: config.oauthConfigured
+  });
+  await refreshWorkspace();
+}
 async function refreshWorkspace() {
   const workspace = await requestJson("/api/public/bot/plus");
   applyWorkspaceState(workspace);
@@ -6440,21 +6481,6 @@ async function clearPlusActivationRequest() {
   } finally {
     renderPlanPanel();
   }
-}
-async function syncLatestMentions() {
-  if (!latestConfig) {
-    return;
-  }
-  const state = await requestJson("/api/public/bot/sync", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: "{}"
-  });
-  applySessionState(latestConfig, {
-    ...state,
-    botHandle: latestConfig.botHandle,
-    oauthConfigured: latestConfig.oauthConfigured
-  });
 }
 async function startOauth() {
   setConnectButtonsBusy(true);
@@ -6740,12 +6766,7 @@ applyQueryStatus();
 setActiveTab("inbox");
 void (async () => {
   try {
-    await refreshEverything();
-    const sessionState = latestState;
-    if (sessionState && sessionState.authenticated && sessionState.user) {
-      await syncLatestMentions();
-      await refreshWorkspace();
-    }
+    await initializeScrapbook();
   } catch (error) {
     setStatus(error instanceof Error ? error.message : t("scrapbookStatusLoadFailed"), true);
   } finally {

@@ -5,6 +5,7 @@ import test from "node:test";
 import { buildDefaultDatabase, type BotArchiveRecord, type BotUserRecord } from "@threads/web-schema";
 import { ingestBotMention } from "../packages/web-server/src/server/bot-service";
 import { readScrapbookPlusState } from "../packages/web-server/src/server/scrapbook-plus-service";
+import { syncScrapbookPlusLicenseLink } from "../packages/web-server/src/server/scrapbook-plan-service";
 
 function createBotUser(overrides: Partial<BotUserRecord> = {}): BotUserRecord {
   return {
@@ -126,4 +127,75 @@ test("scrapbook plus state reports Plus limits when an active license is linked"
   assert.equal(state.plan.folderLimit, 50);
   assert.equal(state.plan.archiveCount, 1);
   assert.equal(state.plan.plusStatus, "active");
+});
+
+test("extension-backed license link upgrades scrapbook state to Plus", () => {
+  const data = buildDefaultDatabase("2026-03-28T00:00:00.000Z");
+  const user = createBotUser();
+  data.botUsers.push(user);
+  data.botSessions.push({
+    id: "session-1",
+    userId: "user-1",
+    sessionHash: createHash("sha256").update("session-token-1").digest("hex"),
+    createdAt: "2026-03-28T00:00:00.000Z",
+    expiresAt: "2026-04-28T00:00:00.000Z",
+    lastSeenAt: "2026-03-28T00:00:00.000Z",
+    revokedAt: null,
+    status: "active"
+  });
+  data.licenses.push({
+    id: "license-1",
+    orderId: "order-1",
+    holderName: "Writer",
+    holderEmail: "writer@example.com",
+    token: "signed.token.value",
+    tokenPreview: "signed...value",
+    issuedAt: "2026-03-28T00:00:00.000Z",
+    expiresAt: "2027-03-28T00:00:00.000Z",
+    revokedAt: null,
+    status: "active"
+  });
+
+  const linked = syncScrapbookPlusLicenseLink(data, user, "license-1", "2026-03-28T00:10:00.000Z");
+  assert.equal(linked, true);
+  assert.equal(user.plusLicenseId, "license-1");
+  assert.equal(user.plusActivatedAt, "2026-03-28T00:10:00.000Z");
+
+  const state = readScrapbookPlusState(data, "session-token-1");
+  assert.equal(state.plan.tier, "plus");
+  assert.equal(state.plan.plusStatus, "active");
+});
+
+test("extension-backed license link does not steal another active user's Plus key", () => {
+  const data = buildDefaultDatabase("2026-03-28T00:00:00.000Z");
+  data.botUsers.push(
+    createBotUser({
+      id: "user-1",
+      plusLicenseId: "license-1",
+      plusActivatedAt: "2026-03-28T00:05:00.000Z"
+    }),
+    createBotUser({
+      id: "user-2",
+      threadsUserId: "threads-user-2",
+      threadsHandle: "writer-two",
+      plusLicenseId: null,
+      plusActivatedAt: null
+    })
+  );
+  data.licenses.push({
+    id: "license-1",
+    orderId: "order-1",
+    holderName: "Writer",
+    holderEmail: "writer@example.com",
+    token: "signed.token.value",
+    tokenPreview: "signed...value",
+    issuedAt: "2026-03-28T00:00:00.000Z",
+    expiresAt: "2027-03-28T00:00:00.000Z",
+    revokedAt: null,
+    status: "active"
+  });
+
+  const linked = syncScrapbookPlusLicenseLink(data, data.botUsers[1]!, "license-1", "2026-03-28T00:10:00.000Z");
+  assert.equal(linked, false);
+  assert.equal(data.botUsers[1]?.plusLicenseId, null);
 });

@@ -124,11 +124,18 @@ export function buildCloudScrapbookUrl(userHandle?: string | null): string {
 }
 
 export async function completeCloudLink(code: string, state: string): Promise<CloudConnectionStatus> {
+  const auth = await getServerAuthContext();
   const result = await requestJsonFromOrigins<CloudLinkCompleteResult>(
     `${EXTENSION_API_PATH}/link/complete`,
     {
       method: "POST",
-      body: JSON.stringify({ code, state })
+      body: JSON.stringify({
+        code,
+        state,
+        token: auth?.token ?? null,
+        deviceId: auth?.deviceId ?? null,
+        deviceLabel: auth?.deviceLabel ?? null
+      })
     }
   );
   const record = buildCloudLinkRecord(result);
@@ -158,10 +165,18 @@ export async function fetchCloudConnectionStatus(): Promise<CloudConnectionStatu
   }
 
   try {
+    const auth = await getServerAuthContext();
+    const headers = new Headers();
+    if (auth) {
+      headers.set("x-threads-license-token", auth.token);
+      headers.set("x-threads-device-id", auth.deviceId);
+      headers.set("x-threads-device-label", auth.deviceLabel);
+    }
     const status = await requestJsonFromOrigins<CloudConnectionStatus>(
       `${EXTENSION_API_PATH}/cloud/status`,
       {
-        method: "GET"
+        method: "GET",
+        headers
       },
       {
         authToken: record.token,

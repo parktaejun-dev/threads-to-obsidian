@@ -11,6 +11,7 @@ export type ActivationFailureReason = "invalid" | "expired" | "revoked" | "seat_
 
 export interface ActivationSuccess {
   ok: true;
+  licenseId: string | null;
   holder: string | null;
   expiresAt: string | null;
   issuedAt: string;
@@ -115,6 +116,7 @@ export async function activateLicenseSeat(
     upsertActivation(data, existing);
     return {
       ok: true,
+      licenseId: validated.license?.id ?? null,
       holder: validated.holder,
       expiresAt: validated.expiresAt,
       issuedAt: validated.issuedAt,
@@ -147,6 +149,7 @@ export async function activateLicenseSeat(
 
   return {
     ok: true,
+    licenseId: validated.license?.id ?? null,
     holder: validated.holder,
     expiresAt: validated.expiresAt,
     issuedAt: validated.issuedAt,
@@ -183,6 +186,7 @@ export async function getLicenseSeatStatus(
 
   return {
     ok: true,
+    licenseId: validated.license?.id ?? null,
     holder: validated.holder,
     expiresAt: validated.expiresAt,
     issuedAt: validated.issuedAt,

@@ -1,5 +1,33 @@
+# Dependencies
 node_modules
-output
-.DS_Store
+
+# Build & Logs
+output/
+dist/
 *.zip
 *.tsbuildinfo
+*.log
+
+# Environment Variables
+.env
+.env.*
+!.env.example
+
+# OS generated files
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+
+# Directories for IDEs and Cache
+.vscode/
+.idea/
+.claude/
+.playwright-cli/

@@ -1,3 +1,5 @@
+import { fetchWithTimeout } from "./http-client";
+
 const THREADS_GRAPH_BASE_URL = "https://graph.threads.net";
 
 export interface ThreadsPublicProfile {
@@ -88,7 +90,7 @@ function parseThreadsApiError(payload: unknown, fallback: string): string {
 }
 
 async function requestThreadsJson<T>(url: URL): Promise<T> {
-  const response = await fetch(url, { cache: "no-store" });
+  const response = await fetchWithTimeout(url, { cache: "no-store" });
   const body = (await response.json().catch(() => null)) as T | Record<string, unknown> | null;
   if (!response.ok) {
     throw new Error(parseThreadsApiError(body, `Threads API request failed (${response.status}).`));

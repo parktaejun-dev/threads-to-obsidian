@@ -55,6 +55,7 @@ import {
   readBotArchiveMarkdownFromStore,
   saveCloudArchiveWithExtensionTokenFromStore,
   revokeBotSessionFromStore,
+  syncExtensionCloudLicenseLinkFromStore,
   startBotOauthFromStore,
   validateBotIngestRequest
 } from "./server/bot-service";
@@ -83,6 +84,7 @@ import {
   buildDashboardSummary,
   buildPublicStorefront,
   buildRevenueReport,
+  closeDatabaseConnections,
   loadDatabase,
   loadDatabaseForConfig,
   saveDatabaseForConfig,
@@ -99,8 +101,10 @@ import {
   getMonitoringOverview,
   listMonitoringIncidents,
   resolveMonitoringIncident,
-  runMonitoringNow
+  runMonitoringNow,
+  stopMonitoringService
 } from "./server/monitoring-service";
+import { fetchWithTimeout } from "./server/http-client";
 import {
   activateRuntimeConfig,
   getPersistedRuntimeConfigSnapshot,
@@ -120,6 +124,12 @@ const ADMIN_SESSION_COOKIE_MAX_AGE_SECONDS = 12 * 60 * 60;
 const ADMIN_SESSION_VERSION = "v1";
 const DEFAULT_ADMIN_ALLOWLIST = new Set(["127.0.0.1", "::1"]);
 const RATE_LIMIT_BUCKET_GC_INTERVAL_MS = 5 * 60_000;
+const DEFAULT_RATE_LIMIT_BUCKET_LIMIT = 50_000;
+const DEFAULT_STRIPE_WEBHOOK_TOLERANCE_MS = 5 * 60_000;
+const DEFAULT_SERVER_REQUEST_TIMEOUT_MS = 30_000;
+const DEFAULT_SERVER_HEADERS_TIMEOUT_MS = 35_000;
+const DEFAULT_SERVER_KEEP_ALIVE_TIMEOUT_MS = 5_000;
+const DEFAULT_GRACEFUL_SHUTDOWN_TIMEOUT_MS = 15_000;
 
 interface ServerConfig {
   adminToken: string;
@@ -181,10 +191,9 @@ const PROVIDER_METHOD_DEFAULT_IDS: Record<PaymentProvider, string> = {
   paypal: "pm-paypal"
 };
 
-const PROVIDER_WEBHOOK_SECRETS: Record<PaymentProvider, string> = {
+const PROVIDER_WEBHOOK_SECRETS: Record<Exclude<PaymentProvider, "paypal">, string> = {
   stableorder: "THREADS_WEBHOOK_SECRET_STABLEORDER",
-  stripe: "THREADS_WEBHOOK_SECRET_STRIPE",
-  paypal: "THREADS_WEBHOOK_SECRET_PAYPAL"
+  stripe: "THREADS_WEBHOOK_SECRET_STRIPE"
 };
 
 const PROVIDER_WEBHOOK_HEADERS: Record<PaymentProvider, string> = {
@@ -206,6 +215,15 @@ const SCRAPBOOK_ARCHIVE_PATH_RE = /^\/scrapbook(?:\/@[^/.?#/]+)?\/archive\/[^/]+
 
 function trimEnv(name: string): string | undefined {
   return process.env[name]?.trim();
+}
+
+function parsePositiveInteger(raw: string | undefined, fallback: number): number {
+  if (!raw) {
+    return fallback;
+  }
+
+  const parsed = Number.parseInt(raw, 10);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
 }
 
 function parsePort(raw: string | undefined, fallback: number): number {
@@ -289,6 +307,30 @@ function resolveConfig(portOverride?: number): ServerConfig {
   };
 }
 
+function getRateLimitBucketLimit(): number {
+  return parsePositiveInteger(trimEnv("THREADS_WEB_RATE_LIMIT_BUCKET_LIMIT"), DEFAULT_RATE_LIMIT_BUCKET_LIMIT);
+}
+
+function getStripeWebhookToleranceMs(): number {
+  return parsePositiveInteger(trimEnv("THREADS_STRIPE_WEBHOOK_TOLERANCE_MS"), DEFAULT_STRIPE_WEBHOOK_TOLERANCE_MS);
+}
+
+function getServerRequestTimeoutMs(): number {
+  return parsePositiveInteger(trimEnv("THREADS_WEB_REQUEST_TIMEOUT_MS"), DEFAULT_SERVER_REQUEST_TIMEOUT_MS);
+}
+
+function getServerHeadersTimeoutMs(): number {
+  return parsePositiveInteger(trimEnv("THREADS_WEB_HEADERS_TIMEOUT_MS"), DEFAULT_SERVER_HEADERS_TIMEOUT_MS);
+}
+
+function getServerKeepAliveTimeoutMs(): number {
+  return parsePositiveInteger(trimEnv("THREADS_WEB_KEEP_ALIVE_TIMEOUT_MS"), DEFAULT_SERVER_KEEP_ALIVE_TIMEOUT_MS);
+}
+
+function getGracefulShutdownTimeoutMs(): number {
+  return parsePositiveInteger(trimEnv("THREADS_WEB_GRACEFUL_SHUTDOWN_TIMEOUT_MS"), DEFAULT_GRACEFUL_SHUTDOWN_TIMEOUT_MS);
+}
+
 function json(response: ServerResponse, statusCode: number, payload: unknown): void {
   response.writeHead(statusCode, { "content-type": "application/json; charset=utf-8" });
   response.end(JSON.stringify(payload));
@@ -330,45 +372,30 @@ function isAdminAuthorized(request: IncomingMessage, adminToken: string): boolea
 }
 
 async function parseJsonBody<T>(request: IncomingMessage, maxBytes: number): Promise<T> {
-  const contentType = readHeader(request.headers, "content-type");
-  const mediaType = contentType?.split(";")[0]?.trim().toLowerCase() ?? "";
-  if (mediaType !== "application/json" && !mediaType.endsWith("+json")) {
-    throw new RequestError(415, "Content-Type must be application/json.");
-  }
-
-  const chunks: Uint8Array[] = [];
-  let totalBytes = 0;
-
-  for await (const chunk of request) {
-    const binary = typeof chunk === "string" ? new TextEncoder().encode(chunk) : chunk;
-    totalBytes += binary.byteLength;
-    if (totalBytes > maxBytes) {
-      throw new RequestError(413, `Request body exceeds ${maxBytes} bytes.`);
-    }
-    chunks.push(binary);
-  }
-
-  const raw = Buffer.concat(chunks).toString("utf8").trim();
-  if (!raw) {
-    return {} as T;
-  }
-
-  try {
-    return JSON.parse(raw) as T;
-  } catch {
-    throw new RequestError(400, "Invalid JSON payload.");
-  }
+  return (await readJsonBody<T>(request, maxBytes)).value;
 }
 
 async function parseFormBody(
   request: IncomingMessage,
   maxBytes: number
 ): Promise<URLSearchParams> {
+  return new URLSearchParams((await readRequestBody(request, maxBytes)).toString("utf8"));
+}
+
+function assertJsonContentType(headers: IncomingMessage["headers"]): void {
+  const contentType = readHeader(headers, "content-type");
+  const mediaType = contentType?.split(";")[0]?.trim().toLowerCase() ?? "";
+  if (mediaType !== "application/json" && !mediaType.endsWith("+json")) {
+    throw new RequestError(415, "Content-Type must be application/json.");
+  }
+}
+
+async function readRequestBody(request: IncomingMessage, maxBytes: number): Promise<Buffer> {
   const chunks: Uint8Array[] = [];
   let totalBytes = 0;
 
   for await (const chunk of request) {
-    const binary = typeof chunk === "string" ? new TextEncoder().encode(chunk) : chunk;
+    const binary = typeof chunk === "string" ? Buffer.from(chunk) : chunk;
     totalBytes += binary.byteLength;
     if (totalBytes > maxBytes) {
       throw new RequestError(413, `Request body exceeds ${maxBytes} bytes.`);
@@ -376,7 +403,33 @@ async function parseFormBody(
     chunks.push(binary);
   }
 
-  return new URLSearchParams(Buffer.concat(chunks).toString("utf8"));
+  return Buffer.concat(chunks);
+}
+
+function parseJsonText<T>(rawText: string): T {
+  if (!rawText.trim()) {
+    return {} as T;
+  }
+
+  try {
+    return JSON.parse(rawText) as T;
+  } catch {
+    throw new RequestError(400, "Invalid JSON payload.");
+  }
+}
+
+async function readJsonBody<T>(
+  request: IncomingMessage,
+  maxBytes: number
+): Promise<{ rawBytes: Buffer; rawText: string; value: T }> {
+  assertJsonContentType(request.headers);
+  const rawBytes = await readRequestBody(request, maxBytes);
+  const rawText = rawBytes.toString("utf8");
+  return {
+    rawBytes,
+    rawText,
+    value: parseJsonText<T>(rawText)
+  };
 }
 
 function normalizeEmail(value: string): string {
@@ -1935,11 +1988,45 @@ function cleanupRateLimitBuckets(now = Date.now()): void {
   }
 }
 
-const rateLimitBucketGcTimer = setInterval(() => {
-  cleanupRateLimitBuckets();
-}, RATE_LIMIT_BUCKET_GC_INTERVAL_MS);
+function enforceRateLimitBucketCap(now = Date.now()): void {
+  cleanupRateLimitBuckets(now);
+  const maxBuckets = getRateLimitBucketLimit();
+  if (rateLimitBuckets.size < maxBuckets) {
+    return;
+  }
 
-rateLimitBucketGcTimer.unref?.();
+  const overflowCount = rateLimitBuckets.size - maxBuckets + 1;
+  const entriesByExpiry = [...rateLimitBuckets.entries()].sort((left, right) => left[1].resetAt - right[1].resetAt);
+  for (let index = 0; index < overflowCount; index += 1) {
+    const entry = entriesByExpiry[index];
+    if (!entry) {
+      break;
+    }
+    rateLimitBuckets.delete(entry[0]);
+  }
+}
+
+let rateLimitBucketGcTimer: NodeJS.Timeout | null = null;
+
+function ensureRateLimitBucketGcTimer(): void {
+  if (rateLimitBucketGcTimer) {
+    return;
+  }
+
+  rateLimitBucketGcTimer = setInterval(() => {
+    cleanupRateLimitBuckets();
+  }, RATE_LIMIT_BUCKET_GC_INTERVAL_MS);
+  rateLimitBucketGcTimer.unref?.();
+}
+
+function stopRateLimitBucketGcTimer(): void {
+  if (rateLimitBucketGcTimer) {
+    clearInterval(rateLimitBucketGcTimer);
+    rateLimitBucketGcTimer = null;
+  }
+}
+
+ensureRateLimitBucketGcTimer();
 
 function getRateLimitRule(pathname: string, method: string): RateLimitRule | null {
   const normalizedMethod = method.toUpperCase();
@@ -2010,6 +2097,7 @@ function assertRateLimit(request: IncomingMessage, pathname: string, method: str
   const key = buildRateLimitKey(request, rule);
   const existing = rateLimitBuckets.get(key);
   if (!existing || existing.resetAt <= now) {
+    enforceRateLimitBucketCap(now);
     rateLimitBuckets.set(key, {
       count: 1,
       resetAt: now + rule.windowMs
@@ -2144,27 +2232,185 @@ function isCompletedStatus(status: string | null): boolean {
   );
 }
 
-function secretsMatch(signature: string, secret: string): boolean {
+function rawSecretsMatch(signature: string, secret: string): boolean {
   const signatureBytes = Buffer.from(signature);
   const secretBytes = Buffer.from(secret);
   return signatureBytes.length === secretBytes.length && timingSafeEqual(signatureBytes, secretBytes);
 }
 
-function verifyWebhookAuth(provider: PaymentProvider, headers: IncomingMessage["headers"]): void {
-  const secret = trimEnv(PROVIDER_WEBHOOK_SECRETS[provider]);
-  if (!secret) {
-    throw new RequestError(503, `Webhook secret is not configured for provider "${provider}".`);
-  }
-
-  const headerName = PROVIDER_WEBHOOK_HEADERS[provider];
-  const signature = readHeader(headers, headerName);
-  if (!signature) {
+function requireWebhookHeader(headers: IncomingMessage["headers"], headerName: string): string {
+  const value = readHeader(headers, headerName);
+  if (!value) {
     throw new RequestError(401, "Webhook request missing signature header.");
   }
+  return value;
+}
 
-  if (!secretsMatch(signature, secret)) {
+function verifyStableorderWebhookSignature(headers: IncomingMessage["headers"], rawText: string): void {
+  const secret = trimEnv(PROVIDER_WEBHOOK_SECRETS.stableorder);
+  if (!secret) {
+    throw new RequestError(503, `Webhook secret is not configured for provider "stableorder".`);
+  }
+
+  const signature = requireWebhookHeader(headers, PROVIDER_WEBHOOK_HEADERS.stableorder);
+  if (rawSecretsMatch(signature, secret)) {
+    return;
+  }
+
+  const expectedSignature = createHmac("sha256", secret).update(rawText).digest("hex");
+  if (rawSecretsMatch(signature, expectedSignature) || rawSecretsMatch(signature, `sha256=${expectedSignature}`)) {
+    return;
+  }
+
+  throw new RequestError(401, "Invalid webhook signature.");
+}
+
+function parseSignatureHeader(signatureHeader: string): Map<string, string[]> {
+  const parts = new Map<string, string[]>();
+  for (const segment of signatureHeader.split(",")) {
+    const [rawKey, ...rawValueParts] = segment.split("=");
+    const key = rawKey?.trim();
+    const value = rawValueParts.join("=").trim();
+    if (!key || !value) {
+      continue;
+    }
+
+    const existing = parts.get(key) ?? [];
+    existing.push(value);
+    parts.set(key, existing);
+  }
+
+  return parts;
+}
+
+function verifyStripeWebhookSignature(headers: IncomingMessage["headers"], rawText: string): void {
+  const secret = trimEnv(PROVIDER_WEBHOOK_SECRETS.stripe);
+  if (!secret) {
+    throw new RequestError(503, `Webhook secret is not configured for provider "stripe".`);
+  }
+
+  const signatureHeader = requireWebhookHeader(headers, PROVIDER_WEBHOOK_HEADERS.stripe);
+  const parsedSignature = parseSignatureHeader(signatureHeader);
+  const timestampText = parsedSignature.get("t")?.[0];
+  const signatures = parsedSignature.get("v1") ?? [];
+  if (!timestampText || signatures.length === 0) {
     throw new RequestError(401, "Invalid webhook signature.");
   }
+
+  const timestamp = Number.parseInt(timestampText, 10);
+  if (!Number.isInteger(timestamp)) {
+    throw new RequestError(401, "Invalid webhook signature.");
+  }
+
+  const ageMs = Math.abs(Date.now() - timestamp * 1000);
+  if (ageMs > getStripeWebhookToleranceMs()) {
+    throw new RequestError(401, "Webhook signature timestamp is outside the allowed tolerance.");
+  }
+
+  const payload = `${timestamp}.${rawText}`;
+  const expectedSignature = createHmac("sha256", secret).update(payload).digest("hex");
+  if (!signatures.some((candidate) => rawSecretsMatch(candidate, expectedSignature))) {
+    throw new RequestError(401, "Invalid webhook signature.");
+  }
+}
+
+function readRequiredPaypalVerificationConfig(): {
+  apiBaseUrl: string;
+  clientId: string;
+  clientSecret: string;
+  webhookId: string;
+} {
+  const clientId = trimEnv("THREADS_PAYPAL_CLIENT_ID");
+  const clientSecret = trimEnv("THREADS_PAYPAL_CLIENT_SECRET");
+  const webhookId = trimEnv("THREADS_PAYPAL_WEBHOOK_ID");
+  const apiBaseUrl = trimEnv("THREADS_PAYPAL_API_BASE_URL") ?? "https://api-m.paypal.com";
+
+  if (!clientId || !clientSecret || !webhookId) {
+    throw new RequestError(503, "PayPal webhook verification is not fully configured.");
+  }
+
+  return { apiBaseUrl, clientId, clientSecret, webhookId };
+}
+
+async function fetchPaypalAccessToken(config: {
+  apiBaseUrl: string;
+  clientId: string;
+  clientSecret: string;
+}): Promise<string> {
+  const authorization = Buffer.from(`${config.clientId}:${config.clientSecret}`).toString("base64");
+  const response = await fetchWithTimeout(new URL("/v1/oauth2/token", config.apiBaseUrl), {
+    method: "POST",
+    headers: {
+      authorization: `Basic ${authorization}`,
+      accept: "application/json",
+      "content-type": "application/x-www-form-urlencoded"
+    },
+    body: "grant_type=client_credentials"
+  });
+  const payload = (await response.json().catch(() => null)) as Record<string, unknown> | null;
+  const accessToken = readString(payload?.access_token);
+  if (!response.ok || !accessToken) {
+    throw new RequestError(502, "PayPal webhook verification token request failed.");
+  }
+  return accessToken;
+}
+
+async function verifyPaypalWebhookSignature(
+  headers: IncomingMessage["headers"],
+  rawPayload: unknown
+): Promise<void> {
+  const config = readRequiredPaypalVerificationConfig();
+  const accessToken = await fetchPaypalAccessToken(config);
+  const transmissionId = requireWebhookHeader(headers, "paypal-transmission-id");
+  const transmissionSig = requireWebhookHeader(headers, "paypal-transmission-sig");
+  const transmissionTime = requireWebhookHeader(headers, "paypal-transmission-time");
+  const authAlgo = requireWebhookHeader(headers, "paypal-auth-algo");
+  const certUrl = requireWebhookHeader(headers, "paypal-cert-url");
+
+  const response = await fetchWithTimeout(new URL("/v1/notifications/verify-webhook-signature", config.apiBaseUrl), {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${accessToken}`,
+      accept: "application/json",
+      "content-type": "application/json"
+    },
+    body: JSON.stringify({
+      auth_algo: authAlgo,
+      cert_url: certUrl,
+      transmission_id: transmissionId,
+      transmission_sig: transmissionSig,
+      transmission_time: transmissionTime,
+      webhook_id: config.webhookId,
+      webhook_event: rawPayload
+    })
+  });
+  const payload = (await response.json().catch(() => null)) as Record<string, unknown> | null;
+  const verificationStatus = readString(payload?.verification_status)?.toUpperCase();
+  if (!response.ok) {
+    throw new RequestError(502, "PayPal webhook verification failed.");
+  }
+  if (verificationStatus !== "SUCCESS") {
+    throw new RequestError(401, "Invalid webhook signature.");
+  }
+}
+
+async function verifyWebhookAuth(
+  provider: PaymentProvider,
+  headers: IncomingMessage["headers"],
+  rawText: string,
+  rawPayload: unknown
+): Promise<void> {
+  if (provider === "stableorder") {
+    verifyStableorderWebhookSignature(headers, rawText);
+    return;
+  }
+
+  if (provider === "stripe") {
+    verifyStripeWebhookSignature(headers, rawText);
+    return;
+  }
+
+  await verifyPaypalWebhookSignature(headers, rawPayload);
 }
 
 function buildWebhookHints(provider: PaymentProvider, rawPayload: unknown): WebhookHints {
@@ -3446,7 +3692,11 @@ async function handlePublicBotRoute(
     try {
       await collector.syncNow("user_sync");
       const nextState = await getBotSessionStateFromStore(rawSession);
-      json(response, 200, nextState);
+      const workspace = await readScrapbookPlusStateFromStore(rawSession);
+      json(response, 200, {
+        ...nextState,
+        workspace
+      });
     } catch (error) {
       json(response, 502, {
         error: toPublicErrorMessage(error, "Could not sync the latest mentions.")
@@ -3691,10 +3941,10 @@ async function handlePublicWebhook(
     return;
   }
 
-  const rawPayload = await parseJsonBody<unknown>(request, config.maxBodyBytes);
+  const { value: rawPayload, rawText } = await readJsonBody<unknown>(request, config.maxBodyBytes);
   const webhookHints = buildWebhookHints(provider, rawPayload);
   try {
-    verifyWebhookAuth(provider, request.headers);
+    await verifyWebhookAuth(provider, request.headers, rawText, rawPayload);
   } catch (error) {
     if (error instanceof RequestError) {
       await withDatabaseTransaction(async (data) => {
@@ -3878,9 +4128,28 @@ async function handleExtensionRoutes(
       return;
     }
 
-    const body = await parseJsonBody<{ code?: string; state?: string }>(request, config.maxBodyBytes);
+    const body = await parseJsonBody<{
+      code?: string;
+      state?: string;
+      token?: string;
+      deviceId?: string;
+      deviceLabel?: string;
+    }>(request, config.maxBodyBytes);
     try {
       const result = await completeExtensionLinkCodeFromStore(safeText(body.code), safeText(body.state));
+      const token = safeText(body.token);
+      const deviceId = safeText(body.deviceId);
+      const deviceLabel = safeText(body.deviceLabel);
+      if (token && deviceId && deviceLabel) {
+        try {
+          const activation = await withDatabaseTransaction((data) => getLicenseSeatStatus(data, token, deviceId, deviceLabel));
+          if (activation.ok && activation.licenseId) {
+            await syncExtensionCloudLicenseLinkFromStore(result.token, activation.licenseId, activation.activatedAt);
+          }
+        } catch {
+          // Linking the scrapbook session should not fail just because plan sync was skipped.
+        }
+      }
       json(response, 200, result);
     } catch (error) {
       json(response, 400, {
@@ -3894,6 +4163,20 @@ async function handleExtensionRoutes(
     if ((request.method ?? "GET") !== "GET") {
       methodNotAllowed(response);
       return;
+    }
+
+    const token = safeText(readHeader(request.headers, "x-threads-license-token"));
+    const deviceId = safeText(readHeader(request.headers, "x-threads-device-id"));
+    const deviceLabel = safeText(readHeader(request.headers, "x-threads-device-label"));
+    if (bearerToken && token && deviceId && deviceLabel) {
+      try {
+        const activation = await withDatabaseTransaction((data) => getLicenseSeatStatus(data, token, deviceId, deviceLabel));
+        if (activation.ok && activation.licenseId) {
+          await syncExtensionCloudLicenseLinkFromStore(bearerToken, activation.licenseId, activation.activatedAt);
+        }
+      } catch {
+        // Keep cloud status readable even when plan sync cannot be refreshed.
+      }
     }
 
     const status = await getExtensionCloudConnectionStatusFromStore(bearerToken);
@@ -4006,6 +4289,9 @@ async function handleExtensionRoutes(
       const activation = await withDatabaseTransaction((data) => getLicenseSeatStatus(data, token, deviceId, deviceLabel));
       if (!activation.ok) {
         throw new RequestError(403, describeProActivationFailure(activation.reason));
+      }
+      if (activation.licenseId) {
+        await syncExtensionCloudLicenseLinkFromStore(bearerToken, activation.licenseId, activation.activatedAt);
       }
 
       const result = await saveCloudArchiveWithExtensionTokenFromStore(
@@ -4719,6 +5005,7 @@ function createWebRuntime(port?: number): {
   config: ServerConfig;
   collector: BotMentionCollector;
   requestHandler: (request: IncomingMessage, response: ServerResponse) => Promise<void>;
+  shutdown: () => Promise<void>;
 } {
   const config = resolveConfig(port);
   assertSupportedProductionDatabaseConfig(getRuntimeConfigSnapshot().database);
@@ -4726,6 +5013,7 @@ function createWebRuntime(port?: number): {
     runTransaction: withDatabaseTransaction,
     loadDatabase
   });
+  ensureRateLimitBucketGcTimer();
   configureMonitoringService({
     getCollectorStatus: () => collector.getStatus()
   });
@@ -4735,6 +5023,12 @@ function createWebRuntime(port?: number): {
     collector,
     requestHandler: async (request: IncomingMessage, response: ServerResponse) => {
       await handleRequest(request, response, config, collector);
+    },
+    shutdown: async () => {
+      collector.stop();
+      stopMonitoringService();
+      stopRateLimitBucketGcTimer();
+      await closeDatabaseConnections();
     }
   };
 }
@@ -4744,19 +5038,73 @@ export function createWebRequestHandler(port?: number): (request: IncomingMessag
 }
 
 export function startWebServer(port?: number): import("node:http").Server {
-  const { config, collector, requestHandler } = createWebRuntime(port);
+  const { config, collector, requestHandler, shutdown } = createWebRuntime(port);
   const server = createServer((request, response) => {
     void requestHandler(request, response);
   });
+  server.requestTimeout = getServerRequestTimeoutMs();
+  server.headersTimeout = Math.max(server.requestTimeout + 1_000, getServerHeadersTimeoutMs());
+  server.keepAliveTimeout = getServerKeepAliveTimeoutMs();
 
   server.listen(config.port, () => {
     console.log(`SS Threads Plus web app running at http://127.0.0.1:${config.port}`);
   });
 
   collector.start();
+  let shutdownPromise: Promise<void> | null = null;
+  let runtimeClosed = false;
+
+  const closeRuntime = async (): Promise<void> => {
+    if (runtimeClosed) {
+      return;
+    }
+    runtimeClosed = true;
+    await shutdown();
+  };
+
+  const removeSignalHandlers = () => {
+    process.off("SIGINT", onSignal);
+    process.off("SIGTERM", onSignal);
+  };
+
+  const onSignal = (signal: NodeJS.Signals): void => {
+    if (shutdownPromise) {
+      return;
+    }
+
+    console.log(`[threads-web] Received ${signal}. Starting graceful shutdown.`);
+    const forceExitTimer = setTimeout(() => {
+      console.error("[threads-web] Graceful shutdown timed out.");
+      process.exit(1);
+    }, getGracefulShutdownTimeoutMs());
+    forceExitTimer.unref?.();
+
+    shutdownPromise = new Promise<void>((resolve) => {
+      server.close(async (error) => {
+        try {
+          if (error) {
+            logUnexpectedError("server close failed", error);
+            process.exitCode = 1;
+          }
+          await closeRuntime();
+        } catch (shutdownError) {
+          logUnexpectedError("graceful shutdown failed", shutdownError);
+          process.exitCode = 1;
+        } finally {
+          clearTimeout(forceExitTimer);
+          removeSignalHandlers();
+          resolve();
+        }
+      });
+    });
+  };
+
   server.on("close", () => {
-    collector.stop();
+    void closeRuntime();
+    removeSignalHandlers();
   });
+  process.on("SIGINT", onSignal);
+  process.on("SIGTERM", onSignal);
 
   return server;
 }

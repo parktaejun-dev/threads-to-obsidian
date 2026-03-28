@@ -52,3 +52,31 @@ test("reply surface reads comment count and waits for new permalink replies", as
   assert.equal(countUniquePermalinkUrls(document), 2);
   assert.ok(elapsed < 600);
 });
+
+test("reply surface exits quickly when comments exist but no loading signal appears", async () => {
+  const dom = new JSDOM(
+    `
+<!doctype html>
+<html lang="ko">
+  <body>
+    <main>
+      <article>
+        <a href="https://www.threads.com/@writer/post/ROOT222"><time datetime="2026-03-08T08:00:00.000Z">1시간</time></a>
+        <div>writer</div>
+        <div>메인 글 본문입니다.</div>
+        <button>좋아요 12</button>
+        <button>댓글 9</button>
+      </article>
+    </main>
+  </body>
+</html>
+`,
+    { url: "https://www.threads.com/@writer/post/ROOT222" }
+  );
+
+  const startedAt = Date.now();
+  await waitForReplySurface(dom.window.document, dom.window.location.href, 4500);
+  const elapsed = Date.now() - startedAt;
+
+  assert.ok(elapsed < 1500);
+});

@@ -10445,6 +10445,16 @@ var databaseReconfigurationBarrier = null;
 var releaseDatabaseReconfigurationBarrier = null;
 var databaseReconfigurationChain = Promise.resolve();
 var databaseIdleWaiters = /* @__PURE__ */ new Set();
+function trimEnv2(name) {
+  return process.env[name]?.trim();
+}
+function parsePositiveInteger2(raw, fallback) {
+  if (!raw) {
+    return fallback;
+  }
+  const parsed = Number.parseInt(raw, 10);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
 async function withDatabaseLock(operation) {
   let operationResult;
   operationResult = databaseOperationChain.then(() => operation());
@@ -10615,13 +10625,37 @@ async function getPostgresPool(connectionString) {
     return postgresPool;
   }
   if (postgresPool) {
-    await postgresPool.end().catch(() => void 0);
+    await closeDatabaseConnections();
   }
   postgresPool = new Pool({
-    connectionString
+    connectionString,
+    allowExitOnIdle: true,
+    connectionTimeoutMillis: parsePositiveInteger2(trimEnv2("THREADS_WEB_POSTGRES_CONNECTION_TIMEOUT_MS"), 1e4),
+    idleTimeoutMillis: parsePositiveInteger2(trimEnv2("THREADS_WEB_POSTGRES_IDLE_TIMEOUT_MS"), 3e4),
+    max: parsePositiveInteger2(trimEnv2("THREADS_WEB_POSTGRES_MAX"), 10),
+    query_timeout: parsePositiveInteger2(trimEnv2("THREADS_WEB_POSTGRES_QUERY_TIMEOUT_MS"), 15e3),
+    statement_timeout: parsePositiveInteger2(trimEnv2("THREADS_WEB_POSTGRES_STATEMENT_TIMEOUT_MS"), 15e3)
+  });
+  postgresPool.on("error", (error) => {
+    console.error("[threads-web] postgres pool error", error);
   });
   postgresPoolConnectionString = connectionString;
   return postgresPool;
+}
+async function closeDatabaseConnections() {
+  if (postgresPool) {
+    await postgresPool.end().catch(() => void 0);
+    postgresPool = null;
+  }
+  postgresPoolConnectionString = null;
+  ensuredPostgresStores.clear();
+  ensuredPostgresMentionJobStores.clear();
+  ensuredPostgresBotUserStores.clear();
+  ensuredPostgresBotArchiveStores.clear();
+  ensuredPostgresRelationalStores.clear();
+  seededPostgresBotUserStores.clear();
+  seededPostgresBotArchiveStores.clear();
+  seededPostgresRelationalStores.clear();
 }
 async function ensurePostgresStore(client, tableName) {
   const cacheKey = `${postgresPoolConnectionString ?? "unknown"}::${tableName}`;
@@ -13521,6 +13555,7 @@ async function activateLicenseSeat(data, token, deviceId, deviceLabel) {
     upsertActivation(data, existing);
     return {
       ok: true,
+      licenseId: validated.license?.id ?? null,
       holder: validated.holder,
       expiresAt: validated.expiresAt,
       issuedAt: validated.issuedAt,
@@ -13550,6 +13585,7 @@ async function activateLicenseSeat(data, token, deviceId, deviceLabel) {
   upsertActivation(data, activation);
   return {
     ok: true,
+    licenseId: validated.license?.id ?? null,
     holder: validated.holder,
     expiresAt: validated.expiresAt,
     issuedAt: validated.issuedAt,
@@ -13577,6 +13613,7 @@ async function getLicenseSeatStatus(data, token, deviceId, deviceLabel) {
   upsertActivation(data, existing);
   return {
     ok: true,
+    licenseId: validated.license?.id ?? null,
     holder: validated.holder,
     expiresAt: validated.expiresAt,
     issuedAt: validated.issuedAt,
@@ -16705,6 +16742,54 @@ async function hashPost(post) {
   return Array.from(new Uint8Array(digest)).map((value) => value.toString(16).padStart(2, "0")).join("").slice(0, 16);
 }
 
+// src/server/http-client.ts
+var DEFAULT_OUTBOUND_FETCH_TIMEOUT_MS = 15e3;
+function trimEnv3(name) {
+  return process.env[name]?.trim();
+}
+function parsePositiveInteger3(raw, fallback) {
+  if (!raw) {
+    return fallback;
+  }
+  const parsed = Number.parseInt(raw, 10);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
+function getOutboundFetchTimeoutMs() {
+  return parsePositiveInteger3(trimEnv3("THREADS_WEB_FETCH_TIMEOUT_MS"), DEFAULT_OUTBOUND_FETCH_TIMEOUT_MS);
+}
+async function fetchWithTimeout(input, init = {}, timeoutMs = getOutboundFetchTimeoutMs()) {
+  const controller = new AbortController();
+  const upstreamSignal = init.signal;
+  const abortFromUpstream = () => {
+    controller.abort(upstreamSignal?.reason);
+  };
+  if (upstreamSignal) {
+    if (upstreamSignal.aborted) {
+      abortFromUpstream();
+    } else {
+      upstreamSignal.addEventListener("abort", abortFromUpstream, { once: true });
+    }
+  }
+  const timeoutId = setTimeout(() => {
+    controller.abort(new Error(`Outbound request timed out after ${timeoutMs} ms.`));
+  }, timeoutMs);
+  timeoutId.unref?.();
+  try {
+    return await fetch(input, {
+      ...init,
+      signal: controller.signal
+    });
+  } catch (error) {
+    if (controller.signal.aborted && !upstreamSignal?.aborted) {
+      throw new Error(`Outbound request timed out after ${timeoutMs} ms.`);
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+    upstreamSignal?.removeEventListener("abort", abortFromUpstream);
+  }
+}
+
 // src/server/scrapbook-plan-service.ts
 var FREE_SCRAPBOOK_ARCHIVE_LIMIT = 100;
 var FREE_SCRAPBOOK_FOLDER_LIMIT = 5;
@@ -16722,6 +16807,9 @@ function findUserPlusLicense(data, user) {
     return null;
   }
   return data.licenses.find((candidate) => candidate.id === user.plusLicenseId) ?? null;
+}
+function isActivePlusLicense(license) {
+  return Boolean(license && license.status !== "revoked" && !hasLicenseExpired(license));
 }
 function countScrapbookArchivesForUser(data, userId) {
   return data.botArchives.filter((candidate) => candidate.userId === userId).length + data.cloudArchives.filter((candidate) => candidate.userId === userId).length;
@@ -16805,6 +16893,36 @@ async function activateScrapbookPlus(data, user, token) {
   user.updatedAt = user.plusActivatedAt;
   upsertBotUser(data, user);
   return readScrapbookPlanState(data, user);
+}
+function syncScrapbookPlusLicenseLink(data, user, licenseId, linkedAt) {
+  const normalizedLicenseId = `${licenseId ?? ""}`.trim();
+  if (!normalizedLicenseId) {
+    return false;
+  }
+  const license = data.licenses.find((candidate) => candidate.id === normalizedLicenseId) ?? null;
+  if (!license || !isActivePlusLicense(license)) {
+    return false;
+  }
+  const activeLicense = license;
+  const otherUser = data.botUsers.find(
+    (candidate) => candidate.id !== user.id && candidate.status === "active" && candidate.plusLicenseId === activeLicense.id
+  );
+  if (otherUser) {
+    return false;
+  }
+  const currentLicense = findUserPlusLicense(data, user);
+  if (user.plusLicenseId && user.plusLicenseId !== activeLicense.id && isActivePlusLicense(currentLicense)) {
+    return false;
+  }
+  if (user.plusLicenseId === activeLicense.id && user.plusActivatedAt) {
+    return true;
+  }
+  const syncedAt = `${linkedAt ?? ""}`.trim() || (/* @__PURE__ */ new Date()).toISOString();
+  user.plusLicenseId = activeLicense.id;
+  user.plusActivatedAt = user.plusActivatedAt ?? syncedAt;
+  user.updatedAt = syncedAt;
+  upsertBotUser(data, user);
+  return true;
 }
 function clearScrapbookPlus(data, user) {
   user.plusLicenseId = null;
@@ -16901,7 +17019,7 @@ async function assertSafeArchiveMediaUrl(mediaUrl) {
 }
 async function fetchArchiveAsset(mediaUrl) {
   const safeUrl = await assertSafeArchiveMediaUrl(mediaUrl);
-  const response = await fetch(safeUrl, {
+  const response = await fetchWithTimeout(safeUrl, {
     cache: "no-store",
     redirect: "manual"
   });
@@ -17840,7 +17958,7 @@ function findBotExtensionAccessTokenRecord(data, rawToken) {
 }
 async function exchangeAuthorizationCode(code, publicOrigin) {
   const { appId, appSecret } = readThreadsOauthConfig();
-  const response = await fetch(`${buildThreadsApiBaseUrl()}oauth/access_token`, {
+  const response = await fetchWithTimeout(`${buildThreadsApiBaseUrl()}oauth/access_token`, {
     method: "POST",
     headers: {
       "content-type": "application/x-www-form-urlencoded"
@@ -17865,7 +17983,7 @@ async function exchangeLongLivedToken(accessToken) {
   url.searchParams.set("grant_type", "th_exchange_token");
   url.searchParams.set("client_secret", appSecret);
   url.searchParams.set("access_token", accessToken);
-  const response = await fetch(url);
+  const response = await fetchWithTimeout(url);
   const body = await response.json().catch(() => null);
   if (!response.ok) {
     throw new Error(body?.error_message?.trim() || "Threads long-lived token exchange failed.");
@@ -17879,7 +17997,7 @@ async function fetchThreadsProfile(accessToken) {
     ["id", "username", "name", "threads_profile_picture_url", "threads_biography", "is_verified"].join(",")
   );
   url.searchParams.set("access_token", accessToken);
-  const response = await fetch(url);
+  const response = await fetchWithTimeout(url);
   const body = await response.json().catch(() => null);
   if (!response.ok) {
     throw new Error(body?.error_message?.trim() || "Threads profile lookup failed.");
@@ -17890,7 +18008,7 @@ async function refreshThreadsAccessToken(accessToken) {
   const url = new URL("refresh_access_token", buildThreadsApiBaseUrl());
   url.searchParams.set("grant_type", "th_refresh_token");
   url.searchParams.set("access_token", accessToken);
-  const response = await fetch(url);
+  const response = await fetchWithTimeout(url);
   const body = await response.json().catch(() => null);
   if (!response.ok) {
     throw new Error(body?.error_message?.trim() || "Threads access token refresh failed.");
@@ -18200,6 +18318,10 @@ function requireExtensionLinkUser(data, rawToken) {
   upsertBotExtensionAccessToken(data, tokenRecord);
   return { user, tokenRecord };
 }
+function syncExtensionCloudLicenseLink(data, rawToken, licenseId, linkedAt) {
+  const { user } = requireExtensionLinkUser(data, rawToken);
+  return syncScrapbookPlusLicenseLink(data, user, licenseId, linkedAt);
+}
 function revokeExtensionCloudConnection(data, rawToken) {
   const tokenRecord = findBotExtensionAccessTokenRecord(data, rawToken);
   if (!tokenRecord) {
@@ -18307,6 +18429,11 @@ async function getExtensionCloudConnectionStatusFromStore(rawToken) {
 }
 async function revokeExtensionCloudConnectionFromStore(rawToken) {
   return withBotAuthDatabaseTransaction((data) => revokeExtensionCloudConnection(data, rawToken));
+}
+async function syncExtensionCloudLicenseLinkFromStore(rawToken, licenseId, linkedAt) {
+  return withBotAuthDatabaseTransaction(
+    (data) => syncExtensionCloudLicenseLink(data, rawToken, licenseId, linkedAt)
+  );
 }
 async function getBotSessionStateFromStore(rawSession) {
   return withBotSessionDatabaseTransaction(rawSession, (data) => getBotSessionState(data, rawSession));
@@ -18828,7 +18955,7 @@ function parseThreadsApiError(payload, fallback) {
   return directMessage || fallback;
 }
 async function requestThreadsJson(url) {
-  const response = await fetch(url, { cache: "no-store" });
+  const response = await fetchWithTimeout(url, { cache: "no-store" });
   const body = await response.json().catch(() => null);
   if (!response.ok) {
     throw new Error(parseThreadsApiError(body, `Threads API request failed (${response.status}).`));
@@ -20361,12 +20488,12 @@ function parsePositiveInt(raw, fallback, minimum = 1, maximum = Number.MAX_SAFE_
   }
   return parsed;
 }
-function trimEnv2(name) {
+function trimEnv4(name) {
   const value = process.env[name]?.trim();
   return value ? value : null;
 }
 function parsePositiveIntEnv(name, fallback, minimum = 1, maximum = Number.MAX_SAFE_INTEGER) {
-  const raw = trimEnv2(name);
+  const raw = trimEnv4(name);
   if (!raw) {
     return fallback;
   }
@@ -21790,6 +21917,13 @@ function configureMonitoringService(options) {
   }, AUTO_RUN_INTERVAL_MS);
   autoRunTimer.unref?.();
 }
+function stopMonitoringService() {
+  if (autoRunTimer) {
+    clearInterval(autoRunTimer);
+    autoRunTimer = null;
+  }
+  collectorStatusReader = null;
+}
 async function getMonitoringOverview() {
   const data = await loadDatabase();
   return buildOverviewFromData(data);
@@ -21840,6 +21974,12 @@ var ADMIN_SESSION_COOKIE_MAX_AGE_SECONDS = 12 * 60 * 60;
 var ADMIN_SESSION_VERSION = "v1";
 var DEFAULT_ADMIN_ALLOWLIST = /* @__PURE__ */ new Set(["127.0.0.1", "::1"]);
 var RATE_LIMIT_BUCKET_GC_INTERVAL_MS = 5 * 6e4;
+var DEFAULT_RATE_LIMIT_BUCKET_LIMIT = 5e4;
+var DEFAULT_STRIPE_WEBHOOK_TOLERANCE_MS = 5 * 6e4;
+var DEFAULT_SERVER_REQUEST_TIMEOUT_MS = 3e4;
+var DEFAULT_SERVER_HEADERS_TIMEOUT_MS = 35e3;
+var DEFAULT_SERVER_KEEP_ALIVE_TIMEOUT_MS = 5e3;
+var DEFAULT_GRACEFUL_SHUTDOWN_TIMEOUT_MS = 15e3;
 var RequestError = class extends Error {
   constructor(statusCode, message) {
     super(message);
@@ -21861,8 +22001,7 @@ var PROVIDER_METHOD_DEFAULT_IDS = {
 };
 var PROVIDER_WEBHOOK_SECRETS = {
   stableorder: "THREADS_WEBHOOK_SECRET_STABLEORDER",
-  stripe: "THREADS_WEBHOOK_SECRET_STRIPE",
-  paypal: "THREADS_WEBHOOK_SECRET_PAYPAL"
+  stripe: "THREADS_WEBHOOK_SECRET_STRIPE"
 };
 var PROVIDER_WEBHOOK_HEADERS = {
   stableorder: "x-stableorder-signature",
@@ -21879,8 +22018,15 @@ var LEGACY_PUBLIC_HOSTS = /* @__PURE__ */ new Set(["threads-obsidian.dahanda.dev
 var LEGACY_PUBLIC_PAGE_PATHS = /* @__PURE__ */ new Set(["/", "/landing", "/landing/", "/scrapbook", "/scrapbook/", "/checkout", "/checkout/"]);
 var SCRAPBOOK_HANDLE_PATH_RE = /^\/scrapbook\/@[^/.?#/]+\/?$/;
 var SCRAPBOOK_ARCHIVE_PATH_RE = /^\/scrapbook(?:\/@[^/.?#/]+)?\/archive\/[^/]+\/?$/;
-function trimEnv3(name) {
+function trimEnv5(name) {
   return process.env[name]?.trim();
+}
+function parsePositiveInteger4(raw, fallback) {
+  if (!raw) {
+    return fallback;
+  }
+  const parsed = Number.parseInt(raw, 10);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
 }
 function parsePort(raw, fallback) {
   if (!raw) {
@@ -21915,7 +22061,7 @@ function parseMaxBodyBytes(raw) {
   return parsed;
 }
 function isProductionRuntime() {
-  return trimEnv3("NODE_ENV") === "production";
+  return trimEnv5("NODE_ENV") === "production";
 }
 function assertSupportedProductionDatabaseConfig(database, statusCode = 500) {
   if (!isProductionRuntime()) {
@@ -21935,15 +22081,33 @@ function assertSupportedProductionDatabaseConfig(database, statusCode = 500) {
   }
 }
 function resolveConfig(portOverride) {
-  const adminToken = trimEnv3("THREADS_WEB_ADMIN_TOKEN");
+  const adminToken = trimEnv5("THREADS_WEB_ADMIN_TOKEN");
   if (!adminToken) {
     throw new RequestError(500, "THREADS_WEB_ADMIN_TOKEN is required for web server startup.");
   }
   return {
     adminToken,
-    maxBodyBytes: parseMaxBodyBytes(trimEnv3("THREADS_WEB_MAX_BODY_BYTES")),
-    port: parsePortFromArg(portOverride, trimEnv3("THREADS_WEB_PORT"))
+    maxBodyBytes: parseMaxBodyBytes(trimEnv5("THREADS_WEB_MAX_BODY_BYTES")),
+    port: parsePortFromArg(portOverride, trimEnv5("THREADS_WEB_PORT"))
   };
+}
+function getRateLimitBucketLimit() {
+  return parsePositiveInteger4(trimEnv5("THREADS_WEB_RATE_LIMIT_BUCKET_LIMIT"), DEFAULT_RATE_LIMIT_BUCKET_LIMIT);
+}
+function getStripeWebhookToleranceMs() {
+  return parsePositiveInteger4(trimEnv5("THREADS_STRIPE_WEBHOOK_TOLERANCE_MS"), DEFAULT_STRIPE_WEBHOOK_TOLERANCE_MS);
+}
+function getServerRequestTimeoutMs() {
+  return parsePositiveInteger4(trimEnv5("THREADS_WEB_REQUEST_TIMEOUT_MS"), DEFAULT_SERVER_REQUEST_TIMEOUT_MS);
+}
+function getServerHeadersTimeoutMs() {
+  return parsePositiveInteger4(trimEnv5("THREADS_WEB_HEADERS_TIMEOUT_MS"), DEFAULT_SERVER_HEADERS_TIMEOUT_MS);
+}
+function getServerKeepAliveTimeoutMs() {
+  return parsePositiveInteger4(trimEnv5("THREADS_WEB_KEEP_ALIVE_TIMEOUT_MS"), DEFAULT_SERVER_KEEP_ALIVE_TIMEOUT_MS);
+}
+function getGracefulShutdownTimeoutMs() {
+  return parsePositiveInteger4(trimEnv5("THREADS_WEB_GRACEFUL_SHUTDOWN_TIMEOUT_MS"), DEFAULT_GRACEFUL_SHUTDOWN_TIMEOUT_MS);
 }
 function json(response, statusCode, payload) {
   response.writeHead(statusCode, { "content-type": "application/json; charset=utf-8" });
@@ -21977,43 +22141,50 @@ function isAdminAuthorized(request, adminToken) {
   return isAdminBearerAuthorized(request, adminToken) || Boolean(readAdminSession(request, adminToken));
 }
 async function parseJsonBody(request, maxBytes) {
-  const contentType = readHeader(request.headers, "content-type");
+  return (await readJsonBody(request, maxBytes)).value;
+}
+async function parseFormBody(request, maxBytes) {
+  return new URLSearchParams((await readRequestBody(request, maxBytes)).toString("utf8"));
+}
+function assertJsonContentType(headers) {
+  const contentType = readHeader(headers, "content-type");
   const mediaType = contentType?.split(";")[0]?.trim().toLowerCase() ?? "";
   if (mediaType !== "application/json" && !mediaType.endsWith("+json")) {
     throw new RequestError(415, "Content-Type must be application/json.");
   }
+}
+async function readRequestBody(request, maxBytes) {
   const chunks = [];
   let totalBytes = 0;
   for await (const chunk of request) {
-    const binary = typeof chunk === "string" ? new TextEncoder().encode(chunk) : chunk;
+    const binary = typeof chunk === "string" ? Buffer.from(chunk) : chunk;
     totalBytes += binary.byteLength;
     if (totalBytes > maxBytes) {
       throw new RequestError(413, `Request body exceeds ${maxBytes} bytes.`);
     }
     chunks.push(binary);
   }
-  const raw = Buffer.concat(chunks).toString("utf8").trim();
-  if (!raw) {
+  return Buffer.concat(chunks);
+}
+function parseJsonText(rawText) {
+  if (!rawText.trim()) {
     return {};
   }
   try {
-    return JSON.parse(raw);
+    return JSON.parse(rawText);
   } catch {
     throw new RequestError(400, "Invalid JSON payload.");
   }
 }
-async function parseFormBody(request, maxBytes) {
-  const chunks = [];
-  let totalBytes = 0;
-  for await (const chunk of request) {
-    const binary = typeof chunk === "string" ? new TextEncoder().encode(chunk) : chunk;
-    totalBytes += binary.byteLength;
-    if (totalBytes > maxBytes) {
-      throw new RequestError(413, `Request body exceeds ${maxBytes} bytes.`);
-    }
-    chunks.push(binary);
-  }
-  return new URLSearchParams(Buffer.concat(chunks).toString("utf8"));
+async function readJsonBody(request, maxBytes) {
+  assertJsonContentType(request.headers);
+  const rawBytes = await readRequestBody(request, maxBytes);
+  const rawText = rawBytes.toString("utf8");
+  return {
+    rawBytes,
+    rawText,
+    value: parseJsonText(rawText)
+  };
 }
 function normalizeEmail(value) {
   return value.trim().toLowerCase();
@@ -23109,7 +23280,7 @@ function resolveRequestOrigin(request, requestUrl) {
   return `${protocol}://${host}`;
 }
 function readConfiguredPublicOrigin() {
-  const configuredOrigin = getRuntimeConfigSnapshot().publicOrigin || trimEnv3("THREADS_WEB_PUBLIC_ORIGIN");
+  const configuredOrigin = getRuntimeConfigSnapshot().publicOrigin || trimEnv5("THREADS_WEB_PUBLIC_ORIGIN");
   if (!configuredOrigin) {
     return null;
   }
@@ -23211,7 +23382,7 @@ function normalizeIpAddress(value) {
   return normalized.startsWith("::ffff:") ? normalized.slice("::ffff:".length) : normalized;
 }
 function readTrustedProxyAllowlist() {
-  const raw = trimEnv3("THREADS_WEB_TRUST_PROXY_ALLOWLIST");
+  const raw = trimEnv5("THREADS_WEB_TRUST_PROXY_ALLOWLIST");
   if (!raw) {
     return /* @__PURE__ */ new Set();
   }
@@ -23234,7 +23405,7 @@ function readClientIp(request) {
   return peerIp;
 }
 function readAdminAllowlist() {
-  const raw = trimEnv3("THREADS_WEB_ADMIN_ALLOWLIST");
+  const raw = trimEnv5("THREADS_WEB_ADMIN_ALLOWLIST");
   if (!raw) {
     return new Set(DEFAULT_ADMIN_ALLOWLIST);
   }
@@ -23252,7 +23423,7 @@ function assertAdminIpAllowed(request) {
   }
 }
 function readConfiguredAdminOrigin() {
-  const raw = trimEnv3("THREADS_WEB_ADMIN_ORIGIN");
+  const raw = trimEnv5("THREADS_WEB_ADMIN_ORIGIN");
   if (!raw) {
     return null;
   }
@@ -23280,10 +23451,39 @@ function cleanupRateLimitBuckets(now = Date.now()) {
     }
   }
 }
-var rateLimitBucketGcTimer = setInterval(() => {
-  cleanupRateLimitBuckets();
-}, RATE_LIMIT_BUCKET_GC_INTERVAL_MS);
-rateLimitBucketGcTimer.unref?.();
+function enforceRateLimitBucketCap(now = Date.now()) {
+  cleanupRateLimitBuckets(now);
+  const maxBuckets = getRateLimitBucketLimit();
+  if (rateLimitBuckets.size < maxBuckets) {
+    return;
+  }
+  const overflowCount = rateLimitBuckets.size - maxBuckets + 1;
+  const entriesByExpiry = [...rateLimitBuckets.entries()].sort((left, right) => left[1].resetAt - right[1].resetAt);
+  for (let index = 0; index < overflowCount; index += 1) {
+    const entry = entriesByExpiry[index];
+    if (!entry) {
+      break;
+    }
+    rateLimitBuckets.delete(entry[0]);
+  }
+}
+var rateLimitBucketGcTimer = null;
+function ensureRateLimitBucketGcTimer() {
+  if (rateLimitBucketGcTimer) {
+    return;
+  }
+  rateLimitBucketGcTimer = setInterval(() => {
+    cleanupRateLimitBuckets();
+  }, RATE_LIMIT_BUCKET_GC_INTERVAL_MS);
+  rateLimitBucketGcTimer.unref?.();
+}
+function stopRateLimitBucketGcTimer() {
+  if (rateLimitBucketGcTimer) {
+    clearInterval(rateLimitBucketGcTimer);
+    rateLimitBucketGcTimer = null;
+  }
+}
+ensureRateLimitBucketGcTimer();
 function getRateLimitRule(pathname, method) {
   const normalizedMethod = method.toUpperCase();
   if (pathname.startsWith("/api/admin/")) {
@@ -23334,6 +23534,7 @@ function assertRateLimit(request, pathname, method) {
   const key = buildRateLimitKey(request, rule);
   const existing = rateLimitBuckets.get(key);
   if (!existing || existing.resetAt <= now) {
+    enforceRateLimitBucketCap(now);
     rateLimitBuckets.set(key, {
       count: 1,
       resetAt: now + rule.windowMs
@@ -23432,24 +23633,146 @@ function isCompletedStatus(status) {
   const normalized = status.trim().toLowerCase();
   return normalized === "paid" || normalized === "payment_succeeded" || normalized === "succeeded" || normalized === "completed" || normalized === "complete" || normalized === "captured" || normalized === "approved";
 }
-function secretsMatch(signature, secret) {
+function rawSecretsMatch(signature, secret) {
   const signatureBytes = Buffer.from(signature);
   const secretBytes = Buffer.from(secret);
   return signatureBytes.length === secretBytes.length && timingSafeEqual(signatureBytes, secretBytes);
 }
-function verifyWebhookAuth(provider, headers) {
-  const secret = trimEnv3(PROVIDER_WEBHOOK_SECRETS[provider]);
-  if (!secret) {
-    throw new RequestError(503, `Webhook secret is not configured for provider "${provider}".`);
-  }
-  const headerName = PROVIDER_WEBHOOK_HEADERS[provider];
-  const signature = readHeader(headers, headerName);
-  if (!signature) {
+function requireWebhookHeader(headers, headerName) {
+  const value = readHeader(headers, headerName);
+  if (!value) {
     throw new RequestError(401, "Webhook request missing signature header.");
   }
-  if (!secretsMatch(signature, secret)) {
+  return value;
+}
+function verifyStableorderWebhookSignature(headers, rawText) {
+  const secret = trimEnv5(PROVIDER_WEBHOOK_SECRETS.stableorder);
+  if (!secret) {
+    throw new RequestError(503, `Webhook secret is not configured for provider "stableorder".`);
+  }
+  const signature = requireWebhookHeader(headers, PROVIDER_WEBHOOK_HEADERS.stableorder);
+  if (rawSecretsMatch(signature, secret)) {
+    return;
+  }
+  const expectedSignature = createHmac("sha256", secret).update(rawText).digest("hex");
+  if (rawSecretsMatch(signature, expectedSignature) || rawSecretsMatch(signature, `sha256=${expectedSignature}`)) {
+    return;
+  }
+  throw new RequestError(401, "Invalid webhook signature.");
+}
+function parseSignatureHeader(signatureHeader) {
+  const parts = /* @__PURE__ */ new Map();
+  for (const segment of signatureHeader.split(",")) {
+    const [rawKey, ...rawValueParts] = segment.split("=");
+    const key = rawKey?.trim();
+    const value = rawValueParts.join("=").trim();
+    if (!key || !value) {
+      continue;
+    }
+    const existing = parts.get(key) ?? [];
+    existing.push(value);
+    parts.set(key, existing);
+  }
+  return parts;
+}
+function verifyStripeWebhookSignature(headers, rawText) {
+  const secret = trimEnv5(PROVIDER_WEBHOOK_SECRETS.stripe);
+  if (!secret) {
+    throw new RequestError(503, `Webhook secret is not configured for provider "stripe".`);
+  }
+  const signatureHeader = requireWebhookHeader(headers, PROVIDER_WEBHOOK_HEADERS.stripe);
+  const parsedSignature = parseSignatureHeader(signatureHeader);
+  const timestampText = parsedSignature.get("t")?.[0];
+  const signatures = parsedSignature.get("v1") ?? [];
+  if (!timestampText || signatures.length === 0) {
     throw new RequestError(401, "Invalid webhook signature.");
   }
+  const timestamp = Number.parseInt(timestampText, 10);
+  if (!Number.isInteger(timestamp)) {
+    throw new RequestError(401, "Invalid webhook signature.");
+  }
+  const ageMs = Math.abs(Date.now() - timestamp * 1e3);
+  if (ageMs > getStripeWebhookToleranceMs()) {
+    throw new RequestError(401, "Webhook signature timestamp is outside the allowed tolerance.");
+  }
+  const payload = `${timestamp}.${rawText}`;
+  const expectedSignature = createHmac("sha256", secret).update(payload).digest("hex");
+  if (!signatures.some((candidate) => rawSecretsMatch(candidate, expectedSignature))) {
+    throw new RequestError(401, "Invalid webhook signature.");
+  }
+}
+function readRequiredPaypalVerificationConfig() {
+  const clientId = trimEnv5("THREADS_PAYPAL_CLIENT_ID");
+  const clientSecret = trimEnv5("THREADS_PAYPAL_CLIENT_SECRET");
+  const webhookId = trimEnv5("THREADS_PAYPAL_WEBHOOK_ID");
+  const apiBaseUrl = trimEnv5("THREADS_PAYPAL_API_BASE_URL") ?? "https://api-m.paypal.com";
+  if (!clientId || !clientSecret || !webhookId) {
+    throw new RequestError(503, "PayPal webhook verification is not fully configured.");
+  }
+  return { apiBaseUrl, clientId, clientSecret, webhookId };
+}
+async function fetchPaypalAccessToken(config) {
+  const authorization = Buffer.from(`${config.clientId}:${config.clientSecret}`).toString("base64");
+  const response = await fetchWithTimeout(new URL("/v1/oauth2/token", config.apiBaseUrl), {
+    method: "POST",
+    headers: {
+      authorization: `Basic ${authorization}`,
+      accept: "application/json",
+      "content-type": "application/x-www-form-urlencoded"
+    },
+    body: "grant_type=client_credentials"
+  });
+  const payload = await response.json().catch(() => null);
+  const accessToken = readString3(payload?.access_token);
+  if (!response.ok || !accessToken) {
+    throw new RequestError(502, "PayPal webhook verification token request failed.");
+  }
+  return accessToken;
+}
+async function verifyPaypalWebhookSignature(headers, rawPayload) {
+  const config = readRequiredPaypalVerificationConfig();
+  const accessToken = await fetchPaypalAccessToken(config);
+  const transmissionId = requireWebhookHeader(headers, "paypal-transmission-id");
+  const transmissionSig = requireWebhookHeader(headers, "paypal-transmission-sig");
+  const transmissionTime = requireWebhookHeader(headers, "paypal-transmission-time");
+  const authAlgo = requireWebhookHeader(headers, "paypal-auth-algo");
+  const certUrl = requireWebhookHeader(headers, "paypal-cert-url");
+  const response = await fetchWithTimeout(new URL("/v1/notifications/verify-webhook-signature", config.apiBaseUrl), {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${accessToken}`,
+      accept: "application/json",
+      "content-type": "application/json"
+    },
+    body: JSON.stringify({
+      auth_algo: authAlgo,
+      cert_url: certUrl,
+      transmission_id: transmissionId,
+      transmission_sig: transmissionSig,
+      transmission_time: transmissionTime,
+      webhook_id: config.webhookId,
+      webhook_event: rawPayload
+    })
+  });
+  const payload = await response.json().catch(() => null);
+  const verificationStatus = readString3(payload?.verification_status)?.toUpperCase();
+  if (!response.ok) {
+    throw new RequestError(502, "PayPal webhook verification failed.");
+  }
+  if (verificationStatus !== "SUCCESS") {
+    throw new RequestError(401, "Invalid webhook signature.");
+  }
+}
+async function verifyWebhookAuth(provider, headers, rawText, rawPayload) {
+  if (provider === "stableorder") {
+    verifyStableorderWebhookSignature(headers, rawText);
+    return;
+  }
+  if (provider === "stripe") {
+    verifyStripeWebhookSignature(headers, rawText);
+    return;
+  }
+  await verifyPaypalWebhookSignature(headers, rawPayload);
 }
 function buildWebhookHints(provider, rawPayload) {
   const payload = toRecord3(rawPayload);
@@ -24477,7 +24800,11 @@ async function handlePublicBotRoute(request, response, pathname, config, collect
     try {
       await collector.syncNow("user_sync");
       const nextState = await getBotSessionStateFromStore(rawSession);
-      json(response, 200, nextState);
+      const workspace = await readScrapbookPlusStateFromStore(rawSession);
+      json(response, 200, {
+        ...nextState,
+        workspace
+      });
     } catch (error) {
       json(response, 502, {
         error: toPublicErrorMessage(error, "Could not sync the latest mentions.")
@@ -24678,10 +25005,10 @@ async function handlePublicWebhook(request, response, pathname, config) {
     methodNotAllowed(response);
     return;
   }
-  const rawPayload = await parseJsonBody(request, config.maxBodyBytes);
+  const { value: rawPayload, rawText } = await readJsonBody(request, config.maxBodyBytes);
   const webhookHints = buildWebhookHints(provider, rawPayload);
   try {
-    verifyWebhookAuth(provider, request.headers);
+    await verifyWebhookAuth(provider, request.headers, rawText, rawPayload);
   } catch (error) {
     if (error instanceof RequestError) {
       await withDatabaseTransaction(async (data) => {
@@ -24846,6 +25173,18 @@ async function handleExtensionRoutes(request, response, pathname, config) {
     const body = await parseJsonBody(request, config.maxBodyBytes);
     try {
       const result = await completeExtensionLinkCodeFromStore(safeText5(body.code), safeText5(body.state));
+      const token = safeText5(body.token);
+      const deviceId = safeText5(body.deviceId);
+      const deviceLabel = safeText5(body.deviceLabel);
+      if (token && deviceId && deviceLabel) {
+        try {
+          const activation = await withDatabaseTransaction((data) => getLicenseSeatStatus(data, token, deviceId, deviceLabel));
+          if (activation.ok && activation.licenseId) {
+            await syncExtensionCloudLicenseLinkFromStore(result.token, activation.licenseId, activation.activatedAt);
+          }
+        } catch {
+        }
+      }
       json(response, 200, result);
     } catch (error) {
       json(response, 400, {
@@ -24858,6 +25197,18 @@ async function handleExtensionRoutes(request, response, pathname, config) {
     if ((request.method ?? "GET") !== "GET") {
       methodNotAllowed(response);
       return;
+    }
+    const token = safeText5(readHeader(request.headers, "x-threads-license-token"));
+    const deviceId = safeText5(readHeader(request.headers, "x-threads-device-id"));
+    const deviceLabel = safeText5(readHeader(request.headers, "x-threads-device-label"));
+    if (bearerToken && token && deviceId && deviceLabel) {
+      try {
+        const activation = await withDatabaseTransaction((data) => getLicenseSeatStatus(data, token, deviceId, deviceLabel));
+        if (activation.ok && activation.licenseId) {
+          await syncExtensionCloudLicenseLinkFromStore(bearerToken, activation.licenseId, activation.activatedAt);
+        }
+      } catch {
+      }
     }
     const status = await getExtensionCloudConnectionStatusFromStore(bearerToken);
     json(response, 200, status);
@@ -24947,6 +25298,9 @@ async function handleExtensionRoutes(request, response, pathname, config) {
       const activation = await withDatabaseTransaction((data) => getLicenseSeatStatus(data, token, deviceId, deviceLabel));
       if (!activation.ok) {
         throw new RequestError(403, describeProActivationFailure(activation.reason));
+      }
+      if (activation.licenseId) {
+        await syncExtensionCloudLicenseLinkFromStore(bearerToken, activation.licenseId, activation.activatedAt);
       }
       const result = await saveCloudArchiveWithExtensionTokenFromStore(
         bearerToken,
@@ -25537,6 +25891,7 @@ function createWebRuntime(port) {
     runTransaction: withDatabaseTransaction,
     loadDatabase
   });
+  ensureRateLimitBucketGcTimer();
   configureMonitoringService({
     getCollectorStatus: () => collector.getStatus()
   });
@@ -25545,6 +25900,12 @@ function createWebRuntime(port) {
     collector,
     requestHandler: async (request, response) => {
       await handleRequest(request, response, config, collector);
+    },
+    shutdown: async () => {
+      collector.stop();
+      stopMonitoringService();
+      stopRateLimitBucketGcTimer();
+      await closeDatabaseConnections();
     }
   };
 }
@@ -25552,17 +25913,65 @@ function createWebRequestHandler(port) {
   return createWebRuntime(port).requestHandler;
 }
 function startWebServer(port) {
-  const { config, collector, requestHandler } = createWebRuntime(port);
+  const { config, collector, requestHandler, shutdown } = createWebRuntime(port);
   const server = createServer((request, response) => {
     void requestHandler(request, response);
   });
+  server.requestTimeout = getServerRequestTimeoutMs();
+  server.headersTimeout = Math.max(server.requestTimeout + 1e3, getServerHeadersTimeoutMs());
+  server.keepAliveTimeout = getServerKeepAliveTimeoutMs();
   server.listen(config.port, () => {
     console.log(`SS Threads Plus web app running at http://127.0.0.1:${config.port}`);
   });
   collector.start();
+  let shutdownPromise = null;
+  let runtimeClosed = false;
+  const closeRuntime = async () => {
+    if (runtimeClosed) {
+      return;
+    }
+    runtimeClosed = true;
+    await shutdown();
+  };
+  const removeSignalHandlers = () => {
+    process.off("SIGINT", onSignal);
+    process.off("SIGTERM", onSignal);
+  };
+  const onSignal = (signal) => {
+    if (shutdownPromise) {
+      return;
+    }
+    console.log(`[threads-web] Received ${signal}. Starting graceful shutdown.`);
+    const forceExitTimer = setTimeout(() => {
+      console.error("[threads-web] Graceful shutdown timed out.");
+      process.exit(1);
+    }, getGracefulShutdownTimeoutMs());
+    forceExitTimer.unref?.();
+    shutdownPromise = new Promise((resolve) => {
+      server.close(async (error) => {
+        try {
+          if (error) {
+            logUnexpectedError("server close failed", error);
+            process.exitCode = 1;
+          }
+          await closeRuntime();
+        } catch (shutdownError) {
+          logUnexpectedError("graceful shutdown failed", shutdownError);
+          process.exitCode = 1;
+        } finally {
+          clearTimeout(forceExitTimer);
+          removeSignalHandlers();
+          resolve();
+        }
+      });
+    });
+  };
   server.on("close", () => {
-    collector.stop();
+    void closeRuntime();
+    removeSignalHandlers();
   });
+  process.on("SIGINT", onSignal);
+  process.on("SIGTERM", onSignal);
   return server;
 }
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
