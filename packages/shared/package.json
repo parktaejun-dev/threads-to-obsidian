@@ -1,0 +1,21 @@
+{
+  "name": "@threads/shared",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./config": "./src/config.ts",
+    "./extractor": "./src/extractor.ts",
+    "./i18n": "./src/i18n.ts",
+    "./license": "./src/license.ts",
+    "./locale": "./src/locale.ts",
+    "./markdown": "./src/markdown.ts",
+    "./notion": "./src/notion.ts",
+    "./types": "./src/types.ts",
+    "./utils": "./src/utils.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --pretty false"
+  }
+}

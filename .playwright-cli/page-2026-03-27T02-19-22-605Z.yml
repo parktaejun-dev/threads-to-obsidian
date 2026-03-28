@@ -1,0 +1,108 @@
+- generic [ref=e2]:
+  - banner [ref=e3]:
+    - link "Threads Saver home" [ref=e4] [cursor=pointer]:
+      - /url: /
+      - generic [ref=e6]:
+        - strong [ref=e7]: Threads Saver
+        - generic [ref=e8]: 127.0.0.1:4273
+    - generic [ref=e9]:
+      - generic "Language switcher" [ref=e10]:
+        - button "한국어" [pressed] [ref=e11] [cursor=pointer]
+        - button "English" [ref=e12] [cursor=pointer]
+        - button "日本語" [ref=e13] [cursor=pointer]
+        - button "Português (Brasil)" [ref=e14] [cursor=pointer]
+        - button "Español" [ref=e15] [cursor=pointer]
+        - button "繁體中文" [ref=e16] [cursor=pointer]
+        - button "Tiếng Việt" [ref=e17] [cursor=pointer]
+      - link "Pro 구매" [ref=e18] [cursor=pointer]:
+        - /url: /checkout
+  - main [ref=e19]:
+    - generic [ref=e20]:
+      - generic [ref=e21]:
+        - paragraph [ref=e22]: Extension + Scrapbook
+        - heading "PC는 extension. 모바일은 mention." [level=1] [ref=e23]
+        - paragraph [ref=e24]: 지금 보는 글은 Chrome extension으로 저장하고, 모바일에서는 mention scrapbook으로 모읍니다.
+        - generic [ref=e25]:
+          - link "Threads to Obsidian" [ref=e26] [cursor=pointer]:
+            - /url: "#desktop-flow"
+          - link "Mention Scrapbook" [ref=e27] [cursor=pointer]:
+            - /url: "#mobile-flow"
+      - complementary "Pricing" [ref=e28]:
+        - paragraph [ref=e29]: One-time
+        - heading "Threads Saver Pro" [level=2] [ref=e30]
+        - generic [ref=e31]:
+          - strong [ref=e32]: $29
+          - generic [ref=e33]: 1회 결제
+        - paragraph [ref=e34]: 29달러 1회 결제 · Extension Pro + Scrapbook core · 7일 환불
+        - link "Pro 구매" [ref=e35] [cursor=pointer]:
+          - /url: /checkout
+    - generic [ref=e36]:
+      - generic [ref=e37]:
+        - paragraph [ref=e38]: Two products
+        - heading "저장하는 두 가지 방식" [level=2] [ref=e39]
+      - article [ref=e40]:
+        - generic [ref=e41]:
+          - paragraph [ref=e42]: PC
+          - paragraph [ref=e43]: Chrome extension
+          - heading "Threads to Obsidian" [level=3] [ref=e44]
+          - paragraph [ref=e45]: PC에서 보고 있는 Threads 글을 바로 저장.
+          - link "GitHub에서 설치" [ref=e46] [cursor=pointer]:
+            - /url: https://github.com/parktaejun-dev/threads-to-obsidian
+        - figure [ref=e47]:
+          - img "Threads to Obsidian extension preview" [ref=e48]
+      - article [ref=e49]:
+        - generic [ref=e50]:
+          - paragraph [ref=e51]: Mobile
+          - paragraph [ref=e52]: Mention bot
+          - heading "Mention Scrapbook" [level=3] [ref=e53]
+          - paragraph [ref=e54]: 모바일에서는 댓글 멘션으로 모아서 나중에 꺼내기.
+          - link "scrapbook 열기" [ref=e55] [cursor=pointer]:
+            - /url: /scrapbook
+        - figure [ref=e56]:
+          - img "Mention scrapbook mobile preview" [ref=e57]
+    - generic [ref=e58]:
+      - heading "Free vs Pro" [level=2] [ref=e60]
+      - table [ref=e62]:
+        - rowgroup [ref=e63]:
+          - row "기능 Free Pro" [ref=e64]:
+            - columnheader "기능" [ref=e65]
+            - columnheader "Free" [ref=e66]
+            - columnheader "Pro" [ref=e67]
+        - rowgroup [ref=e68]:
+          - row "Threads to Obsidian ✓ ✓" [ref=e69]:
+            - cell "Threads to Obsidian" [ref=e70]
+            - cell "✓" [ref=e71]
+            - cell "✓" [ref=e72]
+          - row "Mention Scrapbook ✓ ✓" [ref=e73]:
+            - cell "Mention Scrapbook" [ref=e74]
+            - cell "✓" [ref=e75]
+            - cell "✓" [ref=e76]
+          - row "현재 글 저장 ✓ ✓" [ref=e77]:
+            - cell "현재 글 저장" [ref=e78]
+            - cell "✓" [ref=e79]
+            - cell "✓" [ref=e80]
+          - row "이미지 저장 ✓ ✓" [ref=e81]:
+            - cell "이미지 저장" [ref=e82]
+            - cell "✓" [ref=e83]
+            - cell "✓" [ref=e84]
+          - row "작성자 연속 답글 ✓ ✓" [ref=e85]:
+            - cell "작성자 연속 답글" [ref=e86]
+            - cell "✓" [ref=e87]
+            - cell "✓" [ref=e88]
+          - row "파일명 / 경로 규칙 — ✓" [ref=e89]:
+            - cell "파일명 / 경로 규칙" [ref=e90]
+            - cell "—" [ref=e91]
+            - cell "✓" [ref=e92]
+          - row "내 LLM 키 요약 / 태그 / frontmatter — ✓" [ref=e93]:
+            - cell "내 LLM 키 요약 / 태그 / frontmatter" [ref=e94]
+            - cell "—" [ref=e95]
+            - cell "✓" [ref=e96]
+      - paragraph [ref=e97]:
+        - strong [ref=e98]: Watchlists + Searches + Insights
+        - text: 지속 동기화가 필요한 기능은 별도 add-on.
+      - link "Pro 구매" [ref=e100] [cursor=pointer]:
+        - /url: /checkout
+  - contentinfo [ref=e101]:
+    - generic [ref=e102]: 127.0.0.1:4273
+    - link "GitHub" [ref=e103] [cursor=pointer]:
+      - /url: https://github.com/parktaejun-dev/threads-to-obsidian

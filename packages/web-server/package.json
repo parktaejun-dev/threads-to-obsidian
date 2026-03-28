@@ -1,0 +1,22 @@
+{
+  "name": "@threads/web-server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@threads/shared": "0.1.0",
+    "@threads/web-schema": "0.1.0",
+    "jsdom": "^26.0.0",
+    "jszip": "^3.10.1",
+    "nodemailer": "^8.0.3",
+    "pg": "^8.16.3"
+  },
+  "scripts": {
+    "build": "node ../../scripts/build.mjs --target=server",
+    "start": "node ../../dist/web/server.js",
+    "typecheck": "tsc -p tsconfig.json --pretty false"
+  }
+}

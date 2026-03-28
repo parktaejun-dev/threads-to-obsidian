@@ -1,0 +1,17 @@
+{
+  "name": "@threads/extension",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@threads/shared": "0.1.0",
+    "jszip": "^3.10.1"
+  },
+  "scripts": {
+    "build": "node ../../scripts/build.mjs --target=extension",
+    "typecheck": "tsc -p tsconfig.json --pretty false"
+  }
+}

@@ -1,6 +1,6 @@
 # Threads Saver
 
-> Save Threads posts to Obsidian or Notion from Chrome.
+> Save Threads posts from Chrome, and collect mention-triggered archives on the web.
 
 [한국어](#한국어) | [English](#english)
 
@@ -10,7 +10,7 @@
 
 ### 소개
 
-Threads 글을 PC Chrome에서 Obsidian 또는 Notion으로 저장하는 Chrome 확장 프로그램입니다.
+Threads 글을 PC Chrome에서 Obsidian 또는 Notion으로 저장하는 Chrome 확장 프로그램이며, `@parktaejun` 멘션으로 모으는 web scrapbook 백엔드도 함께 포함합니다. 공개 웹 진입점은 `https://threads-archive.dahanda.dev` 단일 도메인으로 통합합니다.
 
 ### 주요 기능
 
@@ -18,6 +18,8 @@ Threads 글을 PC Chrome에서 Obsidian 또는 Notion으로 저장하는 Chrome 
 - **Notion 저장** — Free는 parent page에, Pro는 data source까지 저장
 - **Pro Notion 고급 저장** — data source 매핑과 Notion 내부 미디어 업로드 지원
 - **ZIP 다운로드 폴백** — 폴더 연결 없이도 ZIP 파일로 저장 가능
+- **Mention scrapbook** — `@parktaejun` 멘션을 서버가 받아 사용자별 private scrapbook에 적재
+- **Threads OAuth 로그인** — Threads 계정 로그인으로 scrapbook 계정을 연결
 - **Pro 규칙 기반 정리** — 파일명 패턴과 저장 경로 패턴을 내 규칙대로 적용
 - **Pro AI 정리** — 사용자 LLM 키로 요약, 태그, 추가 frontmatter 생성
 - **Pro 3대 활성화** — Pro 키는 최대 3개 PC에서 활성화 가능
@@ -25,6 +27,8 @@ Threads 글을 PC Chrome에서 Obsidian 또는 Notion으로 저장하는 Chrome 
 - **이미지 저장** — 포스트 및 답글의 이미지를 로컬에 다운로드
 - **중복 저장 방지** — 같은 URL의 글을 중복 저장하지 않음
 - **한국어/영어 전환** — 브라우저 언어 자동 감지, 수동 전환 가능
+
+고급 기능 도입 계획은 [docs/advanced-features-roadmap.md](docs/advanced-features-roadmap.md) 에 정리했습니다.
 
 ### 설치 방법
 
@@ -45,7 +49,7 @@ Threads 글을 PC Chrome에서 Obsidian 또는 Notion으로 저장하는 Chrome 
 ### 사용법
 
 1. 설정에서 기본 저장 대상을 `Obsidian` 또는 `Notion`으로 선택
-2. Obsidian이면 vault 폴더를 연결하고, Notion이면 integration token과 page/data source를 입력
+2. Obsidian이면 vault 폴더를 연결하고, Notion이면 OAuth로 워크스페이스를 연결한 뒤 기본 저장 위치를 고릅니다
 2. Threads에서 저장하고 싶은 글의 개별 페이지로 이동
 3. 확장 아이콘 클릭 → **현재 글 저장**
 
@@ -89,6 +93,8 @@ cp .env.example .env  # 운영용 변수 입력 후 서버 실행에 사용
 
 ### 운영 배포 실행
 
+상세 배포 구조와 운영 토폴로지는 `docs/deployment-architecture.md`를 본다.
+
 환경변수 예시:
 
 ```bash
@@ -105,7 +111,20 @@ cp .env.example .env
 - `THREADS_WEB_DB_FILE` (선택: 기본값 `output/web-admin-data.json`)
 - `THREADS_WEB_PORT` (선택: 기본값 `4173`)
 - `THREADS_WEB_MAX_BODY_BYTES` (선택: 기본값 `1_000_000`, 최대 `2_000_000`)
-- `THREADS_WEB_PUBLIC_ORIGIN` (선택: 예시 `https://threads-obsidian.dahanda.dev`, 랜딩 canonical/공개 URL 고정)
+- `THREADS_WEB_PUBLIC_ORIGIN` (선택: 예시 `https://threads-archive.dahanda.dev`, 랜딩 canonical/공개 URL 고정)
+- `THREADS_BOT_HANDLE` (scrapbook 봇 handle, 예: `parktaejun`)
+- `THREADS_BOT_APP_ID` (scrapbook Threads OAuth 사용 시 필수)
+- `THREADS_BOT_APP_SECRET` (scrapbook Threads OAuth 사용 시 필수)
+- `THREADS_BOT_GRAPH_API_VERSION` (선택: Threads Graph API 버전 prefix)
+- `THREADS_BOT_ENCRYPTION_SECRET` (권장: scrapbook OAuth 토큰 암호화 전용 시크릿)
+- `THREADS_BOT_MENTION_ACCESS_TOKEN` (선택: background mention collector 전용 토큰 override)
+- `THREADS_BOT_MENTION_POLL_INTERVAL_MS` (선택: background mention collector 주기, 기본 `60000`)
+- `THREADS_BOT_MENTION_FETCH_LIMIT` (선택: 한 번에 가져올 mention 수, 기본 `25`)
+- `THREADS_BOT_MENTION_MAX_PAGES` (선택: 한 번의 sync에서 따라갈 페이지 수, 기본 `5`)
+- `THREADS_BOT_INGEST_TOKEN` (mention ingest API 보호용 Bearer 토큰)
+- `THREADS_NOTION_CLIENT_ID` (Notion OAuth 사용 시 필수)
+- `THREADS_NOTION_CLIENT_SECRET` (Notion OAuth 사용 시 필수)
+- `THREADS_NOTION_ENCRYPTION_SECRET` (권장: Notion OAuth 토큰 암호화 전용 시크릿)
 
 실행:
 
@@ -116,12 +135,37 @@ THREADS_TO_OBSIDIAN_PRO_PRIVATE_JWK_FILE=output/pro-license-private.jwk \
 npm run web:start
 ```
 
+PM2 운영 예시:
+
+```bash
+npm run build
+pm2 start ecosystem.config.cjs
+pm2 save
+```
+
+Notion OAuth 추가 설정:
+
+- Notion public integration redirect URI를 `https://threads-archive.dahanda.dev/api/public/notion/oauth/callback` 로 등록
+- 운영 서버 `.env`에 `THREADS_NOTION_CLIENT_ID`, `THREADS_NOTION_CLIENT_SECRET` 입력
+- `THREADS_NOTION_ENCRYPTION_SECRET`을 별도 랜덤값으로 설정
+- 운영 `THREADS_WEB_PUBLIC_ORIGIN`과 실제 Notion redirect URI를 모두 `https://threads-archive.dahanda.dev` 로 맞춤
+
 운영 점검:
 
 - `GET /health` 응답 `200` 확인
 - `GET /ready` 응답 `200` 확인
 - `GET /api/public/storefront` 응답 `200` 확인
+- `GET /scrapbook` 정적 페이지 로드 확인
+- `GET /api/public/bot/config` 응답 `200` 확인
 - `GET /admin`, `GET /landing` 정적 페이지 로드 확인
+
+Mention scrapbook 흐름:
+
+1. `/scrapbook` 에서 `Threads로 로그인` 버튼으로 계정을 연결
+2. Threads OAuth 승인 후 내 계정 세션이 scrapbook에 생성
+3. Threads에서 저장할 글에 `@parktaejun` 멘션 댓글 작성
+4. 백그라운드 mention collector가 Threads API에서 새 멘션을 읽어 사용자 기준 scrapbook에 반영
+5. 웹에서 Markdown 복사 또는 `.md` 다운로드
 
 백업:
 
@@ -198,14 +242,16 @@ THREADS_WEB_ADMIN_TOKEN=... THREADS_TO_OBSIDIAN_PRO_PRIVATE_JWK_FILE=... npm run
 1. `THREADS_WEB_ADMIN_TOKEN`은 충분히 긴 랜덤 문자열로 설정
 2. `THREADS_TO_OBSIDIAN_PRO_PRIVATE_JWK_FILE` 또는 `THREADS_TO_OBSIDIAN_PRO_PRIVATE_JWK`에 운영 비밀키 등록
 3. `THREADS_WEBHOOK_SECRET_STABLEORDER`, `THREADS_WEBHOOK_SECRET_STRIPE`, `THREADS_WEBHOOK_SECRET_PAYPAL`를 각 결제사 웹훅 시크릿으로 등록
-4. 주문 DB(`THREADS_WEB_DB_FILE`)는 주기 백업 (`cp $PATH $PATH.backup-$(date +%F)`)
-5. 배포 후 `/`(랜딩), `/admin`(운영), `/api/public/storefront`, `/api/admin/dashboard`, `/ready` 헬스 체크
-6. 웹훅 엔드포인트 등록:
+4. Notion OAuth를 쓸 경우 `THREADS_NOTION_CLIENT_ID`, `THREADS_NOTION_CLIENT_SECRET`, `THREADS_NOTION_ENCRYPTION_SECRET` 설정
+5. Notion public integration redirect URI를 `/api/public/notion/oauth/callback` 으로 정확히 등록
+6. 주문 DB(`THREADS_WEB_DB_FILE`)는 주기 백업 (`cp $PATH $PATH.backup-$(date +%F)`)
+7. 배포 후 `/`(랜딩), `/admin`(운영), `/api/public/storefront`, `/api/admin/dashboard`, `/ready` 헬스 체크
+8. 웹훅 엔드포인트 등록:
    - `/api/public/webhooks/stableorder`
    - `/api/public/webhooks/stripe`
    - `/api/public/webhooks/paypal`
    - 권장 검증 헤더(시크릿 설정 시): `x-stableorder-signature`, `stripe-signature`, `paypal-transmission-sig`
-7. 키 전달 SLA(예: 30분 이내)와 환불 규칙을 정책 문서에 고정
+9. 키 전달 SLA(예: 30분 이내)와 환불 규칙을 정책 문서에 고정
 
 ---
 
@@ -213,7 +259,7 @@ THREADS_WEB_ADMIN_TOKEN=... THREADS_TO_OBSIDIAN_PRO_PRIVATE_JWK_FILE=... npm run
 
 ### Introduction
 
-A Chrome extension that saves Threads posts to Obsidian or Notion from desktop Chrome.
+A Chrome extension that saves Threads posts to Obsidian or Notion from desktop Chrome, plus a mention-triggered web scrapbook backend. The public web entry point is consolidated on `https://threads-archive.dahanda.dev`.
 
 ### Features
 
@@ -221,6 +267,8 @@ A Chrome extension that saves Threads posts to Obsidian or Notion from desktop C
 - **Notion Save** — Free saves under a parent page, and Pro adds data-source saves
 - **Pro Notion Advanced Save** — Enable data source mapping and Notion-managed media uploads
 - **ZIP Download Fallback** — Save as ZIP when no folder is connected
+- **Mention Scrapbook** — Collect posts into a per-user private scrapbook through `@parktaejun` mentions
+- **Threads OAuth Sign-in** — Link a Threads account to the scrapbook experience
 - **Pro Rule-based Organization** — Apply your own file-name and save-path patterns
 - **Pro AI Organization** — Generate summaries, tags, and extra frontmatter using your own LLM key
 - **Pro on 3 PCs** — A Pro key can be activated on up to 3 PCs
@@ -228,6 +276,8 @@ A Chrome extension that saves Threads posts to Obsidian or Notion from desktop C
 - **Image Download** — Download post and reply images locally
 - **Duplicate Prevention** — Prevents saving the same post URL twice
 - **Korean / English** — Auto-detects browser language with manual toggle
+
+The advanced feature roadmap lives in [docs/advanced-features-roadmap.md](docs/advanced-features-roadmap.md).
 
 ### Installation
 
@@ -248,7 +298,7 @@ A Chrome extension that saves Threads posts to Obsidian or Notion from desktop C
 ### Usage
 
 1. Choose `Obsidian` or `Notion` as the default save target in Settings
-2. For Obsidian, connect your vault folder. For Notion, enter your integration token and page/data source target.
+2. For Obsidian, connect your vault folder. For Notion, connect your workspace with OAuth and choose a default page or data source.
 2. Navigate to an individual Threads post page
 3. Click the extension icon → **Save Current Post**
 
@@ -302,7 +352,10 @@ Required `.env` values:
 - `THREADS_WEB_DB_FILE` (optional, default: `output/web-admin-data.json`)
 - `THREADS_WEB_PORT` (optional, default: `4173`)
 - `THREADS_WEB_MAX_BODY_BYTES` (optional, default: `1_000_000`, max `2_000_000`)
-- `THREADS_WEB_PUBLIC_ORIGIN` (optional, example: `https://threads-obsidian.dahanda.dev`, pins the public landing origin/canonical URL)
+- `THREADS_WEB_PUBLIC_ORIGIN` (optional, example: `https://threads-archive.dahanda.dev`, pins the public landing origin/canonical URL)
+- `THREADS_NOTION_CLIENT_ID` (required for Notion OAuth)
+- `THREADS_NOTION_CLIENT_SECRET` (required for Notion OAuth)
+- `THREADS_NOTION_ENCRYPTION_SECRET` (recommended dedicated secret for encrypting Notion OAuth tokens)
 
 For testing, use these payload examples in the Sales and Pro key operations section (replace ORDER_ID with an existing order id).
 
@@ -314,6 +367,16 @@ THREADS_WEB_ADMIN_TOKEN=<strong-random-token> \
 THREADS_TO_OBSIDIAN_PRO_PRIVATE_JWK_FILE=output/pro-license-private.jwk \
 npm run web:start
 ```
+
+PM2 example:
+
+```bash
+npm run build
+pm2 start ecosystem.config.cjs
+pm2 save
+```
+
+Use `https://threads-archive.dahanda.dev` for both `THREADS_WEB_PUBLIC_ORIGIN` and the registered Notion redirect URI.
 
 Smoke checks:
 

@@ -1,18 +1,27 @@
 {
-  "name": "threads-obsidian-extension",
+  "name": "threads-workspace",
   "version": "0.1.0",
   "private": true,
   "type": "module",
   "description": "Save Threads posts directly to your Obsidian vault as Markdown. Falls back to ZIP download when direct save is unavailable.",
+  "workspaces": [
+    "packages/*"
+  ],
   "scripts": {
-    "build": "node scripts/build.mjs",
-    "web:start": "node dist/web/server.js",
-    "typecheck": "tsc --noEmit",
+    "build": "npm run build:extension && npm run build:web && npm run build:server",
+    "build:extension": "npm run build -w @threads/extension",
+    "build:web": "npm run build -w @threads/web-client",
+    "build:server": "npm run build -w @threads/web-server",
+    "web:start": "npm run start -w @threads/web-server",
+    "db:migrate:postgres": "node scripts/migrate-web-db-to-postgres.mjs",
+    "typecheck": "tsc -b --pretty false",
+    "typecheck:shared": "tsc -p packages/shared/tsconfig.json --pretty false",
+    "typecheck:web-schema": "tsc -p packages/web-schema/tsconfig.json --pretty false",
+    "typecheck:extension": "tsc -p packages/extension/tsconfig.json --pretty false",
+    "typecheck:web": "tsc -p packages/web-client/tsconfig.json --pretty false",
+    "typecheck:server": "tsc -p packages/web-server/tsconfig.json --pretty false",
+    "typecheck:tests": "tsc -p tsconfig.tests.json --pretty false",
     "test": "tsx --test tests/**/*.test.ts"
-  },
-  "dependencies": {
-    "jszip": "^3.10.1",
-    "nodemailer": "^8.0.3"
   },
   "devDependencies": {
     "@types/chrome": "^0.0.306",
@@ -20,8 +29,10 @@
     "@types/jszip": "^3.4.1",
     "@types/node": "^22.13.11",
     "@types/nodemailer": "^7.0.11",
+    "@types/pg": "^8.20.0",
     "esbuild": "^0.25.0",
     "jsdom": "^26.0.0",
+    "jszip": "^3.10.1",
     "tsx": "^4.19.3",
     "typescript": "^5.8.2"
   }

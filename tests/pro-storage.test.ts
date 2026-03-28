@@ -25,8 +25,8 @@ test("free tier should fall back to default advanced options even if custom opti
   let configMod: any;
 
   try {
-    storageMod = await import("../src/extension/lib/storage");
-    configMod = await import("../src/extension/lib/config");
+    storageMod = await import("../packages/extension/src/lib/storage");
+    configMod = await import("../packages/extension/src/lib/config");
   } catch {
     t.skip("storage/config modules not available in test environment");
     return;
@@ -67,11 +67,61 @@ test("free tier should fall back to default advanced options even if custom opti
     const effective = await storageMod.getEffectiveOptions();
     assert.equal(effective.filenamePattern, configMod.DEFAULT_OPTIONS.filenamePattern);
     assert.equal(effective.savePathPattern, configMod.DEFAULT_OPTIONS.savePathPattern);
-    assert.equal(effective.saveTarget, "notion");
+    assert.equal(effective.saveTarget, configMod.DEFAULT_OPTIONS.saveTarget);
     assert.equal(effective.notion.parentType, "page");
     assert.equal(effective.notion.dataSourceId, configMod.DEFAULT_OPTIONS.notion.dataSourceId);
     assert.equal(effective.notion.uploadMedia, false);
     assert.equal(effective.aiOrganization.enabled, false);
+  } finally {
+    (globalThis as any).chrome = previousChrome;
+  }
+});
+
+test("free tier falls back to Obsidian when cloud save target is stored", async (t) => {
+  let storageMod: any;
+  let configMod: any;
+
+  try {
+    storageMod = await import("../packages/extension/src/lib/storage");
+    configMod = await import("../packages/extension/src/lib/config");
+  } catch {
+    t.skip("storage/config modules not available in test environment");
+    return;
+  }
+
+  if (typeof storageMod.getEffectiveOptions !== "function") {
+    t.skip("getEffectiveOptions not implemented yet");
+    return;
+  }
+
+  const storageState = new Map<string, unknown>();
+  const previousChrome = (globalThis as any).chrome;
+  (globalThis as any).chrome = createChromeStorageStub(storageState);
+  try {
+    storageState.set("options", {
+      saveTarget: "cloud",
+      filenamePattern: "{date}_{author}_{shortcode}",
+      includeImages: true,
+      obsidianFolderLabel: null,
+      savePathPattern: "Sources/Threads/{author}",
+      notion: {
+        token: "secret",
+        parentType: "data_source",
+        parentPageId: "page-123",
+        dataSourceId: "ds-123",
+        uploadMedia: true
+      },
+      aiOrganization: {
+        enabled: true,
+        apiKey: "test-key",
+        baseUrl: "https://api.openai.com/v1",
+        model: "gpt-4.1-mini",
+        prompt: "test"
+      }
+    });
+
+    const effective = await storageMod.getEffectiveOptions();
+    assert.equal(effective.saveTarget, configMod.DEFAULT_OPTIONS.saveTarget);
   } finally {
     (globalThis as any).chrome = previousChrome;
   }
@@ -82,8 +132,8 @@ test("pro tier should use stored advanced options", async (t) => {
   let configMod: any;
 
   try {
-    storageMod = await import("../src/extension/lib/storage");
-    configMod = await import("../src/extension/lib/config");
+    storageMod = await import("../packages/extension/src/lib/storage");
+    configMod = await import("../packages/extension/src/lib/config");
   } catch {
     t.skip("storage/config modules not available in test environment");
     return;
@@ -142,7 +192,7 @@ test("pro tier should use stored advanced options", async (t) => {
 test("plan status should be none when no license is stored", async (t) => {
   let storageMod: any;
   try {
-    storageMod = await import("../src/extension/lib/storage");
+    storageMod = await import("../packages/extension/src/lib/storage");
   } catch {
     t.skip("storage module not available");
     return;
@@ -168,7 +218,7 @@ test("plan status should be none when no license is stored", async (t) => {
 test("activateProLicense should not store invalid license keys", async (t) => {
   let storageMod: any;
   try {
-    storageMod = await import("../src/extension/lib/storage");
+    storageMod = await import("../packages/extension/src/lib/storage");
   } catch {
     t.skip("storage module not available");
     return;
@@ -195,7 +245,7 @@ test("activateProLicense should not store invalid license keys", async (t) => {
 test("clearProLicense should remove stored license record", async (t) => {
   let storageMod: any;
   try {
-    storageMod = await import("../src/extension/lib/storage");
+    storageMod = await import("../packages/extension/src/lib/storage");
   } catch {
     t.skip("storage module not available");
     return;
@@ -237,8 +287,8 @@ test("options migration should fill missing savePathPattern with default", async
   let configMod: any;
 
   try {
-    storageMod = await import("../src/extension/lib/storage");
-    configMod = await import("../src/extension/lib/config");
+    storageMod = await import("../packages/extension/src/lib/storage");
+    configMod = await import("../packages/extension/src/lib/config");
   } catch {
     t.skip("storage/config modules not available in test environment");
     return;

@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="__INITIAL_LOCALE__">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>__SITE_TITLE__</title>
+    <meta name="description" content="__SITE_DESCRIPTION__" />
+    <meta name="theme-color" content="#111827" />
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/variable/pretendardvariable.css"
+    />
+    <link rel="icon" type="image/png" href="/assets/icons/icon-32.png" />
+    <link rel="apple-touch-icon" href="/assets/icons/icon-128.png" />
+    <link rel="canonical" href="__SITE_URL__/" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="__SITE_TITLE__" />
+    <meta property="og:description" content="__SITE_DESCRIPTION__" />
+    <meta property="og:url" content="__SITE_URL__/" />
+    <link rel="stylesheet" href="/landing/styles.css" />
+  </head>
+  <body
+    data-site-host="__SITE_HOST__"
+    data-site-url="__SITE_URL__"
+    data-initial-locale="__INITIAL_LOCALE__"
+  >
+    <div class="page">
+      <header class="topbar">
+        <a class="brand-link" href="/" aria-label="Threads Saver home">
+          <span class="brand-icon" aria-hidden="true">
+            <img src="/assets/icons/icon-32.png" alt="" />
+          </span>
+          <span class="brand-copy">
+            <strong class="brand-name" id="brand-name">Threads Saver</strong>
+            <span class="brand-mark">__SITE_HOST__</span>
+          </span>
+        </a>
+
+        <div class="topbar-actions">
+          <div class="web-lang-switch" aria-label="Language switcher">
+            <select class="web-lang-select" data-web-lang-select aria-label="Select language">
+              <option value="ko">한국어</option>
+              <option value="en">English</option>
+              <option value="ja">日本語</option>
+              <option value="pt-BR">Português (Brasil)</option>
+              <option value="es">Español</option>
+              <option value="zh-TW">繁體中文</option>
+              <option value="vi">Tiếng Việt</option>
+            </select>
+          </div>
+          <a id="topbar-primary-cta" class="topbar-link topbar-link-strong" href="/checkout" data-i18n="primaryCta">Pro 구매</a>
+        </div>
+      </header>
+
+      <main>
+        <section class="hero">
+          <div class="hero-copy">
+            <p class="eyebrow" data-i18n="heroEyebrow">Extension + Scrapbook</p>
+            <h1 id="headline">PC는 extension. 모바일은 mention.</h1>
+            <p id="subheadline" class="lead"></p>
+
+            <div class="hero-actions">
+              <a id="hero-desktop-cta" class="secondary-cta" href="#desktop-flow">Threads to Obsidian</a>
+              <a id="hero-mobile-cta" class="secondary-cta" href="#mobile-flow">Mention Scrapbook</a>
+            </div>
+          </div>
+
+          <aside class="price-panel" aria-label="Pricing">
+            <p class="product-tag" data-i18n="bundleTag">One-time</p>
+            <h2 data-i18n="bundleTitle">Threads Saver Pro</h2>
+            <div class="price-row">
+              <strong id="price-value" class="price-value">$29</strong>
+              <span class="price-note" data-i18n="priceNote">1회 결제</span>
+            </div>
+            <p id="included-updates" class="price-copy"></p>
+          </aside>
+        </section>
+
+        <section id="products" class="section">
+          <div class="section-head">
+            <p class="eyebrow" data-i18n="productsEyebrow">Two products</p>
+            <h2 data-i18n="productsTitle">저장하는 두 가지 방식</h2>
+          </div>
+
+          <article id="desktop-flow" class="flow-row">
+            <div class="flow-copy">
+              <p id="product-a-tag" class="product-tag" data-i18n="productATag">Chrome extension</p>
+              <h3 id="product-a-title" data-i18n="productATitle">Threads to Obsidian</h3>
+              <p id="product-a-desc" class="flow-desc" data-i18n="productADesc"></p>
+              <a id="product-a-cta" class="primary-cta" href="https://github.com/parktaejun-dev/threads-to-obsidian" data-i18n="productACta">GitHub에서 설치</a>
+            </div>
+            <figure class="flow-shot">
+              <img src="/assets/screenshots/popup-preview.png" alt="Threads to Obsidian extension preview" loading="lazy" />
+            </figure>
+          </article>
+
+          <article id="mobile-flow" class="flow-row">
+            <div class="flow-copy">
+              <p id="product-b-tag" class="product-tag" data-i18n="productBTag">Mention bot</p>
+              <h3 id="product-b-title" data-i18n="productBTitle">Mention Scrapbook</h3>
+              <p id="product-b-desc" class="flow-desc" data-i18n="productBDesc"></p>
+              <a id="product-b-cta" class="primary-cta" href="/scrapbook" data-i18n="productBCta">scrapbook 열기</a>
+            </div>
+            <figure class="flow-shot flow-shot-mobile">
+              <img src="/assets/screenshots/scrapbook-preview.png" alt="Mention scrapbook mobile preview" loading="lazy" />
+            </figure>
+          </article>
+        </section>
+
+        <section id="compare" class="section compare-section">
+          <div class="section-head">
+            <h2 data-i18n="compareH2">Free vs Pro</h2>
+          </div>
+
+          <div class="table-wrap">
+            <table class="plan-table">
+              <thead>
+                <tr>
+                  <th data-i18n="compareColFeature">기능</th>
+                  <th>Free</th>
+                  <th>Pro</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td id="compare-product-a-label">Threads to Obsidian</td>
+                  <td class="cmp-check">✓</td>
+                  <td class="cmp-check">✓</td>
+                </tr>
+                <tr>
+                  <td id="compare-product-b-label">Mention Scrapbook</td>
+                  <td class="cmp-check">✓</td>
+                  <td class="cmp-check">✓</td>
+                </tr>
+                <tr>
+                  <td data-i18n="compareRowSavePost">현재 글 저장</td>
+                  <td class="cmp-check">✓</td>
+                  <td class="cmp-check">✓</td>
+                </tr>
+                <tr>
+                  <td data-i18n="compareRowImages">이미지 저장</td>
+                  <td class="cmp-check">✓</td>
+                  <td class="cmp-check">✓</td>
+                </tr>
+                <tr>
+                  <td data-i18n="compareRowReplies">작성자 연속 답글</td>
+                  <td class="cmp-check">✓</td>
+                  <td class="cmp-check">✓</td>
+                </tr>
+                <tr>
+                  <td data-i18n="compareRowRules">파일명 / 경로 규칙</td>
+                  <td class="cmp-dash">—</td>
+                  <td class="cmp-check">✓</td>
+                </tr>
+                <tr>
+                  <td data-i18n="compareRowAi">AI 요약 / 태그</td>
+                  <td class="cmp-dash">—</td>
+                  <td class="cmp-check">✓</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <p class="compare-note">
+            <strong data-i18n="cloudTitle">Watchlists + Searches + Insights</strong>
+            <span data-i18n="cloudDesc">지속 동기화가 필요한 기능은 별도 add-on.</span>
+          </p>
+
+          <div class="compare-cta-row">
+            <a class="primary-cta" href="/checkout" data-i18n="primaryCta">Pro 구매</a>
+          </div>
+        </section>
+      </main>
+
+      <footer class="site-footer">
+        <span class="footer-domain">__SITE_HOST__</span>
+        <a href="https://github.com/parktaejun-dev/threads-to-obsidian" target="_blank" rel="noreferrer">GitHub</a>
+      </footer>
+    </div>
+
+    <script type="module" src="/assets/landing.js"></script>
+  </body>
+</html>

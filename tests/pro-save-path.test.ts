@@ -1,8 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import JSZip from "jszip";
-import { buildArchiveNoteFilename, buildZipPackage } from "../src/extension/lib/package";
-import type { ExtractedPost } from "../src/extension/lib/types";
+import { buildArchiveNoteFilename, buildZipPackage } from "../packages/extension/src/lib/package";
+import type { ExtractedPost } from "../packages/extension/src/lib/types";
 
 const basePost: ExtractedPost = {
   canonicalUrl: "https://www.threads.com/@writer/post/ZIP123",

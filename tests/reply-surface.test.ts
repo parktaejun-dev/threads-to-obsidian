@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { JSDOM } from "jsdom";
-import { countUniquePermalinkUrls, getCommentCountHint, waitForReplySurface } from "../src/extension/lib/reply-surface";
+import { countUniquePermalinkUrls, getCommentCountHint, waitForReplySurface } from "../packages/extension/src/lib/reply-surface";
 
 const replyLoadingFixture = `
 <!doctype html>

@@ -1,8 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { JSDOM } from "jsdom";
-import { extractPostFromDocument } from "../src/extension/lib/extractor";
-import { isSupportedPermalink } from "../src/extension/lib/utils";
+import { extractPostFromDocument } from "../packages/extension/src/lib/extractor";
+import { isSupportedPermalink } from "../packages/extension/src/lib/utils";
 
 const textFixture = `
 <!doctype html>

@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { webcrypto } from "node:crypto";
-import { validateProLicenseToken } from "../src/extension/lib/license";
+import { validateProLicenseToken } from "../packages/extension/src/lib/license";
 
 function base64UrlEncode(bytes: Uint8Array): string {
   return Buffer.from(bytes)

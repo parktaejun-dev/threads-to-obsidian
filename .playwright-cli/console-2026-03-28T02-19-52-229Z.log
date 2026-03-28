@@ -1,0 +1,7 @@
+[      85ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://127.0.0.1:4180/favicon.ico:0
+[   60505ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://127.0.0.1:4180/api/admin/dashboard:0
+[   60505ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://127.0.0.1:4180/api/admin/runtime-config:0
+[   60572ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://127.0.0.1:4180/api/admin/bot-collector/sync:0
+[   60574ms] Error: Unauthorized
+    at requestJson (http://127.0.0.1:4180/assets/admin.js:3200:11)
+    at async syncCollectorNow (http://127.0.0.1:4180/assets/admin.js:3813:18)

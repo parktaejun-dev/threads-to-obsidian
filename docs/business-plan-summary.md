@@ -133,18 +133,19 @@
 ### 9.2 1차 Notion 범위
 
 - PC 환경에서만 지원
-- 사용자가 Notion internal integration token과 parent page를 설정
+- 사용자는 `Connect Notion` 버튼으로 OAuth 승인만 하면 됨
+- 승인 후 기본 저장 위치를 page 또는 data source 중 하나로 선택
 - Threads 포스트를 새 Notion 페이지로 저장
 - YAML frontmatter 없이 Notion 전용 문서 형식으로 저장
 - 작성자, 원문 URL, 본문, 답글, 이미지 링크를 포함
 
 ### 9.3 2차 Notion 범위
 
-- database/data source 저장
+- page/data source 저장
 - page properties 매핑
 - 재저장/업데이트 흐름
 - 파일 업로드
-- 장기적으로 OAuth/public integration 지원
+- OAuth/public integration 운영 안정화
 
 ### 9.4 사업적 의미
 

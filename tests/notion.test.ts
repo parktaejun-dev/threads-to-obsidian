@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { normalizeNotionPageIdInput, savePostToNotion } from "../src/extension/lib/notion";
-import type { ExtractedPost } from "../src/extension/lib/types";
+import { normalizeNotionPageIdInput, savePostToNotion } from "../packages/extension/src/lib/notion";
+import type { ExtractedPost, NotionSettings } from "../packages/extension/src/lib/types";
 
 const basePost: ExtractedPost = {
   canonicalUrl: "https://www.threads.com/@writer/post/NOTE123",
@@ -22,6 +22,23 @@ const basePost: ExtractedPost = {
   extractorVersion: "2026-03-08",
   contentHash: "deadbeef"
 };
+
+function buildNotionSettings(overrides: Partial<NotionSettings> = {}): NotionSettings {
+  return {
+    token: "secret_test_token",
+    parentType: "page",
+    parentPageId: "",
+    dataSourceId: "",
+    uploadMedia: false,
+    oauthConnected: true,
+    workspaceId: "workspace-1",
+    workspaceName: "Workspace",
+    workspaceIcon: "",
+    selectedParentLabel: "",
+    selectedParentUrl: "",
+    ...overrides
+  };
+}
 
 test("normalizeNotionPageIdInput accepts a full Notion URL", () => {
   const normalized = normalizeNotionPageIdInput(
@@ -64,13 +81,10 @@ test("savePostToNotion posts markdown to the Notion API", async () => {
   try {
     const result = await savePostToNotion(
       basePost,
-      {
-        token: "secret_test_token",
+      buildNotionSettings({
         parentType: "page",
-        parentPageId: "https://www.notion.so/My-page-123456781234123412341234567890ab",
-        dataSourceId: "",
-        uploadMedia: false
-      },
+        parentPageId: "https://www.notion.so/My-page-123456781234123412341234567890ab"
+      }),
       true
     );
 
@@ -164,13 +178,11 @@ test("savePostToNotion maps supported fields when saving to a data source", asyn
           }
         ]
       },
-      {
-        token: "secret_test_token",
+      buildNotionSettings({
         parentType: "data_source",
         parentPageId: "",
-        dataSourceId: "https://www.notion.so/My-ds-1a44be1209534631b4989e5817518db8",
-        uploadMedia: false
-      },
+        dataSourceId: "https://www.notion.so/My-ds-1a44be1209534631b4989e5817518db8"
+      }),
       true
     );
 
@@ -282,13 +294,11 @@ test("savePostToNotion uploads media files and appends uploaded blocks when enab
   try {
     const result = await savePostToNotion(
       basePost,
-      {
-        token: "secret_test_token",
+      buildNotionSettings({
         parentType: "page",
         parentPageId: "https://www.notion.so/My-page-123456781234123412341234567890ab",
-        dataSourceId: "",
         uploadMedia: true
-      },
+      }),
       true,
       undefined,
       {

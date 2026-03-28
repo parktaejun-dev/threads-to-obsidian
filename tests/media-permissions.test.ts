@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { MEDIA_PERMISSION_WARNING, resolveImageDownloadPolicy } from "../src/extension/lib/media-permissions";
-import type { ExtractedPost } from "../src/extension/lib/types";
+import { MEDIA_PERMISSION_WARNING, resolveImageDownloadPolicy } from "../packages/extension/src/lib/media-permissions";
+import type { ExtractedPost } from "../packages/extension/src/lib/types";
 
 const basePost: ExtractedPost = {
   canonicalUrl: "https://www.threads.com/@writer/post/ZIP123",

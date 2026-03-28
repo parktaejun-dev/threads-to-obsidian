@@ -33,10 +33,9 @@ Persistent data is stored locally in your browser profile, in files you chose to
 The extension makes the following network requests only when you use a related feature:
 
 - **Threads pages** (`threads.com`, `threads.net`): The content script reads the already-loaded page DOM from the tab you chose to save. The extension does not upload extracted post content back to Threads or to the developer.
-- **Image CDNs** (`cdninstagram.com`, `fbcdn.net`): When "Save images" is enabled for local archives, or when Pro Notion media upload is enabled, the browser requests public image or video files from Meta's CDNs so they can be written locally or uploaded into Notion.
-- **Notion API** (`api.notion.com`): When Notion saving is enabled, the extension sends the content you explicitly save, plus your configured destination information, directly to Notion to create a page or data-source entry in your workspace. If Pro Notion media upload is enabled, the extension also uploads the related image or video files to Notion-managed storage.
+- **Image CDNs** (`cdninstagram.com`, `fbcdn.net`): When "Save images" is enabled for local archives, the browser requests public image or video files from Meta's CDNs so they can be written into the local archive.
 - **Optional AI endpoint** (user-selected OpenAI-compatible endpoint): When AI organization is enabled, the extension sends the post text and visible metadata of the content you explicitly save directly to the endpoint you configured. This is used to generate optional summaries, tags, and extra frontmatter.
-- **Pro activation service** (`threads-obsidian.dahanda.dev`): When you activate, validate, or release a Pro key, the extension sends the Pro token, a generated device ID, and a device label such as `Chrome on macOS` to the developer-controlled licensing endpoint. These requests are used only to enforce seat limits and activation status. They do not include saved Threads post content.
+- **Developer backend** (`threads-archive.dahanda.dev`): When you activate, validate, or release a Pro key, or when you use Notion OAuth saving, the extension sends the Pro token, a generated device ID, and a device label such as `Chrome on macOS` to the developer-controlled backend. For Notion saves, the extension also sends the explicitly saved Threads post content and any locally generated AI summary/tag output so the backend can create a page in your connected Notion workspace. The backend stores the user's Notion OAuth tokens server-side so the browser does not need to store them locally.
 
 The extension contains no analytics, telemetry, advertising, or tracking code.
 
@@ -48,11 +47,9 @@ The extension contains no analytics, telemetry, advertising, or tracking code.
 | `downloads` | Download a ZIP file when direct folder save is unavailable |
 | `tabs` | Check the active tab URL so the extension only runs on supported Threads permalink pages |
 | `scripting` | Re-inject the content script if the page loaded before the extension |
-| `permissions` | Request optional host access for image CDNs, Notion API, or the user-selected AI endpoint |
 | Host: `threads.com`, `threads.net` | Run the content script on Threads post pages |
-| Host: `threads-obsidian.dahanda.dev` | Reach the Pro activation API used for license activation, status checks, and seat release |
-| Optional host: `cdninstagram.com`, `fbcdn.net` | Fetch post media for local saving or for Pro Notion media upload when you approve the optional permission |
-| Optional host: `api.notion.com` | Save posts to your Notion workspace and, in Pro mode, upload media files into Notion-managed storage |
+| Host: `threads-archive.dahanda.dev` | Reach the Pro activation API and Notion save backend |
+| Optional host: `cdninstagram.com`, `fbcdn.net` | Fetch post media for local saving when you approve the optional permission |
 | Optional host: user-selected AI endpoint | Call the OpenAI-compatible LLM endpoint you configure when AI organization is enabled |
 
 ## User Control

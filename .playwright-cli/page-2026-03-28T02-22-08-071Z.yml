@@ -1,0 +1,387 @@
+- main [ref=e2]:
+  - generic [ref=e3]:
+    - generic [ref=e4]:
+      - paragraph [ref=e5]: Admin Portal
+      - heading "결제, 발급, 전달 관리" [level=1] [ref=e6]
+      - paragraph [ref=e7]: 결제 수단 관리, 구매 요청 검토, Pro 키 발급, 수동 이메일 전달을 위한 관리자 패널입니다.
+    - generic [ref=e8]:
+      - generic [ref=e9]: 관리자 토큰
+      - generic [ref=e10]:
+        - textbox "관리자 토큰" [active] [ref=e11]:
+          - /placeholder: Admin access token
+          - text: codex-audit
+        - button "로그인" [ref=e12] [cursor=pointer]
+      - paragraph [ref=e13]: /api/admin/* 접근을 위해 로그인이 필요합니다
+      - generic [ref=e14]:
+        - button "한국어" [ref=e15] [cursor=pointer]
+        - button "English" [ref=e16] [cursor=pointer]
+        - button "日本語" [ref=e17] [cursor=pointer]
+        - button "Português (Brasil)" [ref=e18] [cursor=pointer]
+        - button "Español" [ref=e19] [cursor=pointer]
+        - button "繁體中文" [ref=e20] [cursor=pointer]
+        - button "Tiếng Việt" [ref=e21] [cursor=pointer]
+  - generic [ref=e22]:
+    - article [ref=e23]:
+      - paragraph [ref=e24]: 미결 주문
+      - paragraph [ref=e25]: —
+    - article [ref=e26]:
+      - paragraph [ref=e27]: 결제 확인, 키 대기
+      - paragraph [ref=e28]: —
+    - article [ref=e29]:
+      - paragraph [ref=e30]: 발급된 키
+      - paragraph [ref=e31]: —
+    - article [ref=e32]:
+      - paragraph [ref=e33]: 활성 결제 수단
+      - paragraph [ref=e34]: —
+    - article [ref=e35]:
+      - paragraph [ref=e36]: 웹훅 처리됨
+      - paragraph [ref=e37]: —
+    - article [ref=e38]:
+      - paragraph [ref=e39]: 웹훅 무시됨
+      - paragraph [ref=e40]: —
+    - article [ref=e41]:
+      - paragraph [ref=e42]: 웹훅 거부됨
+      - paragraph [ref=e43]: —
+    - article [ref=e44]:
+      - paragraph [ref=e45]: 웹훅 중복 감지
+      - paragraph [ref=e46]: —
+    - article [ref=e47]:
+      - paragraph [ref=e48]: 발송 대기
+      - paragraph [ref=e49]: —
+    - article [ref=e50]:
+      - paragraph [ref=e51]: 발송 완료
+      - paragraph [ref=e52]: —
+  - generic [ref=e53]:
+    - generic [ref=e54]:
+      - generic [ref=e55]:
+        - heading "매출 현황" [level=2] [ref=e56]
+        - paragraph [ref=e57]: 결제 완료 기준 예상 매출입니다. 실제 수령액과 다를 수 있습니다.
+      - paragraph
+    - generic [ref=e58]:
+      - generic [ref=e59]:
+        - paragraph [ref=e60]: 예상 매출
+        - paragraph [ref=e61]: —
+      - generic [ref=e62]:
+        - paragraph [ref=e63]: 전체 주문
+        - paragraph [ref=e64]: —
+      - generic [ref=e65]:
+        - paragraph [ref=e66]: 결제 완료
+        - paragraph [ref=e67]: —
+      - generic [ref=e68]:
+        - paragraph [ref=e69]: 키 발급됨
+        - paragraph [ref=e70]: —
+      - generic [ref=e71]:
+        - paragraph [ref=e72]: 폐기된 키
+        - paragraph [ref=e73]: —
+      - generic [ref=e74]:
+        - paragraph [ref=e75]: 발송 대기
+        - paragraph [ref=e76]: —
+      - generic [ref=e77]:
+        - paragraph [ref=e78]: 발송 완료
+        - paragraph [ref=e79]: —
+    - generic [ref=e80]:
+      - generic [ref=e81]:
+        - heading "결제수단별" [level=3] [ref=e82]
+        - table [ref=e84]:
+          - rowgroup [ref=e85]:
+            - row "이름 주문수 결제" [ref=e86]:
+              - columnheader "이름" [ref=e87]
+              - columnheader "주문수" [ref=e88]
+              - columnheader "결제" [ref=e89]
+          - rowgroup
+      - generic [ref=e90]:
+        - heading "월별 주문" [level=3] [ref=e91]
+        - table [ref=e93]:
+          - rowgroup [ref=e94]:
+            - row "Month 주문수 발급" [ref=e95]:
+              - columnheader "Month" [ref=e96]
+              - columnheader "주문수" [ref=e97]
+              - columnheader "발급" [ref=e98]
+          - rowgroup
+  - generic [ref=e99]:
+    - generic [ref=e100]:
+      - generic [ref=e101]:
+        - generic [ref=e102]:
+          - heading "멘션 수집기" [level=2] [ref=e103]
+          - paragraph [ref=e104]: 수집기 상태를 점검하고, 폴링 설정을 수정하고, 즉시 동기화를 실행합니다.
+        - button "지금 동기화" [ref=e105] [cursor=pointer]
+      - generic [ref=e106]:
+        - article [ref=e107]:
+          - paragraph [ref=e108]: 상태
+          - paragraph [ref=e109]: —
+        - article [ref=e110]:
+          - paragraph [ref=e111]: 마지막 성공
+          - paragraph [ref=e112]: —
+        - article [ref=e113]:
+          - paragraph [ref=e114]: 최근 오류
+          - paragraph [ref=e115]: —
+      - generic [ref=e116]:
+        - generic [ref=e117]:
+          - generic [ref=e118]:
+            - generic [ref=e119]: 봇 핸들
+            - textbox "봇 핸들" [ref=e120]:
+              - /placeholder: "@threadsbot"
+          - generic [ref=e121]:
+            - generic [ref=e122]: Graph API 버전
+            - textbox "Graph API 버전" [ref=e123]:
+              - /placeholder: v1.0
+        - generic [ref=e124]:
+          - generic [ref=e125]: 액세스 토큰 오버라이드
+          - textbox "액세스 토큰 오버라이드" [ref=e126]:
+            - /placeholder: Optional long-lived access token
+        - generic [ref=e127]:
+          - generic [ref=e128]:
+            - generic [ref=e129]: 폴링 간격 (ms)
+            - spinbutton "폴링 간격 (ms)" [ref=e130]
+          - generic [ref=e131]:
+            - generic [ref=e132]: 가져올 개수
+            - spinbutton "가져올 개수" [ref=e133]
+          - generic [ref=e134]:
+            - generic [ref=e135]: 최대 페이지
+            - spinbutton "최대 페이지" [ref=e136]
+        - generic [ref=e137]:
+          - button "수집기 설정 저장" [ref=e138] [cursor=pointer]
+          - paragraph [ref=e139]: —
+    - generic [ref=e140]:
+      - generic [ref=e142]:
+        - heading "런타임 설정" [level=2] [ref=e143]
+        - paragraph [ref=e144]: 서버 파일을 직접 수정하지 않고 public origin, 데이터베이스, SMTP를 변경합니다.
+      - generic [ref=e145]:
+        - generic [ref=e146]:
+          - generic [ref=e147]: Public origin
+          - textbox "Public origin" [ref=e148]:
+            - /placeholder: https://threads-archive.dahanda.dev
+        - generic [ref=e149]:
+          - heading "데이터베이스" [level=3] [ref=e150]
+          - generic [ref=e151]:
+            - generic [ref=e152]:
+              - generic [ref=e153]: 백엔드
+              - combobox "백엔드" [ref=e154]:
+                - option "파일" [selected]
+                - option "Postgres"
+            - generic [ref=e155]:
+              - generic [ref=e156]: 파일 경로
+              - textbox "파일 경로" [ref=e157]:
+                - /placeholder: /var/app/output/web-admin-data.json
+          - generic [ref=e158]:
+            - generic [ref=e159]:
+              - generic [ref=e160]: Postgres URL
+              - textbox "Postgres URL" [ref=e161]:
+                - /placeholder: postgres://user:pass@host:5432/db
+            - generic [ref=e162]:
+              - generic [ref=e163]: 테이블 이름
+              - textbox "테이블 이름" [ref=e164]:
+                - /placeholder: threads_web_store
+          - generic [ref=e165]:
+            - generic [ref=e166]: Store key
+            - textbox "Store key" [ref=e167]:
+              - /placeholder: default
+          - generic [ref=e168] [cursor=pointer]:
+            - checkbox "저장된 Postgres URL을 저장 시 제거" [ref=e169]
+            - generic [ref=e170]: 저장된 Postgres URL을 저장 시 제거
+          - paragraph [ref=e171]: "Active database: —"
+          - generic [ref=e172]:
+            - button "DB 연결 테스트" [ref=e173] [cursor=pointer]
+            - button "런타임 설정 저장" [ref=e174] [cursor=pointer]
+            - paragraph [ref=e175]: —
+        - generic [ref=e176]:
+          - heading "SMTP" [level=3] [ref=e177]
+          - generic [ref=e178]:
+            - generic [ref=e179]:
+              - generic [ref=e180]: 호스트
+              - textbox "호스트" [ref=e181]:
+                - /placeholder: smtp.resend.com
+            - generic [ref=e182]:
+              - generic [ref=e183]: 포트
+              - spinbutton "포트" [ref=e184]
+          - generic [ref=e185]:
+            - generic [ref=e186]:
+              - generic [ref=e187]: 사용자
+              - textbox "사용자" [ref=e188]:
+                - /placeholder: apikey
+            - generic [ref=e189]:
+              - generic [ref=e190]: 비밀번호
+              - textbox "비밀번호" [ref=e191]:
+                - /placeholder: secret
+          - generic [ref=e192]:
+            - generic [ref=e193]:
+              - generic [ref=e194]: 보내는 주소
+              - textbox "보내는 주소" [ref=e195]:
+                - /placeholder: hello@example.com
+            - generic [ref=e196] [cursor=pointer]:
+              - checkbox "TLS / secure 전송 사용" [ref=e197]
+              - generic [ref=e198]: TLS / secure 전송 사용
+          - generic [ref=e199] [cursor=pointer]:
+            - checkbox "저장된 SMTP 비밀번호를 저장 시 제거" [ref=e200]
+            - generic [ref=e201]: 저장된 SMTP 비밀번호를 저장 시 제거
+          - generic [ref=e202]:
+            - button "SMTP 테스트" [ref=e203] [cursor=pointer]
+            - paragraph [ref=e204]: —
+  - generic [ref=e205]:
+    - generic [ref=e207]:
+      - heading "스토어프론트 설정" [level=2] [ref=e208]
+      - paragraph [ref=e209]: 구매자에게 보이는 랜딩 페이지 문구를 관리합니다.
+    - generic [ref=e210]:
+      - generic [ref=e211]:
+        - generic [ref=e212]:
+          - generic [ref=e213]: 제품명
+          - textbox "제품명" [ref=e214]
+        - generic [ref=e215]:
+          - generic [ref=e216]: 지원 이메일
+          - textbox "지원 이메일" [ref=e217]
+      - generic [ref=e218]:
+        - generic [ref=e219]: 헤드라인
+        - textbox "헤드라인" [ref=e220]
+      - generic [ref=e221]:
+        - generic [ref=e222]: 서브헤드라인
+        - textbox "서브헤드라인" [ref=e223]
+      - generic [ref=e224]:
+        - generic [ref=e225]:
+          - generic [ref=e226]: 가격 레이블
+          - textbox "가격 레이블" [ref=e227]
+        - generic [ref=e228]:
+          - generic [ref=e229]: 가격 값
+          - textbox "가격 값" [ref=e230]
+      - generic [ref=e231]:
+        - generic [ref=e232]: 포함 업데이트
+        - textbox "포함 업데이트" [ref=e233]
+      - generic [ref=e234]:
+        - generic [ref=e235]: Hero 노트
+        - textbox "Hero 노트" [ref=e236]:
+          - /placeholder: One note per line
+      - generic [ref=e237]:
+        - generic [ref=e238]: FAQ
+        - textbox "FAQ" [ref=e239]:
+          - /placeholder: "Question :: Answer"
+      - generic [ref=e240]:
+        - button "스토어프론트 저장" [ref=e241] [cursor=pointer]
+        - paragraph [ref=e242]: —
+  - generic [ref=e243]:
+    - generic [ref=e244]:
+      - generic [ref=e245]:
+        - heading "결제 수단" [level=2] [ref=e246]
+        - paragraph [ref=e247]: 활성화된 수단만 랜딩 페이지에 표시됩니다.
+      - button "새로고침" [ref=e248] [cursor=pointer]
+    - generic [ref=e249]:
+      - table [ref=e251]:
+        - rowgroup [ref=e252]:
+          - row "이름 요약 액션 활성 관리" [ref=e253]:
+            - columnheader "이름" [ref=e254]
+            - columnheader "요약" [ref=e255]
+            - columnheader "액션" [ref=e256]
+            - columnheader "활성" [ref=e257]
+            - columnheader "관리" [ref=e258]
+        - rowgroup
+      - generic [ref=e259]:
+        - generic [ref=e260]:
+          - generic [ref=e261]:
+            - generic [ref=e262]: 결제 수단 이름
+            - textbox "결제 수단 이름" [ref=e263]:
+              - /placeholder: Bank Transfer
+          - generic [ref=e264]:
+            - generic [ref=e265]: 정렬 순서
+            - spinbutton "정렬 순서" [ref=e266]: "10"
+        - generic [ref=e267]:
+          - generic [ref=e268]: 요약
+          - textbox "요약" [ref=e269]:
+            - /placeholder: Manual confirmation, good for local sales
+        - generic [ref=e270]:
+          - generic [ref=e271]: 안내사항
+          - textbox "안내사항" [ref=e272]:
+            - /placeholder: How the buyer should complete or confirm payment
+        - generic [ref=e273]:
+          - generic [ref=e274]:
+            - generic [ref=e275]: CTA 레이블
+            - textbox "CTA 레이블" [ref=e276]:
+              - /placeholder: Request purchase
+          - generic [ref=e277]:
+            - generic [ref=e278]: 외부 링크
+            - textbox "외부 링크" [ref=e279]:
+              - /placeholder: https://...
+        - generic [ref=e280] [cursor=pointer]:
+          - checkbox "활성" [checked] [ref=e281]
+          - generic [ref=e282]: 활성
+        - generic [ref=e283]:
+          - button "결제 수단 추가" [ref=e284] [cursor=pointer]
+          - paragraph [ref=e285]: —
+  - generic [ref=e286]:
+    - generic [ref=e288]:
+      - heading "구매 요청" [level=2] [ref=e289]
+      - paragraph [ref=e290]: 결제 확인 후 키를 발급하고, 이메일 초안을 복사하세요.
+    - table [ref=e292]:
+      - rowgroup [ref=e293]:
+        - row "구매자 결제 수단 상태 생성일 관리" [ref=e294]:
+          - columnheader "구매자" [ref=e295]
+          - columnheader "결제 수단" [ref=e296]
+          - columnheader "상태" [ref=e297]
+          - columnheader "생성일" [ref=e298]
+          - columnheader "관리" [ref=e299]
+      - rowgroup
+  - generic [ref=e300]:
+    - generic [ref=e301]:
+      - generic [ref=e302]:
+        - heading "발급된 키" [level=2] [ref=e303]
+        - paragraph [ref=e304]: 생성된 모든 키는 미리보기, 수령인, 상태와 함께 저장됩니다.
+      - table [ref=e306]:
+        - rowgroup [ref=e307]:
+          - row "수령인 발급일 미리보기 상태 관리" [ref=e308]:
+            - columnheader "수령인" [ref=e309]
+            - columnheader "발급일" [ref=e310]
+            - columnheader "미리보기" [ref=e311]
+            - columnheader "상태" [ref=e312]
+            - columnheader "관리" [ref=e313]
+        - rowgroup
+    - generic [ref=e314]:
+      - heading "이메일 초안" [level=3] [ref=e315]
+      - paragraph [ref=e316]: 단순하고 추적 가능하며 오프라인 키 전달에 최적화된 방식입니다.
+      - generic [ref=e317]:
+        - text: 미리보기
+        - textbox "미리보기" [ref=e318]
+      - button "이메일 초안 복사" [ref=e319] [cursor=pointer]
+      - paragraph [ref=e320]: 발급된 주문을 선택하면 전달 텍스트가 표시됩니다.
+  - generic [ref=e321]:
+    - generic [ref=e323]:
+      - heading "이벤트 기록" [level=2] [ref=e324]
+      - paragraph [ref=e325]: 키, 결제, 웹훅 이벤트 내역 (거부·중복·무시 포함).
+    - generic [ref=e326]:
+      - generic [ref=e327]:
+        - generic [ref=e328]: 종류
+        - combobox "종류" [ref=e329]:
+          - option "전체" [selected]
+          - option "webhook_processed"
+          - option "webhook_ignored"
+          - option "webhook_rejected"
+          - option "order_created"
+          - option "order_paid"
+          - option "license_issued"
+          - option "license_revoked"
+          - option "payment_method_created"
+          - option "payment_method_updated"
+      - generic [ref=e330]:
+        - generic [ref=e331]: 프로바이더
+        - combobox "프로바이더" [ref=e332]:
+          - option "전체" [selected]
+          - option "stableorder"
+          - option "stripe"
+          - option "paypal"
+      - generic [ref=e333]:
+        - generic [ref=e334]: 이유
+        - combobox "이유" [ref=e335]:
+          - option "전체" [selected]
+          - option "signature_rejected"
+          - option "order_not_found"
+          - option "payment_not_completed"
+          - option "already_processed"
+          - option "issued"
+          - option "no_change"
+          - option "payment_marked"
+    - table [ref=e337]:
+      - rowgroup [ref=e338]:
+        - row "시간 이벤트 프로바이더 이벤트 ID 이유 메시지" [ref=e339]:
+          - columnheader "시간" [ref=e340]
+          - columnheader "이벤트" [ref=e341]
+          - columnheader "프로바이더" [ref=e342]
+          - columnheader "이벤트 ID" [ref=e343]
+          - columnheader "이유" [ref=e344]
+          - columnheader "메시지" [ref=e345]
+      - rowgroup

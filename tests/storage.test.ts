@@ -1,8 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { getAiProviderKeyMismatch } from "../src/extension/lib/config";
-import { findDuplicateSave, getOptions, getRecentSaves, upsertRecentSave } from "../src/extension/lib/storage";
-import type { ExtractedPost, RecentSave } from "../src/extension/lib/types";
+import { getAiProviderKeyMismatch } from "../packages/extension/src/lib/config";
+import { findDuplicateSave, getOptions, getRecentSaves, upsertRecentSave } from "../packages/extension/src/lib/storage";
+import type { ExtractedPost, RecentSave } from "../packages/extension/src/lib/types";
 
 const storageState = new Map<string, unknown>();
 
@@ -72,6 +72,33 @@ test("legacy recent saves migrate zipFilename to archiveName", async () => {
   assert.equal(recent[0]?.post.text, "본문 예시");
 });
 
+test("legacy cloud recent saves infer saveTarget from savedVia", async () => {
+  storageState.clear();
+  storageState.set("recent-saves", [
+    {
+      id: "cloud-legacy-1",
+      canonicalUrl: basePost.canonicalUrl,
+      shortcode: basePost.shortcode,
+      author: basePost.author,
+      title: basePost.title,
+      downloadedAt: basePost.capturedAt,
+      archiveName: "threads-cloud-item",
+      contentHash: basePost.contentHash,
+      status: "complete",
+      savedVia: "cloud",
+      remotePageId: "archive-1",
+      remotePageUrl: "https://threads-archive.dahanda.dev/scrapbook?archive=archive-1",
+      post: basePost
+    }
+  ]);
+
+  const recent = await getRecentSaves();
+
+  assert.equal(recent[0]?.saveTarget, "cloud");
+  assert.equal(recent[0]?.savedVia, "cloud");
+  assert.equal(recent[0]?.remotePageId, "archive-1");
+});
+
 test("legacy default filename patterns migrate to the truncated first sentence default", async () => {
   storageState.clear();
   storageState.set("options", {
@@ -132,7 +159,7 @@ test("AI provider mismatch detection ignores matching or custom key shapes", () 
   assert.equal(getAiProviderKeyMismatch("custom", "AIzaSyExampleKey1234567890"), null);
 });
 
-test("recent saves keep separate records for Obsidian and Notion targets", async () => {
+test("recent saves keep separate records for Obsidian, Cloud, and Notion targets", async () => {
   storageState.clear();
   const obsidianSave: RecentSave = {
     id: "obsidian-1",
@@ -161,16 +188,27 @@ test("recent saves keep separate records for Obsidian and Notion targets", async
     remotePageId: "12345678-1234-1234-1234-1234567890ab",
     remotePageUrl: "https://www.notion.so/example"
   };
+  const cloudSave: RecentSave = {
+    ...obsidianSave,
+    id: "cloud-1",
+    saveTarget: "cloud",
+    savedVia: "cloud",
+    savedRelativePath: null,
+    remotePageId: "cloud-archive-1",
+    remotePageUrl: "https://threads-archive.dahanda.dev/scrapbook?archive=cloud-archive-1"
+  };
 
   await upsertRecentSave(obsidianSave);
+  await upsertRecentSave(cloudSave);
   await upsertRecentSave(notionSave);
 
   const recent = await getRecentSaves();
-  assert.equal(recent.length, 2);
+  assert.equal(recent.length, 3);
   assert.deepEqual(
     recent.map((item) => item.saveTarget).sort(),
-    ["notion", "obsidian"]
+    ["cloud", "notion", "obsidian"]
   );
   assert.equal((await findDuplicateSave(basePost.canonicalUrl, basePost.contentHash, "obsidian"))?.id, "obsidian-1");
+  assert.equal((await findDuplicateSave(basePost.canonicalUrl, basePost.contentHash, "cloud"))?.id, "cloud-1");
   assert.equal((await findDuplicateSave(basePost.canonicalUrl, basePost.contentHash, "notion"))?.id, "notion-1");
 });

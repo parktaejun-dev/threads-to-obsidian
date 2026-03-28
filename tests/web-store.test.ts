@@ -1,9 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { buildDeliveryDraft, buildTokenPreview } from "../src/web/server/license-service";
-import { buildPublicStorefront, buildDashboardSummary } from "../src/web/server/store";
-import { buildDefaultDatabase } from "../src/web/lib/schema";
+import { buildDeliveryDraft, buildTokenPreview } from "../packages/web-server/src/server/license-service";
+import { buildPublicStorefront, buildDashboardSummary } from "../packages/web-server/src/server/store";
+import { buildDefaultDatabase } from "@threads/web-schema";
 
 test("public storefront only includes enabled payment methods in sort order", () => {
   const data = buildDefaultDatabase("2026-03-17T00:00:00.000Z");

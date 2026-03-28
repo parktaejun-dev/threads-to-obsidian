@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Checkout — __SITE_TITLE__</title>
+    <meta name="description" content="Threads Saver Pro 구매" />
+    <meta name="theme-color" content="#111827" />
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/variable/pretendardvariable.css"
+    />
+    <link rel="icon" type="image/png" href="/assets/icons/icon-32.png" />
+    <link rel="apple-touch-icon" href="/assets/icons/icon-128.png" />
+    <link rel="stylesheet" href="/checkout/styles.css" />
+  </head>
+  <body data-site-host="__SITE_HOST__" data-site-url="__SITE_URL__">
+    <div class="checkout-page">
+      <header class="checkout-topbar">
+        <a class="brand-link" href="/" aria-label="Back to home">
+          <div class="brand-lockup">
+            <span class="brand-icon" aria-hidden="true">
+              <img src="/assets/icons/icon-32.png" alt="" />
+            </span>
+            <span class="brand-name">Threads Saver</span>
+          </div>
+        </a>
+      </header>
+
+      <main class="checkout-main">
+        <div class="checkout-card">
+          <div class="checkout-summary">
+            <h1 data-i18n="commerceH2">Pro 구매</h1>
+            <p class="checkout-lead" data-i18n="commerceLead">29달러 1회 결제. 이메일로 키를 발송합니다.</p>
+
+            <div class="checkout-price-row">
+              <span class="checkout-price">$29</span>
+              <span class="checkout-price-note" data-i18n="priceNote">1회 결제</span>
+            </div>
+
+            <ul class="checkout-includes">
+              <li>Extension Pro</li>
+              <li>Scrapbook core</li>
+              <li data-i18n="commerceRefund">7일 환불</li>
+            </ul>
+          </div>
+
+          <div id="payment-methods" class="method-grid"></div>
+
+          <form id="purchase-form" class="checkout-form">
+            <label>
+              <span data-i18n="formNameLabel">이름</span>
+              <input type="text" name="buyerName" required placeholder="홍길동" data-i18n-ph="phName" />
+            </label>
+
+            <label>
+              <span data-i18n="formEmailLabel">이메일</span>
+              <input type="email" name="buyerEmail" required placeholder="you@example.com" />
+            </label>
+
+            <label>
+              <span data-i18n="formMethodLabel">결제수단</span>
+              <select name="paymentMethodId" required>
+                <option value="" data-i18n="phMethod">결제수단을 선택하세요</option>
+              </select>
+            </label>
+
+            <label class="checkout-note-field">
+              <span data-i18n="formNoteLabel">메모</span>
+              <textarea
+                name="note"
+                rows="2"
+                placeholder="세금계산서, 통화, 팀용 좌석 요청 등"
+                data-i18n-ph="phNote"
+              ></textarea>
+            </label>
+
+            <button type="submit" data-i18n="formSubmitBtn">구매 요청 보내기</button>
+            <p class="form-remark" data-i18n="formRemark">결제 확인 후 Pro 키를 이메일로 보내드립니다.</p>
+            <div id="purchase-status" class="status-panel hidden"></div>
+          </form>
+
+          <p class="checkout-note" data-i18n="commerceNote">주문 요청 후 결제를 확인하는 방식으로 운영합니다.</p>
+        </div>
+      </main>
+
+      <footer class="checkout-footer">
+        <a href="/">← <span data-i18n="backToHome">제품 페이지로 돌아가기</span></a>
+      </footer>
+    </div>
+
+    <script type="module" src="/assets/checkout.js"></script>
+  </body>
+</html>

@@ -2,9 +2,9 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import path from "node:path";
 
-import { buildDefaultDatabase } from "../src/web/lib/schema";
-import { activateLicenseSeat, getLicenseSeatStatus, releaseLicenseSeat } from "../src/web/server/activation-service";
-import { signProLicenseToken } from "../src/web/server/license-service";
+import { buildDefaultDatabase } from "@threads/web-schema";
+import { activateLicenseSeat, getLicenseSeatStatus, releaseLicenseSeat } from "../packages/web-server/src/server/activation-service";
+import { signProLicenseToken } from "../packages/web-server/src/server/license-service";
 
 const privateKeyFile = path.resolve(process.cwd(), "output", "dev-pro-license-private.jwk");
 
