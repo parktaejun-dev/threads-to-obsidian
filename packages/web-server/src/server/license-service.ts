@@ -85,11 +85,11 @@ export function buildTokenPreview(token: string): string {
 
 export function buildDeliveryDraft(order: PurchaseOrder, license: LicenseRecord): EmailDeliveryDraft {
   const cycleLabel = order.billingCycle === "monthly" ? "monthly" : "yearly";
-  const subject = "Your SS Threads Plus key";
+  const subject = "Your ss-threads Plus key";
   const body = [
     `Hi ${order.buyerName || "there"},`,
     "",
-    `Thanks for purchasing SS Threads Plus (${cycleLabel}).`,
+    `Thanks for purchasing ss-threads Plus (${cycleLabel}).`,
     "",
     "Your Plus key:",
     license.token,

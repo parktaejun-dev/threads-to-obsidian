@@ -228,7 +228,7 @@ function setBusy(target: HTMLElement | HTMLFormElement | null, busy: boolean): v
 
 function formatBotHandlePreview(handle: string | null | undefined): string {
   const normalized = normalizeBotHandle(handle ?? "");
-  return normalized ? `@${normalized}` : "@your-bot";
+  return normalized ? `@${normalized}` : "@ss_threads_bot";
 }
 
 function updateCollectorHandlePreview(handle: string | null | undefined): void {

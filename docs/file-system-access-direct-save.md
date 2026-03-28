@@ -33,23 +33,23 @@
 
 현재 구현은 다음과 같다.
 
-- [background.ts](/Users/parktaejun/Desktop/threads/src/extension/background.ts)
+- [background.ts](../packages/extension/src/background.ts)
   - active tab 조회
   - content script 주입/메시지
   - Threads 글 추출
   - ZIP 생성
   - `chrome.downloads.download()` 호출
   - 최근 저장 기록 갱신
-- [popup.ts](/Users/parktaejun/Desktop/threads/src/extension/popup.ts)
+- [popup.ts](../packages/extension/src/popup.ts)
   - 저장 버튼
   - 최근 저장 목록
   - 다시 다운로드 / 삭제 / 전체 삭제 / 스레드 열기
-- [options.ts](/Users/parktaejun/Desktop/threads/src/extension/options.ts)
+- [options.ts](../packages/extension/src/options.ts)
   - 파일명 패턴
   - 이미지 포함 여부
-- [package.ts](/Users/parktaejun/Desktop/threads/src/extension/lib/package.ts)
+- [package.ts](../packages/extension/src/lib/package.ts)
   - ZIP 구조 생성
-- [markdown.ts](/Users/parktaejun/Desktop/threads/src/extension/lib/markdown.ts)
+- [markdown.ts](../packages/extension/src/lib/markdown.ts)
   - Obsidian용 Markdown 생성
 
 현재 구조의 병목은 `다운로드` 단계다. 사용자가 직접 vault로 옮겨야 하므로 제품 경험이 끊긴다.
@@ -181,7 +181,7 @@
 
 ### 7.1 ExtensionOptions 확장
 
-현재 [types.ts](/Users/parktaejun/Desktop/threads/src/extension/lib/types.ts)의 `ExtensionOptions`:
+현재 [types.ts](../packages/extension/src/lib/types.ts)의 `ExtensionOptions`:
 
 ```ts
 export interface ExtensionOptions {

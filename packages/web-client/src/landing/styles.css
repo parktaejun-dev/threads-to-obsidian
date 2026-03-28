@@ -8,6 +8,7 @@
   --line: oklch(0.9 0.008 85);
   --line-strong: oklch(0.82 0.012 85);
   --accent: oklch(0.28 0.04 220);
+  --brand-accent: oklch(0.58 0.23 28);
   --success: oklch(0.61 0.17 145);
   --radius-lg: 24px;
   --radius-md: 18px;
@@ -91,6 +92,10 @@ img {
   font-size: 15px;
   font-weight: 700;
   letter-spacing: -0.02em;
+}
+
+.brand-accent {
+  color: var(--brand-accent);
 }
 
 .brand-mark,
@@ -237,6 +242,8 @@ h3 {
   max-width: 32ch;
   margin: 12px 0 0;
   font-size: 15px;
+  word-break: keep-all;
+  overflow-wrap: normal;
 }
 
 .hero-actions {
@@ -311,9 +318,12 @@ h3 {
 }
 
 .flow-desc {
-  max-width: 34ch;
+  max-width: 42ch;
   margin: 0;
   font-size: 14px;
+  line-height: 1.72;
+  word-break: keep-all;
+  overflow-wrap: normal;
 }
 
 .flow-shot {

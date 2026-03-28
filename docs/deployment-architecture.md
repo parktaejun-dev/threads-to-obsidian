@@ -334,6 +334,35 @@ mention collector는 별도 서버나 큐 워커가 아니다.
 4. health/readiness 확인
 5. public/admin 주요 화면 smoke test
 
+현재 운영 워크스테이션 기준 실제 명령:
+
+```bash
+rsync -az --delete \
+  --exclude '.git' \
+  --exclude 'node_modules' \
+  --exclude 'dist' \
+  --exclude 'output' \
+  --exclude '.env' \
+  --exclude '.claude' \
+  --exclude '.playwright-cli' \
+  --exclude 'tsconfig.tests.tsbuildinfo' \
+  ./ openclaw-oracle:/home/ubuntu/projects/threads/
+
+ssh openclaw-oracle '
+  cd /home/ubuntu/projects/threads &&
+  npm run build &&
+  pm2 restart threads-obsidian --update-env &&
+  pm2 save
+'
+```
+
+현재 운영 대상:
+
+- SSH alias: `openclaw-oracle`
+- 서버 경로: `/home/ubuntu/projects/threads`
+- PM2 앱 이름: `threads-obsidian`
+- public origin: `https://ss-threads.dahanda.dev`
+
 권장 점검:
 
 - `GET /health`
@@ -342,6 +371,13 @@ mention collector는 별도 서버나 큐 워커가 아니다.
 - `GET /scrapbook`
 - `GET /api/public/bot/config`
 - `GET /admin`
+
+storefront 주의사항:
+
+- 현재 운영 DB backend는 `postgres`다.
+- `settings`는 코드 기본값이 아니라 DB에 저장된 storefront 설정을 우선 사용한다.
+- 따라서 가격, 플랜 이름, FAQ, hero note 같은 판매 문구를 바꾼 배포에서는 코드 반영 후에도 운영 화면이 예전 값을 계속 보여줄 수 있다.
+- 이런 경우 `PUT /api/admin/storefront-settings` 또는 admin 화면으로 persisted storefront 설정을 함께 업데이트해야 한다.
 
 ### 13.2 익스텐션 ZIP 릴리스
 

@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Checkout — __SITE_TITLE__</title>
-    <meta name="description" content="SS Threads Plus 구매" />
+    <meta name="description" content="ss-threads Plus 구매" />
     <meta name="theme-color" content="#111827" />
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
     <link
@@ -23,7 +23,7 @@
             <span class="brand-icon" aria-hidden="true">
               <img src="/assets/icons/icon-32.png" alt="" />
             </span>
-            <span class="brand-name">SS Threads</span>
+            <span class="brand-name">ss-threads</span>
           </div>
         </a>
       </header>
@@ -53,9 +53,11 @@
             </div>
 
             <ul class="checkout-includes">
-              <li>Scrapbook 저장글 1,000개</li>
-              <li>Scrapbook 폴더 50개</li>
-              <li>동일 키로 extension 고급 저장 사용 가능</li>
+              <li id="checkout-include-archive-limit">Scrapbook 저장글 1,000개</li>
+              <li id="checkout-include-folder-limit">Scrapbook 폴더 50개</li>
+              <li id="checkout-include-monitoring">Watchlists · Insights</li>
+              <li id="checkout-include-extension-advanced">Extension 파일 규칙 · Notion · AI 정리</li>
+              <li id="checkout-include-shared-key">같은 Plus 키로 scrapbook + extension 연결</li>
               <li data-i18n="commerceRefund">7일 환불</li>
             </ul>
 
@@ -69,46 +71,115 @@
                   </tr>
                 </thead>
                 <tbody>
+                  <tr class="checkout-section-row">
+                    <td id="compare-section-current" colspan="3">현재 제공 기능</td>
+                  </tr>
                   <tr>
-                    <td id="compare-product-a-label">SS Threads</td>
+                    <td id="compare-row-save-post">현재 글 저장</td>
                     <td class="cmp-check">✓</td>
                     <td class="cmp-check">✓</td>
                   </tr>
                   <tr>
-                    <td id="compare-product-b-label">Mention Scrapbook</td>
+                    <td id="compare-row-images">이미지 저장</td>
                     <td class="cmp-check">✓</td>
                     <td class="cmp-check">✓</td>
                   </tr>
                   <tr>
-                    <td data-i18n="compareRowSavePost">현재 글 저장</td>
+                    <td id="compare-row-replies">작성자 연속 답글</td>
                     <td class="cmp-check">✓</td>
                     <td class="cmp-check">✓</td>
                   </tr>
                   <tr>
-                    <td data-i18n="compareRowImages">이미지 저장</td>
+                    <td id="compare-row-duplicates">중복 건너뜀</td>
                     <td class="cmp-check">✓</td>
                     <td class="cmp-check">✓</td>
                   </tr>
                   <tr>
-                    <td data-i18n="compareRowReplies">작성자 연속 답글</td>
+                    <td id="compare-row-mention-scrapbook">mention inbox</td>
                     <td class="cmp-check">✓</td>
                     <td class="cmp-check">✓</td>
                   </tr>
                   <tr>
-                    <td>Scrapbook 저장글 한도</td>
+                    <td id="compare-row-searches">Searches</td>
+                    <td class="cmp-check">✓</td>
+                    <td class="cmp-check">✓</td>
+                  </tr>
+                  <tr>
+                    <td id="compare-row-markdown-export">Markdown export</td>
+                    <td class="cmp-check">✓</td>
+                    <td class="cmp-check">✓</td>
+                  </tr>
+                  <tr>
+                    <td id="compare-row-zip-export">ZIP export</td>
+                    <td class="cmp-check">✓</td>
+                    <td class="cmp-check">✓</td>
+                  </tr>
+                  <tr class="checkout-section-row">
+                    <td id="compare-section-plus" colspan="3">Plus로 확장되는 항목</td>
+                  </tr>
+                  <tr>
+                    <td id="compare-row-archive-limit">Scrapbook 저장글 한도</td>
                     <td>100</td>
                     <td>1,000</td>
                   </tr>
                   <tr>
-                    <td>Scrapbook 폴더 한도</td>
+                    <td id="compare-row-folder-limit">Scrapbook 폴더 한도</td>
                     <td>5</td>
                     <td>50</td>
+                  </tr>
+                  <tr>
+                    <td id="compare-row-watchlists">Watchlists</td>
+                    <td class="cmp-dash">—</td>
+                    <td class="cmp-check">✓</td>
+                  </tr>
+                  <tr>
+                    <td id="compare-row-insights">Insights</td>
+                    <td class="cmp-dash">—</td>
+                    <td class="cmp-check">✓</td>
+                  </tr>
+                  <tr>
+                    <td id="compare-row-file-name">파일 이름 규칙</td>
+                    <td class="cmp-dash">—</td>
+                    <td class="cmp-check">✓</td>
+                  </tr>
+                  <tr>
+                    <td id="compare-row-save-path">저장 경로 규칙</td>
+                    <td class="cmp-dash">—</td>
+                    <td class="cmp-check">✓</td>
+                  </tr>
+                  <tr>
+                    <td id="compare-row-notion-data-source">Notion data source 저장</td>
+                    <td class="cmp-dash">—</td>
+                    <td class="cmp-check">✓</td>
+                  </tr>
+                  <tr>
+                    <td id="compare-row-notion-media-upload">Notion 내부 미디어 업로드</td>
+                    <td class="cmp-dash">—</td>
+                    <td class="cmp-check">✓</td>
+                  </tr>
+                  <tr>
+                    <td id="compare-row-ai-summary">AI 요약</td>
+                    <td class="cmp-dash">—</td>
+                    <td class="cmp-check">✓</td>
+                  </tr>
+                  <tr>
+                    <td id="compare-row-ai-tags">AI 태그</td>
+                    <td class="cmp-dash">—</td>
+                    <td class="cmp-check">✓</td>
+                  </tr>
+                  <tr>
+                    <td id="compare-row-ai-frontmatter">AI frontmatter</td>
+                    <td class="cmp-dash">—</td>
+                    <td class="cmp-check">✓</td>
                   </tr>
                 </tbody>
               </table>
               <p class="compare-note">
-                <strong>Same key for scrapbook + extension</strong><br>
-                <span>이 체크아웃에서 받은 키를 scrapbook과 extension 양쪽에 같은 키로 붙여넣을 수 있습니다.</span>
+                <strong id="compare-note-title">Plus expands limits, watchlists, insights, and extension advanced save</strong><br>
+                <span id="compare-note-body">이 체크아웃에서 받은 같은 Plus 키를 scrapbook과 extension 양쪽에 붙여넣을 수 있습니다.</span>
+              </p>
+              <p id="compare-scope-note" class="compare-note compare-note-secondary">
+                searches는 Free에서도 사용할 수 있습니다. watchlists와 insights는 Plus에서 열리며, searches·watchlists·insights 사용에는 Threads 로그인과 일부 권한 재연결이 필요합니다.
               </p>
             </div>
           </div>

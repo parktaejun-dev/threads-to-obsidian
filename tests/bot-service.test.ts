@@ -43,7 +43,7 @@ test("bot Threads OAuth sign-in and mention ingest create a scrapbook archive", 
   const previousAdminToken = process.env.THREADS_WEB_ADMIN_TOKEN;
   const previousFetch = globalThis.fetch;
 
-  process.env.THREADS_BOT_HANDLE = "parktaejun";
+  process.env.THREADS_BOT_HANDLE = "collectorbot";
   process.env.THREADS_BOT_INGEST_TOKEN = "test-ingest-token";
   process.env.THREADS_BOT_APP_ID = "threads-app-id";
   process.env.THREADS_BOT_APP_SECRET = "threads-app-secret";
@@ -87,7 +87,7 @@ test("bot Threads OAuth sign-in and mention ingest create a scrapbook archive", 
   try {
     const data = buildDefaultDatabase("2026-03-25T00:00:00.000Z");
     const oauthStart = startBotOauth(data, "https://ss-threads.dahanda.dev");
-    assert.equal(oauthStart.botHandle, "parktaejun");
+    assert.equal(oauthStart.botHandle, "collectorbot");
     assert.match(oauthStart.authorizeUrl, /^https:\/\/www\.threads\.com\/oauth\/authorize\/\?/);
     assert.equal(new URL(oauthStart.authorizeUrl).hash, "#weblink");
 
@@ -118,7 +118,7 @@ test("bot Threads OAuth sign-in and mention ingest create a scrapbook archive", 
       mentionAuthorUserId: "user-1",
       mentionAuthorHandle: "writer.renamed",
       mentionAuthorDisplayName: "Writer",
-      noteText: "@parktaejun #inbox #ads #idea #overflow",
+      noteText: "@collectorbot #inbox #ads #idea #overflow",
       targetUrl: "https://www.threads.com/@target/post/TARGET1",
       targetAuthorHandle: "target",
       targetAuthorDisplayName: "Target User",
@@ -229,7 +229,7 @@ test("scrapbook archive title uses the first sentence and truncates it to 20 cha
     mentionAuthorUserId: "threads-user-1",
     mentionAuthorHandle: "writer",
     mentionAuthorDisplayName: "Writer",
-    noteText: "@ss_savebot",
+    noteText: "@ss_threads_bot",
     targetUrl: "https://www.threads.com/@target/post/TARGET1",
     targetAuthorHandle: "target",
     targetAuthorDisplayName: "Target",
@@ -283,7 +283,7 @@ test("scrapbook ZIP export keeps one markdown file and flat image files per arch
     mentionUrl: "https://www.threads.com/@writer/post/MENTIONZIP",
     mentionAuthorUserId: "threads-user-1",
     mentionAuthorHandle: "writer",
-    noteText: "@ss_savebot #archive",
+    noteText: "@ss_threads_bot #archive",
     targetUrl: "https://www.threads.com/@target/post/TARGETZIP",
     targetAuthorHandle: "target",
     targetText: "Archive this source body for ZIP.",

@@ -54,7 +54,7 @@ test("mention collector fetches mentions and ingests them idempotently", async (
   const previousMaxPages = process.env.THREADS_BOT_MENTION_MAX_PAGES;
   const previousFetch = globalThis.fetch;
 
-  process.env.THREADS_BOT_HANDLE = "parktaejun";
+  process.env.THREADS_BOT_HANDLE = "collectorbot";
   process.env.THREADS_BOT_APP_ID = "threads-app-id";
   process.env.THREADS_BOT_APP_SECRET = "threads-app-secret";
   process.env.THREADS_WEB_ADMIN_TOKEN = "bot-test-admin-secret";
@@ -86,8 +86,8 @@ test("mention collector fetches mentions and ingests them idempotently", async (
     if (url.includes("/me?fields=")) {
       return createJsonResponse({
         id: "bot-user-1",
-        username: "parktaejun",
-        name: "Park Taejun",
+        username: "collectorbot",
+        name: "Collector Bot",
         is_verified: true
       });
     }
@@ -98,10 +98,10 @@ test("mention collector fetches mentions and ingests them idempotently", async (
         data: [
           {
             id: "mention-1",
-            username: "parktaejun",
-            text: "@parktaejun",
+            username: "collectorbot",
+            text: "@collectorbot",
             timestamp: "2026-03-25T12:00:00.000Z",
-            permalink: "https://www.threads.com/@parktaejun/post/MENTION1"
+            permalink: "https://www.threads.com/@collectorbot/post/MENTION1"
           }
         ]
       });
@@ -110,10 +110,10 @@ test("mention collector fetches mentions and ingests them idempotently", async (
     if (url.includes("/mention-1?")) {
       return createJsonResponse({
         id: "mention-1",
-        username: "parktaejun",
-        text: "@parktaejun save this",
+        username: "collectorbot",
+        text: "@collectorbot save this",
         timestamp: "2026-03-25T12:00:00.000Z",
-        permalink: "https://www.threads.com/@parktaejun/post/MENTION1",
+        permalink: "https://www.threads.com/@collectorbot/post/MENTION1",
         replied_to: {
           id: "target-1"
         }
@@ -172,7 +172,7 @@ test("mention collector fetches mentions and ingests them idempotently", async (
     assert.equal(data.botArchives[0]?.mentionId, "mention-1");
     assert.equal(data.botArchives[0]?.targetUrl, "https://www.threads.com/@source/post/TARGET1");
     assert.equal(data.botArchives[0]?.targetText, "Target post body from the original thread.");
-    assert.equal(data.botArchives[0]?.noteText, "@parktaejun save this");
+    assert.equal(data.botArchives[0]?.noteText, "@collectorbot save this");
     assert.match(data.botArchives[0]?.markdownContent ?? "", /Author follow-up reply from the same thread\./);
     assert.match(data.botArchives[0]?.rawPayloadJson ?? "", /"authorReplies":\[/);
 
@@ -241,7 +241,7 @@ test("mention collector refreshes existing archives with the original replied po
   const previousMaxPages = process.env.THREADS_BOT_MENTION_MAX_PAGES;
   const previousFetch = globalThis.fetch;
 
-  process.env.THREADS_BOT_HANDLE = "ss_savebot";
+  process.env.THREADS_BOT_HANDLE = "ss_threads_bot";
   process.env.THREADS_BOT_APP_ID = "threads-app-id";
   process.env.THREADS_BOT_APP_SECRET = "threads-app-secret";
   process.env.THREADS_WEB_ADMIN_TOKEN = "bot-test-admin-secret";
@@ -276,16 +276,16 @@ test("mention collector refreshes existing archives with the original replied po
       if (accessToken === "bot-long-lived-token") {
         return createJsonResponse({
           id: "bot-1",
-          username: "ss_savebot",
-          name: "SS Savebot",
+          username: "ss_threads_bot",
+          name: "SS Threads Bot",
           is_verified: false
         });
       }
 
       return createJsonResponse({
         id: "user-1",
-        username: "parktaejun",
-        name: "Park Taejun",
+        username: "linkedwriter",
+        name: "Linked Writer",
         is_verified: true
       });
     }
@@ -295,10 +295,10 @@ test("mention collector refreshes existing archives with the original replied po
         data: [
           {
             id: "mention-1",
-            username: "parktaejun",
-            text: "@ss_savebot",
+            username: "linkedwriter",
+            text: "@ss_threads_bot",
             timestamp: "2026-03-25T12:00:00.000Z",
-            permalink: "https://www.threads.com/@parktaejun/post/MENTION1"
+            permalink: "https://www.threads.com/@linkedwriter/post/MENTION1"
           }
         ]
       });
@@ -307,10 +307,10 @@ test("mention collector refreshes existing archives with the original replied po
     if (url.includes("/mention-1?")) {
       return createJsonResponse({
         id: "mention-1",
-        username: "parktaejun",
-        text: "@ss_savebot",
+        username: "linkedwriter",
+        text: "@ss_threads_bot",
         timestamp: "2026-03-25T12:00:00.000Z",
-        permalink: "https://www.threads.com/@parktaejun/post/MENTION1"
+        permalink: "https://www.threads.com/@linkedwriter/post/MENTION1"
       });
     }
 
@@ -330,10 +330,10 @@ test("mention collector refreshes existing archives with the original replied po
         data: [
           {
             id: "mention-1",
-            username: "parktaejun",
-            text: "@ss_savebot",
+            username: "linkedwriter",
+            text: "@ss_threads_bot",
             timestamp: "2026-03-25T12:00:00.000Z",
-            permalink: "https://www.threads.com/@parktaejun/post/MENTION1",
+            permalink: "https://www.threads.com/@linkedwriter/post/MENTION1",
             root_post: {
               id: "target-1",
               username: "source",
@@ -377,7 +377,7 @@ test("mention collector refreshes existing archives with the original replied po
       "https://ss-threads.dahanda.dev"
     );
 
-    process.env.THREADS_BOT_HANDLE = "parktaejun";
+    process.env.THREADS_BOT_HANDLE = "linkedwriter";
     const userOauthStart = startBotOauth(data, "https://ss-threads.dahanda.dev");
     const userState = new URL(userOauthStart.authorizeUrl).searchParams.get("state");
     assert.ok(userState);
@@ -387,7 +387,7 @@ test("mention collector refreshes existing archives with the original replied po
       "oauth-code-user",
       "https://ss-threads.dahanda.dev"
     );
-    process.env.THREADS_BOT_HANDLE = "ss_savebot";
+    process.env.THREADS_BOT_HANDLE = "ss_threads_bot";
 
     const collector = createBotMentionCollector({
       runTransaction: async (operation) => operation(data),
@@ -398,8 +398,8 @@ test("mention collector refreshes existing archives with the original replied po
     assert.equal(firstSync.ok, true);
     assert.equal(firstSync.createdArchives, 1);
     assert.equal(data.botMentionJobs[0]?.status, "completed");
-    assert.equal(data.botArchives[0]?.targetUrl, "https://www.threads.com/@parktaejun/post/MENTION1");
-    assert.equal(data.botArchives[0]?.targetText, "@ss_savebot");
+    assert.equal(data.botArchives[0]?.targetUrl, "https://www.threads.com/@linkedwriter/post/MENTION1");
+    assert.equal(data.botArchives[0]?.targetText, "@ss_threads_bot");
 
     replyResolutionEnabled = true;
     const repairSync = await collector.syncNow("user_sync");
@@ -469,7 +469,7 @@ test("mention collector skips target hydration for unmatched users", async () =>
   const previousMaxPages = process.env.THREADS_BOT_MENTION_MAX_PAGES;
   const previousFetch = globalThis.fetch;
 
-  process.env.THREADS_BOT_HANDLE = "ss_savebot";
+  process.env.THREADS_BOT_HANDLE = "ss_threads_bot";
   process.env.THREADS_BOT_APP_ID = "threads-app-id";
   process.env.THREADS_BOT_APP_SECRET = "threads-app-secret";
   process.env.THREADS_WEB_ADMIN_TOKEN = "bot-test-admin-secret";
@@ -503,8 +503,8 @@ test("mention collector skips target hydration for unmatched users", async () =>
     if (url.includes("/me?fields=")) {
       return createJsonResponse({
         id: "bot-user-1",
-        username: "ss_savebot",
-        name: "SS Savebot",
+        username: "ss_threads_bot",
+        name: "SS Threads Bot",
         is_verified: false
       });
     }
@@ -515,7 +515,7 @@ test("mention collector skips target hydration for unmatched users", async () =>
           {
             id: "mention-1",
             username: "stranger",
-            text: "@ss_savebot",
+            text: "@ss_threads_bot",
             timestamp: "2026-03-25T12:00:00.000Z",
             permalink: "https://www.threads.com/@stranger/post/MENTION1"
           }
@@ -528,7 +528,7 @@ test("mention collector skips target hydration for unmatched users", async () =>
       return createJsonResponse({
         id: "mention-1",
         username: "stranger",
-        text: "@ss_savebot save this",
+        text: "@ss_threads_bot save this",
         timestamp: "2026-03-25T12:00:00.000Z",
         permalink: "https://www.threads.com/@stranger/post/MENTION1",
         replied_to: {

@@ -22,7 +22,7 @@ function createJsonResponse(payload: unknown, init?: ResponseInit): Response {
   });
 }
 
-test("watchlists, searches, and insights populate scrapbook plus state", async () => {
+test("searches stay on Free while watchlists and insights require Plus", async () => {
   const previousAppId = process.env.THREADS_BOT_APP_ID;
   const previousAppSecret = process.env.THREADS_BOT_APP_SECRET;
   const previousAdminToken = process.env.THREADS_WEB_ADMIN_TOKEN;
@@ -32,7 +32,7 @@ test("watchlists, searches, and insights populate scrapbook plus state", async (
   process.env.THREADS_BOT_APP_ID = "threads-app-id";
   process.env.THREADS_BOT_APP_SECRET = "threads-app-secret";
   process.env.THREADS_WEB_ADMIN_TOKEN = "threads-admin-secret";
-  process.env.THREADS_BOT_HANDLE = "parktaejun";
+  process.env.THREADS_BOT_HANDLE = "collectorbot";
 
   globalThis.fetch = (async (input: RequestInfo | URL) => {
     const url = typeof input === "string" ? input : input.toString();
@@ -177,25 +177,61 @@ test("watchlists, searches, and insights populate scrapbook plus state", async (
       "https://ss-threads.dahanda.dev"
     );
 
-    await createWatchlist(data, session.sessionToken, {
-      targetHandle: "@target",
-      includeText: "openai agent",
-      autoArchive: true
-    });
-    let workspace = await syncWatchlist(data, session.sessionToken, data.watchlists[0]?.id ?? "");
-    assert.equal(workspace.watchlists.length, 1);
-    assert.equal(workspace.watchlists[0]?.resultCount, 1);
-
     await createSearchMonitor(data, session.sessionToken, {
       query: "openai codex",
       autoArchive: false
     });
-    workspace = await runSearchMonitor(data, session.sessionToken, data.searchMonitors[0]?.id ?? "");
+    let workspace = await runSearchMonitor(data, session.sessionToken, data.searchMonitors[0]?.id ?? "");
     assert.equal(workspace.searches.length, 1);
     assert.equal(workspace.searches[0]?.resultCount, 1);
 
     workspace = await archiveSearchResult(data, session.sessionToken, data.searchResults[0]?.id ?? "");
     assert.equal(workspace.searches[0]?.results[0]?.status, "archived");
+
+    const freeReadState = readScrapbookPlusState(data, session.sessionToken);
+    assert.equal(freeReadState.searches.length, 1);
+    assert.equal(freeReadState.searches[0]?.results[0]?.status, "archived");
+    assert.equal(freeReadState.watchlists.length, 0);
+    assert.equal(freeReadState.insights.ready, false);
+
+    await assert.rejects(
+      () =>
+        createWatchlist(data, session.sessionToken, {
+          targetHandle: "@target",
+          includeText: "openai agent",
+          autoArchive: true
+        }),
+      /Plus activation is required/
+    );
+    await assert.rejects(() => refreshInsights(data, session.sessionToken), /Plus activation is required/);
+
+    const user = data.botUsers.find((candidate) => candidate.id === session.user.id);
+    assert.ok(user);
+
+    data.licenses.push({
+      id: "license-plus-1",
+      orderId: "order-plus-1",
+      holderName: "Writer",
+      holderEmail: "writer@example.com",
+      token: "plus-test-token",
+      tokenPreview: "plus-tes",
+      issuedAt: "2026-03-25T00:00:00.000Z",
+      expiresAt: "2027-03-25T00:00:00.000Z",
+      revokedAt: null,
+      status: "active"
+    });
+    user.plusLicenseId = "license-plus-1";
+    user.plusActivatedAt = "2026-03-25T00:00:00.000Z";
+    user.updatedAt = "2026-03-25T00:00:00.000Z";
+
+    await createWatchlist(data, session.sessionToken, {
+      targetHandle: "@target",
+      includeText: "openai agent",
+      autoArchive: true
+    });
+    workspace = await syncWatchlist(data, session.sessionToken, data.watchlists[0]?.id ?? "");
+    assert.equal(workspace.watchlists.length, 1);
+    assert.equal(workspace.watchlists[0]?.resultCount, 1);
 
     workspace = await refreshInsights(data, session.sessionToken);
     assert.equal(workspace.insights.ready, true);

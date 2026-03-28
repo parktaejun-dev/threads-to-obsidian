@@ -3,7 +3,7 @@ import type { WebLocale } from "./web-i18n";
 const ko = {
   pageTitle: "Threads Scrapbook",
   pageDescription: "댓글 멘션과 Threads 로그인으로 저장한 게시물을 private scrapbook에 모아 관리합니다.",
-  brandName: "SS Threads",
+  brandName: "ss-threads",
   topbarHome: "홈으로",
   topbarScrapbook: "내 scrapbook",
   heroEyebrow: "Mention scrapbook",
@@ -193,7 +193,7 @@ const ko = {
 const en: typeof ko = {
   pageTitle: "Threads Scrapbook",
   pageDescription: "Collect saved Threads posts in a private scrapbook through reply mentions and Threads sign-in.",
-  brandName: "SS Threads",
+  brandName: "ss-threads",
   topbarHome: "Home",
   topbarScrapbook: "My scrapbook",
   heroEyebrow: "Mention scrapbook",

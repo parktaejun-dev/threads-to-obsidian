@@ -328,7 +328,8 @@ function renderRecentSaves(items: RecentSave[]): void {
 }
 
 async function refreshSaveTargetState(saveTargetOverride?: SaveTarget): Promise<void> {
-  cachedSaveTarget = saveTargetOverride ?? (await getOptions()).saveTarget;
+  const options = await getOptions();
+  cachedSaveTarget = saveTargetOverride ?? options.saveTarget;
   updateModeBadge();
 
   if (cachedSaveTarget === "notion") {

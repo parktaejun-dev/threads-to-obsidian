@@ -258,11 +258,25 @@ function createScopeState(user: BotUserRecord | null): ScrapbookScopeState {
   };
 }
 
-async function requireAdvancedContext(data: WebDatabase, rawSession: string | null | undefined) {
+async function requireScopedContext(data: WebDatabase, rawSession: string | null | undefined) {
   const context = await getBotSessionAuthContext(data, rawSession);
+  if (!context.user) {
+    throw new Error("Sign in with Threads to use searches, watchlists, and insights.");
+  }
+
   const scopes = createScopeState(context.user);
   if (scopes.needsReconnect) {
     throw new Error("Reconnect with Threads to grant profile discovery, keyword search, and insights permissions.");
+  }
+
+  return context;
+}
+
+async function requireMonitoringPlusContext(data: WebDatabase, rawSession: string | null | undefined) {
+  const context = await requireScopedContext(data, rawSession);
+  const plan = readScrapbookPlanState(data, context.user);
+  if (plan.tier !== "plus") {
+    throw new Error("Plus activation is required for watchlists and insights.");
   }
 
   return context;
@@ -325,6 +339,23 @@ function metricValue(current: number | null, previous: number | null): Scrapbook
       typeof current === "number" && typeof previous === "number" && Number.isFinite(current) && Number.isFinite(previous)
         ? current - previous
         : null
+  };
+}
+
+function createEmptyInsightsView(): ScrapbookInsightsView {
+  return {
+    ready: false,
+    refreshedAt: null,
+    overview: {
+      followers: metricValue(null, null),
+      profileViews: metricValue(null, null),
+      views: metricValue(null, null),
+      likes: metricValue(null, null),
+      replies: metricValue(null, null),
+      reposts: metricValue(null, null),
+      quotes: metricValue(null, null)
+    },
+    posts: []
   };
 }
 
@@ -630,24 +661,27 @@ export function readScrapbookPlusState(
       scopes,
       watchlists: [],
       searches: [],
-      insights: {
-        ready: false,
-        refreshedAt: null,
-        overview: {
-          followers: metricValue(null, null),
-          profileViews: metricValue(null, null),
-          views: metricValue(null, null),
-          likes: metricValue(null, null),
-          replies: metricValue(null, null),
-          reposts: metricValue(null, null),
-          quotes: metricValue(null, null)
-        },
-        posts: []
-      }
+      insights: createEmptyInsightsView()
     };
   }
 
   void rawSession;
+  if (plan.tier !== "plus") {
+    const searches = data.searchMonitors
+      .filter((candidate) => candidate.userId === user.id)
+      .sort((left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt))
+      .map((monitor) => buildSearchMonitorView(data, monitor));
+
+    return {
+      authenticated: true,
+      plan,
+      scopes,
+      watchlists: [],
+      searches,
+      insights: createEmptyInsightsView()
+    };
+  }
+
   const watchlists = data.watchlists
     .filter((candidate) => candidate.userId === user.id)
     .sort((left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt))
@@ -692,6 +726,7 @@ export function readScrapbookPlusState(
     watchlists,
     searches,
     insights: {
+      ...createEmptyInsightsView(),
       ready: Boolean(latestProfile),
       refreshedAt: latestProfile?.capturedAt ?? null,
       overview: {
@@ -717,7 +752,7 @@ export async function createWatchlist(
   rawSession: string | null | undefined,
   input: CreateWatchlistInput
 ): Promise<ScrapbookPlusState> {
-  const { user } = await requireAdvancedContext(data, rawSession);
+  const { user } = await requireMonitoringPlusContext(data, rawSession);
   const targetHandle = normalizeHandle(input.targetHandle);
   if (!targetHandle) {
     throw new Error("Enter a Threads handle to watch.");
@@ -764,7 +799,7 @@ export async function deleteWatchlist(
   rawSession: string | null | undefined,
   watchlistId: string
 ): Promise<ScrapbookPlusState> {
-  const { user } = await requireAdvancedContext(data, rawSession);
+  const { user } = await requireMonitoringPlusContext(data, rawSession);
   ensureWatchlistBelongsToUser(data, user.id, watchlistId);
   data.watchlists = data.watchlists.filter((candidate) => !(candidate.userId === user.id && candidate.id === watchlistId));
   data.trackedPosts = data.trackedPosts.filter(
@@ -778,7 +813,7 @@ export async function syncWatchlist(
   rawSession: string | null | undefined,
   watchlistId: string
 ): Promise<ScrapbookPlusState> {
-  const { user, accessToken } = await requireAdvancedContext(data, rawSession);
+  const { user, accessToken } = await requireMonitoringPlusContext(data, rawSession);
   const watchlist = ensureWatchlistBelongsToUser(data, user.id, watchlistId);
 
   try {
@@ -867,7 +902,7 @@ export async function createSearchMonitor(
   rawSession: string | null | undefined,
   input: CreateSearchMonitorInput
 ): Promise<ScrapbookPlusState> {
-  const { user } = await requireAdvancedContext(data, rawSession);
+  const { user } = await requireScopedContext(data, rawSession);
   const query = safeText(input.query);
   if (!query) {
     throw new Error("Enter a keyword query to monitor.");
@@ -898,7 +933,7 @@ export async function deleteSearchMonitor(
   rawSession: string | null | undefined,
   monitorId: string
 ): Promise<ScrapbookPlusState> {
-  const { user } = await requireAdvancedContext(data, rawSession);
+  const { user } = await requireScopedContext(data, rawSession);
   ensureSearchMonitorBelongsToUser(data, user.id, monitorId);
   data.searchMonitors = data.searchMonitors.filter((candidate) => !(candidate.userId === user.id && candidate.id === monitorId));
   data.searchResults = data.searchResults.filter((candidate) => !(candidate.userId === user.id && candidate.monitorId === monitorId));
@@ -910,7 +945,7 @@ export async function runSearchMonitor(
   rawSession: string | null | undefined,
   monitorId: string
 ): Promise<ScrapbookPlusState> {
-  const { user, accessToken } = await requireAdvancedContext(data, rawSession);
+  const { user, accessToken } = await requireScopedContext(data, rawSession);
   const monitor = ensureSearchMonitorBelongsToUser(data, user.id, monitorId);
   const now = new Date().toISOString();
 
@@ -1017,7 +1052,7 @@ export async function archiveSearchResult(
   rawSession: string | null | undefined,
   resultId: string
 ): Promise<ScrapbookPlusState> {
-  const { user } = await requireAdvancedContext(data, rawSession);
+  const { user } = await requireScopedContext(data, rawSession);
   const result = ensureSearchResultBelongsToUser(data, user.id, resultId);
   const archiveResult = upsertArchiveFromPost(
     data,
@@ -1053,7 +1088,7 @@ export async function dismissSearchResult(
   rawSession: string | null | undefined,
   resultId: string
 ): Promise<ScrapbookPlusState> {
-  const { user } = await requireAdvancedContext(data, rawSession);
+  const { user } = await requireScopedContext(data, rawSession);
   const result = ensureSearchResultBelongsToUser(data, user.id, resultId);
   result.dismissedAt = new Date().toISOString();
   result.status = "dismissed";
@@ -1066,7 +1101,7 @@ export async function refreshInsights(
   data: WebDatabase,
   rawSession: string | null | undefined
 ): Promise<ScrapbookPlusState> {
-  const { user, accessToken } = await requireAdvancedContext(data, rawSession);
+  const { user, accessToken } = await requireMonitoringPlusContext(data, rawSession);
   const now = new Date().toISOString();
 
   const profileInsights = await getProfileInsights(accessToken);
@@ -1153,7 +1188,7 @@ export async function archiveTrackedInsightPost(
   rawSession: string | null | undefined,
   externalPostId: string
 ): Promise<ScrapbookPlusState> {
-  const { user } = await requireAdvancedContext(data, rawSession);
+  const { user } = await requireMonitoringPlusContext(data, rawSession);
   const tracked = findExistingInsightPost(data, user.id, externalPostId);
   if (!tracked) {
     throw new Error("The requested insight post could not be found.");
@@ -1186,7 +1221,7 @@ export async function archiveTrackedPost(
   rawSession: string | null | undefined,
   trackedPostId: string
 ): Promise<ScrapbookPlusState> {
-  const { user } = await requireAdvancedContext(data, rawSession);
+  const { user } = await requireMonitoringPlusContext(data, rawSession);
   const tracked = ensureTrackedPostBelongsToUser(data, user.id, trackedPostId);
   const sourceLabel =
     tracked.origin === "watchlist"

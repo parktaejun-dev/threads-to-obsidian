@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "SS Threads",
+  "name": "ss-threads",
   "description": "Save Threads posts to Obsidian or Notion, with ZIP fallback and optional AI organization.",
   "version": "0.1.0",
   "icons": {

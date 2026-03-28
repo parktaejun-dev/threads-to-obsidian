@@ -697,16 +697,16 @@ export interface EmailDeliveryDraft {
 }
 
 export const DEFAULT_SETTINGS: StorefrontSettings = {
-  productName: "SS Threads",
+  productName: "ss-threads",
   headline: "Threads 저장을 한 곳에서.",
-  subheadline: "Free는 저장글 100개와 폴더 5개까지. Plus는 저장글 1,000개와 폴더 50개, 그리고 기존 extension 고급 저장 기능까지 함께 엽니다.",
-  priceLabel: "SS Threads Plus",
+  subheadline: "Free는 저장글 100개와 폴더 5개, 그리고 searches까지. Plus는 저장글 1,000개, 폴더 50개, watchlists/insights, 그리고 기존 extension 고급 저장 기능까지 함께 엽니다.",
+  priceLabel: "ss-threads Plus",
   priceValue: "US$19.99",
   supportEmail: "hello@oxcorp.ninja",
-  includedUpdates: "US$2.99 monthly · US$19.99 yearly · scrapbook 1000/50 + extension advanced",
+  includedUpdates: "US$2.99 monthly · US$19.99 yearly · Free 100/5 + searches -> Plus 1000/50 + watchlists/insights + extension advanced",
   heroNotes: [
-    "Free: 저장글 100개 · 폴더 5개",
-    "Plus: 저장글 1,000개 · 폴더 50개",
+    "Free: 저장글 100개 · 폴더 5개 · searches · Markdown / ZIP export",
+    "Plus: 저장글 1,000개 · 폴더 50개 · watchlists · insights",
     "Plus bonus: extension 파일 규칙 · Notion 고급 저장 · AI 정리"
   ],
   faqs: [
@@ -718,12 +718,12 @@ export const DEFAULT_SETTINGS: StorefrontSettings = {
     {
       id: "faq-2",
       question: "누가 Plus를 쓰면 좋나요?",
-      answer: "저장글을 많이 쌓고 폴더를 촘촘히 쓰는 사용자, 그리고 extension의 규칙 저장과 AI 정리까지 함께 쓰려는 사용자에게 맞습니다."
+      answer: "저장글을 많이 쌓고 폴더를 촘촘히 쓰는 사용자, watchlists와 insights가 필요한 사용자, 그리고 extension의 규칙 저장과 AI 정리까지 함께 쓰려는 사용자에게 맞습니다."
     },
     {
       id: "faq-3",
       question: "Plus에 extension 고급 기능도 포함되나요?",
-      answer: "네. Plus 키를 extension에 넣으면 파일명·경로 규칙, Notion 고급 저장, AI 요약과 태그 같은 기존 고급 기능도 함께 활성화됩니다."
+      answer: "네. Plus는 scrapbook 저장 한도와 watchlists/insights를 함께 열고, 같은 키를 extension에 넣으면 파일명·경로 규칙, Notion 고급 저장, AI 요약과 태그 같은 기존 고급 기능도 함께 활성화됩니다. searches는 Free에서도 계속 사용할 수 있습니다."
     },
     {
       id: "faq-4",

@@ -2155,7 +2155,9 @@ const brandedDictionaryCache = new WeakMap<Messages, Messages>();
 
 function applyPlanBrandingToString(value: string): string {
     return value
-        .replaceAll("SS Threads Pro", "SS Threads Plus")
+        .replaceAll("SS Threads Pro", "ss-threads Plus")
+        .replaceAll("SS Threads Plus", "ss-threads Plus")
+        .replaceAll("SS Threads", "ss-threads")
         .replace(PLAN_BRAND_PATTERN, "Plus");
 }
 

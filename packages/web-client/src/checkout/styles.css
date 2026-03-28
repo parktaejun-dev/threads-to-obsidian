@@ -205,6 +205,16 @@ body {
   border-bottom: 0;
 }
 
+.checkout-section-row td {
+  padding: 12px 8px;
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--co-text);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 .cmp-check {
   color: #34d399; /* success green */
   font-weight: 700;
@@ -218,6 +228,12 @@ body {
   margin: 12px 0 0;
   font-size: 12px;
   color: var(--co-text-muted);
+}
+
+.compare-note-secondary {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--co-border);
 }
 
 .compare-note strong {
