@@ -171,16 +171,16 @@ img {
 
 .hero {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 280px;
-  gap: 30px;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 18px;
   align-items: start;
-  padding: 36px 0 40px;
+  padding: 30px 0 32px;
   border-top: 1px solid var(--line);
   border-bottom: 1px solid var(--line);
 }
 
 .hero-copy {
-  max-width: 700px;
+  max-width: 760px;
 }
 
 .eyebrow {
@@ -201,10 +201,10 @@ h3 {
 }
 
 h1 {
-  max-width: 13ch;
-  margin-top: 18px;
-  font-size: clamp(2.6rem, 7vw, 4.9rem);
-  line-height: 0.94;
+  max-width: none;
+  margin-top: 14px;
+  font-size: clamp(2.1rem, 4.2vw, 3.25rem);
+  line-height: 1;
 }
 
 #headline {
@@ -213,10 +213,7 @@ h1 {
 }
 
 #headline .headline-row {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 1.6ch;
+  display: block;
 }
 
 h2 {
@@ -237,23 +234,16 @@ h3 {
 }
 
 .lead {
-  max-width: 38ch;
-  margin: 16px 0 0;
-  font-size: 17px;
+  max-width: 32ch;
+  margin: 12px 0 0;
+  font-size: 15px;
 }
 
 .hero-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
-  margin-top: 24px;
-}
-
-.price-panel {
-  display: grid;
-  gap: 8px;
-  padding-left: 22px;
-  border-left: 1px solid var(--line);
+  margin-top: 18px;
 }
 
 .product-tag {
@@ -296,28 +286,22 @@ h3 {
 }
 
 .section {
-  margin-top: 56px;
-}
-
-.section-head {
-  display: grid;
-  gap: 8px;
-  margin-bottom: 18px;
+  margin-top: 36px;
 }
 
 .flow-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: 16px;
+  gap: 12px;
   align-items: center;
-  padding: 28px 0;
+  padding: 20px 0;
   border-top: 1px solid var(--line);
 }
 
 .flow-copy {
   display: grid;
   align-content: start;
-  gap: 10px;
+  gap: 8px;
 }
 
 .flow-label {
@@ -327,7 +311,7 @@ h3 {
 }
 
 .flow-desc {
-  max-width: 46ch;
+  max-width: 34ch;
   margin: 0;
   font-size: 14px;
 }
@@ -436,22 +420,13 @@ h3 {
 }
 
 @media (max-width: 900px) {
-  .hero,
   .flow-row {
     grid-template-columns: 1fr;
   }
 
-  .price-panel,
   .flow-shot-mobile {
     max-width: none;
     justify-self: stretch;
-  }
-
-  .price-panel {
-    padding-left: 0;
-    padding-top: 18px;
-    border-left: 0;
-    border-top: 1px solid var(--line);
   }
 }
 
@@ -472,13 +447,12 @@ h3 {
   }
 
   .hero {
-    gap: 22px;
-    padding: 26px 0 30px;
+    gap: 16px;
+    padding: 22px 0 26px;
   }
 
   h1 {
-    max-width: none;
-    font-size: clamp(2.1rem, 13vw, 3.3rem);
+    font-size: clamp(2rem, 11vw, 3rem);
   }
 
   .hero-actions,

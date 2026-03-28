@@ -82,57 +82,9 @@
       </header>
 
       <main>
-        <section class="hero">
-          <div class="hero-copy">
-            <p class="eyebrow" data-i18n="scrapbookHeroEyebrow">Mention scrapbook</p>
-            <h1 data-i18n="scrapbookHeroTitle">멘션으로 모은 Threads를 private scrapbook에 저장.</h1>
-
-            <div class="hero-actions">
-              <button class="primary-cta" type="button" data-bot-connect data-i18n="scrapbookConnectButton">Threads로 로그인</button>
-            </div>
-            <p class="status-panel status-panel-warning hidden" data-mobile-oauth-note data-i18n="scrapbookMobileOauthNote">
-              모바일에서는 브라우저용 연결 페이지에서 <strong>로그인 링크 복사</strong>를 누른 뒤, 새 탭 주소창에 붙여넣는 방식으로 진행해 주세요.
-            </p>
-          </div>
-        </section>
-
         <section class="section section-status">
           <p id="page-status" class="status-panel hidden"></p>
           <div id="auth-panel" class="hidden"></div>
-        </section>
-
-        <section class="section section-plan">
-          <div id="plan-panel" class="plan-panel panel">
-            <div class="plan-panel-head">
-              <div>
-                <p class="eyebrow">Plan</p>
-                <h2 id="plan-title">Free 100 / 5</h2>
-                <p id="plan-copy" class="section-copy">로그인하면 저장글 한도와 Plus 연결 상태를 확인할 수 있습니다.</p>
-              </div>
-              <span id="plan-tier-badge" class="plan-tier-badge">Free</span>
-            </div>
-            <div class="plan-usage-grid">
-              <div class="plan-usage-card">
-                <span class="plan-usage-label">Saved posts</span>
-                <strong id="plan-archive-usage">0 / 100</strong>
-              </div>
-              <div class="plan-usage-card">
-                <span class="plan-usage-label">Folders</span>
-                <strong id="plan-folder-usage">0 / 5</strong>
-              </div>
-            </div>
-            <p id="plan-license-status" class="session-menu-note"></p>
-            <form id="plan-key-form" class="plan-key-form">
-              <label class="plan-key-field">
-                <span id="plan-key-label">Plus key</span>
-                <input id="plan-key-input" type="text" autocomplete="off" placeholder="Paste your Plus key" />
-              </label>
-              <div class="plan-key-actions">
-                <button id="plan-key-submit" class="primary-cta" type="submit">Activate Plus</button>
-                <button id="plan-key-clear" class="secondary-cta" type="button">Remove key</button>
-              </div>
-            </form>
-          </div>
         </section>
 
         <section class="section customer-hidden">
@@ -144,42 +96,7 @@
           </nav>
         </section>
 
-        <section id="how-it-works" class="section customer-hidden">
-          <div class="section-head">
-            <p class="eyebrow" data-i18n="scrapbookHowEyebrow">How it works</p>
-            <h2 data-i18n="scrapbookHowTitle">설정은 한 번, 저장은 멘션만.</h2>
-            <p class="section-copy" data-i18n="scrapbookHowCopy">
-              공개 댓글은 트리거 역할만 하고, 저장된 결과는 내 scrapbook에만 보입니다.
-            </p>
-          </div>
-
-          <div class="steps-grid">
-            <article class="step-card">
-              <span class="install-step">1</span>
-              <h3 data-i18n="scrapbookHowStep1Title">Threads로 로그인</h3>
-              <p data-i18n="scrapbookHowStep1Desc">내 Threads 계정을 연결해 어떤 댓글 작성자가 어떤 scrapbook 소유자인지 서버가 정확히 식별하게 합니다.</p>
-            </article>
-
-            <article class="step-card">
-              <span class="install-step">2</span>
-              <h3 data-i18n="scrapbookHowStep2Title">댓글에 봇 멘션</h3>
-              <p data-i18n="scrapbookHowStep2Desc">저장하고 싶은 글에 <span data-bot-handle>@your-bot</span> 만 멘션하면 수집기가 그 이벤트를 보관합니다.</p>
-            </article>
-
-            <article class="step-card">
-              <span class="install-step">3</span>
-              <h3 data-i18n="scrapbookHowStep3Title">웹에서 검토하고 내보내기</h3>
-              <p data-i18n="scrapbookHowStep3Desc">웹 scrapbook에서 저장 상태를 확인하고 Markdown 복사나 다운로드로 다음 툴로 넘깁니다.</p>
-            </article>
-          </div>
-        </section>
-
         <section id="archives-section" class="section tab-panel" data-tab-panel="inbox">
-          <div class="section-head">
-            <p class="eyebrow" data-i18n="scrapbookInboxEyebrow">Inbox</p>
-            <h2 data-i18n="scrapbookInboxTitle">Inbox</h2>
-          </div>
-
           <div id="archives-toolbar" class="archives-toolbar hidden">
             <div class="archives-toolbar-meta" id="archives-toolbar-meta"></div>
             <div class="archives-toolbar-actions">
@@ -233,6 +150,40 @@
                 <button id="archives-page-next" class="archives-pagination-button" type="button" aria-label="Next page">›</button>
               </div>
             </div>
+          </div>
+        </section>
+
+        <section class="section section-plan">
+          <div id="plan-panel" class="plan-panel panel">
+            <div class="plan-panel-head">
+              <div>
+                <p class="eyebrow">Plan</p>
+                <h2 id="plan-title">Free 100 / 5</h2>
+                <p id="plan-copy" class="section-copy">로그인하면 저장글 한도와 Plus 연결 상태를 확인할 수 있습니다.</p>
+              </div>
+              <span id="plan-tier-badge" class="plan-tier-badge">Free</span>
+            </div>
+            <div class="plan-usage-grid">
+              <div class="plan-usage-card">
+                <span class="plan-usage-label">Saved posts</span>
+                <strong id="plan-archive-usage">0 / 100</strong>
+              </div>
+              <div class="plan-usage-card">
+                <span class="plan-usage-label">Folders</span>
+                <strong id="plan-folder-usage">0 / 5</strong>
+              </div>
+            </div>
+            <p id="plan-license-status" class="session-menu-note"></p>
+            <form id="plan-key-form" class="plan-key-form">
+              <label class="plan-key-field">
+                <span id="plan-key-label">Plus key</span>
+                <input id="plan-key-input" type="text" autocomplete="off" placeholder="Paste your Plus key" />
+              </label>
+              <div class="plan-key-actions">
+                <button id="plan-key-submit" class="primary-cta" type="submit">Activate Plus</button>
+                <button id="plan-key-clear" class="secondary-cta" type="button">Remove key</button>
+              </div>
+            </form>
           </div>
         </section>
 

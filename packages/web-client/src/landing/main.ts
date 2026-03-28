@@ -101,15 +101,17 @@ function renderLocalizedStorefront(locale: WebLocale): void {
   }
 
   setHref(topbarPrimaryCta, copy.links.topbarPrimaryHref);
+  setHref(heroDesktopCta, copy.links.productAHref);
+  setHref(heroMobileCta, copy.links.productBHref);
   setHref(priceCardCta, copy.links.priceCardHref);
   setHref(productACta, copy.links.productAHref);
   setHref(productBCta, copy.links.productBHref);
 
   if (heroDesktopCta) {
-    heroDesktopCta.textContent = msg.productATitle;
+    heroDesktopCta.textContent = msg.productACta;
   }
   if (heroMobileCta) {
-    heroMobileCta.textContent = msg.productBTitle;
+    heroMobileCta.textContent = msg.productBCta;
   }
   if (compareProductALabel) {
     compareProductALabel.textContent = msg.productATitle;
