@@ -5,6 +5,7 @@ import type {
   BotArchiveRecord,
   BotUserRecord,
   InsightsSnapshotRecord,
+  SavedViewRecord,
   SearchMonitorRecord,
   SearchResultRecord,
   TrackedPostRecord,
@@ -32,6 +33,7 @@ import {
 import {
   upsertBotArchive,
   upsertInsightsSnapshot,
+  upsertSavedView,
   upsertSearchMonitor,
   upsertSearchResult,
   upsertTrackedPost,
@@ -45,6 +47,7 @@ import {
   type ScrapbookPlanState,
   readScrapbookPlanState
 } from "./scrapbook-plan-service";
+import { extractTitleExcerpt } from "@threads/shared/utils";
 
 export interface ScrapbookMetricValue {
   value: number | null;
@@ -134,6 +137,38 @@ export interface ScrapbookInsightsPostView {
   capturedAt: string | null;
 }
 
+export interface ScrapbookInsightsSavedPostView {
+  externalPostId: string | null;
+  canonicalUrl: string | null;
+  title: string;
+  views: number | null;
+  likes: number | null;
+}
+
+export interface ScrapbookInsightsSavedView {
+  id: string;
+  name: string;
+  createdAt: string;
+  updatedAt: string;
+  capturedAt: string | null;
+  insightProps: {
+    highlightId: string;
+    highlightParams: Record<string, string | number>;
+    localeAtSave: string;
+    tier: string;
+    score: number;
+  } | null;
+  overview: {
+    followers: number | null;
+    profileViews: number | null;
+    views: number | null;
+    likes: number | null;
+    replies: number | null;
+    reposts: number | null;
+  };
+  posts: ScrapbookInsightsSavedPostView[];
+}
+
 export interface ScrapbookInsightsView {
   ready: boolean;
   refreshedAt: string | null;
@@ -147,6 +182,7 @@ export interface ScrapbookInsightsView {
     quotes: ScrapbookMetricValue;
   };
   posts: ScrapbookInsightsPostView[];
+  savedViews: ScrapbookInsightsSavedView[];
 }
 
 function toOperationalStatusError(error: unknown, fallback: string): string {
@@ -218,13 +254,8 @@ function parseCsvHandles(value: string | null | undefined): string[] {
 }
 
 function titleFromText(text: string, fallback: string): string {
-  const normalized = text.replace(/\s+/g, " ").trim();
-  if (!normalized) {
-    return fallback;
-  }
-
-  const excerpt = Array.from(normalized).slice(0, 80).join("").trim();
-  return excerpt || fallback;
+  const title = extractTitleExcerpt(text, fallback, 80);
+  return title || fallback;
 }
 
 function normalizeMediaType(post: ThreadsApiPost): string {
@@ -355,7 +386,8 @@ function createEmptyInsightsView(): ScrapbookInsightsView {
       reposts: metricValue(null, null),
       quotes: metricValue(null, null)
     },
-    posts: []
+    posts: [],
+    savedViews: []
   };
 }
 
@@ -380,6 +412,53 @@ function getInsightMetricSnapshotMap(data: WebDatabase, userId: string) {
     latestProfile,
     previousProfile,
     postSnapshotGroups
+  };
+}
+
+function buildSavedInsightView(
+  data: WebDatabase,
+  userId: string,
+  savedView: SavedViewRecord
+): ScrapbookInsightsSavedView | null {
+  const snapshotById = new Map(
+    data.insightsSnapshots
+      .filter((candidate) => candidate.userId === userId)
+      .map((snapshot) => [snapshot.id, snapshot] as const)
+  );
+  const profileSnapshot =
+    savedView.targetIds
+      .map((id) => snapshotById.get(id) ?? null)
+      .find((snapshot) => snapshot?.kind === "profile") ?? null;
+  const postSnapshots = savedView.targetIds
+    .map((id) => snapshotById.get(id) ?? null)
+    .filter((snapshot): snapshot is InsightsSnapshotRecord => Boolean(snapshot && snapshot.kind === "post"));
+
+  if (!profileSnapshot && postSnapshots.length === 0) {
+    return null;
+  }
+
+  return {
+    id: savedView.id,
+    name: savedView.name,
+    createdAt: savedView.createdAt,
+    updatedAt: savedView.updatedAt,
+    capturedAt: profileSnapshot?.capturedAt ?? postSnapshots[0]?.capturedAt ?? null,
+    insightProps: savedView.insightProps ?? null,
+    overview: {
+      followers: profileSnapshot?.followers ?? null,
+      profileViews: profileSnapshot?.profileViews ?? null,
+      views: profileSnapshot?.views ?? null,
+      likes: profileSnapshot?.likes ?? null,
+      replies: profileSnapshot?.replies ?? null,
+      reposts: profileSnapshot?.reposts ?? null
+    },
+    posts: postSnapshots.slice(0, 3).map((snapshot) => ({
+      externalPostId: snapshot.externalPostId,
+      canonicalUrl: snapshot.canonicalUrl,
+      title: snapshot.title ?? "Post",
+      views: snapshot.views,
+      likes: snapshot.likes
+    }))
   };
 }
 
@@ -718,6 +797,11 @@ export function readScrapbookPlusState(
         capturedAt: latest?.capturedAt ?? null
       } satisfies ScrapbookInsightsPostView;
     });
+  const savedViews = data.savedViews
+    .filter((candidate) => candidate.userId === user.id && candidate.kind === "insight")
+    .sort((left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt))
+    .map((savedView) => buildSavedInsightView(data, user.id, savedView))
+    .filter((savedView): savedView is ScrapbookInsightsSavedView => Boolean(savedView));
 
   return {
     authenticated: true,
@@ -738,7 +822,8 @@ export function readScrapbookPlusState(
         reposts: metricValue(latestProfile?.reposts ?? null, previousProfile?.reposts ?? null),
         quotes: metricValue(latestProfile?.quotes ?? null, previousProfile?.quotes ?? null)
       },
-      posts: insightPosts
+      posts: insightPosts,
+      savedViews
     }
   };
 }
@@ -916,7 +1001,7 @@ export async function createSearchMonitor(
     authorHandle: normalizeHandle(input.authorHandle) || null,
     excludeHandles: [...new Set((input.excludeHandles ?? []).map((value) => normalizeHandle(value)).filter(Boolean))],
     autoArchive: input.autoArchive === true,
-    searchType: input.searchType === "recent" ? "recent" : "top",
+    searchType: input.searchType === "top" ? "top" : "recent",
     lastCursor: null,
     lastRunAt: null,
     lastError: null,
@@ -1183,6 +1268,46 @@ export async function refreshInsights(
   return readScrapbookPlusState(data, rawSession, user.id);
 }
 
+export async function saveInsightsView(
+  data: WebDatabase,
+  rawSession: string | null | undefined,
+  name?: string | null,
+  insightProps?: {
+    highlightId: string;
+    highlightParams: Record<string, string | number>;
+    localeAtSave: string;
+    tier: string;
+    score: number;
+  } | null
+): Promise<ScrapbookPlusState> {
+  const { user } = await requireMonitoringPlusContext(data, rawSession);
+  const { latestProfile, postSnapshotGroups } = getInsightMetricSnapshotMap(data, user.id);
+  if (!latestProfile) {
+    throw new Error("Update your insight data first.");
+  }
+
+  const latestPostSnapshots = [...postSnapshotGroups.values()]
+    .map((group) => group[0] ?? null)
+    .filter((snapshot): snapshot is InsightsSnapshotRecord => Boolean(snapshot))
+    .sort((left, right) => Date.parse(right.capturedAt) - Date.parse(left.capturedAt))
+    .slice(0, 3);
+  const now = new Date().toISOString();
+
+  upsertSavedView(data, {
+    id: crypto.randomUUID(),
+    userId: user.id,
+    name: safeText(name) || `Growth card ${latestProfile.capturedAt.slice(0, 16).replace("T", " ")}`,
+    kind: "insight",
+    targetIds: [latestProfile.id, ...latestPostSnapshots.map((snapshot) => snapshot.id)],
+    createdAt: now,
+    updatedAt: now,
+    status: "active",
+    insightProps: insightProps ?? null
+  });
+
+  return readScrapbookPlusState(data, rawSession, user.id);
+}
+
 export async function archiveTrackedInsightPost(
   data: WebDatabase,
   rawSession: string | null | undefined,
@@ -1213,6 +1338,18 @@ export async function archiveTrackedInsightPost(
   tracked.archivedAt = archiveResult.archive.archivedAt;
   tracked.updatedAt = new Date().toISOString();
   upsertTrackedPost(data, tracked);
+  return readScrapbookPlusState(data, rawSession, user.id);
+}
+
+export async function deleteInsightsView(
+  data: WebDatabase,
+  rawSession: string | null | undefined,
+  savedViewId: string
+): Promise<ScrapbookPlusState> {
+  const { user } = await requireMonitoringPlusContext(data, rawSession);
+  data.savedViews = data.savedViews.filter(
+    (candidate) => !(candidate.userId === user.id && candidate.kind === "insight" && candidate.id === savedViewId)
+  );
   return readScrapbookPlusState(data, rawSession, user.id);
 }
 
@@ -1373,6 +1510,20 @@ export async function refreshInsightsFromStore(
   return withBotSessionDatabaseTransaction(rawSession, (data) => refreshInsights(data, rawSession));
 }
 
+export async function saveInsightsViewFromStore(
+  rawSession: string | null | undefined,
+  name?: string | null,
+  insightProps?: {
+    highlightId: string;
+    highlightParams: Record<string, string | number>;
+    localeAtSave: string;
+    tier: string;
+    score: number;
+  } | null
+): Promise<ScrapbookPlusState> {
+  return withBotSessionDatabaseTransaction(rawSession, (data) => saveInsightsView(data, rawSession, name, insightProps));
+}
+
 export async function archiveTrackedInsightPostFromStore(
   rawSession: string | null | undefined,
   externalPostId: string
@@ -1380,6 +1531,13 @@ export async function archiveTrackedInsightPostFromStore(
   return withBotSessionDatabaseTransaction(rawSession, (data) =>
     archiveTrackedInsightPost(data, rawSession, externalPostId)
   );
+}
+
+export async function deleteInsightsViewFromStore(
+  rawSession: string | null | undefined,
+  savedViewId: string
+): Promise<ScrapbookPlusState> {
+  return withBotSessionDatabaseTransaction(rawSession, (data) => deleteInsightsView(data, rawSession, savedViewId));
 }
 
 export async function archiveTrackedPostFromStore(

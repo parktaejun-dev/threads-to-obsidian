@@ -62,8 +62,8 @@
             <p id="hero-eyebrow" class="eyebrow">Threads 저장</p>
             <h1 id="headline">__LANDING_HEADLINE__</h1>
 
-            <article class="hero-mention-box hero-mention-box-inline">
-              <span id="hero-mention-text"></span>
+            <article id="hero-mention-box" class="hero-mention-box hero-mention-box-inline" __LANDING_MENTION_HIDDEN__>
+              <span id="hero-mention-text">__LANDING_MENTION__</span>
             </article>
 
             <div class="hero-actions">
@@ -87,15 +87,11 @@
           <div class="section-head">
             <p id="routes-eyebrow" class="eyebrow">저장 방법</p>
             <h2 id="routes-title">PC와 모바일, 쓰는 방식이 다릅니다</h2>
-            <p id="routes-copy" class="section-copy">
-              PC는 보고 있는 글을 바로 저장합니다. 모바일은 댓글 한 줄로 나중에 볼 글을 모아 둡니다.
-            </p>
           </div>
 
           <div class="route-grid">
             <article id="desktop-flow" class="route-card">
               <div class="route-card-head">
-                <p id="product-a-tag" class="product-tag" data-i18n="productATag">PC</p>
                 <h3 id="product-a-title" data-i18n="productATitle">PC는 Chrome 확장</h3>
                 <p id="product-a-desc" class="flow-desc" data-i18n="productADesc"></p>
               </div>
@@ -109,7 +105,6 @@
 
             <article id="mobile-flow" class="route-card">
               <div class="route-card-head">
-                <p id="product-b-tag" class="product-tag" data-i18n="productBTag">모바일</p>
                 <h3 id="product-b-title" data-i18n="productBTitle">모바일은 댓글 저장</h3>
                 <p id="product-b-desc" class="flow-desc" data-i18n="productBDesc"></p>
               </div>
@@ -127,27 +122,16 @@
           <div class="section-head">
             <p id="plan-eyebrow" class="eyebrow">요금</p>
             <h2 id="plan-title">먼저 Free로 시작하고, 필요할 때 Plus</h2>
-            <p id="plan-copy" class="section-copy">
-              Free는 저장, 태그, 검색까지. Plus는 저장 한도를 넓히고 관심 계정과 반응 보기까지 지원합니다.
-            </p>
           </div>
 
           <div class="plan-grid">
             <article class="plan-card">
-              <p class="plan-tier">Free</p>
               <h3 id="plan-free-title">Free</h3>
-              <p id="plan-free-copy" class="plan-copy">
-                가볍게 저장하고 다시 찾기에 충분합니다.
-              </p>
               <ul id="plan-free-list" class="plan-list"></ul>
             </article>
 
             <article class="plan-card plan-card-plus">
-              <p class="plan-tier plan-tier-plus">Plus</p>
               <h3 id="plan-plus-title">Plus</h3>
-              <p id="plan-plus-copy" class="plan-copy">
-                저장을 많이 하거나, 더 자주 확인할 때 어울립니다.
-              </p>
               <ul id="plan-plus-list" class="plan-list"></ul>
               <a id="price-card-cta" class="primary-cta primary-cta-block" href="/checkout">Plus 보기</a>
             </article>
@@ -220,38 +204,6 @@
           </div>
         </section>
 
-        <section class="section trust-section" aria-labelledby="trust-title">
-          <div class="section-head">
-            <p id="trust-eyebrow" class="eyebrow">지원과 신뢰</p>
-            <h2 id="trust-title">결제 전 마지막 질문도 여기서 끝냅니다</h2>
-            <p id="trust-copy" class="section-copy">
-              지원 이메일, 환불, 데이터 처리 요약, 자주 묻는 질문을 한 번에 보여줍니다.
-            </p>
-          </div>
-
-          <div class="trust-grid">
-            <article class="panel trust-card">
-              <p id="trust-support-label" class="panel-title">지원 이메일</p>
-              <a
-                id="support-email-link-secondary"
-                class="support-email"
-                href="mailto:hello@oxcorp.ninja"
-              >hello@oxcorp.ninja</a>
-              <p id="trust-support-copy" class="panel-copy">
-                결제 확인, 환불 요청, 키 전달 문의는 이 이메일로 처리합니다.
-              </p>
-            </article>
-
-            <article class="panel trust-card">
-              <p id="trust-data-label" class="panel-title">데이터 처리</p>
-              <p id="trust-data-copy" class="panel-copy">
-                기본 저장과 검색은 웹 보관함 중심으로 작동하고, Plus 키 활성화나 Notion 저장, AI 정리처럼 일부 기능은 서버 연동이 포함됩니다.
-              </p>
-            </article>
-          </div>
-
-          <div id="faq-list" class="faq-list"></div>
-        </section>
       </main>
 
       <footer class="site-footer">

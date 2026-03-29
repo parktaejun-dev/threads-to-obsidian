@@ -6,6 +6,7 @@ import { buildDefaultDatabase, type BotArchiveRecord, type BotUserRecord } from 
 import { ingestBotMention } from "../packages/web-server/src/server/bot-service";
 import { readScrapbookPlusState } from "../packages/web-server/src/server/scrapbook-plus-service";
 import { syncScrapbookPlusLicenseLink } from "../packages/web-server/src/server/scrapbook-plan-service";
+import { replaceRuntimeConfigForTests } from "../packages/web-server/src/server/runtime-config";
 
 function createBotUser(overrides: Partial<BotUserRecord> = {}): BotUserRecord {
   return {
@@ -127,6 +128,63 @@ test("scrapbook plus state reports Plus limits when an active license is linked"
   assert.equal(state.plan.folderLimit, 50);
   assert.equal(state.plan.archiveCount, 1);
   assert.equal(state.plan.plusStatus, "active");
+});
+
+test("scrapbook plus state excludes trigger-only captures from the archive count", () => {
+  const previousHandle = process.env.THREADS_BOT_HANDLE;
+  process.env.THREADS_BOT_HANDLE = "ss_threads_bot";
+  replaceRuntimeConfigForTests(null);
+
+  try {
+    const data = buildDefaultDatabase("2026-03-28T00:00:00.000Z");
+    data.botUsers.push(createBotUser());
+    data.botSessions.push({
+      id: "session-1",
+      userId: "user-1",
+      sessionHash: createHash("sha256").update("session-token-1").digest("hex"),
+      createdAt: "2026-03-28T00:00:00.000Z",
+      expiresAt: "2026-04-28T00:00:00.000Z",
+      lastSeenAt: "2026-03-28T00:00:00.000Z",
+      revokedAt: null,
+      status: "active"
+    });
+    data.botArchives.push(
+      createArchive(1),
+      {
+        ...createArchive(2),
+        id: "archive-trigger-only",
+        mentionId: "mention-trigger-only",
+        mentionUrl: "https://www.threads.com/@writer/post/MENTION_TRIGGER",
+        targetUrl: "https://www.threads.com/@writer/post/MENTION_TRIGGER",
+        targetAuthorHandle: "writer",
+        targetAuthorDisplayName: "Writer",
+        targetText: "@ss_threads_bot 감사합니다.",
+        rawPayloadJson: JSON.stringify({
+          mention: {
+            id: "mention-trigger-only"
+          },
+          target: {
+            id: "mention-trigger-only"
+          },
+          extractedPost: null
+        }),
+        archivedAt: "2026-03-28T01:05:00.000Z",
+        updatedAt: "2026-03-28T01:05:00.000Z",
+        status: "saved"
+      }
+    );
+
+    const state = readScrapbookPlusState(data, "session-token-1");
+    assert.equal(state.plan.archiveCount, 1);
+    assert.equal(state.plan.remainingArchiveSlots, 99);
+  } finally {
+    replaceRuntimeConfigForTests(null);
+    if (typeof previousHandle === "string") {
+      process.env.THREADS_BOT_HANDLE = previousHandle;
+    } else {
+      delete process.env.THREADS_BOT_HANDLE;
+    }
+  }
 });
 
 test("extension-backed license link upgrades scrapbook state to Plus", () => {

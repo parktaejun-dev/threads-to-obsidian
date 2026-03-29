@@ -1,8 +1,10 @@
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
 import { lookup } from "node:dns/promises";
 import net from "node:net";
+import { JSDOM } from "jsdom";
 import JSZip from "jszip";
 
+import { BUNDLED_EXTRACTOR_CONFIG } from "@threads/shared/config";
 import { type Locale } from "@threads/shared/i18n";
 import { isSupportedLocale, normalizeLocale } from "@threads/shared/locale";
 import { renderMarkdown } from "@threads/shared/markdown";
@@ -14,7 +16,8 @@ import type {
   ExtractedPost,
   FrontmatterPrimitive
 } from "@threads/shared/types";
-import { dedupeStrings } from "@threads/shared/utils";
+import { extractPostFromDocument } from "@threads/shared/extractor";
+import { dedupeStrings, extractTitleExcerpt } from "@threads/shared/utils";
 import type {
   BotArchiveRecord,
   BotExtensionAccessTokenRecord,
@@ -47,6 +50,7 @@ import {
 const BOT_OAUTH_TTL_MS = 10 * 60_000;
 const BOT_OAUTH_ACTIVATION_TTL_MS = 5 * 60_000;
 const BOT_SESSION_TTL_MS = 30 * 24 * 60 * 60_000;
+const BOT_SESSION_TOUCH_INTERVAL_MS = 12 * 60 * 60_000;
 const BOT_EXTENSION_LINK_TTL_MS = 10 * 60_000;
 const BOT_EXTENSION_TOKEN_TTL_MS = 30 * 24 * 60 * 60_000;
 const THREADS_LONG_LIVED_TOKEN_TTL_MS = 60 * 24 * 60 * 60_000;
@@ -552,6 +556,27 @@ function readArchiveExtractedPost(rawPayloadJson: string | null): ExtractedPost 
   }
 }
 
+function writeArchiveExtractedPost(rawPayloadJson: string | null, extractedPost: ExtractedPost): string {
+  if (!rawPayloadJson) {
+    return JSON.stringify({ extractedPost });
+  }
+
+  try {
+    const parsed = JSON.parse(rawPayloadJson) as unknown;
+    const record = toRecord(parsed);
+    if (record) {
+      return JSON.stringify({
+        ...record,
+        extractedPost
+      });
+    }
+  } catch {
+    // Fall back to the minimal extracted payload below.
+  }
+
+  return JSON.stringify({ extractedPost });
+}
+
 function readCloudArchivePayload(rawPayloadJson: string | null): ParsedCloudArchivePayload {
   if (!rawPayloadJson) {
     return {
@@ -586,6 +611,89 @@ function summarizeReplyMediaUrls(reply: AuthorReply): string[] {
     ...reply.imageUrls,
     reply.sourceType === "video" ? reply.thumbnailUrl ?? reply.videoUrl : null
   ]);
+}
+
+async function extractArchivePostFromPermalink(permalinkUrl: string): Promise<ExtractedPost | null> {
+  const normalizedUrl = safeText(permalinkUrl);
+  if (!normalizedUrl) {
+    return null;
+  }
+
+  try {
+    const response = await fetch(normalizedUrl, {
+      cache: "no-store",
+      headers: {
+        accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "accept-language": "ko,en;q=0.8",
+        "user-agent":
+          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36"
+      }
+    });
+    if (!response.ok) {
+      throw new Error(`Threads HTML fetch failed (${response.status}).`);
+    }
+
+    const html = await response.text();
+    const dom = new JSDOM(html, { url: response.url || normalizedUrl });
+    return await extractPostFromDocument(
+      dom.window.document,
+      dom.window.location.href,
+      BUNDLED_EXTRACTOR_CONFIG
+    );
+  } catch {
+    return null;
+  }
+}
+
+function shouldRepairMentionArchiveRecord(archive: BotArchiveRecord, extractedPost: ExtractedPost | null): boolean {
+  if (!archive.mentionUrl) {
+    return false;
+  }
+
+  if (archive.targetUrl === archive.mentionUrl) {
+    return true;
+  }
+
+  if (archive.noteText && safeText(archive.targetText) === safeText(archive.noteText)) {
+    return true;
+  }
+
+  return Boolean((extractedPost?.repliedToUrl || extractedPost?.quotedPostUrl) && extractedPost.canonicalUrl === archive.mentionUrl);
+}
+
+async function repairMentionArchiveRecord(archive: BotArchiveRecord): Promise<boolean> {
+  const currentExtractedPost = readArchiveExtractedPost(archive.rawPayloadJson);
+  if (!shouldRepairMentionArchiveRecord(archive, currentExtractedPost)) {
+    return false;
+  }
+
+  const mentionExtractedPost =
+    currentExtractedPost?.canonicalUrl === archive.mentionUrl
+      ? currentExtractedPost
+      : await extractArchivePostFromPermalink(archive.mentionUrl);
+  const relatedTargetUrl = safeText(mentionExtractedPost?.repliedToUrl || mentionExtractedPost?.quotedPostUrl);
+  if (!relatedTargetUrl || relatedTargetUrl === archive.mentionUrl) {
+    return false;
+  }
+
+  const originalExtractedPost = await extractArchivePostFromPermalink(relatedTargetUrl);
+  if (!originalExtractedPost || !safeText(originalExtractedPost.text) || originalExtractedPost.canonicalUrl === archive.mentionUrl) {
+    return false;
+  }
+
+  const now = new Date().toISOString();
+  const mediaUrls = summarizeExtractedPostPreviewMediaUrls(originalExtractedPost);
+  const rawPayloadJson = writeArchiveExtractedPost(archive.rawPayloadJson, originalExtractedPost);
+  archive.targetUrl = originalExtractedPost.canonicalUrl;
+  archive.targetAuthorHandle = safeText(originalExtractedPost.author) || archive.targetAuthorHandle;
+  archive.targetAuthorDisplayName = null;
+  archive.targetText = originalExtractedPost.text;
+  archive.targetPublishedAt = originalExtractedPost.publishedAt;
+  archive.mediaUrls = mediaUrls;
+  archive.rawPayloadJson = rawPayloadJson;
+  archive.updatedAt = now;
+  archive.markdownContent = buildArchiveMarkdownFromRecord(archive, mediaUrls);
+  return true;
 }
 
 function buildArchiveReplyView(reply: AuthorReply): BotArchiveReplyView {
@@ -767,7 +875,7 @@ function extractArchiveTitleExcerpt(text: string, maxChars = 20): string {
 }
 
 function buildArchiveTitle(targetAuthorHandle: string | null, targetText: string): string {
-  const excerpt = extractArchiveTitleExcerpt(targetText, 20);
+  const excerpt = extractTitleExcerpt(targetText, targetAuthorHandle, 30);
   if (excerpt) {
     return excerpt;
   }
@@ -853,9 +961,14 @@ function buildArchiveMarkdownFromExtractedPost(
 
   if (post.authorReplies.length > 0) {
     lines.push("## Author Replies", "");
+    const total = post.authorReplies.length;
 
     post.authorReplies.forEach((reply, index) => {
-      lines.push(`### Reply ${index + 1}`, "", `Source: ${reply.canonicalUrl}`, `Author: @${reply.author}`);
+      if (index > 0) {
+        lines.push("---", "");
+      }
+
+      lines.push(`### Reply ${index + 1}/${total}`, "", `Source: ${reply.canonicalUrl}`, `Author: @${reply.author}`);
       if (reply.publishedAt) {
         lines.push(`Published: ${reply.publishedAt}`);
       }
@@ -1203,7 +1316,9 @@ function buildCloudArchiveUrl(publicOrigin: string, archiveId: string, userHandl
 async function buildArchiveZipBundle(archives: StoredArchiveRecord[]): Promise<BotArchiveZipResult> {
   const zip = new JSZip();
   const now = new Date();
-  const zipStamp = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}-${String(now.getHours()).padStart(2, "0")}${String(now.getMinutes()).padStart(2, "0")}${String(now.getSeconds()).padStart(2, "0")}`;
+  const zipStamp = `${String(now.getFullYear()).slice(-2)}${String(now.getMonth() + 1).padStart(2, "0")}${String(
+    now.getDate()
+  ).padStart(2, "0")}_${String(now.getHours()).padStart(2, "0")}${String(now.getMinutes()).padStart(2, "0")}`;
   let singleArchiveName = "threads-archive";
 
   for (const [index, archive] of archives.entries()) {
@@ -1250,7 +1365,7 @@ async function buildArchiveZipBundle(archives: StoredArchiveRecord[]): Promise<B
   }
 
   return {
-    filename: archives.length === 1 ? `${singleArchiveName}.zip` : `threads-scrapbook-${zipStamp}.zip`,
+    filename: archives.length === 1 ? `${singleArchiveName}_${zipStamp}.zip` : `threads-scrapbook_${zipStamp}.zip`,
     content: await zip.generateAsync({ type: "nodebuffer" })
   };
 }
@@ -1277,7 +1392,7 @@ function toBotArchiveView(item: BotArchiveRecord): BotArchiveView {
   return {
     id: item.id,
     origin: "mention",
-    originLabel: "Inbox",
+    originLabel: "Saved",
     mentionUrl: item.mentionUrl,
     mentionAuthorHandle: item.mentionAuthorHandle,
     mentionAuthorDisplayName: item.mentionAuthorDisplayName,
@@ -1294,6 +1409,29 @@ function toBotArchiveView(item: BotArchiveRecord): BotArchiveView {
     archivedAt: item.archivedAt,
     updatedAt: item.updatedAt
   };
+}
+
+function isTriggerOnlyArchiveRecord(
+  item: Pick<
+    BotArchiveRecord,
+    "mentionAuthorHandle" | "mentionUrl" | "targetAuthorHandle" | "targetText" | "targetUrl"
+  >
+): boolean {
+  const normalizedBotHandle = readBotHandle();
+  if (!normalizedBotHandle) {
+    return false;
+  }
+
+  const normalizedTargetText = safeText(item.targetText).trim().toLowerCase();
+  if (!normalizedTargetText.includes(`@${normalizedBotHandle}`)) {
+    return false;
+  }
+
+  return (
+    item.targetUrl === item.mentionUrl &&
+    normalizeThreadsHandle(safeText(item.targetAuthorHandle)) ===
+      normalizeThreadsHandle(safeText(item.mentionAuthorHandle))
+  );
 }
 
 function toCloudArchiveView(item: CloudArchiveRecord): BotArchiveView {
@@ -1453,17 +1591,6 @@ function touchExpiredExtensionAccessTokens(data: WebDatabase): void {
   }
 }
 
-function revokeActiveBotSessionsForUser(data: WebDatabase, userId: string, now: string): void {
-  for (const session of data.botSessions) {
-    if (session.userId !== userId || session.status !== "active") {
-      continue;
-    }
-    session.status = "revoked";
-    session.revokedAt = now;
-    upsertBotSession(data, session);
-  }
-}
-
 function revokeActiveExtensionTokensForUser(data: WebDatabase, userId: string, now: string): void {
   for (const token of data.botExtensionAccessTokens) {
     if (token.userId !== userId || token.status !== "active") {
@@ -1478,7 +1605,6 @@ function revokeActiveExtensionTokensForUser(data: WebDatabase, userId: string, n
 function createBotSession(data: WebDatabase, user: BotUserRecord): { sessionToken: string; user: BotUserView } {
   const rawSession = createOpaqueToken();
   const now = new Date().toISOString();
-  revokeActiveBotSessionsForUser(data, user.id, now);
   const session: BotSessionRecord = {
     id: crypto.randomUUID(),
     userId: user.id,
@@ -1501,6 +1627,28 @@ function createBotSession(data: WebDatabase, user: BotUserRecord): { sessionToke
   };
 }
 
+function shouldRefreshBotSession(session: BotSessionRecord, nowMs: number): boolean {
+  const lastSeenAtMs = Date.parse(session.lastSeenAt);
+  const expiresAtMs = Date.parse(session.expiresAt);
+  if (!Number.isFinite(lastSeenAtMs) || !Number.isFinite(expiresAtMs)) {
+    return true;
+  }
+
+  return nowMs - lastSeenAtMs >= BOT_SESSION_TOUCH_INTERVAL_MS || expiresAtMs - nowMs <= BOT_SESSION_TOUCH_INTERVAL_MS;
+}
+
+function refreshBotSessionKeepAlive(data: WebDatabase, session: BotSessionRecord): void {
+  const nowMs = Date.now();
+  if (!shouldRefreshBotSession(session, nowMs)) {
+    return;
+  }
+
+  const now = new Date(nowMs).toISOString();
+  session.lastSeenAt = now;
+  session.expiresAt = new Date(nowMs + BOT_SESSION_TTL_MS).toISOString();
+  upsertBotSession(data, session);
+}
+
 function getBotSessionRecord(data: WebDatabase, rawSession: string | null | undefined): BotSessionRecord | null {
   touchExpiredSessions(data);
   const normalized = safeText(rawSession);
@@ -1509,7 +1657,13 @@ function getBotSessionRecord(data: WebDatabase, rawSession: string | null | unde
   }
 
   const hash = hashSecret(normalized);
-  return data.botSessions.find((candidate) => candidate.sessionHash === hash && candidate.status === "active") ?? null;
+  const session = data.botSessions.find((candidate) => candidate.sessionHash === hash && candidate.status === "active") ?? null;
+  if (!session) {
+    return null;
+  }
+
+  refreshBotSessionKeepAlive(data, session);
+  return session;
 }
 
 function findBotExtensionAccessTokenRecord(
@@ -2066,7 +2220,9 @@ export function getBotSessionState(data: WebDatabase, rawSession: string | null 
   }
 
   const archives = [
-    ...data.botArchives.filter((candidate) => candidate.userId === user.id).map(toBotArchiveView),
+    ...data.botArchives
+      .filter((candidate) => candidate.userId === user.id && !isTriggerOnlyArchiveRecord(candidate))
+      .map(toBotArchiveView),
     ...data.cloudArchives.filter((candidate) => candidate.userId === user.id).map(toCloudArchiveView)
   ].sort((left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt));
 
@@ -2195,6 +2351,32 @@ export async function getBotSessionStateFromStore(
   rawSession: string | null | undefined
 ): Promise<BotSessionState> {
   return withBotSessionDatabaseTransaction(rawSession, (data) => getBotSessionState(data, rawSession));
+}
+
+export async function repairBotSessionArchives(
+  data: WebDatabase,
+  userId: string | null | undefined
+): Promise<number> {
+  const normalizedUserId = safeText(userId) || null;
+  if (!normalizedUserId) {
+    return 0;
+  }
+
+  let repaired = 0;
+  const archives = data.botArchives.filter((candidate) => candidate.userId === normalizedUserId && candidate.status === "saved");
+  for (const archive of archives) {
+    if (await repairMentionArchiveRecord(archive)) {
+      repaired += 1;
+    }
+  }
+
+  return repaired;
+}
+
+export async function repairBotSessionArchivesFromStore(
+  rawSession: string | null | undefined
+): Promise<number> {
+  return withBotSessionDatabaseTransaction(rawSession, (data, userId) => repairBotSessionArchives(data, userId));
 }
 
 export function revokeBotSession(data: WebDatabase, rawSession: string | null | undefined): void {
@@ -2384,6 +2566,21 @@ export function materializeBotMentionArchive(
     | "rawPayloadJson"
     | "archivedAt"
   >;
+  const unresolvedTargetCapture = isTriggerOnlyArchiveRecord(archiveDraft);
+  if (unresolvedTargetCapture) {
+    const preservedArchive =
+      existingArchive && !isTriggerOnlyArchiveRecord(existingArchive) ? existingArchive : null;
+    return {
+      result: {
+        ok: true,
+        matched: Boolean(preservedArchive),
+        created: false,
+        archiveId: preservedArchive?.id ?? null,
+        reason: preservedArchive ? null : "unresolved_target"
+      },
+      archive: preservedArchive
+    };
+  }
   const markdownContent = buildArchiveMarkdownFromRecord(archiveDraft, mediaUrls);
 
   if (existingArchive) {

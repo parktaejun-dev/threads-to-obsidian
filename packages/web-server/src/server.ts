@@ -1,7 +1,7 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { existsSync } from "node:fs";
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rename, writeFile, stat } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -54,6 +54,7 @@ import {
   readBotArchiveZipFromStore,
   ingestBotMention,
   pollBotOauthSessionFromStore,
+  repairBotSessionArchivesFromStore,
   revokeExtensionCloudConnectionFromStore,
   readBotArchiveMarkdownFromStore,
   saveCloudArchiveWithExtensionTokenFromStore,
@@ -70,11 +71,13 @@ import {
   clearScrapbookPlusForSessionFromStore,
   createSearchMonitorFromStore,
   createWatchlistFromStore,
+  deleteInsightsViewFromStore,
   deleteSearchMonitorFromStore,
   deleteWatchlistFromStore,
   dismissSearchResultFromStore,
   readScrapbookPlusStateFromStore,
   refreshInsightsFromStore,
+  saveInsightsViewFromStore,
   runSearchMonitorFromStore,
   syncWatchlistFromStore
 } from "./server/scrapbook-plus-service";
@@ -88,6 +91,8 @@ import {
   buildPublicStorefront,
   buildRevenueReport,
   closeDatabaseConnections,
+  loadBotArchives,
+  loadBotMentionJobs,
   loadDatabase,
   loadDatabaseForConfig,
   loadPublicStorefrontSnapshot,
@@ -144,13 +149,17 @@ const ADMIN_SESSION_COOKIE_MAX_AGE_SECONDS = 12 * 60 * 60;
 const ADMIN_SESSION_VERSION = "v1";
 const DEFAULT_LANDING_BOT_HANDLE = "ss_threads_bot";
 const LANDING_HEADLINE_LINES: Record<SupportedLocale, string[]> = {
-  ko: ["Threads 글을 쉽게 저장하세요", "PC는 Chrome 확장,", "모바일은 댓글 한 줄"],
-  en: ["Save Threads the easy way.", "Use Chrome on desktop,", "or one reply on mobile."],
+  ko: ["Threads 글 저장을 편하게,", "PC는 extension, 모바일은 @mention"],
+  en: ["Keep Threads in one place.", "Desktop saves with the extension."],
   ja: ["Threads 保存をもっと手軽に", "PC は extension、Mobile は @mention", "返信で @{botHandle} と書くだけ。"],
   "pt-BR": ["Salve Threads com menos atrito.", "Extension no PC, @mention no celular.", "Responda com @{botHandle}."],
   es: ["Guarda Threads de forma simple.", "Extension en PC, @mention en móvil.", "Responde con @{botHandle}."],
   "zh-TW": ["更輕鬆地保存 Threads", "PC 用 extension，Mobile 用 @mention", "回覆 @{botHandle} 就可以。"],
   vi: ["Lưu Threads gọn hơn.", "Dùng extension trên PC, @mention trên mobile.", "Chỉ cần trả lời với @{botHandle}."]
+};
+const LANDING_MENTION_HTML: Partial<Record<SupportedLocale, string>> = {
+  ko: '댓글로 <code class="bot-handle">@{botHandle}</code> 만 적으세요.',
+  en: 'Reply with <code class="bot-handle">@{botHandle}</code> only.'
 };
 const DEFAULT_ADMIN_ALLOWLIST = new Set(["127.0.0.1", "::1"]);
 const RATE_LIMIT_BUCKET_GC_INTERVAL_MS = 5 * 60_000;
@@ -768,6 +777,18 @@ function buildClearedSessionCookie(secure: boolean): string {
     sameSite: getSessionCookieSameSite(secure),
     maxAge: 0
   });
+}
+
+function refreshActiveBotSessionCookie(
+  response: ServerResponse,
+  rawSession: string | null | undefined,
+  secure: boolean,
+  authenticated: boolean
+): void {
+  if (!authenticated || !rawSession) {
+    return;
+  }
+  appendSetCookie(response, buildSessionCookie(rawSession, secure));
 }
 
 function buildAdminSessionCookie(value: string, secure: boolean): string {
@@ -2193,106 +2214,110 @@ async function buildPublicMentionSaveStatus(
   }
 
   const collectorStatus = collector.getStatus();
-  return await withDatabaseTransaction(async (data) => {
-    let latestArchiveUpdatedAt: string | null = null;
-    for (const candidate of data.botArchives) {
-      if (candidate.userId !== sessionState.user?.id) {
-        continue;
-      }
+  const [botArchives, botMentionJobs] = await Promise.all([
+    loadBotArchives(),
+    loadBotMentionJobs()
+  ]);
 
-      if (
-        !latestArchiveUpdatedAt ||
-        toTimestamp(candidate.updatedAt) > toTimestamp(latestArchiveUpdatedAt)
-      ) {
-        latestArchiveUpdatedAt = candidate.updatedAt;
-      }
+  let latestArchiveUpdatedAt: string | null = null;
+  for (const candidate of botArchives) {
+    if (candidate.userId !== sessionState.user?.id) {
+      continue;
     }
 
-    const userId = safeText(sessionState.user?.threadsUserId);
-    const userHandle = normalizeHandleForStatus(sessionState.user?.threadsHandle);
-    let latestMentionUrl: string | null = null;
-    let latestMentionCreatedAt: string | null = null;
-    let latestMentionUpdatedAt: string | null = null;
-    let latestMentionStatus: BotMentionJobRecord["status"] | null = null;
-    let latestMentionError: string | null = null;
-    let latestMentionAvailableAt: string | null = null;
-    let latestMentionTimestamp = -1;
-    for (const candidate of data.botMentionJobs) {
-      const matchesUser =
-        (userId && safeText(candidate.mentionAuthorUserId) === userId) ||
-        normalizeHandleForStatus(candidate.mentionAuthorHandle) === userHandle;
-      if (!matchesUser) {
-        continue;
-      }
-
-      const candidateTimestamp = toTimestamp(candidate.updatedAt || candidate.createdAt);
-      if (candidateTimestamp > latestMentionTimestamp) {
-        latestMentionTimestamp = candidateTimestamp;
-        latestMentionUrl = candidate.mentionUrl;
-        latestMentionCreatedAt = candidate.createdAt;
-        latestMentionUpdatedAt = candidate.updatedAt;
-        latestMentionStatus = candidate.status;
-        latestMentionError = candidate.lastError;
-        latestMentionAvailableAt = candidate.availableAt;
-      }
-    }
-
-    let currentState: PublicMentionSaveState = "idle";
-    let completionSource: "job" | "archive_inferred" | null = null;
-    if (latestMentionStatus === "queued") {
-      currentState = "queued";
-    } else if (latestMentionStatus === "processing") {
-      currentState = "processing";
-    } else if (
-      latestMentionStatus === "failed" ||
-      latestMentionStatus === "invalid" ||
-      latestMentionStatus === "unmatched"
+    if (
+      !latestArchiveUpdatedAt ||
+      toTimestamp(candidate.updatedAt) > toTimestamp(latestArchiveUpdatedAt)
     ) {
-      currentState = "failed";
-    } else if (latestMentionStatus === "completed") {
-      currentState = "completed";
-      completionSource = "job";
-    } else if (
-      latestMentionTimestamp >= 0 &&
-      latestArchiveUpdatedAt &&
-      toTimestamp(latestArchiveUpdatedAt) >= toTimestamp(latestMentionUpdatedAt || latestMentionCreatedAt, 0)
-    ) {
-      currentState = "completed";
-      completionSource = "archive_inferred";
+      latestArchiveUpdatedAt = candidate.updatedAt;
+    }
+  }
+
+  const userId = safeText(sessionState.user?.threadsUserId);
+  const userHandle = normalizeHandleForStatus(sessionState.user?.threadsHandle);
+  let latestMentionUrl: string | null = null;
+  let latestMentionCreatedAt: string | null = null;
+  let latestMentionUpdatedAt: string | null = null;
+  let latestMentionStatus: BotMentionJobRecord["status"] | null = null;
+  let latestMentionError: string | null = null;
+  let latestMentionAvailableAt: string | null = null;
+  let latestMentionTimestamp = -1;
+  for (const candidate of botMentionJobs) {
+    const matchesUser =
+      (userId && safeText(candidate.mentionAuthorUserId) === userId) ||
+      normalizeHandleForStatus(candidate.mentionAuthorHandle) === userHandle;
+    if (!matchesUser) {
+      continue;
     }
 
-    let expectedVisibleAt: string | null = null;
-    if (currentState === "queued" || currentState === "processing") {
-      expectedVisibleAt = new Date(
-        Math.max(Date.now(), toTimestamp(latestMentionAvailableAt, Date.now())) + collectorStatus.pollIntervalMs
-      ).toISOString();
-    } else if (currentState === "failed") {
-      expectedVisibleAt = latestMentionAvailableAt;
+    const candidateTimestamp = toTimestamp(candidate.updatedAt || candidate.createdAt);
+    if (candidateTimestamp > latestMentionTimestamp) {
+      latestMentionTimestamp = candidateTimestamp;
+      latestMentionUrl = candidate.mentionUrl;
+      latestMentionCreatedAt = candidate.createdAt;
+      latestMentionUpdatedAt = candidate.updatedAt;
+      latestMentionStatus = candidate.status;
+      latestMentionError = candidate.lastError;
+      latestMentionAvailableAt = candidate.availableAt;
     }
+  }
 
-    return {
-      currentState,
-      completionSource,
-      collectorEnabled: collectorStatus.enabled,
-      pollIntervalMs: collectorStatus.pollIntervalMs,
-      collectorError: collectorStatus.lastError,
-      lastCollectedAt: collectorStatus.lastSucceededAt ?? collectorStatus.lastCompletedAt,
-      latestMentionUrl,
-      latestMentionCreatedAt,
-      latestMentionUpdatedAt,
-      latestJobStatus: latestMentionStatus,
-      latestJobError: latestMentionError,
-      latestSavedAt: latestArchiveUpdatedAt,
-      expectedVisibleAt,
-      retryAvailableAt: currentState === "failed" ? latestMentionAvailableAt : null
-    };
-  });
+  let currentState: PublicMentionSaveState = "idle";
+  let completionSource: "job" | "archive_inferred" | null = null;
+  if (latestMentionStatus === "queued") {
+    currentState = "queued";
+  } else if (latestMentionStatus === "processing") {
+    currentState = "processing";
+  } else if (
+    latestMentionStatus === "failed" ||
+    latestMentionStatus === "invalid" ||
+    latestMentionStatus === "unmatched"
+  ) {
+    currentState = "failed";
+  } else if (latestMentionStatus === "completed") {
+    currentState = "completed";
+    completionSource = "job";
+  } else if (
+    latestMentionTimestamp >= 0 &&
+    latestArchiveUpdatedAt &&
+    toTimestamp(latestArchiveUpdatedAt) >= toTimestamp(latestMentionUpdatedAt || latestMentionCreatedAt, 0)
+  ) {
+    currentState = "completed";
+    completionSource = "archive_inferred";
+  }
+
+  let expectedVisibleAt: string | null = null;
+  if (currentState === "queued" || currentState === "processing") {
+    expectedVisibleAt = new Date(
+      Math.max(Date.now(), toTimestamp(latestMentionAvailableAt, Date.now())) + collectorStatus.pollIntervalMs
+    ).toISOString();
+  } else if (currentState === "failed") {
+    expectedVisibleAt = latestMentionAvailableAt;
+  }
+
+  return {
+    currentState,
+    completionSource,
+    collectorEnabled: collectorStatus.enabled,
+    pollIntervalMs: collectorStatus.pollIntervalMs,
+    collectorError: collectorStatus.lastError,
+    lastCollectedAt: collectorStatus.lastSucceededAt ?? collectorStatus.lastCompletedAt,
+    latestMentionUrl,
+    latestMentionCreatedAt,
+    latestMentionUpdatedAt,
+    latestJobStatus: latestMentionStatus,
+    latestJobError: latestMentionError,
+    latestSavedAt: latestArchiveUpdatedAt,
+    expectedVisibleAt,
+    retryAvailableAt: currentState === "failed" ? latestMentionAvailableAt : null
+  };
 }
 
 async function buildPublicBotSessionResponse(
   rawSession: string | null | undefined,
   collector: BotMentionCollector
 ): Promise<Awaited<ReturnType<typeof getBotSessionStateFromStore>> & { saveStatus: PublicMentionSaveStatus | null }> {
+  await repairBotSessionArchivesFromStore(rawSession);
   const state = await getBotSessionStateFromStore(rawSession);
   return {
     ...state,
@@ -2591,6 +2616,15 @@ function resolveInitialLandingHeadline(
   return persistedHeadline.trim() ? renderLandingHeadlineLines(persistedHeadline) : defaultHeadline;
 }
 
+function resolveInitialLandingMention(locale: SupportedLocale): string {
+  const template = LANDING_MENTION_HTML[locale];
+  if (!template) {
+    return "";
+  }
+
+  return applyLandingBotHandleTemplate(template, getBotPublicConfig().botHandle);
+}
+
 function resolvePublicStorefrontSettings(settings: StorefrontSettings): StorefrontSettings {
   const botHandle = getBotPublicConfig().botHandle;
   return {
@@ -2700,6 +2734,11 @@ function schedulePublicStorefrontSnapshotRefresh(): void {
 async function getPublicStorefrontSnapshotCached(): Promise<PublicStorefrontResponse> {
   const cached = publicStorefrontCache.current;
   if (cached) {
+    const fileStat = await stat(getPublicStorefrontSnapshotFilePath()).catch(() => null);
+    if (fileStat && fileStat.mtimeMs > cached.loadedAt) {
+      return (await refreshPublicStorefrontSnapshotCache()).snapshot;
+    }
+
     if (Date.now() - cached.loadedAt > getPublicStorefrontCacheTtlMs()) {
       schedulePublicStorefrontSnapshotRefresh();
     }
@@ -3288,6 +3327,7 @@ async function serveStatic(request: IncomingMessage, response: ServerResponse, p
           logUnexpectedError("landing bootstrap load failed", error);
         }
         const landingHeadline = resolveInitialLandingHeadline(initialLocale, siteHost, storefrontSettings);
+        const landingMention = resolveInitialLandingMention(initialLocale);
         const landingBootstrap = escapeInlineJson({
           botHandle: getBotPublicConfig().botHandle,
           storefrontSettings
@@ -3299,6 +3339,8 @@ async function serveStatic(request: IncomingMessage, response: ServerResponse, p
           .replaceAll("__SITE_HOST__", escapeHtml(siteHost))
           .replaceAll("__INITIAL_LOCALE__", escapeHtml(initialLocale))
           .replaceAll("__LANDING_HEADLINE__", landingHeadline)
+          .replaceAll("__LANDING_MENTION__", landingMention)
+          .replaceAll("__LANDING_MENTION_HIDDEN__", landingMention ? "" : "hidden")
           .replaceAll("__LANDING_BOOTSTRAP__", landingBootstrap);
         const etag = buildEtag({
           siteUrl,
@@ -4238,6 +4280,7 @@ async function handlePublicBotRoute(
 
     const rawSession = readCookie(request.headers, BOT_SESSION_COOKIE);
     const state = await buildPublicBotSessionResponse(rawSession, collector);
+    refreshActiveBotSessionCookie(response, rawSession, secureCookie, state.authenticated);
     json(response, 200, state);
     return;
   }
@@ -4258,6 +4301,7 @@ async function handlePublicBotRoute(
     const rawSession = readCookie(request.headers, BOT_SESSION_COOKIE);
     try {
       const state = await readScrapbookPlusStateFromStore(rawSession);
+      refreshActiveBotSessionCookie(response, rawSession, secureCookie, state.authenticated);
       json(response, 200, state);
     } catch (error) {
       json(response, 400, {
@@ -4452,7 +4496,7 @@ async function handlePublicBotRoute(
         authorHandle: body.authorHandle ?? null,
         excludeHandles,
         autoArchive: body.autoArchive ?? false,
-        searchType: body.searchType ?? "top"
+        searchType: body.searchType ?? "recent"
       });
       json(response, 200, state);
     } catch (error) {
@@ -4532,6 +4576,29 @@ async function handlePublicBotRoute(
     return;
   }
 
+  if (pathname === "/api/public/bot/insights/views" && request.method === "POST") {
+    const rawSession = readCookie(request.headers, BOT_SESSION_COOKIE);
+    const body = await parseJsonBody<{
+      name?: string | null;
+      insightProps?: {
+        highlightId: string;
+        highlightParams: Record<string, string | number>;
+        localeAtSave: string;
+        tier: string;
+        score: number;
+      } | null;
+    }>(request, config.maxBodyBytes);
+    try {
+      const state = await saveInsightsViewFromStore(rawSession, body.name ?? null, body.insightProps ?? null);
+      json(response, 200, state);
+    } catch (error) {
+      json(response, 400, {
+        error: toPublicErrorMessage(error, "Could not save the insight card.")
+      });
+    }
+    return;
+  }
+
   if (pathname === "/api/public/bot/insights/archive") {
     const rawSession = readCookie(request.headers, BOT_SESSION_COOKIE);
     const body = await parseJsonBody<{ postId?: string }>(request, config.maxBodyBytes);
@@ -4541,6 +4608,20 @@ async function handlePublicBotRoute(
     } catch (error) {
       json(response, 400, {
         error: toPublicErrorMessage(error, "Could not archive the insight post.")
+      });
+    }
+    return;
+  }
+
+  const insightsViewDeleteMatch = pathname.match(/^\/api\/public\/bot\/insights\/views\/([^/]+)$/);
+  if (insightsViewDeleteMatch && request.method === "DELETE") {
+    const rawSession = readCookie(request.headers, BOT_SESSION_COOKIE);
+    try {
+      const state = await deleteInsightsViewFromStore(rawSession, decodeURIComponent(insightsViewDeleteMatch[1] ?? ""));
+      json(response, 200, state);
+    } catch (error) {
+      json(response, 400, {
+        error: toPublicErrorMessage(error, "Could not delete the insight card.")
       });
     }
     return;
@@ -5865,7 +5946,7 @@ function createWebRuntime(port?: number): {
       }
     },
     shutdown: async () => {
-      collector.stop();
+      await collector.stop();
       stopMonitoringService();
       stopRateLimitBucketGcTimer(rateLimitState);
       await closeDatabaseConnections();

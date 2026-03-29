@@ -2,6 +2,54 @@ import { BUNDLED_EXTRACTOR_CONFIG } from "./config";
 import type { ExtractedPost, ExtractorConfig } from "./types";
 
 const THREADS_PERMALINK_RE = /^https:\/\/www\.threads\.(?:com|net)\/@[^/]+\/post\/[^/?#]+/i;
+const THREADS_TRAILING_NOISE_PATTERNS: RegExp[] = [
+  /^Threads에 로그인 또는 가입하기$/u,
+  /^Threads에 가입하여 .*$/u,
+  /^Threads에 가입해 .*$/u,
+  /^로그인하여 더 많은 답글을 확인해보세요\.?$/u,
+  /^Threads에서 소통해보세요$/u,
+  /^Threads 약관$/u,
+  /^개인정보처리방침$/u,
+  /^쿠키 정책$/u,
+  /^문제 신고$/u,
+  /^Log in or sign up for Threads$/i,
+  /^Log in to continue$/i,
+  /^Sign in to continue$/i,
+  /^Continue with Instagram$/i,
+  /^Threads Terms$/i,
+  /^Privacy Policy$/i,
+  /^Cookie Policy$/i,
+  /^Report a problem$/i
+];
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function stripLeadingAuthorPrefix(line: string, author: string): string {
+  const normalizedLine = line.trim().replace(/\s+/g, " ");
+  const normalizedAuthor = author.trim().replace(/^@+/, "");
+  if (!normalizedLine || !normalizedAuthor || normalizedAuthor.toLowerCase() === "unknown") {
+    return normalizedLine;
+  }
+
+  if (normalizedLine === normalizedAuthor || normalizedLine === `@${normalizedAuthor}`) {
+    return "";
+  }
+
+  const prefixMatch = normalizedLine.match(
+    new RegExp(`^(?:@?${escapeRegExp(normalizedAuthor)})(?:[\\s·:：\\-–—]+|$)`, "i")
+  );
+  if (!prefixMatch) {
+    return normalizedLine;
+  }
+
+  return normalizedLine.slice(prefixMatch[0].length).trim();
+}
+
+function isTrailingThreadsNoiseLine(line: string): boolean {
+  return THREADS_TRAILING_NOISE_PATTERNS.some((pattern) => pattern.test(line));
+}
 
 export function isSupportedPermalink(url: string): boolean {
   return THREADS_PERMALINK_RE.test(url);
@@ -60,6 +108,16 @@ function truncateFilenamePart(value: string, maxLength: number): string {
   return value.slice(0, maxLength).replace(/_+$/g, "");
 }
 
+function trimTextExcerpt(value: string, maxLength: number): string {
+  if (value.length <= maxLength) {
+    return value;
+  }
+
+  const sliced = value.slice(0, maxLength);
+  const boundary = Math.max(sliced.lastIndexOf(" "), sliced.lastIndexOf(","), sliced.lastIndexOf("·"));
+  return (boundary >= 16 ? sliced.slice(0, boundary) : sliced).trim();
+}
+
 export function extractFirstSentence(text: string): string {
   const normalized = decodeEscapedJsonString(text).trim();
   if (!normalized) {
@@ -79,9 +137,38 @@ export function extractFirstSentence(text: string): string {
   return (sentenceMatch?.[1] ?? firstBlock).trim();
 }
 
+export function extractTitleExcerpt(text: string, author: string | null | undefined = null, maxLength = 38): string {
+  const normalized = decodeEscapedJsonString(text).trim();
+  if (!normalized) {
+    return "";
+  }
+
+  const blocks = normalized
+    .split(/\n+/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  for (const block of blocks) {
+    const stripped = stripLeadingAuthorPrefix(block, author ?? "");
+    if (!stripped) {
+      continue;
+    }
+
+    const sentenceMatch = stripped.match(/^(.+?[.!?。！？])(?:\s|$)/u);
+    const excerpt = (sentenceMatch?.[1] ?? stripped).replace(/\s+/g, " ").trim().replace(/[.!?。！？]+$/u, "");
+    if (!excerpt) {
+      continue;
+    }
+
+    return trimTextExcerpt(excerpt, maxLength);
+  }
+
+  return "";
+}
+
 function resolvePatternTokens(pattern: string, post: ExtractedPost): string {
   const date = (post.publishedAt ?? post.capturedAt).slice(0, 10);
-  const firstSentence = extractFirstSentence(post.text) || post.title || post.shortcode;
+  const firstSentence = extractTitleExcerpt(post.text, post.author, 80) || post.title || post.shortcode;
   const sanitizedFirstSentence = sanitizeFilenamePart(firstSentence);
   return pattern
     .replaceAll("{date}", sanitizeFilenamePart(date))
@@ -93,7 +180,7 @@ function resolvePatternTokens(pattern: string, post: ExtractedPost): string {
 
 export function buildArchiveBaseName(pattern: string, post: ExtractedPost): string {
   const resolved = resolvePatternTokens(pattern, post);
-  const firstSentence = extractFirstSentence(post.text) || post.title || post.shortcode;
+  const firstSentence = extractTitleExcerpt(post.text, post.author, 80) || extractFirstSentence(post.text) || post.title || post.shortcode;
 
   return resolved || `${sanitizeFilenamePart(post.author)}_${sanitizeFilenamePart(firstSentence)}`;
 }
@@ -172,6 +259,7 @@ export function cleanTextLines(text: string, author: string, config: ExtractorCo
     text
       .split(/\n+/)
       .map((line) => line.trim())
+      .map((line) => stripLeadingAuthorPrefix(line, author))
       .filter(Boolean)
   );
 
@@ -189,13 +277,20 @@ export function cleanTextLines(text: string, author: string, config: ExtractorCo
       /^Threads에 가입하여 .*$/u.test(line) ||
       /^Threads에 가입해 .*$/u.test(line) ||
       /^Threads에 로그인 또는 가입하기$/u.test(line) ||
-      /^사람들의 이야기를 확인하고 대화에 참여해보세요\.$/u.test(line)
+      /^사람들의 이야기를 확인하고 대화에 참여해보세요\.$/u.test(line) ||
+      isTrailingThreadsNoiseLine(line)
     ) {
+      if (filtered.length > 0 && isTrailingThreadsNoiseLine(line)) {
+        break;
+      }
       continue;
     }
 
     if (config.noisePatterns.some((pattern) => line === pattern || line.startsWith(`${pattern} `))) {
-      break;
+      if (filtered.length > 0) {
+        break;
+      }
+      continue;
     }
 
     if (/^\d+\s*(초|분|시간|일|주|개월|년)$/.test(line)) {

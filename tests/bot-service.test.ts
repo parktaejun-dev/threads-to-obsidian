@@ -18,6 +18,7 @@ import {
   pollBotOauthSession,
   readBotArchiveMarkdown,
   readBotArchiveZip,
+  repairBotSessionArchives,
   revokeExtensionCloudConnection,
   saveCloudArchive,
   saveCloudArchiveWithExtensionToken,
@@ -25,6 +26,7 @@ import {
   syncExtensionCloudLicenseLink,
   validateBotIngestRequest
 } from "../packages/web-server/src/server/bot-service";
+import { replaceRuntimeConfigForTests } from "../packages/web-server/src/server/runtime-config";
 
 function createJsonResponse(payload: unknown, init?: ResponseInit): Response {
   return new Response(JSON.stringify(payload), {
@@ -191,7 +193,146 @@ test("bot Threads OAuth sign-in and mention ingest create a scrapbook archive", 
   }
 });
 
-test("scrapbook archive title uses the first sentence and truncates it to 20 characters", async () => {
+test("re-signing in keeps earlier scrapbook web sessions active", async () => {
+  const previousHandle = process.env.THREADS_BOT_HANDLE;
+  const previousAppId = process.env.THREADS_BOT_APP_ID;
+  const previousAppSecret = process.env.THREADS_BOT_APP_SECRET;
+  const previousAdminToken = process.env.THREADS_WEB_ADMIN_TOKEN;
+  const previousFetch = globalThis.fetch;
+
+  process.env.THREADS_BOT_HANDLE = "collectorbot";
+  process.env.THREADS_BOT_APP_ID = "threads-app-id";
+  process.env.THREADS_BOT_APP_SECRET = "threads-app-secret";
+  process.env.THREADS_WEB_ADMIN_TOKEN = "bot-test-admin-secret";
+
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = typeof input === "string" ? input : input.toString();
+    assert.ok(init?.signal instanceof AbortSignal);
+
+    if (url.includes("/oauth/access_token")) {
+      return createJsonResponse({
+        access_token: "short-lived-token",
+        user_id: "user-1",
+        expires_in: 3600
+      });
+    }
+
+    if (url.includes("/access_token?")) {
+      return createJsonResponse({
+        access_token: "long-lived-token",
+        expires_in: 5_184_000
+      });
+    }
+
+    if (url.includes("/me?")) {
+      return createJsonResponse({
+        id: "user-1",
+        username: "writer",
+        name: "Writer",
+        threads_profile_picture_url: "https://cdn.example.com/profile.jpg",
+        threads_biography: "Archive everything.",
+        is_verified: true
+      });
+    }
+
+    throw new Error(`Unexpected fetch URL in bot-service test: ${url}`);
+  }) as typeof fetch;
+
+  try {
+    const data = buildDefaultDatabase("2026-03-25T00:00:00.000Z");
+    const firstState = new URL(startBotOauth(data, "https://ss-threads.dahanda.dev").authorizeUrl).searchParams.get("state");
+    const secondState = new URL(startBotOauth(data, "https://ss-threads.dahanda.dev").authorizeUrl).searchParams.get("state");
+    assert.ok(firstState);
+    assert.ok(secondState);
+
+    const firstSession = await completeBotOauth(
+      data,
+      firstState as string,
+      "oauth-code-1",
+      "https://ss-threads.dahanda.dev"
+    );
+    const secondSession = await completeBotOauth(
+      data,
+      secondState as string,
+      "oauth-code-2",
+      "https://ss-threads.dahanda.dev"
+    );
+
+    assert.notEqual(firstSession.sessionToken, secondSession.sessionToken);
+    assert.equal(getBotSessionState(data, firstSession.sessionToken).authenticated, true);
+    assert.equal(getBotSessionState(data, secondSession.sessionToken).authenticated, true);
+    assert.equal(data.botSessions.filter((candidate) => candidate.status === "active").length, 2);
+  } finally {
+    globalThis.fetch = previousFetch;
+
+    if (typeof previousHandle === "string") {
+      process.env.THREADS_BOT_HANDLE = previousHandle;
+    } else {
+      delete process.env.THREADS_BOT_HANDLE;
+    }
+
+    if (typeof previousAppId === "string") {
+      process.env.THREADS_BOT_APP_ID = previousAppId;
+    } else {
+      delete process.env.THREADS_BOT_APP_ID;
+    }
+
+    if (typeof previousAppSecret === "string") {
+      process.env.THREADS_BOT_APP_SECRET = previousAppSecret;
+    } else {
+      delete process.env.THREADS_BOT_APP_SECRET;
+    }
+
+    if (typeof previousAdminToken === "string") {
+      process.env.THREADS_WEB_ADMIN_TOKEN = previousAdminToken;
+    } else {
+      delete process.env.THREADS_WEB_ADMIN_TOKEN;
+    }
+  }
+});
+
+test("reading scrapbook session state refreshes the active session expiry window", () => {
+  const data = buildDefaultDatabase("2026-03-25T00:00:00.000Z");
+  data.botUsers.push({
+    id: "user-1",
+    threadsUserId: "threads-user-1",
+    threadsHandle: "writer",
+    displayName: "Writer",
+    profilePictureUrl: null,
+    biography: null,
+    isVerified: false,
+    accessTokenCiphertext: null,
+    tokenExpiresAt: null,
+    email: null,
+    grantedScopes: [],
+    scopeVersion: 0,
+    lastScopeUpgradeAt: null,
+    createdAt: "2026-03-01T00:00:00.000Z",
+    updatedAt: "2026-03-01T00:00:00.000Z",
+    lastLoginAt: "2026-03-01T00:00:00.000Z",
+    status: "active"
+  });
+  data.botSessions.push({
+    id: "session-1",
+    userId: "user-1",
+    sessionHash: createHash("sha256").update("session-token-1").digest("hex"),
+    createdAt: "2026-03-01T00:00:00.000Z",
+    expiresAt: new Date(Date.now() + 60 * 60_000).toISOString(),
+    lastSeenAt: new Date(Date.now() - 2 * 24 * 60 * 60_000).toISOString(),
+    revokedAt: null,
+    status: "active"
+  });
+
+  const previousExpiry = data.botSessions[0]!.expiresAt;
+  const previousLastSeen = data.botSessions[0]!.lastSeenAt;
+  const state = getBotSessionState(data, "session-token-1");
+
+  assert.equal(state.authenticated, true);
+  assert.ok(Date.parse(data.botSessions[0]!.expiresAt) > Date.parse(previousExpiry));
+  assert.ok(Date.parse(data.botSessions[0]!.lastSeenAt) > Date.parse(previousLastSeen));
+});
+
+test("scrapbook archive title uses the first sentence and truncates it to 30 characters", async () => {
   const data = buildDefaultDatabase("2026-03-25T00:00:00.000Z");
   data.botUsers.push({
     id: "user-1",
@@ -239,8 +380,293 @@ test("scrapbook archive title uses the first sentence and truncates it to 20 cha
   });
 
   const exported = readBotArchiveMarkdown(data, "session-token-1", ingest.archiveId as string);
-  assert.equal(exported.filename, "this-is-the-first-se.md");
-  assert.match(exported.markdownContent, /^# This is the first se$/m);
+  assert.equal(exported.filename, "this-is-the-first-sentence-tha.md");
+  assert.match(exported.markdownContent, /^# This is the first sentence tha$/m);
+});
+
+test("repairBotSessionArchives rewrites mention captures to the original post thread", async () => {
+  const previousFetch = globalThis.fetch;
+  const data = buildDefaultDatabase("2026-03-25T00:00:00.000Z");
+
+  data.botUsers.push({
+    id: "user-1",
+    threadsUserId: "threads-user-1",
+    threadsHandle: "writer",
+    displayName: "Writer",
+    profilePictureUrl: null,
+    biography: null,
+    isVerified: false,
+    accessTokenCiphertext: null,
+    tokenExpiresAt: null,
+    email: null,
+    grantedScopes: [],
+    scopeVersion: 0,
+    lastScopeUpgradeAt: null,
+    createdAt: "2026-03-25T00:00:00.000Z",
+    updatedAt: "2026-03-25T00:00:00.000Z",
+    lastLoginAt: "2026-03-25T00:00:00.000Z",
+    status: "active"
+  });
+  data.botSessions.push({
+    id: "session-1",
+    userId: "user-1",
+    sessionHash: createHash("sha256").update("session-token-1").digest("hex"),
+    createdAt: "2026-03-25T00:00:00.000Z",
+    expiresAt: "2026-04-25T00:00:00.000Z",
+    lastSeenAt: "2026-03-25T00:00:00.000Z",
+    revokedAt: null,
+    status: "active"
+  });
+  data.botArchives.push({
+    id: "archive-1",
+    userId: "user-1",
+    mentionId: "mention-1",
+    mentionUrl: "https://www.threads.com/@writer/post/MENTION1",
+    mentionAuthorHandle: "writer",
+    mentionAuthorDisplayName: "Writer",
+    noteText: "@ss_threads_bot #voiceAI #audio thanks",
+    targetUrl: "https://www.threads.com/@writer/post/MENTION1",
+    targetAuthorHandle: null,
+    targetAuthorDisplayName: null,
+    targetText: "@ss_threads_bot #voiceAI #audio thanks",
+    targetPublishedAt: "2026-03-25T12:00:00.000Z",
+    mediaUrls: [],
+    markdownContent: "# stale",
+    rawPayloadJson: JSON.stringify({
+      extractedPost: {
+        canonicalUrl: "https://www.threads.com/@writer/post/MENTION1",
+        shortcode: "MENTION1",
+        author: "writer",
+        title: "@ss_threads_bot #voiceAI #audio",
+        text: "@ss_threads_bot #voiceAI #audio thanks",
+        publishedAt: "2026-03-25T12:00:00.000Z",
+        capturedAt: "2026-03-25T12:00:30.000Z",
+        sourceType: "text",
+        imageUrls: [],
+        videoUrl: null,
+        externalUrl: null,
+        quotedPostUrl: "https://www.threads.com/@source/post/TARGET1",
+        repliedToUrl: null,
+        thumbnailUrl: null,
+        authorReplies: [],
+        extractorVersion: "test",
+        contentHash: "mention-hash"
+      }
+    }),
+    archivedAt: "2026-03-25T12:01:00.000Z",
+    updatedAt: "2026-03-25T12:01:00.000Z",
+    status: "saved"
+  });
+
+  globalThis.fetch = (async (input: RequestInfo | URL) => {
+    const url = typeof input === "string" ? input : input.toString();
+    if (url === "https://www.threads.com/@source/post/TARGET1") {
+      return new Response(
+        `<!doctype html>
+        <html lang="ko">
+          <head>
+            <link rel="canonical" href="https://www.threads.com/@source/post/TARGET1" />
+            <meta property="og:title" content="source on Threads" />
+            <meta property="og:description" content="Original source post body." />
+          </head>
+          <body>
+            <main>
+              <article>
+                <a href="https://www.threads.com/@source/post/TARGET1"><time datetime="2026-03-25T11:59:00.000Z">1분</time></a>
+                <div>source</div>
+                <div>Original source post body.</div>
+              </article>
+              <article>
+                <a href="https://www.threads.com/@source/post/REPLY1"><time datetime="2026-03-25T12:01:00.000Z">방금</time></a>
+                <div>source</div>
+                <div>Author follow-up reply from the same thread.</div>
+              </article>
+            </main>
+          </body>
+        </html>`,
+        {
+          status: 200,
+          headers: {
+            "content-type": "text/html; charset=utf-8"
+          }
+        }
+      );
+    }
+
+    throw new Error(`Unexpected fetch URL in repairBotSessionArchives test: ${url}`);
+  }) as typeof fetch;
+
+  try {
+    const repaired = await repairBotSessionArchives(data, "user-1");
+    assert.equal(repaired, 1);
+
+    const state = getBotSessionState(data, "session-token-1");
+    assert.equal(state.archives[0]?.targetUrl, "https://www.threads.com/@source/post/TARGET1");
+    assert.equal(state.archives[0]?.targetAuthorHandle, "source");
+    assert.equal(state.archives[0]?.targetText, "Original source post body.");
+    assert.equal(state.archives[0]?.authorReplies.length, 1);
+    assert.match(state.archives[0]?.authorReplies[0]?.text ?? "", /Author follow-up reply/);
+
+    const exported = readBotArchiveMarkdown(data, "session-token-1", "archive-1");
+    assert.match(exported.markdownContent, /Original source post body\./);
+    assert.match(exported.markdownContent, /Author follow-up reply from the same thread\./);
+  } finally {
+    globalThis.fetch = previousFetch;
+  }
+});
+
+test("trigger-only mention captures are hidden from the scrapbook archive list", () => {
+  const previousHandle = process.env.THREADS_BOT_HANDLE;
+  process.env.THREADS_BOT_HANDLE = "ss_threads_bot";
+  replaceRuntimeConfigForTests(null);
+
+  try {
+    const data = buildDefaultDatabase("2026-03-25T00:00:00.000Z");
+    data.botUsers.push({
+      id: "user-1",
+      threadsUserId: "threads-user-1",
+      threadsHandle: "writer",
+      displayName: "Writer",
+      profilePictureUrl: null,
+      biography: null,
+      isVerified: false,
+      accessTokenCiphertext: null,
+      tokenExpiresAt: null,
+      email: null,
+      grantedScopes: [],
+      scopeVersion: 0,
+      lastScopeUpgradeAt: null,
+      createdAt: "2026-03-25T00:00:00.000Z",
+      updatedAt: "2026-03-25T00:00:00.000Z",
+      lastLoginAt: "2026-03-25T00:00:00.000Z",
+      status: "active"
+    });
+    data.botSessions.push({
+      id: "session-1",
+      userId: "user-1",
+      sessionHash: createHash("sha256").update("session-token-1").digest("hex"),
+      createdAt: "2026-03-25T00:00:00.000Z",
+      expiresAt: "2026-04-25T00:00:00.000Z",
+      lastSeenAt: "2026-03-25T00:00:00.000Z",
+      revokedAt: null,
+      status: "active"
+    });
+    data.botArchives.push({
+      id: "archive-1",
+      userId: "user-1",
+      mentionId: "mention-1",
+      mentionUrl: "https://www.threads.com/@writer/post/MENTION1",
+      mentionAuthorHandle: "writer",
+      mentionAuthorDisplayName: "Writer",
+      noteText: null,
+      targetUrl: "https://www.threads.com/@writer/post/MENTION1",
+      targetAuthorHandle: "writer",
+      targetAuthorDisplayName: "Writer",
+      targetText: "@ss_threads_bot #skills 감사합니다.",
+      targetPublishedAt: "2026-03-25T01:00:00.000Z",
+      mediaUrls: [],
+      markdownContent: "# stale",
+      rawPayloadJson: JSON.stringify({
+        mention: {
+          id: "mention-1"
+        },
+        target: {
+          id: "mention-1"
+        },
+        extractedPost: null
+      }),
+      archivedAt: "2026-03-25T01:00:00.000Z",
+      updatedAt: "2026-03-25T01:00:00.000Z",
+      status: "saved"
+    });
+
+    const state = getBotSessionState(data, "session-token-1");
+    assert.equal(state.archives.length, 0);
+  } finally {
+    replaceRuntimeConfigForTests(null);
+    if (typeof previousHandle === "string") {
+      process.env.THREADS_BOT_HANDLE = previousHandle;
+    } else {
+      delete process.env.THREADS_BOT_HANDLE;
+    }
+  }
+});
+
+test("trigger-only mention captures are hidden when the bot mention is at the end of the comment", () => {
+  const previousHandle = process.env.THREADS_BOT_HANDLE;
+  process.env.THREADS_BOT_HANDLE = "ss_threads_bot";
+  replaceRuntimeConfigForTests(null);
+
+  try {
+    const data = buildDefaultDatabase("2026-03-25T00:00:00.000Z");
+    data.botUsers.push({
+      id: "user-1",
+      threadsUserId: "threads-user-1",
+      threadsHandle: "writer",
+      displayName: "Writer",
+      profilePictureUrl: null,
+      biography: null,
+      isVerified: false,
+      accessTokenCiphertext: null,
+      tokenExpiresAt: null,
+      email: null,
+      grantedScopes: [],
+      scopeVersion: 0,
+      lastScopeUpgradeAt: null,
+      createdAt: "2026-03-25T00:00:00.000Z",
+      updatedAt: "2026-03-25T00:00:00.000Z",
+      lastLoginAt: "2026-03-25T00:00:00.000Z",
+      status: "active"
+    });
+    data.botSessions.push({
+      id: "session-1",
+      userId: "user-1",
+      sessionHash: createHash("sha256").update("session-token-1").digest("hex"),
+      createdAt: "2026-03-25T00:00:00.000Z",
+      expiresAt: "2026-04-25T00:00:00.000Z",
+      lastSeenAt: "2026-03-25T00:00:00.000Z",
+      revokedAt: null,
+      status: "active"
+    });
+    data.botArchives.push({
+      id: "archive-1",
+      userId: "user-1",
+      mentionId: "mention-1",
+      mentionUrl: "https://www.threads.com/@writer/post/MENTION1",
+      mentionAuthorHandle: "writer",
+      mentionAuthorDisplayName: "Writer",
+      noteText: null,
+      targetUrl: "https://www.threads.com/@writer/post/MENTION1",
+      targetAuthorHandle: "writer",
+      targetAuthorDisplayName: "Writer",
+      targetText: "감사합니다! @ss_threads_bot",
+      targetPublishedAt: "2026-03-25T01:00:00.000Z",
+      mediaUrls: [],
+      markdownContent: "# stale",
+      rawPayloadJson: JSON.stringify({
+        mention: {
+          id: "mention-1"
+        },
+        target: {
+          id: "mention-1"
+        },
+        extractedPost: null
+      }),
+      archivedAt: "2026-03-25T01:00:00.000Z",
+      updatedAt: "2026-03-25T01:00:00.000Z",
+      status: "saved"
+    });
+
+    const state = getBotSessionState(data, "session-token-1");
+    assert.equal(state.archives.length, 0);
+  } finally {
+    replaceRuntimeConfigForTests(null);
+    if (typeof previousHandle === "string") {
+      process.env.THREADS_BOT_HANDLE = previousHandle;
+    } else {
+      delete process.env.THREADS_BOT_HANDLE;
+    }
+  }
 });
 
 test("scrapbook ZIP export keeps one markdown file and flat image files per archive", async () => {
@@ -347,13 +773,13 @@ test("scrapbook ZIP export keeps one markdown file and flat image files per arch
 
   try {
     const exported = await readBotArchiveZip(data, "session-token-zip", [ingest.archiveId as string]);
-    assert.equal(exported.filename, "archive-this-source.zip");
+    assert.equal(exported.filename, "archive-this-source-body-for-z.zip");
 
     const zip = await JSZip.loadAsync(exported.content);
     const fileNames = Object.keys(zip.files).sort();
-    assert.deepEqual(fileNames, ["archive-this-source.md", "image-01.jpg", "reply-01-image-01.jpg"]);
+    assert.deepEqual(fileNames, ["archive-this-source-body-for-z.md", "image-01.jpg", "reply-01-image-01.jpg"]);
 
-    const note = await zip.file("archive-this-source.md")?.async("text");
+    const note = await zip.file("archive-this-source-body-for-z.md")?.async("text");
     assert.ok(note?.includes("# Archive this source"));
     assert.ok(note?.includes("(image-01.jpg)"));
     assert.ok(note?.includes("## Author Replies"));

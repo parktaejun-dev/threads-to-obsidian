@@ -3268,8 +3268,10 @@ export async function loadBotArchives(filePath?: string): Promise<BotArchiveReco
 }
 
 export async function loadBotMentionReadState(filePath?: string): Promise<{
-  activeUserIds: string[];
-  activeUserHandles: string[];
+  activeUsers: Array<{
+    threadsUserId: string | null;
+    threadsHandle: string;
+  }>;
   knownMentionIds: string[];
 }> {
   return withDatabaseAccess(async () => {
@@ -3301,12 +3303,12 @@ export async function loadBotMentionReadState(filePath?: string): Promise<{
       );
 
       return {
-        activeUserIds: activeUsersResult.rows
-          .map((row) => (typeof row.threads_user_id === "string" ? row.threads_user_id : ""))
-          .filter(Boolean),
-        activeUserHandles: activeUsersResult.rows
-          .map((row) => normalizeThreadsHandle(typeof row.threads_handle === "string" ? row.threads_handle : ""))
-          .filter(Boolean),
+        activeUsers: activeUsersResult.rows
+          .map((row) => ({
+            threadsUserId: typeof row.threads_user_id === "string" ? row.threads_user_id : null,
+            threadsHandle: normalizeThreadsHandle(typeof row.threads_handle === "string" ? row.threads_handle : "")
+          }))
+          .filter((row) => Boolean(row.threadsUserId || row.threadsHandle)),
         knownMentionIds: knownMentionIdsResult.rows
           .map((row) => (typeof row.mention_id === "string" ? row.mention_id.trim() : ""))
           .filter(Boolean)
@@ -3315,14 +3317,13 @@ export async function loadBotMentionReadState(filePath?: string): Promise<{
 
     const database = await loadDatabaseUnsafe(backend.filePath);
     return {
-      activeUserIds: database.botUsers
+      activeUsers: database.botUsers
         .filter((candidate) => candidate.status === "active")
-        .map((candidate) => candidate.threadsUserId ?? "")
-        .filter(Boolean),
-      activeUserHandles: database.botUsers
-        .filter((candidate) => candidate.status === "active")
-        .map((candidate) => normalizeThreadsHandle(candidate.threadsHandle))
-        .filter(Boolean),
+        .map((candidate) => ({
+          threadsUserId: candidate.threadsUserId,
+          threadsHandle: normalizeThreadsHandle(candidate.threadsHandle)
+        }))
+        .filter((candidate) => Boolean(candidate.threadsUserId || candidate.threadsHandle)),
       knownMentionIds: [
         ...database.botArchives.map((candidate) => candidate.mentionId ?? ""),
         ...database.botMentionJobs.map((candidate) => candidate.mentionId)

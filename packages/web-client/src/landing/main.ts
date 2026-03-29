@@ -20,32 +20,17 @@ interface BotPublicConfig {
 
 const headline = document.querySelector<HTMLElement>("#headline");
 const heroEyebrow = document.querySelector<HTMLElement>("#hero-eyebrow");
-const subheadline = document.querySelector<HTMLElement>("#subheadline");
-const heroProofItems = [
-  document.querySelector<HTMLElement>("#hero-proof-1"),
-  document.querySelector<HTMLElement>("#hero-proof-2"),
-  document.querySelector<HTMLElement>("#hero-proof-3")
-];
-const heroDestinationItems = [
-  document.querySelector<HTMLElement>("#hero-destination-1"),
-  document.querySelector<HTMLElement>("#hero-destination-2"),
-  document.querySelector<HTMLElement>("#hero-destination-3")
-];
 const priceLabel = document.querySelector<HTMLElement>("#price-label");
 const priceValue = document.querySelector<HTMLElement>("#price-value");
 const includedUpdates = document.querySelector<HTMLElement>("#included-updates");
+const heroMentionBox = document.querySelector<HTMLElement>("#hero-mention-box");
 const heroMentionText = document.querySelector<HTMLElement>("#hero-mention-text");
-const supportTitle = document.querySelector<HTMLElement>("#support-title");
-const supportCopy = document.querySelector<HTMLElement>("#support-copy");
-const supportEmailLink = document.querySelector<HTMLAnchorElement>("#support-email-link");
-const supportEmailLinkSecondary = document.querySelector<HTMLAnchorElement>("#support-email-link-secondary");
 const topbarPrimaryCta = document.querySelector<HTMLAnchorElement>("#topbar-primary-cta");
 const heroDesktopCta = document.querySelector<HTMLAnchorElement>("#hero-desktop-cta");
 const heroMobileCta = document.querySelector<HTMLAnchorElement>("#hero-mobile-cta");
 const priceCardCta = document.querySelector<HTMLAnchorElement>("#price-card-cta");
 const routesEyebrow = document.querySelector<HTMLElement>("#routes-eyebrow");
 const routesTitle = document.querySelector<HTMLElement>("#routes-title");
-const routesCopy = document.querySelector<HTMLElement>("#routes-copy");
 const capabilitySection = document.querySelector<HTMLElement>(".capability-section");
 const saveRouteSection = document.querySelector<HTMLElement>(".save-route-section");
 const capabilityEyebrow = document.querySelector<HTMLElement>("#capability-eyebrow");
@@ -61,8 +46,6 @@ const capabilityInsightsTitle = document.querySelector<HTMLElement>("#capability
 const capabilityInsightsDesc = document.querySelector<HTMLElement>("#capability-insights-desc");
 const productACta = document.querySelector<HTMLAnchorElement>("#product-a-cta");
 const productBCta = document.querySelector<HTMLAnchorElement>("#product-b-cta");
-const productATag = document.querySelector<HTMLElement>("#product-a-tag");
-const productBTag = document.querySelector<HTMLElement>("#product-b-tag");
 const productAPoints = document.querySelector<HTMLElement>("#product-a-points");
 const productBPoints = document.querySelector<HTMLElement>("#product-b-points");
 const footerExtensionLink = document.querySelector<HTMLAnchorElement>("#footer-extension-link");
@@ -72,23 +55,10 @@ const productADesc = document.querySelector<HTMLElement>("#product-a-desc");
 const productBDesc = document.querySelector<HTMLElement>("#product-b-desc");
 const planEyebrow = document.querySelector<HTMLElement>("#plan-eyebrow");
 const planTitle = document.querySelector<HTMLElement>("#plan-title");
-const planCopy = document.querySelector<HTMLElement>("#plan-copy");
 const planFreeTitle = document.querySelector<HTMLElement>("#plan-free-title");
-const planFreeCopy = document.querySelector<HTMLElement>("#plan-free-copy");
 const planFreeList = document.querySelector<HTMLElement>("#plan-free-list");
 const planPlusTitle = document.querySelector<HTMLElement>("#plan-plus-title");
-const planPlusCopy = document.querySelector<HTMLElement>("#plan-plus-copy");
 const planPlusList = document.querySelector<HTMLElement>("#plan-plus-list");
-const trustEyebrow = document.querySelector<HTMLElement>("#trust-eyebrow");
-const trustTitle = document.querySelector<HTMLElement>("#trust-title");
-const trustCopy = document.querySelector<HTMLElement>("#trust-copy");
-const trustSupportLabel = document.querySelector<HTMLElement>("#trust-support-label");
-const trustSupportCopy = document.querySelector<HTMLElement>("#trust-support-copy");
-const trustDataLabel = document.querySelector<HTMLElement>("#trust-data-label");
-const trustDataCopy = document.querySelector<HTMLElement>("#trust-data-copy");
-const faqList = document.querySelector<HTMLElement>("#faq-list");
-const compareProductALabel = document.querySelector<HTMLElement>("#compare-product-a-label");
-const compareProductBLabel = document.querySelector<HTMLElement>("#compare-product-b-label");
 const installHeroEyebrow = document.querySelector<HTMLElement>("#install-hero-eyebrow");
 const installTopbarCta = document.querySelector<HTMLAnchorElement>("#install-topbar-cta");
 const installDownloadCta = document.querySelector<HTMLAnchorElement>("#install-download-cta");
@@ -149,7 +119,7 @@ function readLandingBootstrap(): LandingBootstrapPayload | null {
 const landingBootstrap = readLandingBootstrap();
 
 let msg: LandingMsg = landingMessages.ko[landingVariant];
-let currentLocale: WebLocale = initialLocaleHint ?? getLocale("en");
+let currentLocale: WebLocale = getLocale(initialLocaleHint ?? "en");
 let currentBotHandle = normalizeBotHandleValue(landingBootstrap?.botHandle, DEFAULT_BOT_HANDLE);
 let storefrontSettings: StorefrontSettings | null = landingBootstrap?.storefrontSettings ?? null;
 
@@ -178,43 +148,20 @@ type CapabilitySectionCopy = {
 };
 
 type LandingUiCopy = {
-  heroEyebrow: string;
-  heroLead: string;
-  heroProofs: string[];
-  heroDestinations: string[];
   heroMentionHtml: string;
-  supportTitle: string;
-  supportCopy: string;
   routesEyebrow: string;
   routesTitle: string;
-  routesCopy: string;
-  desktopTag: string;
-  desktopTitle: string;
   desktopDesc: string;
   desktopPoints: string[];
-  desktopCta: string;
-  mobileTag: string;
-  mobileTitle: string;
   mobileDesc: string;
   mobilePoints: string[];
-  mobileCta: string;
   planEyebrow: string;
   planTitle: string;
-  planCopy: string;
   freeTitle: string;
-  freeCopy: string;
   freePoints: string[];
   plusTitle: string;
-  plusCopy: string;
   plusPoints: string[];
   priceCta: string;
-  trustEyebrow: string;
-  trustTitle: string;
-  trustCopy: string;
-  trustSupportLabel: string;
-  trustSupportCopy: string;
-  trustDataLabel: string;
-  trustDataCopy: string;
 };
 
 type InstallMetaCopy = {
@@ -558,40 +505,24 @@ const capabilitySectionCopyByLocale: Partial<Record<WebLocale, CapabilitySection
 
 const landingUiCopyByLocale: Partial<Record<WebLocale, LandingUiCopy>> = {
   ko: {
-    heroEyebrow: "Threads 저장",
-    heroLead:
-      "PC는 보고 있는 글을 바로 저장하고, 모바일은 댓글 한 줄로 모읍니다. 다시 볼 때는 스크랩북에서 찾습니다.",
-    heroProofs: ["무료로 시작", "7일 환불", "이메일 지원"],
-    heroDestinations: ["Notion", "Obsidian", "웹 스크랩북"],
     heroMentionHtml: "댓글로 <code class=\"bot-handle\">@{botHandle}</code> 만 적으세요.",
-    supportTitle: "문의",
-    supportCopy: "결제, 환불, Plus 문의는 이 이메일로 안내합니다.",
     routesEyebrow: "저장 방법",
-    routesTitle: "PC는 바로 저장, 모바일은 댓글 한 줄",
-    routesCopy: "처음 한 번 설치한 PC 저장과 매일 쓰는 스크랩북을 같은 흐름으로 묶었습니다.",
-    desktopTag: "PC",
-    desktopTitle: "PC는 바로 저장",
-    desktopDesc: "처음 한 번만 설치하면 보고 있는 글을 바로 저장합니다.",
+    routesTitle: "PC는 extension, 모바일은 @mention",
+    desktopDesc: "Chrome에서 바로 저장합니다.",
     desktopPoints: [
-      "처음 한 번만 설치",
-      "보고 있는 글 바로 저장",
-      "저장한 글은 스크랩북에서도 보기"
+      "한 번만 설치",
+      "보고 있는 글 저장",
+      "스크랩북에서도 다시 보기"
     ],
-    desktopCta: "PC 설치 안내",
-    mobileTag: "모바일",
-    mobileTitle: "모바일은 댓글 한 줄",
-    mobileDesc: "댓글에 @ss_threads_bot만 남기면 내 스크랩북에 저장됩니다.",
+    mobileDesc: "댓글로 바로 저장합니다.",
     mobilePoints: [
-      "댓글 한 줄로 저장",
-      "매일 스크랩북에서 다시 보기",
+      "댓글에 @ss_threads_bot",
+      "스크랩북으로 바로 저장",
       "태그로 정리"
     ],
-    mobileCta: "스크랩북 열기",
     planEyebrow: "요금",
-    planTitle: "Free로 쓰다가, 필요할 때만 Plus",
-    planCopy: "저장과 다시 보기까지는 Free면 충분합니다. 더 넓게 쓰고 싶을 때만 Plus를 붙이면 됩니다.",
+    planTitle: "Free와 Plus",
     freeTitle: "Free",
-    freeCopy: "저장과 다시 보기에 충분합니다.",
     freePoints: [
       "저장글 100개 · 폴더 5개",
       "태그와 검색",
@@ -599,57 +530,33 @@ const landingUiCopyByLocale: Partial<Record<WebLocale, LandingUiCopy>> = {
       "스크랩북에서 다시 보기"
     ],
     plusTitle: "Plus",
-    plusCopy: "저장이 많아질 때 한도를 넓혀 줍니다.",
     plusPoints: [
       "저장글 1,000개 · 폴더 50개",
       "관심 계정 새 글 보기",
       "내 계정 반응 변화 보기",
       "PC 저장에도 같은 키 사용"
     ],
-    priceCta: "Plus 자세히",
-    trustEyebrow: "안내",
-    trustTitle: "문의",
-    trustCopy: "결제, 환불, Plus 문의는 이메일로 안내합니다.",
-    trustSupportLabel: "이메일",
-    trustSupportCopy: "영업일 기준 순서대로 답변합니다.",
-    trustDataLabel: "데이터 처리",
-    trustDataCopy: "저장과 검색은 스크랩북 중심으로 동작하고, 연결 기능만 서버를 거칩니다."
+    priceCta: "Plus 보기"
   },
   en: {
-    heroEyebrow: "Save Threads",
-    heroLead:
-      "Desktop saves the post you are viewing now. Mobile collects posts with one reply and scrapbook becomes the place you return to.",
-    heroProofs: ["Free to start", "7-day refund", "Email support"],
-    heroDestinations: ["Notion", "Obsidian", "Web scrapbook"],
-    heroMentionHtml: "Just reply with <code class=\"bot-handle\">@{botHandle}</code>.",
-    supportTitle: "Support",
-    supportCopy: "Use this email for payment, refunds, and Plus questions.",
+    heroMentionHtml: "Reply with <code class=\"bot-handle\">@{botHandle}</code> only.",
     routesEyebrow: "How it works",
-    routesTitle: "Desktop saves now. Mobile keeps a backlog.",
-    routesCopy: "The same product supports two different save moments without making them feel equal.",
-    desktopTag: "Desktop",
-    desktopTitle: "Desktop uses the Chrome extension",
-    desktopDesc: "Save the Threads post in front of you. Installation only happens once.",
+    routesTitle: "Desktop saves with the extension. Mobile saves with one mention.",
+    desktopDesc: "Save directly from Chrome.",
     desktopPoints: [
       "Install once in Chrome",
-      "Choose Notion, Obsidian, or scrapbook",
-      "Save the post in front of you"
+      "Save the post in front of you",
+      "Open it again in scrapbook"
     ],
-    desktopCta: "Install Chrome extension",
-    mobileTag: "Mobile",
-    mobileTitle: "Mobile saves with one reply",
-    mobileDesc: "Reply with @ss_threads_bot and the post lands in your scrapbook.",
+    mobileDesc: "Save directly from one reply.",
     mobilePoints: [
-      "Save with one reply",
-      "Return to it in scrapbook",
+      "Reply with @ss_threads_bot",
+      "Save straight into scrapbook",
       "Organize with tags"
     ],
-    mobileCta: "Open scrapbook",
     planEyebrow: "Pricing",
-    planTitle: "Start on Free, add Plus when limits matter",
-    planCopy: "Free handles saving and finding posts again. Plus is for people who save enough to outgrow the default space.",
+    planTitle: "Free and Plus",
     freeTitle: "Free",
-    freeCopy: "Enough for everyday saving and review.",
     freePoints: [
       "100 saved posts and 5 folders",
       "Tags and search",
@@ -657,21 +564,13 @@ const landingUiCopyByLocale: Partial<Record<WebLocale, LandingUiCopy>> = {
       "Review in scrapbook"
     ],
     plusTitle: "Plus",
-    plusCopy: "A better fit when your saved archive grows.",
     plusPoints: [
       "1,000 saved posts and 50 folders",
       "Follow accounts",
       "See account activity",
       "Use the same key in the extension"
     ],
-    priceCta: "See Plus",
-    trustEyebrow: "Support",
-    trustTitle: "Install and checkout stay brief",
-    trustCopy: "Install notes, refunds, support, and data handling are kept in plain language.",
-    trustSupportLabel: "Support email",
-    trustSupportCopy: "Use this email for payments, refunds, and Plus questions.",
-    trustDataLabel: "Data handling",
-    trustDataCopy: "Core saving and search run through scrapbook, while only connected features use server-side processing."
+    priceCta: "See Plus"
   }
 };
 
@@ -850,15 +749,6 @@ function setList(element: HTMLElement | null, items: string[]): void {
   element.innerHTML = items.map((item) => `<li>${escapeHtml(item)}</li>`).join("");
 }
 
-function setEmailLink(element: HTMLAnchorElement | null, email: string): void {
-  if (!element) {
-    return;
-  }
-
-  element.href = `mailto:${email}`;
-  element.textContent = email;
-}
-
 function escapeHtml(value: string): string {
   return value
     .replaceAll("&", "&amp;")
@@ -918,12 +808,8 @@ function resolveLocalizedStorefront(locale: WebLocale) {
     return baseCopy;
   }
 
-  const normalizedFaqs = storefrontSettings.faqs.filter((faq) => faq.question.trim() && faq.answer.trim());
   const persistedHeadline = applyBotHandlePlaceholder(storefrontSettings.headline, currentBotHandle, DEFAULT_BOT_HANDLE);
-  const persistedSubheadline = applyBotHandlePlaceholder(storefrontSettings.subheadline, currentBotHandle, DEFAULT_BOT_HANDLE);
   const persistedIncludedUpdates = applyBotHandlePlaceholder(storefrontSettings.includedUpdates, currentBotHandle, DEFAULT_BOT_HANDLE);
-  const persistedHeroNotes = applyBotHandlePlaceholder(storefrontSettings.heroNotes, currentBotHandle, DEFAULT_BOT_HANDLE);
-  const persistedFaqs = applyBotHandlePlaceholder(normalizedFaqs, currentBotHandle, DEFAULT_BOT_HANDLE);
   const commonCopy = {
     ...baseCopy,
     productName: storefrontSettings.productName.trim() || baseCopy.productName,
@@ -937,32 +823,20 @@ function resolveLocalizedStorefront(locale: WebLocale) {
   return {
     ...commonCopy,
     headline: persistedHeadline.trim() ? renderHeadlineLines(persistedHeadline) : baseCopy.headline,
-    subheadline: persistedSubheadline.trim() || baseCopy.subheadline,
-    includedUpdates: persistedIncludedUpdates.trim() || baseCopy.includedUpdates,
-    heroNotes: persistedHeroNotes.filter((note) => note.trim()).length > 0 ? persistedHeroNotes : baseCopy.heroNotes,
-    faqs: persistedFaqs.length > 0 ? persistedFaqs : baseCopy.faqs
+    includedUpdates: persistedIncludedUpdates.trim() || baseCopy.includedUpdates
   };
 }
 
 function renderLocalizedStorefront(locale: WebLocale): void {
   const copy = resolveLocalizedStorefront(locale);
-  const uiCopy = getLandingUiCopy(locale);
+  const localeUiCopy = landingUiCopyByLocale[locale];
+  const uiCopy = localeUiCopy ?? getLandingUiCopy("en");
   const resolvedPriceValue = storefrontSettings?.priceValue.trim() || DEFAULT_SETTINGS.priceValue;
-  const resolvedSupportEmail = storefrontSettings?.supportEmail.trim() || DEFAULT_SETTINGS.supportEmail;
+  const mentionHtml = localeUiCopy?.heroMentionHtml?.replace("{botHandle}", currentBotHandle) ?? "";
 
   if (headline) {
     headline.innerHTML = copy.headline;
   }
-  setText(heroEyebrow, uiCopy.heroEyebrow);
-  if (subheadline) {
-    subheadline.textContent = copy.subheadline.trim() || uiCopy.heroLead;
-  }
-  heroProofItems.forEach((element, index) => {
-    setText(element, uiCopy.heroProofs[index] ?? "");
-  });
-  heroDestinationItems.forEach((element, index) => {
-    setText(element, uiCopy.heroDestinations[index] ?? "");
-  });
   if (priceLabel) {
     priceLabel.textContent = copy.priceLabel;
   }
@@ -972,54 +846,22 @@ function renderLocalizedStorefront(locale: WebLocale): void {
   if (includedUpdates) {
     includedUpdates.textContent = copy.includedUpdates;
   }
+  heroMentionBox?.toggleAttribute("hidden", !mentionHtml);
   if (heroMentionText) {
-    heroMentionText.innerHTML = uiCopy.heroMentionHtml.replace("{botHandle}", currentBotHandle);
+    heroMentionText.innerHTML = mentionHtml;
   }
-  setText(supportTitle, uiCopy.supportTitle);
-  setText(supportCopy, uiCopy.supportCopy);
-  setEmailLink(supportEmailLink, resolvedSupportEmail);
-  setEmailLink(supportEmailLinkSecondary, resolvedSupportEmail);
   setText(routesEyebrow, uiCopy.routesEyebrow);
   setText(routesTitle, uiCopy.routesTitle);
-  setText(routesCopy, uiCopy.routesCopy);
-  setText(productATag, uiCopy.desktopTag);
-  setText(productATitle, uiCopy.desktopTitle);
   setText(productADesc, uiCopy.desktopDesc);
   setList(productAPoints, uiCopy.desktopPoints);
-  setText(productBTag, uiCopy.mobileTag);
-  setText(productBTitle, uiCopy.mobileTitle);
   setText(productBDesc, uiCopy.mobileDesc);
   setList(productBPoints, uiCopy.mobilePoints);
   setText(planEyebrow, uiCopy.planEyebrow);
   setText(planTitle, uiCopy.planTitle);
-  setText(planCopy, uiCopy.planCopy);
   setText(planFreeTitle, uiCopy.freeTitle);
-  setText(planFreeCopy, uiCopy.freeCopy);
   setList(planFreeList, uiCopy.freePoints);
   setText(planPlusTitle, uiCopy.plusTitle);
-  setText(planPlusCopy, uiCopy.plusCopy);
   setList(planPlusList, uiCopy.plusPoints);
-  setText(trustEyebrow, uiCopy.trustEyebrow);
-  setText(trustTitle, uiCopy.trustTitle);
-  setText(trustCopy, uiCopy.trustCopy);
-  setText(trustSupportLabel, uiCopy.trustSupportLabel);
-  setText(trustSupportCopy, uiCopy.trustSupportCopy);
-  setText(trustDataLabel, uiCopy.trustDataLabel);
-  setText(trustDataCopy, uiCopy.trustDataCopy);
-
-  if (faqList) {
-    faqList.innerHTML = copy.faqs
-      .slice(0, 4)
-      .map(
-        (faq) => `
-          <article class="faq-item">
-            <h3>${escapeHtml(faq.question)}</h3>
-            <p>${escapeHtml(faq.answer)}</p>
-          </article>
-        `
-      )
-      .join("");
-  }
 
   setHref(topbarPrimaryCta, copy.links.topbarPrimaryHref);
   setHref(heroDesktopCta, "/install");
@@ -1030,31 +872,25 @@ function renderLocalizedStorefront(locale: WebLocale): void {
   setHref(footerExtensionLink, "/install");
 
   if (topbarPrimaryCta) {
-    topbarPrimaryCta.textContent = uiCopy.mobileCta;
+    topbarPrimaryCta.textContent = msg.productBCta;
   }
   if (heroDesktopCta) {
-    heroDesktopCta.textContent = uiCopy.desktopCta;
+    heroDesktopCta.textContent = msg.guideInstallCta;
   }
   if (heroMobileCta) {
-    heroMobileCta.textContent = uiCopy.mobileCta;
+    heroMobileCta.textContent = msg.productBCta;
   }
   if (productACta) {
     productACta.textContent = msg.guideInstallCta;
   }
   if (productBCta) {
-    productBCta.textContent = uiCopy.mobileCta;
+    productBCta.textContent = msg.productBCta;
   }
   if (priceCardCta) {
     priceCardCta.textContent = uiCopy.priceCta;
   }
   if (footerExtensionLink) {
     footerExtensionLink.textContent = msg.guideInstallCta;
-  }
-  if (compareProductALabel) {
-    compareProductALabel.textContent = uiCopy.desktopTitle;
-  }
-  if (compareProductBLabel) {
-    compareProductBLabel.textContent = uiCopy.mobileTitle;
   }
 
   if (pageType === "landing") {

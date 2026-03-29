@@ -356,6 +356,14 @@ export interface InsightsSnapshotRecord {
   rawPayloadJson: string | null;
 }
 
+export interface SavedViewInsightProps {
+  highlightId: string;
+  highlightParams: Record<string, string | number>;
+  localeAtSave: string;
+  tier: string;
+  score: number;
+}
+
 export interface SavedViewRecord {
   id: string;
   userId: string;
@@ -365,6 +373,7 @@ export interface SavedViewRecord {
   createdAt: string;
   updatedAt: string;
   status: SavedViewStatus;
+  insightProps?: SavedViewInsightProps | null;
 }
 
 export interface BotMentionSyncSummary {
@@ -698,7 +707,7 @@ export interface EmailDeliveryDraft {
 
 export const DEFAULT_SETTINGS: StorefrontSettings = {
   productName: "ss-threads",
-  headline: "Threads 글을 모아두세요\nPC는 바로 저장\n모바일은 댓글 한 줄",
+  headline: "Threads 글 저장을 편하게,\nPC는 extension, 모바일은 @mention",
   subheadline: "",
   priceLabel: "ss-threads Plus",
   priceValue: "US$19.99",

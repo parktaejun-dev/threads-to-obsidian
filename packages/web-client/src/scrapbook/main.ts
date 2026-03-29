@@ -9,7 +9,14 @@ import {
   type WebLocale
 } from "../lib/web-i18n";
 import { DEFAULT_BOT_HANDLE, normalizeBotHandleValue } from "../lib/web-copy-constants";
-
+import * as htmlToImage from "html-to-image";
+import {
+  calculateGrowthScore,
+  calculateMedals,
+  selectHighlight,
+  type GrowthInsightsData
+} from "./growth-tier";
+import { extractTitleExcerpt } from "@threads/shared/utils";
 interface BotPublicConfig {
   botHandle: string;
   oauthConfigured: boolean;
@@ -181,6 +188,38 @@ interface ScrapbookInsightsPostView {
   capturedAt: string | null;
 }
 
+interface ScrapbookInsightsSavedPostView {
+  externalPostId: string | null;
+  canonicalUrl: string | null;
+  title: string;
+  views: number | null;
+  likes: number | null;
+}
+
+interface ScrapbookInsightsSavedView {
+  id: string;
+  name: string;
+  createdAt: string;
+  updatedAt: string;
+  capturedAt: string | null;
+  insightProps?: {
+    highlightId: string;
+    highlightParams: Record<string, string | number>;
+    localeAtSave: string;
+    tier: string;
+    score: number;
+  } | null;
+  overview: {
+    followers: number | null;
+    profileViews: number | null;
+    views: number | null;
+    likes: number | null;
+    replies: number | null;
+    reposts: number | null;
+  };
+  posts: ScrapbookInsightsSavedPostView[];
+}
+
 interface ScrapbookInsightsView {
   ready: boolean;
   refreshedAt: string | null;
@@ -194,6 +233,7 @@ interface ScrapbookInsightsView {
     quotes: ScrapbookMetricValue;
   };
   posts: ScrapbookInsightsPostView[];
+  savedViews: ScrapbookInsightsSavedView[];
 }
 
 interface ScrapbookScopeState {
@@ -226,6 +266,13 @@ interface ScrapbookPlusState {
   insights: ScrapbookInsightsView;
 }
 
+interface ScrapbookSyncSnapshot {
+  savedAt: string;
+  config: BotPublicConfig;
+  state: BotSessionState;
+  workspace: ScrapbookPlusState | null;
+}
+
 type WorkspaceTab = "inbox" | "watchlists" | "searches" | "insights";
 
 let latestConfig: BotPublicConfig | null = null;
@@ -245,6 +292,7 @@ let archiveSearchQuery = "";
 let activeArchiveTag: string | null = null;
 let activeFolderId: string | null = null;
 let pendingConnectedStatus = false;
+let hasAppliedSyncSnapshot = false;
 
 interface FolderEntry {
   id: string;
@@ -254,6 +302,9 @@ interface FolderEntry {
 
 const FOLDER_STORAGE_KEY = "scrapbook_folders";
 const FOLDER_MAP_STORAGE_KEY = "scrapbook_folder_map";
+const SYNC_SNAPSHOT_STORAGE_KEY = "scrapbook_sync_snapshot_v1";
+const SYNC_SNAPSHOT_TTL_MS = 15 * 60_000;
+const SYNC_SNAPSHOT_ARCHIVE_LIMIT = 30;
 
 function loadFolders(): FolderEntry[] {
   try {
@@ -281,6 +332,100 @@ function saveFolderMap(map: Record<string, string>): void {
   localStorage.setItem(FOLDER_MAP_STORAGE_KEY, JSON.stringify(map));
 }
 
+function clearSyncSnapshot(): void {
+  try {
+    localStorage.removeItem(SYNC_SNAPSHOT_STORAGE_KEY);
+  } catch {
+    // Ignore snapshot storage failures and fall back to network-only boot.
+  }
+}
+
+function loadSyncSnapshot(): ScrapbookSyncSnapshot | null {
+  try {
+    const raw = localStorage.getItem(SYNC_SNAPSHOT_STORAGE_KEY);
+    if (!raw) {
+      return null;
+    }
+
+    const snapshot = JSON.parse(raw) as ScrapbookSyncSnapshot | null;
+    const savedAtMs = Date.parse(snapshot?.savedAt ?? "");
+    if (!snapshot?.state?.authenticated || !snapshot.state.user || !Number.isFinite(savedAtMs)) {
+      clearSyncSnapshot();
+      return null;
+    }
+    if (Date.now() - savedAtMs > SYNC_SNAPSHOT_TTL_MS) {
+      clearSyncSnapshot();
+      return null;
+    }
+
+    const snapshotHandle = normalizeScrapbookHandle(snapshot.state.user.threadsHandle);
+    if (!snapshotHandle) {
+      clearSyncSnapshot();
+      return null;
+    }
+    if (activeScrapbookHandle && activeScrapbookHandle !== snapshotHandle) {
+      return null;
+    }
+
+    return snapshot;
+  } catch {
+    clearSyncSnapshot();
+    return null;
+  }
+}
+
+function persistSyncSnapshot(): void {
+  if (!latestConfig || !latestState?.authenticated || !latestState.user) {
+    clearSyncSnapshot();
+    return;
+  }
+
+  const snapshot: ScrapbookSyncSnapshot = {
+    savedAt: new Date().toISOString(),
+    config: {
+      botHandle: latestConfig.botHandle,
+      oauthConfigured: latestConfig.oauthConfigured
+    },
+    state: {
+      ...latestState,
+      user: { ...latestState.user },
+      saveStatus: latestState.saveStatus ? { ...latestState.saveStatus } : null,
+      archives: latestState.archives.slice(0, SYNC_SNAPSHOT_ARCHIVE_LIMIT).map((item) => ({
+        ...item,
+        tags: [...item.tags],
+        mediaUrls: [...item.mediaUrls],
+        authorReplies: item.authorReplies.map((reply) => ({
+          ...reply,
+          mediaUrls: [...reply.mediaUrls]
+        }))
+      }))
+    },
+    workspace:
+      latestWorkspace && latestWorkspace.authenticated
+        ? JSON.parse(JSON.stringify(latestWorkspace)) as ScrapbookPlusState
+        : null
+  };
+
+  try {
+    localStorage.setItem(SYNC_SNAPSHOT_STORAGE_KEY, JSON.stringify(snapshot));
+  } catch {
+    clearSyncSnapshot();
+  }
+}
+
+function applySyncSnapshot(): boolean {
+  const snapshot = loadSyncSnapshot();
+  if (!snapshot) {
+    return false;
+  }
+
+  applySessionState(snapshot.config, snapshot.state, { persist: false });
+  if (snapshot.workspace?.authenticated) {
+    applyWorkspaceState(snapshot.workspace, { persist: false });
+  }
+  return true;
+}
+
 function generateFolderId(): string {
   return `folder_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
@@ -289,13 +434,13 @@ let currentLocale: WebLocale = getLocale("en");
 let msg: ScrapbookMsg = scrapbookMessages[currentLocale];
 
 const botHandleEls = document.querySelectorAll<HTMLElement>("[data-bot-handle]");
-const hostEls = document.querySelectorAll<HTMLElement>("[data-site-host]");
 const connectButtons = document.querySelectorAll<HTMLButtonElement>("[data-bot-connect]");
 const mobileOauthNotes = document.querySelectorAll<HTMLElement>("[data-mobile-oauth-note]");
 const brandLink = document.querySelector<HTMLAnchorElement>(".brand-link");
 const localeSelect = document.querySelector<HTMLSelectElement>("#scrapbook-locale-select");
 const metaDescription = document.querySelector<HTMLMetaElement>("#scrapbook-meta-description");
 const topbarCurrentLink = document.querySelector<HTMLAnchorElement>("#topbar-current-link");
+const topbarPlanBadge = document.querySelector<HTMLElement>("#topbar-plan-badge");
 const authPanel = document.querySelector<HTMLElement>("#auth-panel");
 const sessionPanel = document.querySelector<HTMLElement>("#session-panel");
 const sessionTrigger = document.querySelector<HTMLButtonElement>("#session-trigger");
@@ -303,20 +448,19 @@ const sessionMenu = document.querySelector<HTMLElement>("#session-menu");
 const pageStatus = document.querySelector<HTMLParagraphElement>("#page-status");
 const saveStatusPanel = document.querySelector<HTMLElement>("#save-status-panel");
 const saveStatusEyebrow = document.querySelector<HTMLElement>("#save-status-eyebrow");
-const saveStatusTitle = document.querySelector<HTMLElement>("#save-status-title");
-const saveStatusSummary = document.querySelector<HTMLParagraphElement>("#save-status-summary");
-const saveStatusRefresh = document.querySelector<HTMLButtonElement>("#save-status-refresh");
-const saveStatusCurrentLabel = document.querySelector<HTMLElement>("#save-status-current-label");
-const saveStatusCurrentValue = document.querySelector<HTMLElement>("#save-status-current-value");
 const saveStatusLastLabel = document.querySelector<HTMLElement>("#save-status-last-label");
 const saveStatusLastValue = document.querySelector<HTMLElement>("#save-status-last-value");
-const saveStatusEtaLabel = document.querySelector<HTMLElement>("#save-status-eta-label");
-const saveStatusEtaValue = document.querySelector<HTMLElement>("#save-status-eta-value");
-const saveStatusDetail = document.querySelector<HTMLElement>("#save-status-detail");
+const saveStatusPlan = document.querySelector<HTMLElement>("#save-status-plan");
+const saveStatusPlanSummary = document.querySelector<HTMLElement>("#save-status-plan-summary");
+const saveStatusPlanClear = document.querySelector<HTMLButtonElement>("#save-status-plan-clear");
+const planSection = document.querySelector<HTMLElement>("#plan-section");
+const planEyebrow = document.querySelector<HTMLElement>("#plan-eyebrow");
 const planTitle = document.querySelector<HTMLElement>("#plan-title");
 const planCopy = document.querySelector<HTMLElement>("#plan-copy");
 const planTierBadge = document.querySelector<HTMLElement>("#plan-tier-badge");
+const planArchiveLabel = document.querySelector<HTMLElement>("#plan-archive-label");
 const planArchiveUsage = document.querySelector<HTMLElement>("#plan-archive-usage");
+const planFolderLabel = document.querySelector<HTMLElement>("#plan-folder-label");
 const planFolderUsage = document.querySelector<HTMLElement>("#plan-folder-usage");
 const planLicenseStatus = document.querySelector<HTMLElement>("#plan-license-status");
 const planKeyForm = document.querySelector<HTMLFormElement>("#plan-key-form");
@@ -331,6 +475,7 @@ const sessionRouting = document.querySelector<HTMLParagraphElement>("#session-ro
 const scopeStatus = document.querySelector<HTMLParagraphElement>("#scope-status");
 const sessionProfileLink = document.querySelector<HTMLAnchorElement>("#session-profile-link");
 const sessionScrapbookLink = document.querySelector<HTMLAnchorElement>("#session-scrapbook-link");
+const sessionPlanClear = document.querySelector<HTMLButtonElement>("#session-plan-clear");
 const avatarImage = document.querySelector<HTMLImageElement>("#profile-avatar-image");
 const avatarFallback = document.querySelector<HTMLElement>("#profile-avatar-fallback");
 const archivesEl = document.querySelector<HTMLElement>("#archives");
@@ -341,10 +486,21 @@ const archivesPerPageSelect = document.querySelector<HTMLSelectElement>("#archiv
 const archivesPagePrev = document.querySelector<HTMLButtonElement>("#archives-page-prev");
 const archivesPageNext = document.querySelector<HTMLButtonElement>("#archives-page-next");
 const archivesPageInfo = document.querySelector<HTMLSpanElement>("#archives-page-info");
+const archivesSearchToggle = document.querySelector<HTMLButtonElement>("#archives-search-toggle");
+const archivesSearchWrap = document.querySelector<HTMLElement>("#archives-search-wrap");
+const archivesTagToggle = document.querySelector<HTMLButtonElement>("#archives-tag-toggle");
+const archivesSortHeader = document.querySelector<HTMLElement>("#archives-sort-header");
+const archivesSortToggle = document.querySelector<HTMLButtonElement>("#archives-sort-toggle");
+const archivesSortArrow = document.querySelector<HTMLElement>("#archives-sort-arrow");
+type ArchiveSortOrder = "asc" | "desc";
+let archiveSortOrder: ArchiveSortOrder = "desc";
 let archivesPage = 1;
 let archivesPerPage = 10;
+let archivesSearchExpanded = false;
+let archivesTagExpanded = false;
 const archivesToolbar = document.querySelector<HTMLElement>("#archives-toolbar");
 const archivesToolbarMeta = document.querySelector<HTMLElement>("#archives-toolbar-meta");
+const archivesToolbarActions = document.querySelector<HTMLElement>("#archives-toolbar .archives-toolbar-actions");
 const archivesSelectAll = document.querySelector<HTMLInputElement>("#archives-select-all");
 const archivesExportAll = document.querySelector<HTMLButtonElement>("#archives-export-all");
 const archivesMoveSelected = document.querySelector<HTMLButtonElement>("#archives-move-selected");
@@ -355,6 +511,10 @@ const archivesTagPanel = document.querySelector<HTMLElement>("#archives-tag-pane
 const archivesFolderStrip = document.querySelector<HTMLElement>("#archives-folder-strip");
 const logoutButton = document.querySelector<HTMLButtonElement>("#logout");
 const workspaceTabs = document.querySelector<HTMLElement>("#workspace-tabs");
+const workspaceTabTrigger = document.querySelector<HTMLButtonElement>("#workspace-tab-trigger");
+const workspaceTabCurrent = document.querySelector<HTMLElement>("#workspace-tab-current");
+const workspaceTabOverlay = document.querySelector<HTMLElement>("#workspace-tab-overlay");
+const workspaceTabClose = document.querySelector<HTMLButtonElement>("#workspace-tab-close");
 const workspaceTabButtons = document.querySelectorAll<HTMLButtonElement>("[data-tab]");
 const workspacePanels = document.querySelectorAll<HTMLElement>("[data-tab-panel]");
 const watchlistForm = document.querySelector<HTMLFormElement>("#watchlist-form");
@@ -363,9 +523,13 @@ const watchlistsEmpty = document.querySelector<HTMLElement>("#watchlists-empty")
 const searchForm = document.querySelector<HTMLFormElement>("#search-form");
 const searchesList = document.querySelector<HTMLElement>("#searches-list");
 const searchesEmpty = document.querySelector<HTMLElement>("#searches-empty");
+const insightsSaveView = document.querySelector<HTMLButtonElement>("#insights-save-view");
+const insightsShareCard = document.querySelector<HTMLButtonElement>("#insights-share-card");
 const insightsRefresh = document.querySelector<HTMLButtonElement>("#insights-refresh");
 const insightsRefreshed = document.querySelector<HTMLElement>("#insights-refreshed");
 const insightsEmpty = document.querySelector<HTMLElement>("#insights-empty");
+const insightsSavedEmpty = document.querySelector<HTMLElement>("#insights-saved-empty");
+const insightsSavedList = document.querySelector<HTMLElement>("#insights-saved-list");
 const insightsPosts = document.querySelector<HTMLElement>("#insights-posts");
 const metricFollowers = document.querySelector<HTMLElement>("#metric-followers");
 const metricFollowersDelta = document.querySelector<HTMLElement>("#metric-followers-delta");
@@ -399,19 +563,33 @@ function buildUiTextKey(ko: string, en: string): string {
 }
 
 const staticUiTextOverrides: Record<string, SecondaryLocaleCopy> = {
-  [buildUiTextKey("폴더 이동", "Move to folder")]: {
-    ja: "フォルダへ移動",
-    "pt-BR": "Mover para pasta",
-    es: "Mover a carpeta",
-    "zh-TW": "移動到資料夾",
-    vi: "Chuyển vào thư mục"
+  [buildUiTextKey("이동", "Move")]: {
+    ja: "移動",
+    "pt-BR": "Mover",
+    es: "Mover",
+    "zh-TW": "移動",
+    vi: "Di chuyển"
   },
-  [buildUiTextKey("선택 삭제", "Delete selected")]: {
-    ja: "選択を削除",
-    "pt-BR": "Excluir selecionados",
-    es: "Eliminar seleccionados",
-    "zh-TW": "刪除所選",
-    vi: "Xóa mục đã chọn"
+  [buildUiTextKey("삭제", "Delete")]: {
+    ja: "削除",
+    "pt-BR": "Excluir",
+    es: "Eliminar",
+    "zh-TW": "刪除",
+    vi: "Xóa"
+  },
+  [buildUiTextKey("내보내기", "Export")]: {
+    ja: "エクスポート",
+    "pt-BR": "Exportar",
+    es: "Exportar",
+    "zh-TW": "匯出",
+    vi: "Xuất"
+  },
+  [buildUiTextKey("내보내는 중", "Exporting")]: {
+    ja: "エクスポート中",
+    "pt-BR": "Exportando",
+    es: "Exportando",
+    "zh-TW": "匯出中",
+    vi: "Đang xuất"
   },
   [buildUiTextKey("로그인하면 현재 계정의 저장글 한도와 Plus 연결 상태를 확인할 수 있습니다.", "Sign in to see your current save limits and Plus status for this scrapbook account.")]: {
     ja: "ログインすると、この scrapbook アカウントの保存上限と Plus 連携状態を確認できます。",
@@ -440,6 +618,97 @@ const staticUiTextOverrides: Record<string, SecondaryLocaleCopy> = {
     es: "Clave Plus",
     "zh-TW": "Plus 金鑰",
     vi: "Khóa Plus"
+  },
+  [buildUiTextKey("구매한 Plus 키를 붙여넣기", "Paste your Plus key")]: {
+    ja: "購入した Plus キーを貼り付け",
+    "pt-BR": "Cole sua chave Plus aqui",
+    es: "Pega tu clave Plus aquí",
+    "zh-TW": "貼上購買的 Plus 金鑰",
+    vi: "Dán khóa Plus bạn đã mua"
+  },
+  [buildUiTextKey("Plus 연결", "Activate Plus")]: {
+    ja: "Plus 連携",
+    "pt-BR": "Ativar Plus",
+    es: "Activar Plus",
+    "zh-TW": "Plus 連線",
+    vi: "Kết nối Plus"
+  },
+  [buildUiTextKey("키 제거", "Remove key")]: {
+    ja: "キーを削除",
+    "pt-BR": "Remover chave",
+    es: "Quitar clave",
+    "zh-TW": "清除金鑰",
+    vi: "Xóa khóa"
+  },
+  [buildUiTextKey("댓글 저장", "Reply saves")]: {
+    ja: "リプライ保存",
+    "pt-BR": "Salvar respostas",
+    es: "Guardar respuestas",
+    "zh-TW": "留言儲存",
+    vi: "Lưu phản hồi"
+  },
+  [buildUiTextKey("업데이트", "Updated")]: {
+    ja: "更新済み",
+    "pt-BR": "Atualizado",
+    es: "Actualizado",
+    "zh-TW": "已更新",
+    vi: "Đã cập nhật"
+  },
+  [buildUiTextKey("불러오는 중", "Loading")]: {
+    ja: "読み込み中",
+    "pt-BR": "Carregando",
+    es: "Cargando",
+    "zh-TW": "讀取中",
+    vi: "Đang tải"
+  },
+  [buildUiTextKey("Plus가 필요합니다.", "Plus required.")]: {
+    ja: "Plus が必要です。",
+    "pt-BR": "Necessário Plus.",
+    es: "Se requiere Plus.",
+    "zh-TW": "需要 Plus。",
+    vi: "Yêu cầu Plus."
+  },
+  [buildUiTextKey("먼저 Plus 키를 입력하세요.", "Enter a Plus key first.")]: {
+    ja: "先に Plus キーを入力してください。",
+    "pt-BR": "Insira uma chave Plus primeiro.",
+    es: "Ingresa una clave Plus primero.",
+    "zh-TW": "請先輸入 Plus 金鑰。",
+    vi: "Hãy nhập khóa Plus trước."
+  },
+  [buildUiTextKey("Plus가 이 scrapbook 계정에 연결되었습니다.", "Plus is now linked to this scrapbook account.")]: {
+    ja: "Plus がこの scrapbook アカウントに連携されました。",
+    "pt-BR": "O Plus agora está vinculado a esta conta do scrapbook.",
+    es: "Plus ahora está vinculado a esta cuenta del scrapbook.",
+    "zh-TW": "Plus 已連結至此 scrapbook 帳號。",
+    vi: "Plus đã được kết nối với tài khoản scrapbook này."
+  },
+  [buildUiTextKey("Plus 연결에 실패했습니다.", "Could not activate Plus.")]: {
+    ja: "Plus 連携に失敗しました。",
+    "pt-BR": "Não foi possível ativar o Plus.",
+    es: "No se pudo activar Plus.",
+    "zh-TW": "Plus 連線失敗。",
+    vi: "Kết nối Plus thất bại."
+  },
+  [buildUiTextKey("Plus 키 연결이 제거되었습니다.", "The Plus key was removed from this scrapbook account.")]: {
+    ja: "Plus キーの連携が解除されました。",
+    "pt-BR": "A chave Plus foi removida desta conta do scrapbook.",
+    es: "Se ha quitado la clave Plus de esta cuenta del scrapbook.",
+    "zh-TW": "Plus 金鑰連結已清除。",
+    vi: "Đã xóa kết nối khóa Plus."
+  },
+  [buildUiTextKey("Plus 키 제거에 실패했습니다.", "Could not remove the Plus key.")]: {
+    ja: "Plus キーの解除に 실패했습니다。",
+    "pt-BR": "Não foi possível remover a chave Plus.",
+    es: "No se pudo quitar la clave Plus.",
+    "zh-TW": "Plus 金鑰清除失敗。",
+    vi: "Xóa khóa Plus thất bại."
+  },
+  [buildUiTextKey("새 댓글 저장 상태를 다시 확인했습니다.", "Checked the latest reply save status.")]: {
+    ja: "最新のリプライ保存状態を再確認しました。",
+    "pt-BR": "Status de salvamento de respostas atualizado.",
+    es: "Se ha vuelto a comprobar el estado de guardado de respuestas.",
+    "zh-TW": "已重新確認最新留言儲存狀態。",
+    vi: "Đã kiểm tra lại trạng thái lưu phản hồi mới."
   },
   [buildUiTextKey("구매한 Plus 키를 붙여넣기", "Paste your Plus key")]: {
     ja: "購入した Plus キーを貼り付ける",
@@ -623,19 +892,19 @@ const staticUiTextOverrides: Record<string, SecondaryLocaleCopy> = {
     "zh-TW": "保存狀態尚未載入。",
     vi: "Trạng thái lưu vẫn chưa được tải."
   },
-  [buildUiTextKey("최근 멘션 저장 요청이 대기열에 들어왔습니다. 보통 다음 수집 주기 안에 inbox에 반영됩니다.", "The latest mention save request is queued. It usually appears in the inbox within the next collection cycle.")]: {
-    ja: "最新の mention 保存リクエストはキューに入りました。通常は次の収集周期内に inbox に反映されます。",
-    "pt-BR": "O pedido de salvamento por mention mais recente entrou na fila. Normalmente ele aparece na inbox no próximo ciclo de coleta.",
-    es: "La solicitud de guardado por mention más reciente está en cola. Normalmente aparece en la inbox en el siguiente ciclo de recopilación.",
-    "zh-TW": "最近一次 mention 保存請求已進入佇列，通常會在下一輪收集內出現在 inbox。",
-    vi: "Yêu cầu lưu bằng mention gần nhất đã vào hàng đợi. Thường nó sẽ xuất hiện trong inbox ở chu kỳ thu thập kế tiếp."
+  [buildUiTextKey("최근 멘션 저장 요청이 대기열에 들어왔습니다. 보통 다음 수집 주기 안에 저장 항목으로 반영됩니다.", "The latest mention save request is queued. It usually appears in saved items within the next collection cycle.")]: {
+    ja: "最新の mention 保存リクエストはキューに入りました。通常は次の収集周期内に保存済み項目へ反映されます。",
+    "pt-BR": "O pedido de salvamento por mention mais recente entrou na fila. Normalmente ele aparece no item salvo no próximo ciclo de coleta.",
+    es: "La solicitud de guardado por mention más reciente está en cola. Normalmente aparece en los elementos guardados en el siguiente ciclo de recopilación.",
+    "zh-TW": "最近一次 mention 保存請求已進入佇列，通常會在下一輪收集內出現在已保存項目。",
+    vi: "Yêu cầu lưu bằng mention gần nhất đã vào hàng đợi. Thường nó sẽ xuất hiện trong mục đã lưu ở chu kỳ thu thập kế tiếp."
   },
-  [buildUiTextKey("최근 멘션 저장 요청을 처리 중입니다. 수집 완료 직후 inbox에 반영됩니다.", "The latest mention save request is being processed and should appear right after the next completed fetch.")]: {
-    ja: "最新の mention 保存リクエストを処理中です。次の収集完了直後に inbox へ反映されます。",
+  [buildUiTextKey("최근 멘션 저장 요청을 처리 중입니다. 수집 완료 직후 저장 항목에 반영됩니다.", "The latest mention save request is being processed and should appear right after the next completed fetch.")]: {
+    ja: "最新の mention 保存リクエストを処理中です。次の収集完了直後に保存済み項目へ反映されます。",
     "pt-BR": "O pedido de salvamento por mention mais recente está sendo processado e deve aparecer logo após a próxima coleta concluída.",
     es: "La solicitud de guardado por mention más reciente se está procesando y debería aparecer justo después de la próxima recopilación completada.",
-    "zh-TW": "最近一次 mention 保存請求正在處理中，通常會在下一次收集完成後立即出現在 inbox。",
-    vi: "Yêu cầu lưu bằng mention gần nhất đang được xử lý và sẽ xuất hiện ngay sau lần thu thập hoàn tất tiếp theo."
+    "zh-TW": "最近一次 mention 保存請求正在處理中，通常會在下一次收集完成後立即出現在已保存項目。",
+    vi: "Yêu cầu lưu bằng mention gần nhất đang được xử lý và sẽ xuất hiện ngay sau lần thu thập hoàn tất tiếp theo trong mục đã lưu."
   },
   [buildUiTextKey("가장 최근 멘션 저장 요청은 최근 저장 시각 기준으로 반영된 것으로 보입니다. 아래에서 최근 멘션과 반영 시각을 다시 확인해 주세요.", "The latest mention save request looks reflected based on the recent save time. Review the latest mention and save timing below.")]: {
     ja: "最新の mention 保存リクエストは、最近の保存時刻から見て反映済みに見えます。下で最新 mention と反映時刻を確認してください。",
@@ -658,12 +927,12 @@ const staticUiTextOverrides: Record<string, SecondaryLocaleCopy> = {
     "zh-TW": "最近一次 mention 保存請求未自動反映。請先確認失敗原因，再立即重新檢查。",
     vi: "Yêu cầu lưu bằng mention gần nhất không được phản ánh tự động. Hãy xem lý do thất bại rồi kiểm tra lại ngay."
   },
-  [buildUiTextKey("새 멘션 저장 요청을 기다리는 중입니다. 요청이 들어오면 보통 다음 수집 주기 안에 inbox에 반영됩니다.", "Waiting for a new mention save request. Once it arrives, it usually reaches the inbox within the next collection cycle.")]: {
-    ja: "新しい mention 保存リクエストを待っています。届くと通常は次の収集周期内に inbox へ反映されます。",
-    "pt-BR": "Aguardando um novo pedido de salvamento por mention. Quando ele chegar, normalmente entra na inbox no próximo ciclo de coleta.",
-    es: "Esperando una nueva solicitud de guardado por mention. Cuando llegue, normalmente se refleja en la inbox dentro del siguiente ciclo de recopilación.",
-    "zh-TW": "正在等待新的 mention 保存請求。請求進來後通常會在下一輪收集內出現在 inbox。",
-    vi: "Đang chờ một yêu cầu lưu bằng mention mới. Khi yêu cầu đến, nó thường vào inbox trong chu kỳ thu thập kế tiếp."
+  [buildUiTextKey("새 멘션 저장 요청을 기다리는 중입니다. 요청이 들어오면 보통 다음 수집 주기 안에 저장 항목에 반영됩니다.", "Waiting for a new mention save request. Once it arrives, it usually reaches saved items within the next collection cycle.")]: {
+    ja: "新しい mention 保存リクエストを待っています。届くと通常は次の収集周期内に保存済み項目へ反映されます。",
+    "pt-BR": "Aguardando um novo pedido de salvamento por mention. Quando ele chegar, normalmente entra no conteúdo salvo no próximo ciclo de coleta.",
+    es: "Esperando una nueva solicitud de guardado por mention. Cuando llegue, normalmente se refleja en los elementos guardados dentro del siguiente ciclo de recopilación.",
+    "zh-TW": "正在等待新的 mention 保存請求。請求進來後通常會在下一輪收集內進入已保存項目。",
+    vi: "Đang chờ một yêu cầu lưu bằng mention mới. Khi yêu cầu đến, nó thường đi vào mục đã lưu trong chu kỳ thu tập kế tiếp."
   },
   [buildUiTextKey("저장 상태", "Save status")]: {
     ja: "保存状態",
@@ -922,7 +1191,7 @@ type RuntimeLocaleLabels = {
 const runtimeLocaleLabels: Record<WebLocale, RuntimeLocaleLabels> = {
   ko: {
     requestFailed: "요청에 실패했습니다 ({status}).",
-    sourceMention: "Inbox",
+    sourceMention: "저장됨",
     sourceCloud: "클라우드 저장",
     searchRunNow: "지금 실행",
     searchStatusNew: "신규",
@@ -931,7 +1200,7 @@ const runtimeLocaleLabels: Record<WebLocale, RuntimeLocaleLabels> = {
   },
   en: {
     requestFailed: "Request failed ({status}).",
-    sourceMention: "Inbox",
+    sourceMention: "Saved",
     sourceCloud: "Cloud save",
     searchRunNow: "Run now",
     searchStatusNew: "New",
@@ -940,7 +1209,7 @@ const runtimeLocaleLabels: Record<WebLocale, RuntimeLocaleLabels> = {
   },
   ja: {
     requestFailed: "リクエストに失敗しました ({status})。",
-    sourceMention: "Inbox",
+    sourceMention: "保存済み",
     sourceCloud: "クラウド保存",
     searchRunNow: "今すぐ実行",
     searchStatusNew: "新規",
@@ -949,7 +1218,7 @@ const runtimeLocaleLabels: Record<WebLocale, RuntimeLocaleLabels> = {
   },
   "pt-BR": {
     requestFailed: "A solicitação falhou ({status}).",
-    sourceMention: "Inbox",
+    sourceMention: "Salvos",
     sourceCloud: "Salvamento na nuvem",
     searchRunNow: "Executar agora",
     searchStatusNew: "Novo",
@@ -958,7 +1227,7 @@ const runtimeLocaleLabels: Record<WebLocale, RuntimeLocaleLabels> = {
   },
   es: {
     requestFailed: "La solicitud falló ({status}).",
-    sourceMention: "Inbox",
+    sourceMention: "Guardado",
     sourceCloud: "Guardado en la nube",
     searchRunNow: "Ejecutar ahora",
     searchStatusNew: "Nuevo",
@@ -967,7 +1236,7 @@ const runtimeLocaleLabels: Record<WebLocale, RuntimeLocaleLabels> = {
   },
   "zh-TW": {
     requestFailed: "請求失敗 ({status})。",
-    sourceMention: "Inbox",
+    sourceMention: "珍藏",
     sourceCloud: "雲端儲存",
     searchRunNow: "立即執行",
     searchStatusNew: "新增",
@@ -976,7 +1245,7 @@ const runtimeLocaleLabels: Record<WebLocale, RuntimeLocaleLabels> = {
   },
   vi: {
     requestFailed: "Yêu cầu thất bại ({status}).",
-    sourceMention: "Inbox",
+    sourceMention: "Đã lưu",
     sourceCloud: "Lưu đám mây",
     searchRunNow: "Chạy ngay",
     searchStatusNew: "Mới",
@@ -1005,6 +1274,39 @@ function getCurrentPlanState(): ScrapbookPlanState {
 
 function getCurrentFolderLimit(): number {
   return getCurrentPlanState().folderLimit;
+}
+
+function getPlanTierLabel(tier: ScrapbookPlanState["tier"]): string {
+  if (tier === "plus") {
+    return "Plus";
+  }
+  return uiText("Free", "Free", {
+    ja: "無料",
+    "pt-BR": "Free",
+    es: "Free",
+    "zh-TW": "Free",
+    vi: "Free"
+  });
+}
+
+function buildPlanUsageSummary(plan: ScrapbookPlanState, folderCount: number): string {
+  return uiText(
+    "저장 {saved}/{limit} · 폴더 {folders}/{folderLimit}",
+    "Saved {saved}/{limit} · Folders {folders}/{folderLimit}",
+    {
+      ja: "保存 {saved}/{limit} ・フォルダ {folders}/{folderLimit}",
+      "pt-BR": "Salvos {saved}/{limit} · Pastas {folders}/{folderLimit}",
+      es: "Guardados {saved}/{limit} · Carpetas {folders}/{folderLimit}",
+      "zh-TW": "保存 {saved}/{limit} · 資料夾 {folders}/{folderLimit}",
+      vi: "Đã lưu {saved}/{limit} · Thư mục {folders}/{folderLimit}"
+    },
+    {
+      saved: formatPlainNumber(plan.archiveCount),
+      limit: formatPlainNumber(plan.archiveLimit),
+      folders: formatPlainNumber(folderCount),
+      folderLimit: formatPlainNumber(plan.folderLimit)
+    }
+  );
 }
 
 function ensureFolderLimitAvailable(): boolean {
@@ -1036,6 +1338,18 @@ function renderPlanPanel(): void {
   const plan = getCurrentPlanState();
   const isAuthenticated = Boolean(latestState?.authenticated && latestState?.user);
   const folderCount = loadFolders().length;
+  const hideExpandedPlan = isAuthenticated && plan.tier === "plus" && plan.plusStatus === "active";
+
+  planSection?.classList.toggle("hidden", hideExpandedPlan);
+  if (planEyebrow) {
+    planEyebrow.textContent = uiText("저장 한도", "Storage", {
+      ja: "保存上限",
+      "pt-BR": "Limites",
+      es: "Límites",
+      "zh-TW": "保存上限",
+      vi: "Giới hạn"
+    });
+  }
 
   if (planTitle) {
     planTitle.textContent = plan.tier === "plus" ? "Plus 1000 / 50" : "Free 100 / 5";
@@ -1048,8 +1362,8 @@ function renderPlanPanel(): void {
       );
     } else if (plan.tier === "plus") {
       planCopy.textContent = uiText(
-        "이 계정은 Plus입니다. 저장글 1,000개와 폴더 50개까지 사용할 수 있습니다.",
-        "This account is on Plus. You can save up to 1,000 posts and use up to 50 folders."
+        "Plus가 연결되면 저장글 1,000개와 폴더 50개까지 사용할 수 있습니다.",
+        "Plus raises your limits to 1,000 saved posts and 50 folders."
       );
     } else {
       planCopy.textContent = uiText(
@@ -1059,11 +1373,29 @@ function renderPlanPanel(): void {
     }
   }
   if (planTierBadge) {
-    planTierBadge.textContent = plan.tier === "plus" ? "Plus" : "Free";
+    planTierBadge.textContent = getPlanTierLabel(plan.tier);
     planTierBadge.classList.toggle("is-plus", plan.tier === "plus");
+  }
+  if (planArchiveLabel) {
+    planArchiveLabel.textContent = uiText("저장된 글", "Saved posts", {
+      ja: "保存した投稿",
+      "pt-BR": "Posts salvos",
+      es: "Publicaciones guardadas",
+      "zh-TW": "已保存貼文",
+      vi: "Bài đã lưu"
+    });
   }
   if (planArchiveUsage) {
     planArchiveUsage.textContent = `${plan.archiveCount} / ${plan.archiveLimit}`;
+  }
+  if (planFolderLabel) {
+    planFolderLabel.textContent = uiText("폴더", "Folders", {
+      ja: "フォルダ",
+      "pt-BR": "Pastas",
+      es: "Carpetas",
+      "zh-TW": "資料夾",
+      vi: "Thư mục"
+    });
   }
   if (planFolderUsage) {
     planFolderUsage.textContent = `${folderCount} / ${plan.folderLimit}`;
@@ -1093,20 +1425,20 @@ function renderPlanPanel(): void {
     } else if (plan.plusStatus === "active") {
       statusText = plan.plusExpiresAt
         ? uiText(
-            "Plus 활성화됨. 만료일: {date}. 같은 키를 extension에도 사용할 수 있습니다.",
-            "Plus is active. Expires on {date}. The same key also works in the extension.",
+            "Plus 연결됨. 만료일: {date}. 같은 키를 extension에도 사용할 수 있습니다.",
+            "Plus is connected. Expires on {date}. The same key also works in the extension.",
             {
-              ja: "Plus が有効です。有効期限: {date}。同じキーを extension でも使えます。",
-              "pt-BR": "O Plus está ativo. Expira em {date}. A mesma chave também funciona na extensão.",
-              es: "Plus está activo. Vence el {date}. La misma clave también funciona en la extensión.",
-              "zh-TW": "Plus 已啟用。到期日：{date}。同一組金鑰也可在擴充功能中使用。",
-              vi: "Plus đang hoạt động. Hết hạn vào {date}. Cùng một khóa cũng dùng được trong tiện ích mở rộng."
+              ja: "Plus が接続されています。有効期限: {date}。同じキーを extension でも使えます。",
+              "pt-BR": "O Plus está conectado. Expira em {date}. A mesma chave também funciona na extensão.",
+              es: "Plus está conectado. Vence el {date}. La misma clave también funciona en la extensión.",
+              "zh-TW": "Plus 已連線。到期日：{date}。同一組金鑰也可在擴充功能中使用。",
+              vi: "Plus đã được kết nối. Hết hạn vào {date}. Cùng một khóa cũng dùng được trong tiện ích mở rộng."
             },
             { date: formatDate(plan.plusExpiresAt) }
           )
         : uiText(
-            "Plus 활성화됨. 같은 키를 extension에도 사용할 수 있습니다.",
-            "Plus is active. The same key also works in the extension."
+            "Plus 연결됨. 같은 키를 extension에도 사용할 수 있습니다.",
+            "Plus is connected. The same key also works in the extension."
           );
     } else if (plan.plusStatus === "expired") {
       statusText = uiText(
@@ -1245,13 +1577,23 @@ function applyStaticTranslations(): void {
   brandLink?.setAttribute("aria-label", t("scrapbookHomeAriaLabel"));
   localeSelect?.setAttribute("aria-label", t("scrapbookLocaleLabel"));
   workspaceTabs?.setAttribute("aria-label", t("scrapbookWorkspaceAriaLabel"));
+  archivesSelectAll?.setAttribute(
+    "aria-label",
+    uiText("전체 선택", "Select all", {
+      ja: "すべて選択",
+      "pt-BR": "Selecionar tudo",
+      es: "Seleccionar todo",
+      "zh-TW": "全部選取",
+      vi: "Chọn tất cả"
+    })
+  );
 
   applyTranslations(msg);
   if (archivesMoveSelected) {
-    archivesMoveSelected.textContent = uiText("폴더 이동", "Move to folder");
+    archivesMoveSelected.textContent = uiText("이동", "Move");
   }
   if (archivesDeleteSelected) {
-    archivesDeleteSelected.textContent = uiText("선택 삭제", "Delete selected");
+    archivesDeleteSelected.textContent = uiText("삭제", "Delete");
   }
 
   setLocalizedHtml(
@@ -1371,6 +1713,16 @@ function formatCompactNumber(value: number | null): string {
   }).format(value);
 }
 
+function formatPlainNumber(value: number | null): string {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return t("scrapbookNumberNone");
+  }
+
+  return new Intl.NumberFormat(currentLocale, {
+    maximumFractionDigits: 0
+  }).format(value);
+}
+
 function formatDelta(value: number | null): string {
   if (typeof value !== "number" || !Number.isFinite(value)) {
     return t("scrapbookNoChange");
@@ -1396,6 +1748,36 @@ function setMetricValue(valueEl: HTMLElement | null, deltaEl: HTMLElement | null
   deltaEl.classList.toggle("metric-negative", typeof metric.delta === "number" && metric.delta < 0);
 }
 
+function getPendingConnectStatusMessage(): string {
+  return uiText("Threads 로그인 응답을 확인하는 중입니다...", "Confirming your Threads sign-in...", {
+    ja: "Threads ログインの応答を確認しています...",
+    "pt-BR": "Confirmando a resposta do login do Threads...",
+    es: "Confirmando la respuesta del inicio de sesión de Threads...",
+    "zh-TW": "正在確認 Threads 登入回應...",
+    vi: "Đang xác nhận phản hồi đăng nhập Threads..."
+  });
+}
+
+function getPendingConnectButtonLabel(): string {
+  return uiText("로그인 확인 중...", "Confirming sign-in...", {
+    ja: "ログインを確認中...",
+    "pt-BR": "Confirmando login...",
+    es: "Confirmando acceso...",
+    "zh-TW": "正在確認登入...",
+    vi: "Đang xác nhận đăng nhập..."
+  });
+}
+
+function getDisconnectPlusLabel(): string {
+  return uiText("키 연결 해제", "Disconnect Plus", {
+    ja: "Plus 接続を解除",
+    "pt-BR": "Desconectar Plus",
+    es: "Desconectar Plus",
+    "zh-TW": "解除 Plus 連線",
+    vi: "Ngắt kết nối Plus"
+  });
+}
+
 function setStatus(message: string, isError = false): void {
   if (!pageStatus) {
     return;
@@ -1405,12 +1787,23 @@ function setStatus(message: string, isError = false): void {
     pageStatus.textContent = "";
     pageStatus.classList.add("hidden");
     pageStatus.classList.remove("is-error");
+    pageStatus.classList.remove("is-loading");
+    pageStatus.removeAttribute("aria-live");
+    pageStatus.removeAttribute("role");
     return;
   }
 
   pageStatus.textContent = message;
   pageStatus.classList.remove("hidden");
   pageStatus.classList.toggle("is-error", isError);
+  pageStatus.classList.remove("is-loading");
+  pageStatus.setAttribute("aria-live", isError ? "assertive" : "polite");
+  pageStatus.setAttribute("role", isError ? "alert" : "status");
+}
+
+function setLoadingStatus(message: string): void {
+  setStatus(message, false);
+  pageStatus?.classList.add("is-loading");
 }
 
 function resolvePendingConnectedStatus(state: BotSessionState | null): void {
@@ -1420,7 +1813,7 @@ function resolvePendingConnectedStatus(state: BotSessionState | null): void {
 
   if (state?.authenticated && state.user) {
     pendingConnectedStatus = false;
-    setStatus(t("scrapbookStatusConnected"));
+    setStatus("");
   }
 }
 
@@ -1449,273 +1842,51 @@ function setElementText(element: HTMLElement | null, value: string): void {
   }
 }
 
-function getSaveStatusStateLabel(saveStatus: BotSaveStatusView | null): string {
-  if (!saveStatus) {
-    return uiText("불러오는 중", "Loading");
-  }
-
-  switch (saveStatus.currentState) {
-    case "queued":
-      return uiText("저장 대기", "Queued");
-    case "processing":
-      return uiText("처리 중", "Processing");
-    case "completed":
-      return saveStatus.completionSource === "archive_inferred"
-        ? uiText("반영 추정", "Likely reflected")
-        : uiText("반영 완료", "Saved");
-    case "failed":
-      return uiText("확인 필요", "Needs review");
-    default:
-      return uiText("새 요청 대기", "Waiting");
-  }
-}
-
-function getSaveStatusCompletionBasis(saveStatus: BotSaveStatusView | null): string {
-  if (!saveStatus || saveStatus.currentState !== "completed") {
-    return "";
-  }
-
-  if (saveStatus.completionSource === "job") {
-    return uiText(
-      "가장 최근 mention job이 완료로 기록됐습니다.",
-      "The latest mention job was recorded as completed."
-    );
-  }
-
-  if (saveStatus.completionSource === "archive_inferred") {
-    return uiText(
-      "최근 archive 반영 시각이 마지막 mention 요청보다 늦어서 반영된 것으로 추정합니다.",
-      "A newer archive save time than the latest mention request suggests it has likely been reflected."
-    );
-  }
-
-  return "";
-}
-
-function getSaveStatusFailureReason(saveStatus: BotSaveStatusView | null): string {
-  if (!saveStatus) {
-    return "";
-  }
-
-  if (saveStatus.latestJobError?.trim()) {
-    return saveStatus.latestJobError;
-  }
-
-  switch (saveStatus.latestJobStatus) {
-    case "unmatched":
-      return uiText(
-        "멘션 댓글을 작성한 Threads 계정이 현재 연결된 scrapbook 계정과 일치하지 않았습니다.",
-        "The reply author did not match the Threads account connected to this scrapbook."
-      );
-    case "invalid":
-      return uiText(
-        "멘션 요청을 유효한 저장 요청으로 해석하지 못했습니다.",
-        "The mention could not be parsed as a valid save request."
-      );
-    default:
-      return saveStatus.collectorError?.trim() ?? "";
-  }
-}
-
-function getSaveStatusGuidance(saveStatus: BotSaveStatusView | null): string {
-  if (!saveStatus || saveStatus.currentState !== "failed") {
-    return "";
-  }
-
-  switch (saveStatus.latestJobStatus) {
-    case "unmatched":
-      return uiText(
-        "저장 요청 댓글을 작성한 계정과 이 scrapbook에 로그인한 계정이 같은지 확인하세요.",
-        "Check that the reply was written from the same account that is signed in to this scrapbook."
-      );
-    case "invalid":
-      return uiText(
-        "저장할 글에 새 댓글로 @{handle}만 멘션해 다시 시도하세요.",
-        "Try again by posting a fresh reply that only mentions @{handle}.",
-        {
-          ja: "保存したい投稿に新しい返信で @{handle} だけをメンションして、もう一度試してください。",
-          "pt-BR": "Tente de novo publicando uma nova resposta que mencione apenas @{handle}.",
-          es: "Inténtalo de nuevo publicando una respuesta nueva que solo mencione a @{handle}.",
-          "zh-TW": "請在要保存的貼文下以新回覆只提及 @{handle}，然後再試一次。",
-          vi: "Hãy thử lại bằng cách đăng một phản hồi mới chỉ nhắc tới @{handle}."
-        },
-        { handle: getCurrentBotHandle() }
-      );
-    default:
-      return uiText(
-        "잠시 후 자동 재시도가 잡혀 있을 수 있습니다. 지금 다시 확인 버튼으로 즉시 반영도 시도할 수 있습니다.",
-        "An automatic retry may already be queued. You can also use Check now to force another fetch."
-      );
-  }
-}
-
-function getSaveStatusEta(saveStatus: BotSaveStatusView | null): string {
-  if (!saveStatus) {
-    return t("scrapbookDateNone");
-  }
-
-  if (saveStatus.expectedVisibleAt) {
-    return formatDate(saveStatus.expectedVisibleAt);
-  }
-
-  if (saveStatus.currentState === "completed") {
-    return saveStatus.completionSource === "archive_inferred"
-      ? uiText("최근 저장 기준", "Based on recent save")
-      : uiText("이미 반영됨", "Already reflected");
-  }
-
-  if (saveStatus.pollIntervalMs > 0) {
-    const seconds = Math.max(1, Math.round(saveStatus.pollIntervalMs / 1000));
-    return uiText(
-      "멘션 후 약 {seconds}초",
-      "About {seconds}s after mention",
-      {
-        ja: "メンション後およそ {seconds} 秒",
-        "pt-BR": "Cerca de {seconds}s após a menção",
-        es: "Aproximadamente {seconds}s después de la mención",
-        "zh-TW": "提及後約 {seconds} 秒",
-        vi: "Khoảng {seconds} giây sau khi nhắc tới"
-      },
-      { seconds }
-    );
-  }
-
-  return t("scrapbookDateNone");
-}
-
-function getSaveStatusSummary(saveStatus: BotSaveStatusView | null): string {
-  if (!saveStatus) {
-    return uiText("저장 상태를 아직 불러오지 못했습니다.", "Save status has not loaded yet.");
-  }
-
-  switch (saveStatus.currentState) {
-    case "queued":
-      return uiText(
-        "최근 멘션 저장 요청이 대기열에 들어왔습니다. 보통 다음 수집 주기 안에 inbox에 반영됩니다.",
-        "The latest mention save request is queued. It usually appears in the inbox within the next collection cycle."
-      );
-    case "processing":
-      return uiText(
-        "최근 멘션 저장 요청을 처리 중입니다. 수집 완료 직후 inbox에 반영됩니다.",
-        "The latest mention save request is being processed and should appear right after the next completed fetch."
-      );
-    case "completed":
-      return saveStatus.completionSource === "archive_inferred"
-        ? uiText(
-            "가장 최근 멘션 저장 요청은 최근 저장 시각 기준으로 반영된 것으로 보입니다. 아래에서 최근 멘션과 반영 시각을 다시 확인해 주세요.",
-            "The latest mention save request looks reflected based on the recent save time. Review the latest mention and save timing below."
-          )
-        : uiText(
-            "가장 최근 멘션 저장 요청이 반영되었습니다. 필요하면 아래에서 최근 멘션과 반영 시각을 다시 확인할 수 있습니다.",
-            "The latest mention save request has been reflected. You can review the latest mention and save timing below."
-          );
-    case "failed":
-      return uiText(
-        "가장 최근 멘션 저장 요청이 자동 반영되지 않았습니다. 실패 이유를 확인한 뒤 즉시 다시 확인할 수 있습니다.",
-        "The latest mention save request did not reflect automatically. Review the failure reason and check again right away."
-      );
-    default:
-      return uiText(
-        "새 멘션 저장 요청을 기다리는 중입니다. 요청이 들어오면 보통 다음 수집 주기 안에 inbox에 반영됩니다.",
-        "Waiting for a new mention save request. Once it arrives, it usually reaches the inbox within the next collection cycle."
-      );
-  }
-}
-
 function renderSaveStatus(state: BotSessionState | null): void {
   const isAuthenticated = Boolean(state?.authenticated && state.user);
+  const plan = getCurrentPlanState();
+  const folderCount = loadFolders().length;
   saveStatusPanel?.classList.toggle("hidden", !isAuthenticated);
+
+  if (sessionPlanClear) {
+    sessionPlanClear.textContent = getDisconnectPlusLabel();
+    sessionPlanClear.classList.toggle("hidden", !(isAuthenticated && plan.tier === "plus" && plan.plusStatus === "active"));
+    sessionPlanClear.disabled = !isAuthenticated;
+  }
+
+  if (topbarPlanBadge) {
+    const showPlus = isAuthenticated && plan.tier === "plus";
+    topbarPlanBadge.textContent = showPlus ? getPlanTierLabel("plus") : "";
+    topbarPlanBadge.classList.toggle("hidden", !showPlus);
+  }
 
   if (!isAuthenticated) {
     return;
   }
 
   const saveStatus = state?.saveStatus ?? null;
-  setElementText(saveStatusEyebrow, uiText("저장 상태", "Save status"));
-  setElementText(saveStatusTitle, uiText("댓글 저장 상태", "Reply save status"));
-  setElementText(saveStatusSummary, getSaveStatusSummary(saveStatus));
-  setElementText(saveStatusCurrentLabel, uiText("현재 상태", "Current state"));
-  setElementText(saveStatusCurrentValue, getSaveStatusStateLabel(saveStatus));
-  setElementText(saveStatusLastLabel, uiText("마지막 수집", "Last collection"));
-  setElementText(saveStatusLastValue, saveStatus?.lastCollectedAt ? formatDate(saveStatus.lastCollectedAt) : t("scrapbookDateNone"));
-  setElementText(saveStatusEtaLabel, uiText("예상 반영", "Expected reflection"));
-  setElementText(saveStatusEtaValue, getSaveStatusEta(saveStatus));
-
-  if (saveStatusRefresh) {
-    saveStatusRefresh.disabled = isRefreshingSaveStatus;
-    saveStatusRefresh.textContent = isRefreshingSaveStatus
-      ? uiText("새 댓글 확인 중...", "Checking replies...")
-      : uiText("새 댓글 확인", "Check replies");
+  setElementText(saveStatusEyebrow, uiText("댓글 저장", "Reply saves"));
+  setElementText(
+    saveStatusLastLabel,
+    uiText("업데이트", "Updated", {
+      ja: "更新",
+      "pt-BR": "Atualizado",
+      es: "Actualizado",
+      "zh-TW": "更新",
+      vi: "Cập nhật"
+    })
+  );
+  setElementText(
+    saveStatusLastValue,
+    saveStatus ? (saveStatus.latestSavedAt ? formatDate(saveStatus.latestSavedAt) : t("scrapbookDateNone")) : uiText("불러오는 중", "Loading")
+  );
+  saveStatusPlan?.classList.remove("hidden");
+  setElementText(saveStatusPlanSummary, buildPlanUsageSummary(plan, folderCount));
+  if (saveStatusPlanClear) {
+    saveStatusPlanClear.textContent = getDisconnectPlusLabel();
+    saveStatusPlanClear.classList.toggle("hidden", !(plan.tier === "plus" && plan.plusStatus === "active"));
+    saveStatusPlanClear.disabled = !isAuthenticated;
   }
-
-  if (!saveStatusDetail) {
-    return;
-  }
-
-  const failureReason = getSaveStatusFailureReason(saveStatus);
-  const guidance = getSaveStatusGuidance(saveStatus);
-  const completionBasis = getSaveStatusCompletionBasis(saveStatus);
-  const rows: string[] = [];
-
-  if (saveStatus?.latestMentionCreatedAt) {
-    rows.push(
-      `<div class="save-status-detail-row"><strong>${escapeHtml(uiText("최근 저장 요청", "Latest request"))}</strong><span>${escapeHtml(formatDate(saveStatus.latestMentionCreatedAt))}</span></div>`
-    );
-  }
-
-  if (saveStatus?.latestSavedAt) {
-    rows.push(
-      `<div class="save-status-detail-row"><strong>${escapeHtml(uiText("마지막 반영 시각", "Last reflected"))}</strong><span>${escapeHtml(formatDate(saveStatus.latestSavedAt))}</span></div>`
-    );
-  }
-
-  if (completionBasis) {
-    rows.push(
-      `<div class="save-status-detail-row"><strong>${escapeHtml(uiText("완료 판정 근거", "Completion basis"))}</strong><span>${escapeHtml(completionBasis)}</span></div>`
-    );
-  }
-
-  if (failureReason) {
-    rows.push(
-      `<div class="save-status-detail-row"><strong>${escapeHtml(uiText("실패 이유", "Failure reason"))}</strong><span>${escapeHtml(failureReason)}</span></div>`
-    );
-  }
-
-  if (saveStatus?.retryAvailableAt) {
-    rows.push(
-      `<div class="save-status-detail-row"><strong>${escapeHtml(uiText("다음 자동 재시도", "Next automatic retry"))}</strong><span>${escapeHtml(formatDate(saveStatus.retryAvailableAt))}</span></div>`
-    );
-  }
-
-  if (guidance) {
-    rows.push(
-      `<div class="save-status-detail-row"><strong>${escapeHtml(uiText("재시도 안내", "Retry guidance"))}</strong><span>${escapeHtml(guidance)}</span></div>`
-    );
-  }
-
-  if (rows.length === 0) {
-    rows.push(
-      `<div class="save-status-detail-row"><strong>${escapeHtml(uiText("현재 메모", "Current note"))}</strong><span>${escapeHtml(
-        uiText(
-          "아직 최근 멘션 요청 기록이 없습니다. 새 저장 요청이 들어오면 여기에서 대기와 반영 상태를 확인할 수 있습니다.",
-          "There is no recent mention request yet. Once a new save request arrives, its queue and reflection status will appear here."
-        )
-      )}</span></div>`
-    );
-  }
-
-  const actions: string[] = [];
-  if (saveStatus?.latestMentionUrl) {
-    actions.push(
-      `<a class="topbar-link" href="${escapeHtml(saveStatus.latestMentionUrl)}" target="_blank" rel="noreferrer">${escapeHtml(
-        uiText("최근 멘션 보기", "Open latest mention")
-      )}</a>`
-    );
-  }
-
-  saveStatusDetail.innerHTML =
-    rows.join("") +
-    (actions.length > 0 ? `<div class="save-status-actions">${actions.join("")}</div>` : "");
 }
 
 function setSessionMenuOpen(open: boolean): void {
@@ -1724,6 +1895,67 @@ function setSessionMenuOpen(open: boolean): void {
   sessionPanel?.classList.toggle("is-open", shouldOpen);
   sessionMenu?.classList.toggle("hidden", !shouldOpen);
   sessionTrigger?.setAttribute("aria-expanded", String(shouldOpen));
+}
+
+function isWorkspaceMobileLayout(): boolean {
+  return window.matchMedia("(max-width: 720px)").matches;
+}
+
+function isWorkspaceAuthenticated(): boolean {
+  return Boolean(latestState?.authenticated && latestState.user);
+}
+
+function setWorkspaceTabsOpen(open: boolean): void {
+  if (!workspaceTabs || !workspaceTabTrigger || !workspaceTabOverlay) {
+    return;
+  }
+
+  if (isWorkspaceMobileLayout()) {
+    workspaceTabs.classList.remove("hidden");
+    workspaceTabs.classList.remove("is-open");
+    workspaceTabOverlay.classList.add("hidden");
+    workspaceTabTrigger.setAttribute("aria-expanded", "true");
+    workspaceTabTrigger.setAttribute("aria-label", t("scrapbookWorkspaceAriaLabel"));
+    return;
+  }
+
+  const shouldOpen = open && isWorkspaceMobileLayout() && isWorkspaceAuthenticated();
+  workspaceTabs.classList.toggle("is-open", shouldOpen);
+  workspaceTabs.classList.toggle("hidden", !shouldOpen);
+  workspaceTabOverlay.classList.toggle("hidden", !shouldOpen);
+  workspaceTabTrigger.setAttribute("aria-expanded", String(shouldOpen));
+  workspaceTabTrigger.setAttribute("aria-label", t("scrapbookWorkspaceAriaLabel"));
+}
+
+function syncWorkspaceTabsVisibility(isAuthenticated: boolean): void {
+  if (!workspaceTabs || !workspaceTabTrigger || !workspaceTabOverlay) {
+    return;
+  }
+
+  workspaceTabTrigger.classList.toggle("hidden", !isAuthenticated);
+  if (workspaceTabCurrent) {
+    const activeTabLabel = Array.from(workspaceTabButtons).find((button) =>
+      button.classList.contains("is-active")
+    )?.textContent;
+    if (activeTabLabel) {
+      workspaceTabCurrent.textContent = activeTabLabel;
+    }
+  }
+
+  if (isAuthenticated && isWorkspaceMobileLayout()) {
+    workspaceTabs.classList.remove("is-open");
+    workspaceTabs.classList.remove("hidden");
+    workspaceTabOverlay.classList.add("hidden");
+    workspaceTabTrigger.setAttribute("aria-expanded", "true");
+    workspaceTabTrigger.setAttribute("aria-label", t("scrapbookWorkspaceAriaLabel"));
+    return;
+  }
+
+  workspaceTabs.classList.toggle("hidden", !isAuthenticated);
+  workspaceTabs.classList.remove("is-open");
+  workspaceTabOverlay.classList.add("hidden");
+  workspaceTabTrigger.setAttribute("aria-expanded", "false");
+  workspaceTabTrigger.setAttribute("aria-label", t("scrapbookWorkspaceAriaLabel"));
 }
 
 function setConnectButtonsEnabled(enabled: boolean): void {
@@ -1745,13 +1977,19 @@ function renderMobileOauthNotice(): void {
 
 function renderConnectButtons(): void {
   const isAuthenticated = Boolean(latestState?.authenticated && latestState.user);
-  const disabled = connectButtonsBusy || !connectButtonsAvailable;
+  const isLoading = connectButtonsBusy || pendingConnectedStatus;
+  const disabled = isLoading || !connectButtonsAvailable;
   for (const button of connectButtons) {
     button.classList.toggle("hidden", isAuthenticated);
     button.disabled = disabled;
     button.setAttribute("aria-disabled", String(disabled));
-    button.setAttribute("aria-busy", String(connectButtonsBusy));
-    button.textContent = connectButtonsBusy ? t("scrapbookConnectBusy") : t("scrapbookConnectButton");
+    button.setAttribute("aria-busy", String(isLoading));
+    button.classList.toggle("is-loading", isLoading);
+    button.textContent = pendingConnectedStatus
+      ? getPendingConnectButtonLabel()
+      : connectButtonsBusy
+        ? t("scrapbookConnectBusy")
+        : t("scrapbookConnectButton");
     button.title = "";
   }
   renderMobileOauthNotice();
@@ -1767,18 +2005,12 @@ function setConnectButtonsIdle(): void {
   renderConnectButtons();
 }
 
-function extractArchiveTitleExcerpt(text: string, maxChars = 30): string {
-  const normalized = text.replace(/\s+/g, " ").trim();
-  if (!normalized) {
-    return "";
-  }
-
-  const firstSentence = normalized.split(/(?<=[.!?。！？])\s+|\n+/u, 1)[0]?.trim() ?? normalized;
-  return Array.from(firstSentence).slice(0, maxChars).join("").trim();
+function extractArchiveTitleExcerpt(text: string, author: string | null, maxChars = 30): string {
+  return extractTitleExcerpt(text, author, maxChars);
 }
 
 function buildArchiveTitle(item: BotArchiveView): string {
-  const excerpt = extractArchiveTitleExcerpt(item.targetText, 30);
+  const excerpt = extractArchiveTitleExcerpt(item.targetText, item.targetAuthorHandle, 30);
   if (excerpt) {
     return excerpt;
   }
@@ -1788,26 +2020,142 @@ function buildArchiveTitle(item: BotArchiveView): string {
   return t("scrapbookArchiveFallbackSavedItem");
 }
 
+function normalizeArchiveHandle(value: string | null | undefined): string {
+  return (value ?? "").trim().replace(/^@+/, "").toLowerCase();
+}
+
 function buildArchiveAuthorMeta(item: BotArchiveView): string {
+  const displayHandle = normalizeArchiveHandle(item.targetAuthorHandle);
   const displayName = item.targetAuthorDisplayName?.trim() ?? "";
-  const handle = item.targetAuthorHandle?.trim().replace(/^@+/, "") ?? "";
-  if (!displayName && !handle) {
+  if (!displayName && !displayHandle) {
     return "";
   }
 
   if (!displayName) {
-    return `@${handle}`;
+    return `@${displayHandle}`;
   }
 
-  if (!handle || displayName.toLowerCase() === handle.toLowerCase()) {
+  if (!displayHandle || displayName.toLowerCase() === displayHandle.toLowerCase()) {
     return displayName;
   }
 
-  return `${displayName} · @${handle}`;
+  return `${displayName} · @${displayHandle}`;
+}
+
+function buildArchiveRowMeta(item: BotArchiveView): string {
+  const metaParts: string[] = [];
+  const authorMeta = buildArchiveAuthorMeta(item);
+  if (authorMeta) {
+    metaParts.push(authorMeta);
+  }
+
+  const tagsLabel = buildArchiveTagsLabel(item);
+  if (tagsLabel) {
+    metaParts.push(tagsLabel);
+  }
+
+  return metaParts.join(" · ");
+}
+
+const ARCHIVE_PARSE_NOISE_PATTERNS: RegExp[] = [
+  /log in or sign up for threads/i,
+  /log in to continue/i,
+  /sign in to continue/i,
+  /continue with instagram/i,
+  /threads terms?/i,
+  /privacy policy/i,
+  /cookie policy/i,
+  /report a problem/i,
+  /로그인하여 더 많은 답글을 확인해보세요/u,
+  /Threads에 로그인 또는 가입하기/u,
+  /Threads에 가입하여 .*$/u,
+  /Threads에 가입해 .*$/u,
+  /Threads 약관/u,
+  /개인정보처리방침/u,
+  /쿠키 정책/u,
+  /문제 신고/u
+];
+
+function isLikelyArchiveParseIssue(item: BotArchiveView): boolean {
+  const haystack = [item.targetText, item.markdownContent, item.noteText ?? ""].join("\n");
+  return ARCHIVE_PARSE_NOISE_PATTERNS.some((pattern) => pattern.test(haystack));
 }
 
 function buildArchiveTagsLabel(item: BotArchiveView): string {
   return item.tags.map((tag) => `#${tag}`).join(" ");
+}
+
+function isArchiveCompactLayout(): boolean {
+  return window.matchMedia("(max-width: 720px)").matches;
+}
+
+function syncArchiveSortControls(): void {
+  archivesSortHeader?.setAttribute("aria-sort", archiveSortOrder === "asc" ? "ascending" : "descending");
+  archivesSortToggle?.setAttribute("aria-pressed", String(archiveSortOrder === "asc"));
+  if (archivesSortArrow) {
+    archivesSortArrow.textContent = archiveSortOrder === "asc" ? "↑" : "↓";
+  }
+}
+
+function sortArchivesByDate(items: BotArchiveView[]): BotArchiveView[] {
+  const direction = archiveSortOrder === "asc" ? 1 : -1;
+  return [...items].sort((left, right) => {
+    const leftArchived = Date.parse(left.archivedAt) || 0;
+    const rightArchived = Date.parse(right.archivedAt) || 0;
+    if (leftArchived !== rightArchived) {
+      return (leftArchived - rightArchived) * direction;
+    }
+
+    const leftUpdated = Date.parse(left.updatedAt) || 0;
+    const rightUpdated = Date.parse(right.updatedAt) || 0;
+    if (leftUpdated !== rightUpdated) {
+      return (leftUpdated - rightUpdated) * direction;
+    }
+
+    return left.id.localeCompare(right.id) * direction;
+  });
+}
+
+function toggleArchiveSortOrder(): void {
+  archiveSortOrder = archiveSortOrder === "asc" ? "desc" : "asc";
+  archivesPage = 1;
+  syncArchiveSortControls();
+  if (latestState) {
+    renderArchives(latestState.archives, latestState.authenticated && Boolean(latestState.user));
+  }
+}
+
+function syncArchiveFilterControls(): void {
+  const compact = isArchiveCompactLayout();
+  const searchOpen = !compact || archivesSearchExpanded;
+  const tagOpen = !compact || archivesTagExpanded;
+  const hasTagContent = Boolean(archivesTagPanel?.innerHTML.trim());
+
+  archivesFilterBar?.classList.toggle("is-search-open", compact && searchOpen);
+  archivesFilterBar?.classList.toggle("is-tag-open", compact && tagOpen);
+
+  if (archivesSearchToggle) {
+    archivesSearchToggle.classList.toggle("hidden", !compact);
+    archivesSearchToggle.classList.toggle("is-active", Boolean(archiveSearchQuery.trim()) || (compact && archivesSearchExpanded));
+    archivesSearchToggle.setAttribute("aria-expanded", String(searchOpen));
+  }
+
+  if (archivesSearchWrap) {
+    archivesSearchWrap.classList.toggle("hidden", compact && !searchOpen);
+    archivesSearchWrap.classList.toggle("is-open", searchOpen);
+  }
+
+  if (archivesTagToggle) {
+    archivesTagToggle.classList.toggle("hidden", !compact);
+    archivesTagToggle.classList.toggle("is-active", Boolean(activeArchiveTag));
+    archivesTagToggle.textContent = uiText("#태그", "#Tags");
+    archivesTagToggle.setAttribute("aria-expanded", String(tagOpen));
+  }
+
+  if (archivesTagPanel) {
+    archivesTagPanel.classList.toggle("hidden", !hasTagContent || (compact && !tagOpen));
+    archivesTagPanel.classList.toggle("is-open", tagOpen);
+  }
 }
 
 function normalizeArchiveSearchValue(value: string): string {
@@ -1844,10 +2192,6 @@ function buildArchiveSearchText(item: BotArchiveView, activeBotHandle: string): 
 
 function hasActiveArchiveFilters(): boolean {
   return Boolean(archiveSearchQuery.trim() || activeArchiveTag || activeFolderId);
-}
-
-function finishInitialBoot(): void {
-  document.body.classList.remove("page-booting");
 }
 
 function filterArchivesByFolder(items: BotArchiveView[]): BotArchiveView[] {
@@ -1930,34 +2274,15 @@ function renderArchiveTagPanel(items: BotArchiveView[], isAuthenticated: boolean
   if (tags.length === 0) {
     archivesTagPanel.innerHTML = "";
     archivesTagPanel.classList.add("hidden");
+    archivesTagExpanded = false;
+    syncArchiveFilterControls();
     return;
   }
 
-  const title = uiText("내 태그", "My tags");
-  const caption = activeArchiveTag
-    ? uiText(
-        "#{tag} 태그만 보는 중",
-        "Filtering by #{tag}",
-        {
-          ja: "#{tag} タグだけを表示中",
-          "pt-BR": "Filtrando por #{tag}",
-          es: "Filtrando por #{tag}",
-          "zh-TW": "目前只顯示 #{tag} 標籤",
-          vi: "Đang lọc theo #{tag}"
-        },
-        { tag: activeArchiveTag }
-      )
-    : uiText("눌러서 같은 태그 글만 다시 봅니다.", "Click a tag to filter the list.");
   const allLabel = uiText("전체", "All");
 
   archivesTagPanel.classList.remove("hidden");
   archivesTagPanel.innerHTML = `
-    <div class="archives-tag-head">
-      <div class="archives-tag-copy">
-        <strong class="archives-tag-title">${escapeHtml(title)}</strong>
-        <p class="archives-tag-caption">${escapeHtml(caption)}</p>
-      </div>
-    </div>
     <div class="archives-tag-strip">
       <button class="archive-tag-pill ${activeArchiveTag === null ? "is-active" : ""}" type="button" data-tag-filter="" aria-pressed="${String(activeArchiveTag === null)}">
         ${escapeHtml(allLabel)}
@@ -1989,6 +2314,8 @@ function renderArchiveTagPanel(items: BotArchiveView[], isAuthenticated: boolean
       }
     });
   }
+
+  syncArchiveFilterControls();
 }
 
 function buildArchiveSelectionTitle(count: number, total: number): string {
@@ -2038,6 +2365,7 @@ function renderReplyBlocks(item: BotArchiveView, showMedia: boolean): string {
     return "";
   }
 
+  const total = item.authorReplies.length;
   return `
     <section class="archive-replies">
       <div class="archive-replies-head">
@@ -2047,9 +2375,10 @@ function renderReplyBlocks(item: BotArchiveView, showMedia: boolean): string {
         ${item.authorReplies
           .map(
             (reply, index) => `
+              ${index > 0 ? `<div class="archive-reply-divider" aria-hidden="true"></div>` : ""}
               <article class="archive-reply-card">
                 <div class="archive-reply-meta">
-                  <span class="archive-chip">${escapeHtml(t("scrapbookReplyLabel", { index: index + 1 }))}</span>
+                  <span class="archive-chip">${escapeHtml(t("scrapbookReplyLabel", { index: `${index + 1}/${total}` }))}</span>
                   <span class="archive-chip">@${escapeHtml(reply.author)}</span>
                   ${reply.publishedAt ? `<span class="archive-chip">${escapeHtml(formatDate(reply.publishedAt))}</span>` : ""}
                 </div>
@@ -2095,7 +2424,10 @@ function updateArchivesToolbar(items: BotArchiveView[], isAuthenticated: boolean
   }
 
   const hasItems = isAuthenticated && items.length > 0;
-  archivesToolbar.classList.toggle("hidden", !hasItems);
+  const selectedCount = hasItems ? items.filter((item) => selectedArchiveIds.has(item.id)).length : 0;
+  const showToolbar = hasItems && selectedCount > 0;
+  archivesToolbar.classList.toggle("hidden", !showToolbar);
+  archivesToolbarActions?.classList.toggle("hidden", !showToolbar);
   if (!hasItems) {
     archivesSelectAll.checked = false;
     archivesSelectAll.indeterminate = false;
@@ -2106,16 +2438,11 @@ function updateArchivesToolbar(items: BotArchiveView[], isAuthenticated: boolean
     return;
   }
 
-  const selectedCount = items.filter((item) => selectedArchiveIds.has(item.id)).length;
-  archivesToolbarMeta.textContent = buildArchiveSelectionTitle(selectedCount, items.length);
+  archivesToolbarMeta.textContent = "";
   archivesSelectAll.checked = selectedCount > 0 && selectedCount === items.length;
   archivesSelectAll.indeterminate = selectedCount > 0 && selectedCount < items.length;
   archivesExportAll.disabled = isExportingArchives || items.length === 0;
-  archivesExportAll.textContent = isExportingArchives
-    ? t("scrapbookExportPreparing")
-    : selectedCount > 0
-      ? t("scrapbookExportSelected")
-      : t("scrapbookExportAll");
+  archivesExportAll.textContent = isExportingArchives ? uiText("내보내는 중", "Exporting") : uiText("내보내기", "Export");
   if (archivesMoveSelected) archivesMoveSelected.disabled = selectedCount === 0;
   if (archivesDeleteSelected) archivesDeleteSelected.disabled = selectedCount === 0;
 }
@@ -2574,9 +2901,7 @@ function renderArchiveDetailHtml(item: BotArchiveView): string {
   const totalMediaCount = countArchiveMedia(item);
   const hasMedia = totalMediaCount > 0;
   const showMedia = expandedMediaArchiveIds.has(item.id);
-  const triggerLink = item.mentionUrl
-    ? `<a class="topbar-link archive-action-link" href="${escapeHtml(item.mentionUrl)}" target="_blank" rel="noreferrer">${escapeHtml(t("scrapbookTriggerView"))}</a>`
-    : "";
+  const hasParseIssue = isLikelyArchiveParseIssue(item);
 
   return `
     <div class="archive-detail-inline">
@@ -2591,6 +2916,19 @@ function renderArchiveDetailHtml(item: BotArchiveView): string {
       </div>
       <div class="archive-detail-body">${escapeHtml(item.targetText)}</div>
       ${
+        hasParseIssue
+          ? `<div class="archive-parse-warning"><strong>${escapeHtml(uiText("파싱 결과가 불안정할 수 있어요.", "This item may have been parsed poorly."))}</strong><span>${escapeHtml(uiText("원문추적과 원문보기를 눌러 원본을 확인하세요.", "Use trace source and view original to inspect the source."))}</span></div>`
+          : ""
+      }
+      <div class="archive-detail-links">
+        ${
+          item.mentionUrl
+            ? `<a class="secondary-cta" href="${escapeHtml(item.mentionUrl)}" target="_blank" rel="noreferrer">${escapeHtml(uiText("원문추적", "Trace source"))}</a>`
+            : ""
+        }
+        <a class="secondary-cta" href="${escapeHtml(item.targetUrl)}" target="_blank" rel="noreferrer">${escapeHtml(uiText("원문보기", "View original"))}</a>
+      </div>
+      ${
         hasMedia
           ? `<button class="secondary-cta archive-media-toggle" type="button" data-media-toggle="${item.id}">${escapeHtml(
               showMedia ? t("scrapbookImagesHide") : t("scrapbookImagesShow", { count: totalMediaCount })
@@ -2600,8 +2938,6 @@ function renderArchiveDetailHtml(item: BotArchiveView): string {
       ${hasMedia && showMedia && item.mediaUrls.length > 0 ? renderMediaPreviewUrls(item.mediaUrls) : ""}
       ${renderReplyBlocks(item, showMedia)}
       <div class="archive-actions">
-        <a class="secondary-cta archive-action-link" href="${escapeHtml(item.targetUrl)}" target="_blank" rel="noreferrer">${escapeHtml(t("scrapbookOpenOriginal"))}</a>
-        ${triggerLink}
         <button class="topbar-link archive-copy" type="button" data-copy="${item.id}">${escapeHtml(t("scrapbookCopyMarkdown"))}</button>
         <a class="topbar-link archive-action-link" href="/api/public/bot/archive/${encodeURIComponent(item.id)}.md">${escapeHtml(t("scrapbookDownloadMarkdown"))}</a>
         <button class="topbar-link archive-action-link" type="button" data-archive-delete="${item.id}">${escapeHtml(t("scrapbookDelete"))}</button>
@@ -2614,6 +2950,9 @@ function renderArchives(items: BotArchiveView[], isAuthenticated: boolean): void
   if (!archivesEl || !archivesEmptyEl || !archivesBoard) {
     return;
   }
+
+  syncArchiveSortControls();
+  syncArchiveFilterControls();
 
   if (!isAuthenticated || items.length === 0) {
     archivesEl.innerHTML = "";
@@ -2632,13 +2971,7 @@ function renderArchives(items: BotArchiveView[], isAuthenticated: boolean): void
   }
 
   archivesFilterBar?.classList.remove("hidden");
-  const ordered = [...items].sort((left, right) => {
-    const archivedDelta = Date.parse(right.archivedAt) - Date.parse(left.archivedAt);
-    if (archivedDelta !== 0) {
-      return archivedDelta;
-    }
-    return Date.parse(right.updatedAt) - Date.parse(left.updatedAt);
-  });
+  const ordered = sortArchivesByDate(items);
   renderFolderStrip(ordered);
   renderArchiveTagPanel(ordered, isAuthenticated);
 
@@ -2646,14 +2979,14 @@ function renderArchives(items: BotArchiveView[], isAuthenticated: boolean): void
 
   syncSelectedArchiveIds(filtered);
   if (!filtered.some((item) => item.id === activeArchiveId)) {
-    activeArchiveId = null; 
+    activeArchiveId = null;
   }
 
   archivesEmptyEl.classList.add("hidden");
   archivesBoard.classList.remove("hidden");
 
   if (filtered.length === 0) {
-    archivesEl.innerHTML = `<tr><td colspan="4" class="archive-no-results">${escapeHtml(t("scrapbookNoResults"))}</td></tr>`;
+    archivesEl.innerHTML = `<tr><td colspan="3" class="archive-no-results">${escapeHtml(t("scrapbookNoResults"))}</td></tr>`;
     archivesPaginationEl?.classList.add("hidden");
     updateArchivesToolbar(filtered, isAuthenticated);
     syncScrapbookHistory();
@@ -2674,10 +3007,9 @@ function renderArchives(items: BotArchiveView[], isAuthenticated: boolean): void
   for (const item of paginated) {
     const isSelected = selectedArchiveIds.has(item.id);
     const isActive = activeArchiveId === item.id;
-    const tagsLabel = buildArchiveTagsLabel(item);
-    const authorMeta = buildArchiveAuthorMeta(item);
+    const rowMeta = buildArchiveRowMeta(item);
     html += `
-        <tr class="${isActive ? "is-active" : ""}" data-open="${item.id}">
+        <tr class="${isActive ? "is-active" : ""}" data-open-row="${item.id}">
           <td class="archive-table-select">
             <label class="archive-row-checkbox">
               <input type="checkbox" data-select="${item.id}" ${isSelected ? "checked" : ""} />
@@ -2685,16 +3017,15 @@ function renderArchives(items: BotArchiveView[], isAuthenticated: boolean): void
           </td>
           <td>
             <div class="archive-row-main">
-              <button class="archive-row-title" type="button" data-open="${item.id}">${escapeHtml(buildArchiveTitle(item))}</button>
-              ${authorMeta ? `<div class="archive-row-meta">${escapeHtml(authorMeta)}</div>` : ""}
+              <button class="archive-row-title" type="button" data-open-trigger="${item.id}">${escapeHtml(buildArchiveTitle(item))}</button>
+              ${rowMeta ? `<div class="archive-row-meta">${escapeHtml(rowMeta)}</div>` : ""}
             </div>
           </td>
           <td class="archive-row-date">${escapeHtml(formatDate(item.archivedAt))}</td>
-          <td class="archive-row-tags">${escapeHtml(tagsLabel)}</td>
         </tr>
       `;
     if (isActive) {
-      html += `<tr class="archive-row-detail"><td colspan="4">${renderArchiveDetailHtml(item)}</td></tr>`;
+      html += `<tr class="archive-row-detail"><td colspan="3">${renderArchiveDetailHtml(item)}</td></tr>`;
     }
   }
 
@@ -2715,21 +3046,35 @@ function renderArchives(items: BotArchiveView[], isAuthenticated: boolean): void
     });
   }
 
-  for (const trigger of archivesEl.querySelectorAll<HTMLElement>("[data-open]")) {
-    trigger.addEventListener("click", (event) => {
-      const archiveId = trigger.dataset.open;
+  const toggleArchiveOpen = (archiveId: string): void => {
+    activeArchiveId = activeArchiveId === archiveId ? null : archiveId;
+    renderArchives(items, isAuthenticated);
+  };
+
+  for (const row of archivesEl.querySelectorAll<HTMLTableRowElement>("[data-open-row]")) {
+    row.addEventListener("click", (event) => {
+      const archiveId = row.dataset.openRow;
       if (!archiveId) {
         return;
       }
-      if (event.target instanceof HTMLInputElement) {
+      if (!(event.target instanceof HTMLElement)) {
         return;
       }
-      if (activeArchiveId === archiveId) {
-        activeArchiveId = null;
-      } else {
-        activeArchiveId = archiveId;
+      if (event.target.closest(".archive-row-checkbox")) {
+        return;
       }
-      renderArchives(items, isAuthenticated);
+      toggleArchiveOpen(archiveId);
+    });
+  }
+
+  for (const trigger of archivesEl.querySelectorAll<HTMLButtonElement>("[data-open-trigger]")) {
+    trigger.addEventListener("click", (event) => {
+      const archiveId = trigger.dataset.openTrigger;
+      if (!archiveId) {
+        return;
+      }
+      event.stopPropagation();
+      toggleArchiveOpen(archiveId);
     });
   }
 
@@ -2841,10 +3186,8 @@ function renderScopeStatus(state: ScrapbookPlusState | null): void {
   }
 
   if (!state.scopes.needsReconnect) {
-    scopeStatus.textContent = t("scrapbookScopeReady", {
-      scopes: state.scopes.grantedScopes.join(", ")
-    });
-    scopeStatus.classList.remove("hidden");
+    scopeStatus.textContent = "";
+    scopeStatus.classList.add("hidden");
     return;
   }
 
@@ -2857,11 +3200,26 @@ function renderScopeStatus(state: ScrapbookPlusState | null): void {
 
 function setActiveTab(tab: WorkspaceTab): void {
   activeTab = tab;
+  let selectedLabel = "";
+
   for (const button of workspaceTabButtons) {
-    button.classList.toggle("is-active", button.dataset.tab === tab);
+    const isActive = button.dataset.tab === tab;
+    button.classList.toggle("is-active", isActive);
+    button.setAttribute("aria-pressed", String(isActive));
+    if (isActive) {
+      selectedLabel = button.textContent?.trim() || "";
+    }
   }
   for (const panel of workspacePanels) {
     panel.classList.toggle("hidden", panel.dataset.tabPanel !== tab);
+  }
+
+  if (selectedLabel && workspaceTabCurrent) {
+    workspaceTabCurrent.textContent = selectedLabel;
+  }
+
+  if (isWorkspaceMobileLayout()) {
+    setWorkspaceTabsOpen(false);
   }
 }
 
@@ -2929,8 +3287,8 @@ function renderWatchlists(workspace: ScrapbookPlusState | null): void {
       watchlistsList,
       uiText("Plus가 필요합니다.", "Plus required."),
       uiText(
-        "watchlists는 Plus에서 열립니다. Plus 키를 연결하면 공개 계정 모니터링을 사용할 수 있습니다.",
-        "Watchlists unlock on Plus. Activate Plus to monitor public Threads accounts."
+        "공개 계정 모니터링은 Plus에서 열립니다. Plus를 연결하면 바로 사용할 수 있습니다.",
+        "Public account monitoring unlocks on Plus. Connect Plus to start using it."
       ),
       watchlistForm
     );
@@ -3119,6 +3477,327 @@ function renderSearches(workspace: ScrapbookPlusState | null): void {
   }
 }
 
+type InsightCardModel = {
+  title: string;
+  subtitle: string;
+  handle: string;
+  avatarUrl: string | null;
+  dateStr: string;
+  insightsData: GrowthInsightsData;
+  insightProps?: {
+    highlightId: string;
+    highlightParams: Record<string, string | number>;
+    localeAtSave: string;
+    tier: string;
+    score: number;
+  } | null;
+};
+
+function buildInsightsCardModelFromCurrent(workspace: ScrapbookPlusState | null): InsightCardModel | null {
+  if (!workspace?.authenticated || !workspace.insights.ready) {
+    return null;
+  }
+
+  const handle = latestState?.user?.threadsHandle || latestConfig?.botHandle || "unknown";
+  const avatarUrl = latestState?.user?.profilePictureUrl || null;
+
+  const insightsData: GrowthInsightsData = {
+    overview: workspace.insights.overview,
+    posts: workspace.insights.posts.map((p) => ({
+      metrics: {
+        views: p.metrics.views,
+        likes: p.metrics.likes,
+        replies: p.metrics.replies,
+        reposts: p.metrics.reposts
+      }
+    }))
+  };
+
+  return {
+    title: t("scrapbookInsightsTitle"),
+    subtitle: workspace.insights.refreshedAt
+      ? t("scrapbookInsightsRefreshedAt", { date: formatDate(workspace.insights.refreshedAt) })
+      : t("scrapbookInsightsNotLoadedYet"),
+    handle,
+    avatarUrl,
+    dateStr: formatDate(new Date().toISOString()),
+    insightsData
+  };
+}
+
+function buildInsightsCardModelFromSavedView(view: ScrapbookInsightsSavedView): InsightCardModel {
+  const handle = latestState?.user?.threadsHandle || latestConfig?.botHandle || "unknown";
+  const avatarUrl = latestState?.user?.profilePictureUrl || null;
+
+  const insightsData: GrowthInsightsData = {
+    overview: {
+      followers: { value: view.overview.followers },
+      views: { value: view.overview.views },
+      likes: { value: view.overview.likes },
+      replies: { value: view.overview.replies },
+      reposts: { value: view.overview.reposts }
+    },
+    posts: view.posts.map((p) => ({
+      metrics: {
+        views: { value: p.views },
+        likes: { value: p.likes },
+        replies: { value: null }, // Old saved views might not have these
+        reposts: { value: null }
+      }
+    }))
+  };
+
+  return {
+    title: view.name,
+    subtitle: t("scrapbookInsightsSavedAt", { date: formatDate(view.capturedAt || view.createdAt) }),
+    handle,
+    avatarUrl,
+    dateStr: formatDate(view.capturedAt || view.createdAt),
+    insightsData,
+    insightProps: view.insightProps
+  };
+}
+
+async function renderInsightsCardBlob(card: InsightCardModel): Promise<Blob> {
+  const calculatedScore = calculateGrowthScore(card.insightsData);
+  const score = card.insightProps?.score ?? calculatedScore.score;
+  const tier = card.insightProps?.tier ?? calculatedScore.tier;
+  const tierNameEn = card.insightProps ? card.insightProps.tier.replace(/-/g, " ") : calculatedScore.tierNameEn;
+
+  const medals = calculateMedals(card.insightsData);
+  const highlight = card.insightProps ? { id: card.insightProps.highlightId, params: card.insightProps.highlightParams } : selectHighlight(card.insightsData);
+
+  const container = document.createElement("div");
+  container.className = "growth-card-export";
+  container.style.position = "fixed";
+  container.style.left = "-9999px";
+  container.style.top = "0";
+
+  let highlightTitle = "";
+  let highlightCopy = "";
+  if (highlight.id === "top-post") {
+    highlightTitle = `역대 최고 히트수 기록`;
+    highlightCopy = `${formatCompactNumber(highlight.params.views as number)} 조회수와 ${formatCompactNumber(highlight.params.likes as number)} 반응을 끌어낸 최고의 글이 탄생했습니다.`;
+  } else if (highlight.id === "reply-magnet") {
+    highlightTitle = `폭발적인 대화의 중심`;
+    highlightCopy = `평소보다 ${highlight.params.multiplier}배 많은 답글을 연달아 이끌어낸 커뮤니티의 핵심입니다.`;
+  } else if (highlight.id === "reposted-post") {
+    highlightTitle = `영향력의 확산`;
+    highlightCopy = `내가 쓴 글이 계속 리포스트되며 조용하게 그러나 멀리 울려 퍼졌습니다.`;
+  } else if (highlight.id === "high-engage") {
+    highlightTitle = `미친 반응률, 마그넷 계정`;
+    highlightCopy = `조회수 대비 반응률이 ${highlight.params.rate}%에 달하는 극강의 인게이지먼트를 달성했습니다.`;
+  } else if (highlight.id === "silent-reach") {
+    highlightTitle = `소리없는 도약`;
+    highlightCopy = `조용히 그러나 묵직하게. 평균보다 3배 많은 유저 핏에 스며들었습니다.`;
+  } else {
+    highlightTitle = `조용한 성장의 씨앗`;
+    highlightCopy = `조용히 땅의 기운을 모으고 있습니다. 당신만의 색깔을 키워보세요.`;
+  }
+
+  container.innerHTML = `
+    <div class="gc-panel">
+      <div class="gc-header">
+        <div class="gc-user">
+          ${card.avatarUrl ? `<img src="${card.avatarUrl}" class="gc-user-avatar" crossorigin="anonymous" />` : '<div class="gc-user-avatar" style="background: rgba(255,255,255,0.1);"></div>'}
+          <div class="gc-user-info">
+            <span class="gc-user-name">${card.handle}</span>
+            <span class="gc-user-handle">@${card.handle}</span>
+          </div>
+        </div>
+        <div class="gc-brand">
+          <p class="gc-brand-name">SS<span class="gc-brand-accent">THREADS</span></p>
+          <p class="gc-brand-date">${card.dateStr}</p>
+        </div>
+      </div>
+      
+      <div class="gc-hero">
+        <h1 class="gc-highlight-title">${highlightTitle}</h1>
+        <p class="gc-highlight-copy">${highlightCopy}</p>
+      </div>
+
+      <div class="gc-stats-grid">
+        <div class="gc-tier-box">
+          <span class="gc-tier-label">Growth Tier</span>
+          <h2 class="gc-tier-value">${tierNameEn.toUpperCase()}</h2>
+          <p class="gc-score-value">${score.toLocaleString()} PTS</p>
+        </div>
+        <div class="gc-medals-box">
+          <div class="gc-medals-row">
+            <div class="gc-medal-item">
+              <div class="gc-hex" data-tier="${medals.reach}">${medals.reach.charAt(0).toUpperCase()}</div>
+              <span class="gc-medal-label">Reach</span>
+            </div>
+            <div class="gc-medal-item">
+              <div class="gc-hex" data-tier="${medals.community}">${medals.community.charAt(0).toUpperCase()}</div>
+              <span class="gc-medal-label">Comm</span>
+            </div>
+            <div class="gc-medal-item">
+              <div class="gc-hex" data-tier="${medals.engagement}">${medals.engagement.charAt(0).toUpperCase()}</div>
+              <span class="gc-medal-label">Engage</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(container);
+
+  await document.fonts?.ready;
+  if (card.avatarUrl) {
+    const img = container.querySelector("img");
+    if (img && !img.complete) {
+      await Promise.race([
+        new Promise((resolve) => {
+          img.onload = resolve;
+          img.onerror = resolve;
+        }),
+        new Promise((resolve) => setTimeout(resolve, 3000))
+      ]);
+    }
+  }
+
+  const blob = await htmlToImage.toBlob(container, {
+    quality: 1.0,
+    pixelRatio: 2,
+    skipFonts: false
+  });
+
+  document.body.removeChild(container);
+
+  if (!blob) throw new Error("Card rendering failed");
+  return blob;
+}
+
+function buildInsightCardFilename(prefix: string): string {
+  const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+  return `${prefix}-${stamp}.png`;
+}
+
+async function shareInsightCard(card: InsightCardModel): Promise<void> {
+  const blob = await renderInsightsCardBlob(card);
+  const filename = buildInsightCardFilename("ss-threads-growth");
+  const file = new File([blob], filename, { type: "image/png" });
+
+  if (navigator.share && navigator.canShare?.({ files: [file] })) {
+    await navigator.share({
+      title: card.title,
+      files: [file]
+    });
+    setStatus(t("scrapbookStatusInsightsCardShared"));
+    return;
+  }
+
+  downloadBlob(blob, filename);
+  setStatus(t("scrapbookStatusInsightsCardDownloaded"));
+}
+
+function renderInsightsSavedViews(workspace: ScrapbookPlusState | null): void {
+  if (!insightsSavedEmpty || !insightsSavedList) {
+    return;
+  }
+
+  const insightsLocked = !workspace || !workspace.authenticated || workspace.plan.tier !== "plus" || workspace.scopes.needsReconnect;
+  if (insightsLocked) {
+    insightsSavedEmpty.classList.add("hidden");
+    insightsSavedList.classList.add("hidden");
+    insightsSavedList.innerHTML = "";
+    return;
+  }
+
+  const savedViews = workspace.insights.savedViews;
+  if (savedViews.length === 0) {
+    insightsSavedList.classList.add("hidden");
+    insightsSavedList.innerHTML = "";
+    insightsSavedEmpty.classList.remove("hidden");
+    return;
+  }
+
+  insightsSavedEmpty.classList.add("hidden");
+  insightsSavedList.classList.remove("hidden");
+  insightsSavedList.innerHTML = savedViews
+    .map(
+      (view) => `
+        <details class="insights-saved-card">
+          <summary class="insights-saved-summary">
+            <div class="insights-saved-summary-main">
+              <div class="insights-saved-copy">
+                <strong class="insights-saved-title">${escapeHtml(view.name)}</strong>
+                <span class="insights-saved-date">${escapeHtml(t("scrapbookInsightsSavedAt", { date: formatDate(view.capturedAt || view.createdAt) }))}</span>
+              </div>
+              <div class="insights-saved-summary-metrics">
+                <span class="insights-saved-summary-metric">
+                  <span>${escapeHtml(t("scrapbookMetricFollowers"))}</span>
+                  <strong>${escapeHtml(formatCompactNumber(view.overview.followers))}</strong>
+                </span>
+                <span class="insights-saved-summary-metric">
+                  <span>${escapeHtml(t("scrapbookMetricViews"))}</span>
+                  <strong>${escapeHtml(formatCompactNumber(view.overview.views))}</strong>
+                </span>
+                <span class="insights-saved-summary-metric">
+                  <span>${escapeHtml(t("scrapbookMetricLikes"))}</span>
+                  <strong>${escapeHtml(formatCompactNumber(view.overview.likes))}</strong>
+                </span>
+              </div>
+            </div>
+            <span class="insights-saved-chevron" aria-hidden="true"></span>
+          </summary>
+          <div class="insights-saved-body">
+            <div class="insights-saved-actions">
+              <button class="secondary-cta" type="button" data-insight-share-view="${escapeHtml(view.id)}">${escapeHtml(t("scrapbookInsightsShareCardAgain"))}</button>
+              <button class="topbar-link" type="button" data-insight-delete-view="${escapeHtml(view.id)}">${escapeHtml(t("scrapbookInsightsDeleteView"))}</button>
+            </div>
+            <div class="insights-saved-metrics">
+              <div class="insights-saved-metric">
+                <span>${escapeHtml(t("scrapbookMetricFollowers"))}</span>
+                <strong>${escapeHtml(formatCompactNumber(view.overview.followers))}</strong>
+              </div>
+              <div class="insights-saved-metric">
+                <span>${escapeHtml(t("scrapbookMetricViews"))}</span>
+                <strong>${escapeHtml(formatCompactNumber(view.overview.views))}</strong>
+              </div>
+              <div class="insights-saved-metric">
+                <span>${escapeHtml(t("scrapbookMetricLikes"))}</span>
+                <strong>${escapeHtml(formatCompactNumber(view.overview.likes))}</strong>
+              </div>
+            </div>
+            ${
+              view.posts.length > 0
+                ? `<div class="insights-saved-posts">
+                    ${view.posts
+                      .map(
+                        (post) => `
+                          <div class="insights-saved-post">
+                            <span class="insights-saved-post-title">${escapeHtml(post.title)}</span>
+                            <span class="insights-saved-post-meta">${escapeHtml(`${t("scrapbookInsightsViews", { value: formatCompactNumber(post.views) })} · ${t("scrapbookInsightsLikes", { value: formatCompactNumber(post.likes) })}`)}</span>
+                          </div>
+                        `
+                      )
+                      .join("")}
+                  </div>`
+                : ""
+            }
+          </div>
+        </details>
+      `
+    )
+    .join("");
+
+  for (const button of insightsSavedList.querySelectorAll<HTMLButtonElement>("[data-insight-share-view]")) {
+    button.addEventListener("click", () => {
+      const view = workspace.insights.savedViews.find((candidate) => candidate.id === (button.dataset.insightShareView || ""));
+      if (view) {
+        void shareInsightCard(buildInsightsCardModelFromSavedView(view));
+      }
+    });
+  }
+
+  for (const button of insightsSavedList.querySelectorAll<HTMLButtonElement>("[data-insight-delete-view]")) {
+    button.addEventListener("click", () => void deleteInsightsViewRequest(button.dataset.insightDeleteView || ""));
+  }
+}
+
 function renderInsights(workspace: ScrapbookPlusState | null): void {
   if (insightsRefreshed) {
     insightsRefreshed.textContent = workspace?.insights.refreshedAt
@@ -3127,9 +3806,17 @@ function renderInsights(workspace: ScrapbookPlusState | null): void {
   }
 
   const insightsLocked = !workspace || !workspace.authenticated || workspace.plan.tier !== "plus" || workspace.scopes.needsReconnect;
+  const currentCard = buildInsightsCardModelFromCurrent(workspace);
+  if (insightsSaveView) {
+    insightsSaveView.disabled = insightsLocked || !currentCard;
+  }
+  if (insightsShareCard) {
+    insightsShareCard.disabled = insightsLocked || !currentCard;
+  }
   if (insightsRefresh) {
     insightsRefresh.disabled = insightsLocked;
   }
+  renderInsightsSavedViews(workspace);
 
   if (!workspace || !workspace.authenticated || workspace.plan.tier !== "plus" || workspace.scopes.needsReconnect) {
     setMetricValue(metricFollowers, metricFollowersDelta, { value: null, delta: null });
@@ -3150,8 +3837,8 @@ function renderInsights(workspace: ScrapbookPlusState | null): void {
           : workspace.plan.tier !== "plus"
             ? `<strong>${escapeHtml(uiText("Plus가 필요합니다.", "Plus required."))}</strong><span>${escapeHtml(
                 uiText(
-                  "insights는 Plus에서 열립니다. Plus 키를 연결하면 계정 성과 추적을 사용할 수 있습니다.",
-                  "Insights unlock on Plus. Activate Plus to track your Threads account performance."
+                  "성과 보기는 Plus에서 열립니다. Plus를 연결하면 내 계정 성장을 바로 확인할 수 있습니다.",
+                  "Growth insights unlock on Plus. Connect Plus to see your account growth here."
                 )
               )}</span>`
             : `<strong>${escapeHtml(t("scrapbookInsightsReconnectTitle"))}</strong><span>${escapeHtml(t("scrapbookInsightsReconnectCopy"))}</span>`;
@@ -3170,10 +3857,42 @@ function renderInsights(workspace: ScrapbookPlusState | null): void {
     return;
   }
 
+  if (!workspace.insights.ready) {
+    insightsPosts.innerHTML = "";
+    insightsPosts.classList.add("hidden");
+    insightsEmpty.classList.remove("hidden");
+    return;
+  }
+
   if (workspace.insights.posts.length === 0) {
     insightsPosts.innerHTML = "";
     insightsPosts.classList.add("hidden");
     insightsEmpty.classList.remove("hidden");
+    insightsEmpty.innerHTML = `<strong>${escapeHtml(
+      uiText(
+        "아직 표시할 최근 게시물이 없습니다.",
+        "No recent posts to show yet.",
+        {
+          ja: "まだ表示する最近の投稿はありません。",
+          "pt-BR": "Ainda não há posts recentes para mostrar.",
+          es: "Todavía no hay publicaciones recientes para mostrar.",
+          "zh-TW": "目前還沒有可顯示的最近貼文。",
+          vi: "Chưa có bài gần đây để hiển thị."
+        }
+      )
+    )}</strong><span>${escapeHtml(
+      uiText(
+        "새 글을 올린 뒤 다시 업데이트하면 최근 게시물 반응이 여기에 표시됩니다.",
+        "Update again after you publish and recent post reactions will appear here.",
+        {
+          ja: "新しい投稿を公開したあとに再度更新すると、最近の投稿反応がここに表示されます。",
+          "pt-BR": "Atualize novamente depois de publicar e as reações dos posts recentes aparecerão aqui.",
+          es: "Vuelve a actualizar después de publicar y aquí aparecerán las reacciones de tus publicaciones recientes.",
+          "zh-TW": "發文之後再更新一次，最近貼文的反應就會顯示在這裡。",
+          vi: "Hãy cập nhật lại sau khi đăng bài và phản ứng của các bài gần đây sẽ xuất hiện tại đây."
+        }
+      )
+    )}</span>`;
     return;
   }
 
@@ -3219,22 +3938,32 @@ function renderInsights(workspace: ScrapbookPlusState | null): void {
   }
 }
 
-function applySessionState(config: BotPublicConfig, state: BotSessionState): void {
+function applySessionState(
+  config: BotPublicConfig,
+  state: BotSessionState,
+  options: { persist?: boolean } = {}
+): void {
+  const previousUserHandle = normalizeScrapbookHandle(latestState?.user?.threadsHandle);
   latestConfig = config;
   latestState = state;
   applyStaticTranslations();
   for (const element of document.querySelectorAll<HTMLElement>("[data-bot-handle]")) {
     element.textContent = `@${normalizeBotHandle(config.botHandle) || DEFAULT_BOT_HANDLE}`;
   }
-  for (const element of document.querySelectorAll<HTMLElement>("[data-site-host]")) {
-    element.textContent = window.location.host;
-  }
 
   const isAuthenticated = state.authenticated && Boolean(state.user);
-  activeScrapbookHandle = isAuthenticated ? normalizeScrapbookHandle(state.user?.threadsHandle) : null;
+  const nextUserHandle = isAuthenticated ? normalizeScrapbookHandle(state.user?.threadsHandle) : null;
+  activeScrapbookHandle = nextUserHandle;
+  if (!isAuthenticated || (previousUserHandle && nextUserHandle && previousUserHandle !== nextUserHandle)) {
+    latestWorkspace = null;
+    renderScopeStatus(null);
+    renderWatchlists(null);
+    renderSearches(null);
+    renderInsights(null);
+  }
   authPanel?.classList.toggle("hidden", isAuthenticated);
   sessionPanel?.classList.toggle("hidden", !isAuthenticated);
-  workspaceTabs?.classList.toggle("hidden", !isAuthenticated);
+  syncWorkspaceTabsVisibility(isAuthenticated);
   syncScrapbookLinks();
   setSessionMenuOpen(false);
 
@@ -3264,15 +3993,22 @@ function applySessionState(config: BotPublicConfig, state: BotSessionState): voi
   renderPlanPanel();
   syncScrapbookHistory();
   resolvePendingConnectedStatus(state);
+  if (options.persist ?? true) {
+    persistSyncSnapshot();
+  }
 }
 
-function applyWorkspaceState(workspace: ScrapbookPlusState): void {
+function applyWorkspaceState(workspace: ScrapbookPlusState, options: { persist?: boolean } = {}): void {
   latestWorkspace = workspace;
   renderScopeStatus(workspace);
   renderWatchlists(workspace);
   renderSearches(workspace);
   renderInsights(workspace);
   renderPlanPanel();
+  renderSaveStatus(latestState);
+  if (options.persist ?? true) {
+    persistSyncSnapshot();
+  }
 }
 
 function applyQueryStatus(): void {
@@ -3285,10 +4021,8 @@ function applyQueryStatus(): void {
   const archiveId = routeState.archiveId ?? currentUrl.searchParams.get("archive");
   if (connected === "1") {
     pendingConnectedStatus = true;
-    setStatus(
-      uiText("Threads 로그인 응답을 확인하는 중입니다...", "Confirming your Threads sign-in..."),
-      false
-    );
+    setLoadingStatus(getPendingConnectStatusMessage());
+    renderConnectButtons();
   } else if (authError) {
     setStatus(authError, true);
   }
@@ -3317,9 +4051,11 @@ async function refreshSession(): Promise<void> {
 }
 
 async function initializeScrapbook(): Promise<void> {
-  const [config, state] = await Promise.all([
+  const workspacePromise = requestJson<ScrapbookPlusState>("/api/public/bot/plus").catch(() => null);
+  const [config, state, workspace] = await Promise.all([
     requestJson<BotPublicConfig>("/api/public/bot/config"),
-    requestJson<BotSessionState>("/api/public/bot/session")
+    requestJson<BotSessionState>("/api/public/bot/session"),
+    workspacePromise
   ]);
   latestConfig = config;
   applySessionState(config, {
@@ -3328,7 +4064,9 @@ async function initializeScrapbook(): Promise<void> {
     oauthConfigured: config.oauthConfigured
   });
 
-  if (state.authenticated && state.user) {
+  if (workspace) {
+    applyWorkspaceState(workspace);
+  } else if (state.authenticated && state.user) {
     void refreshWorkspace().catch(() => undefined);
   }
 }
@@ -3460,9 +4198,9 @@ async function submitWatchlist(event: SubmitEvent): Promise<void> {
     return;
   }
   const formData = new FormData(watchlistForm);
-  const mediaTypes = Array.from(watchlistForm.querySelectorAll<HTMLOptionElement>("select[name='mediaTypes'] option"))
-    .filter((option) => option.selected)
-    .map((option) => option.value);
+  const mediaTypes = Array.from(watchlistForm.querySelectorAll<HTMLInputElement>("input[name='mediaTypes']:checked")).map(
+    (option) => option.value
+  );
 
   const workspace = await requestJson<ScrapbookPlusState>("/api/public/bot/watchlists", {
     method: "POST",
@@ -3476,9 +4214,6 @@ async function submitWatchlist(event: SubmitEvent): Promise<void> {
     })
   });
   watchlistForm.reset();
-  for (const option of watchlistForm.querySelectorAll<HTMLOptionElement>("select[name='mediaTypes'] option")) {
-    option.selected = false;
-  }
   applyWorkspaceState(workspace);
   setStatus(t("scrapbookStatusWatchlistSaved"));
   setActiveTab("watchlists");
@@ -3552,11 +4287,15 @@ async function submitSearch(event: SubmitEvent): Promise<void> {
       query: formData.get("query")?.toString() ?? "",
       authorHandle: formData.get("authorHandle")?.toString() ?? "",
       excludeHandles: formData.get("excludeHandles")?.toString() ?? "",
-      searchType: formData.get("searchType")?.toString() ?? "top",
+      searchType: formData.get("searchType")?.toString() ?? "recent",
       autoArchive: formData.get("autoArchive") === "on"
     })
   });
   searchForm.reset();
+  const searchTypeSelect = searchForm.querySelector<HTMLSelectElement>("select[name='searchType']");
+  if (searchTypeSelect) {
+    searchTypeSelect.value = "recent";
+  }
   applyWorkspaceState(workspace);
   setStatus(t("scrapbookStatusSearchSaved"));
   setActiveTab("searches");
@@ -3623,6 +4362,57 @@ async function refreshInsightsRequest(): Promise<void> {
   }
 }
 
+async function saveInsightsViewRequest(): Promise<void> {
+  const snapshotDate = latestWorkspace?.insights.refreshedAt ? formatDate(latestWorkspace.insights.refreshedAt) : formatDate(new Date().toISOString());
+  const name = uiText(
+    "성과 카드 {date}",
+    "Growth card {date}",
+    {
+      ja: "成長カード {date}",
+      "pt-BR": "Cartão de crescimento {date}",
+      es: "Tarjeta de crecimiento {date}",
+      "zh-TW": "成長卡片 {date}",
+      vi: "Thẻ tăng trưởng {date}"
+    },
+    { date: snapshotDate }
+  );
+
+  const model = buildInsightsCardModelFromCurrent(latestWorkspace);
+  let insightProps = null;
+  if (model) {
+    const { score, tier } = calculateGrowthScore(model.insightsData);
+    const highlight = selectHighlight(model.insightsData);
+    insightProps = {
+      highlightId: highlight.id,
+      highlightParams: highlight.params,
+      localeAtSave: typeof window !== "undefined" && document.documentElement.lang ? document.documentElement.lang : "en",
+      tier,
+      score
+    };
+  }
+
+  const workspace = await requestJson<ScrapbookPlusState>("/api/public/bot/insights/views", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ name, insightProps })
+  });
+  applyWorkspaceState(workspace);
+  setStatus(t("scrapbookStatusInsightsViewSaved"));
+}
+
+async function deleteInsightsViewRequest(viewId: string): Promise<void> {
+  const confirmed = window.confirm(t("scrapbookInsightsDeleteConfirm"));
+  if (!confirmed) {
+    return;
+  }
+
+  const workspace = await requestJson<ScrapbookPlusState>(`/api/public/bot/insights/views/${encodeURIComponent(viewId)}`, {
+    method: "DELETE"
+  });
+  applyWorkspaceState(workspace);
+  setStatus(t("scrapbookStatusInsightsViewDeleted"));
+}
+
 async function archiveInsightPostRequest(postId: string): Promise<void> {
   const workspace = await requestJson<ScrapbookPlusState>("/api/public/bot/insights/archive", {
     method: "POST",
@@ -3655,7 +4445,12 @@ document.addEventListener("click", (event) => {
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape") {
     setSessionMenuOpen(false);
+    setWorkspaceTabsOpen(false);
   }
+});
+
+window.addEventListener("resize", () => {
+  syncWorkspaceTabsVisibility(Boolean(latestState?.authenticated && latestState.user));
 });
 
 for (const button of connectButtons) {
@@ -3704,6 +4499,18 @@ for (const button of workspaceTabButtons) {
   });
 }
 
+workspaceTabTrigger?.addEventListener("click", () => {
+  setWorkspaceTabsOpen(!workspaceTabTrigger?.getAttribute("aria-expanded") || workspaceTabTrigger.getAttribute("aria-expanded") === "false");
+});
+
+workspaceTabOverlay?.addEventListener("click", () => {
+  setWorkspaceTabsOpen(false);
+});
+
+workspaceTabClose?.addEventListener("click", () => {
+  setWorkspaceTabsOpen(false);
+});
+
 watchlistForm?.addEventListener("submit", (event) => {
   void submitWatchlist(event);
 });
@@ -3716,12 +4523,23 @@ insightsRefresh?.addEventListener("click", () => {
   void refreshInsightsRequest();
 });
 
-saveStatusRefresh?.addEventListener("click", () => {
-  void syncLatestMentions().catch((error) => {
-    isRefreshingSaveStatus = false;
-    renderSaveStatus(latestState);
-    setStatus(error instanceof Error ? error.message : uiText("저장 상태를 다시 확인할 수 없습니다.", "Could not refresh save status."), true);
-  });
+insightsSaveView?.addEventListener("click", () => {
+  void saveInsightsViewRequest();
+});
+
+insightsShareCard?.addEventListener("click", () => {
+  const card = buildInsightsCardModelFromCurrent(latestWorkspace);
+  if (card) {
+    void shareInsightCard(card);
+  }
+});
+
+saveStatusPlanClear?.addEventListener("click", () => {
+  void clearPlusActivationRequest();
+});
+
+sessionPlanClear?.addEventListener("click", () => {
+  void clearPlusActivationRequest();
 });
 
 planKeyForm?.addEventListener("submit", (event) => {
@@ -3747,6 +4565,23 @@ archivesSelectAll?.addEventListener("change", () => {
   renderArchives(latestState.archives, true);
 });
 
+archivesSearchToggle?.addEventListener("click", () => {
+  archivesSearchExpanded = !archivesSearchExpanded;
+  syncArchiveFilterControls();
+  if (archivesSearchExpanded) {
+    window.setTimeout(() => archivesSearchInput?.focus(), 0);
+  }
+});
+
+archivesTagToggle?.addEventListener("click", () => {
+  archivesTagExpanded = !archivesTagExpanded;
+  syncArchiveFilterControls();
+});
+
+archivesSortToggle?.addEventListener("click", () => {
+  toggleArchiveSortOrder();
+});
+
 archivesExportAll?.addEventListener("click", async () => {
   if (!latestState?.authenticated || !latestState.user) {
     return;
@@ -3766,6 +4601,8 @@ archivesDeleteSelected?.addEventListener("click", () => {
 let searchDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 archivesSearchInput?.addEventListener("input", () => {
   archiveSearchQuery = archivesSearchInput.value;
+  archivesSearchExpanded = true;
+  syncArchiveFilterControls();
   if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
   searchDebounceTimer = setTimeout(() => {
     if (latestState) {
@@ -3783,6 +4620,7 @@ localeSelect?.addEventListener("change", () => {
   }
 });
 applyQueryStatus();
+hasAppliedSyncSnapshot = applySyncSnapshot();
 setActiveTab("inbox");
 
 void (async () => {
@@ -3790,13 +4628,14 @@ void (async () => {
     await initializeScrapbook();
   } catch (error) {
     setStatus(error instanceof Error ? error.message : t("scrapbookStatusLoadFailed"), true);
-    authPanel?.classList.remove("hidden");
-    archivesEmptyEl?.classList.remove("hidden");
+    if (!hasAppliedSyncSnapshot) {
+      authPanel?.classList.remove("hidden");
+      archivesEmptyEl?.classList.remove("hidden");
+    }
   } finally {
     finalizePendingConnectedStatus();
     setConnectButtonsIdle();
     renderConnectButtons();
-    finishInitialBoot();
   }
 })();
 

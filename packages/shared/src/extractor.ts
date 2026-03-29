@@ -1,7 +1,7 @@
 import { BUNDLED_EXTRACTOR_CONFIG } from "./config";
 import { t } from "./i18n";
 import type { AuthorReply, ExtractedPost, ExtractorConfig, SourceType } from "./types";
-import { cleanTextLines, decodeEscapedJsonString, dedupeStrings, extractAuthorFromUrl, extractShortcode, hashPost, isSupportedPermalink, normalizeThreadsUrl, unwrapExternalUrl } from "./utils";
+import { cleanTextLines, decodeEscapedJsonString, dedupeStrings, extractAuthorFromUrl, extractShortcode, extractTitleExcerpt, hashPost, isSupportedPermalink, normalizeThreadsUrl, unwrapExternalUrl } from "./utils";
 
 function getMeta(document: Document, selector: string): string | null {
   return document.querySelector<HTMLMetaElement>(selector)?.content?.trim() ?? null;
@@ -276,9 +276,43 @@ function getExternalUrl(root: HTMLElement | null): string | null {
   return external ? unwrapExternalUrl(external.href) : null;
 }
 
-function getRelatedPostUrls(root: HTMLElement | null, canonicalUrl: string): { quotedPostUrl: string | null; repliedToUrl: string | null } {
+function getEmbeddedPostUrls(document: Document, canonicalUrl: string): string[] {
+  const html = document.documentElement.innerHTML;
+  const matches = html.matchAll(
+    /"post":\{[\s\S]*?"user":\{[\s\S]*?"username":"([^"]+)"[\s\S]*?"code":"([A-Za-z0-9_-]+)"/g
+  );
+  const urls: string[] = [];
+
+  for (const match of matches) {
+    const username = match[1]?.trim();
+    const code = match[2]?.trim();
+    if (!username || !code) {
+      continue;
+    }
+
+    try {
+      const normalized = normalizeThreadsUrl(`https://www.threads.com/@${username}/post/${code}`);
+      urls.push(normalized);
+    } catch {
+      // Ignore malformed embedded post entries.
+    }
+  }
+
+  return dedupeStrings(urls);
+}
+
+function getRelatedPostUrls(
+  root: HTMLElement | null,
+  document: Document,
+  canonicalUrl: string
+): { quotedPostUrl: string | null; repliedToUrl: string | null } {
   if (!root) {
-    return { quotedPostUrl: null, repliedToUrl: null };
+    const embeddedUrls = getEmbeddedPostUrls(document, canonicalUrl);
+    const currentIndex = embeddedUrls.indexOf(canonicalUrl);
+    return {
+      quotedPostUrl: null,
+      repliedToUrl: currentIndex > 0 ? embeddedUrls[currentIndex - 1] ?? null : null
+    };
   }
 
   const links = dedupeStrings(
@@ -291,6 +325,15 @@ function getRelatedPostUrls(root: HTMLElement | null, canonicalUrl: string): { q
       }
     })
   );
+
+  if (links.length === 0) {
+    const embeddedUrls = getEmbeddedPostUrls(document, canonicalUrl);
+    const currentIndex = embeddedUrls.indexOf(canonicalUrl);
+    return {
+      quotedPostUrl: null,
+      repliedToUrl: currentIndex > 0 ? embeddedUrls[currentIndex - 1] ?? null : null
+    };
+  }
 
   return {
     quotedPostUrl: links[0] ?? null,
@@ -384,9 +427,9 @@ function deriveKeyword(raw: string): string | null {
 }
 
 function getPostTitle(_document: Document, author: string, text: string, _externalUrl: string | null): string {
-  const firstLine = text.replace(/\s+/g, " ").trim().split(/[.!?\n]/)[0]?.trim();
-  if (firstLine && firstLine.length > 2) {
-    return trimKeyword(firstLine);
+  const title = extractTitleExcerpt(text, author, 38);
+  if (title) {
+    return trimKeyword(title);
   }
 
   return author;
@@ -522,7 +565,7 @@ export async function extractPostFromDocument(document: Document, pageUrl: strin
   const videoUrl = getVideoUrl(root);
   const videoPosterUrl = getVideoPosterUrl(root);
   const externalUrl = getExternalUrl(root);
-  const related = getRelatedPostUrls(root, canonicalUrl);
+  const related = getRelatedPostUrls(root, document, canonicalUrl);
   const title = getPostTitle(document, author, text, externalUrl);
   const capturedAt = new Date().toISOString();
   const sourceType = detectSourceType(imageUrls, root, videoUrl, videoPosterUrl);

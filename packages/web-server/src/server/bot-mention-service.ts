@@ -19,6 +19,7 @@ import {
   ingestBotMention,
   materializeBotMentionArchive
 } from "./bot-service";
+import { resolveTargetPostWithBrowser } from "./browser-target-resolver";
 import { getRuntimeConfigSnapshot } from "./runtime-config";
 import {
   claimBotMentionJobs as claimStoredBotMentionJobs,
@@ -103,6 +104,10 @@ type MentionCollectorConfig = RuntimeCollectorConfig;
 interface MentionSyncReadState {
   activeUserIds: Set<string>;
   activeUserHandles: Set<string>;
+  activeUsers: Array<{
+    threadsUserId: string | null;
+    threadsHandle: string;
+  }>;
   knownMentionIds: Set<string>;
 }
 
@@ -119,7 +124,7 @@ type MentionProcessResult =
 
 export interface BotMentionCollector {
   start: () => void;
-  stop: () => void;
+  stop: () => Promise<void>;
   syncNow: (mode?: string) => Promise<BotMentionSyncSummary>;
   getStatus: () => BotMentionCollectorStatus;
   reloadConfig: () => BotMentionCollectorStatus;
@@ -299,14 +304,121 @@ async function extractTargetPostFromPermalink(permalinkUrl: string): Promise<Ext
 
     const html = await response.text();
     const dom = new JSDOM(html, { url: response.url || normalizedUrl });
-    return await extractPostFromDocument(
+    const extractedPost = await extractPostFromDocument(
       dom.window.document,
       dom.window.location.href,
       BUNDLED_EXTRACTOR_CONFIG
     );
+    if (extractedPost.repliedToUrl || extractedPost.quotedPostUrl) {
+      return extractedPost;
+    }
+
+    const embeddedMatches = html.matchAll(
+      /"post":\{[\s\S]*?"user":\{[\s\S]*?"username":"([^"]+)"[\s\S]*?"code":"([A-Za-z0-9_-]+)"/g
+    );
+    const embeddedUrls = Array.from(
+      new Set(
+        Array.from(embeddedMatches, (match) => {
+          const username = safeText(match[1]);
+          const code = safeText(match[2]);
+          return username && code ? `https://www.threads.com/@${username}/post/${code}` : null;
+        }).filter((value): value is string => Boolean(value))
+      )
+    );
+    const currentIndex = embeddedUrls.indexOf(extractedPost.canonicalUrl);
+    if (currentIndex <= 0) {
+      return extractedPost;
+    }
+
+    return {
+      ...extractedPost,
+      repliedToUrl: embeddedUrls[currentIndex - 1] ?? extractedPost.repliedToUrl
+    };
   } catch {
     return null;
   }
+}
+
+async function extractRelatedTargetPermalink(permalinkUrl: string): Promise<string | null> {
+  const normalizedUrl = safeText(permalinkUrl);
+  if (!normalizedUrl) {
+    return null;
+  }
+
+  try {
+    const response = await fetch(normalizedUrl, {
+      cache: "no-store",
+      headers: {
+        accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "accept-language": "ko,en;q=0.8",
+        "user-agent":
+          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36"
+      }
+    });
+    if (!response.ok) {
+      return null;
+    }
+
+    const html = await response.text();
+    const embeddedMatches = html.matchAll(
+      /"post":\{[\s\S]*?"user":\{[\s\S]*?"username":"([^"]+)"[\s\S]*?"code":"([A-Za-z0-9_-]+)"/g
+    );
+    const embeddedUrls = Array.from(
+      new Set(
+        Array.from(embeddedMatches, (match) => {
+          const username = safeText(match[1]);
+          const code = safeText(match[2]);
+          return username && code ? `https://www.threads.com/@${username}/post/${code}` : null;
+        }).filter((value): value is string => Boolean(value))
+      )
+    );
+    const currentIndex = embeddedUrls.indexOf(normalizedUrl);
+    return currentIndex > 0 ? embeddedUrls[currentIndex - 1] ?? null : null;
+  } catch {
+    return null;
+  }
+}
+
+async function resolveExtractedTargetPost(
+  unresolvedTargetUrl: string,
+  mentionUrl: string,
+  mentionText: string
+): Promise<ExtractedPost | null> {
+  const extractedTargetPost = await extractTargetPostFromPermalink(unresolvedTargetUrl);
+  const relatedTargetUrl =
+    safeText(extractedTargetPost?.repliedToUrl || extractedTargetPost?.quotedPostUrl) ||
+    (await extractRelatedTargetPermalink(unresolvedTargetUrl));
+  if (!extractedTargetPost && !relatedTargetUrl) {
+    return await resolveTargetPostWithBrowser(mentionUrl);
+  }
+
+  if (!extractedTargetPost && relatedTargetUrl) {
+    return (
+      (await extractTargetPostFromPermalink(relatedTargetUrl)) ??
+      (await resolveTargetPostWithBrowser(mentionUrl)) ??
+      null
+    );
+  }
+
+  const looksLikeTriggerCapture =
+    unresolvedTargetUrl === mentionUrl ||
+    extractedTargetPost?.canonicalUrl === mentionUrl ||
+    (mentionText.length > 0 && extractedTargetPost?.text === mentionText);
+  if (looksLikeTriggerCapture) {
+    const browserResolvedTarget = await resolveTargetPostWithBrowser(mentionUrl);
+    if (browserResolvedTarget) {
+      return browserResolvedTarget;
+    }
+  }
+  if (!relatedTargetUrl || relatedTargetUrl === mentionUrl || !looksLikeTriggerCapture) {
+    return extractedTargetPost ?? null;
+  }
+
+  return (
+    (await extractTargetPostFromPermalink(relatedTargetUrl)) ??
+    (await resolveTargetPostWithBrowser(mentionUrl)) ??
+    extractedTargetPost
+  );
 }
 
 function buildThreadsApiBaseUrl(config: MentionCollectorConfig): string {
@@ -381,6 +493,25 @@ function safeJsonStringify(value: unknown): string | null {
   } catch {
     return null;
   }
+}
+
+function createCachedAccessTokenResolver(baseResolver: ThreadsAccessTokenResolver): ThreadsAccessTokenResolver {
+  const cache = new Map<string, Promise<string | null>>();
+
+  return (rawThreadsUserId, rawHandle) => {
+    const threadsUserId = safeText(rawThreadsUserId) || "";
+    const handle = normalizeHandle(rawHandle);
+    const cacheKey = `${threadsUserId}::${handle}`;
+    if (!cache.has(cacheKey)) {
+      const pending = baseResolver(rawThreadsUserId, rawHandle).catch((error) => {
+        cache.delete(cacheKey);
+        throw error;
+      });
+      cache.set(cacheKey, pending);
+    }
+
+    return cache.get(cacheKey) as Promise<string | null>;
+  };
 }
 
 function parseMentionSummaryJobPayload(job: BotMentionJobRecord): ThreadsNode | null {
@@ -566,39 +697,58 @@ function completeMentionJob(
 }
 
 function buildMentionSyncReadState(input: {
-  activeUserIds: Iterable<string>;
-  activeUserHandles: Iterable<string>;
+  activeUsers: Iterable<{
+    threadsUserId: string | null | undefined;
+    threadsHandle: string | null | undefined;
+  }>;
   knownMentionIds: Iterable<string>;
 }): MentionSyncReadState {
+  const activeUserIds = new Set<string>();
+  const activeUserHandles = new Set<string>();
+  const activeUsers: MentionSyncReadState["activeUsers"] = [];
+  const seenUsers = new Set<string>();
+
+  for (const candidate of input.activeUsers) {
+    const threadsUserId = safeText(candidate.threadsUserId) || null;
+    const threadsHandle = normalizeHandle(candidate.threadsHandle);
+    if (!threadsUserId && !threadsHandle) {
+      continue;
+    }
+
+    if (threadsUserId) {
+      activeUserIds.add(threadsUserId);
+    }
+    if (threadsHandle) {
+      activeUserHandles.add(threadsHandle);
+    }
+
+    const cacheKey = `${threadsUserId ?? ""}::${threadsHandle}`;
+    if (seenUsers.has(cacheKey)) {
+      continue;
+    }
+    seenUsers.add(cacheKey);
+    activeUsers.push({
+      threadsUserId,
+      threadsHandle
+    });
+  }
+
   return {
-    activeUserIds: new Set([...input.activeUserIds].map((value) => safeText(value)).filter(Boolean)),
-    activeUserHandles: new Set([...input.activeUserHandles].map((value) => normalizeHandle(value)).filter(Boolean)),
+    activeUserIds,
+    activeUserHandles,
+    activeUsers,
     knownMentionIds: new Set([...input.knownMentionIds].map((value) => safeText(value)).filter(Boolean))
   };
 }
 
 function createMentionSyncReadState(data: WebDatabase): MentionSyncReadState {
-  const activeUserIds: string[] = [];
-  const activeUserHandles: string[] = [];
-  for (const candidate of data.botUsers) {
-    if (candidate.status !== "active") {
-      continue;
-    }
-
-    const threadsUserId = safeText(candidate.threadsUserId);
-    if (threadsUserId) {
-      activeUserIds.push(threadsUserId);
-    }
-
-    const threadsHandle = normalizeHandle(candidate.threadsHandle);
-    if (threadsHandle) {
-      activeUserHandles.push(threadsHandle);
-    }
-  }
-
   return buildMentionSyncReadState({
-    activeUserIds,
-    activeUserHandles,
+    activeUsers: data.botUsers
+      .filter((candidate) => candidate.status === "active")
+      .map((candidate) => ({
+        threadsUserId: candidate.threadsUserId,
+        threadsHandle: candidate.threadsHandle
+      })),
     knownMentionIds: [
       ...data.botArchives.map((candidate) => safeText(candidate.mentionId)),
       ...data.botMentionJobs.map((candidate) => safeText(candidate.mentionId))
@@ -943,10 +1093,11 @@ async function buildIngestPayload(
     return { kind: "invalid" };
   }
 
-  const mentionDetail = await fetchThreadNode(config, accessToken, mentionId, true);
-  const mentionUrl = buildThreadPermalink(mentionDetail) || buildThreadPermalink(mentionSummary);
-  const mentionAuthorHandle = extractThreadHandle(mentionDetail) || extractThreadHandle(mentionSummary);
-  const mentionAuthorUserId = extractThreadUserId(mentionDetail) || extractThreadUserId(mentionSummary);
+  const mentionDetail = await fetchThreadNode(config, accessToken, mentionId, true).catch(() => null);
+  const mentionNode = mentionDetail ?? mentionSummary;
+  const mentionUrl = buildThreadPermalink(mentionNode) || buildThreadPermalink(mentionSummary);
+  const mentionAuthorHandle = extractThreadHandle(mentionNode) || extractThreadHandle(mentionSummary);
+  const mentionAuthorUserId = extractThreadUserId(mentionNode) || extractThreadUserId(mentionSummary);
   if (!mentionUrl || !mentionAuthorHandle) {
     return { kind: "invalid" };
   }
@@ -955,11 +1106,11 @@ async function buildIngestPayload(
     return { kind: "unmatched" };
   }
 
-  const relatedThreadId = extractRelatedThreadId(mentionDetail);
+  const relatedThreadId = extractRelatedThreadId(mentionNode);
   const relatedThreadNode = await hydrateRelatedThreadNode(
     config,
     accessToken,
-    extractRelatedThreadNode(mentionDetail)
+    extractRelatedThreadNode(mentionNode)
   );
   const replyResolvedTarget =
     relatedThreadNode ??
@@ -975,8 +1126,8 @@ async function buildIngestPayload(
   const targetNode = replyResolvedTarget ?? mentionDetail ?? mentionSummary;
 
   const unresolvedTargetUrl = buildThreadPermalink(targetNode) || mentionUrl;
-  const mentionText = safeText(extractThreadText(mentionDetail) || extractThreadText(mentionSummary) || "");
-  const extractedTargetPost = await extractTargetPostFromPermalink(unresolvedTargetUrl);
+  const mentionText = safeText(extractThreadText(mentionNode) || extractThreadText(mentionSummary) || "");
+  const extractedTargetPost = await resolveExtractedTargetPost(unresolvedTargetUrl, mentionUrl, mentionText);
   const targetUrl = safeText(extractedTargetPost?.canonicalUrl) || unresolvedTargetUrl;
   const targetText =
     safeText(extractedTargetPost?.text) ||
@@ -991,7 +1142,7 @@ async function buildIngestPayload(
       mentionUrl,
       mentionAuthorUserId,
       mentionAuthorHandle,
-      mentionAuthorDisplayName: extractThreadDisplayName(mentionDetail) || extractThreadDisplayName(mentionSummary),
+      mentionAuthorDisplayName: extractThreadDisplayName(mentionNode) || extractThreadDisplayName(mentionSummary),
       noteText: targetIsSeparate ? mentionText || null : null,
       targetUrl,
       targetAuthorHandle: safeText(extractedTargetPost?.author) || extractThreadHandle(targetNode),
@@ -1001,7 +1152,7 @@ async function buildIngestPayload(
       mediaUrls: extractedTargetPost ? summarizeExtractedPostPreviewMediaUrls(extractedTargetPost) : extractMediaUrls(targetNode),
       extractedPost: extractedTargetPost,
       rawPayload: {
-        mention: mentionDetail ?? mentionSummary,
+        mention: mentionNode,
         target: targetNode,
         extractedPost: extractedTargetPost
       }
@@ -1091,9 +1242,13 @@ async function enqueueMentionSyncJobs(
   config: MentionCollectorConfig,
   mode: string,
   accessToken: string,
+  resolveRepliesAccessToken: ThreadsAccessTokenResolver,
   runTransaction: DatabaseRunner
 ): Promise<BotMentionSyncSummary> {
   const knownMentionIds = new Set(readState.knownMentionIds);
+  const queuedMentions: ThreadsNode[] = [];
+  const queuedMentionIds = new Set<string>();
+  const normalizedBotHandle = normalizeHandle(config.botHandle);
 
   let fetchedPages = 0;
   let fetchedMentions = 0;
@@ -1101,13 +1256,33 @@ async function enqueueMentionSyncJobs(
   let skippedInvalid = 0;
   let afterCursor: string | null = null;
 
+  const enqueueMentionSummary = (mentionSummary: ThreadsNode): void => {
+    const mentionId = safeText(readNestedString(mentionSummary, ["id"]) || "");
+    if (!mentionId) {
+      skippedInvalid += 1;
+      return;
+    }
+
+    if (queuedMentionIds.has(mentionId)) {
+      return;
+    }
+
+    if (mode === "interval" && knownMentionIds.has(mentionId)) {
+      skippedExisting += 1;
+      return;
+    }
+
+    knownMentionIds.add(mentionId);
+    queuedMentionIds.add(mentionId);
+    queuedMentions.push(mentionSummary);
+  };
+
   for (let page = 0; page < config.maxPages; page += 1) {
     const pageResult = await fetchMentionPage(config, accessToken, afterCursor);
     fetchedPages += 1;
     fetchedMentions += pageResult.items.length;
 
     let sawOnlyExisting = true;
-    const queuedMentions: ThreadsNode[] = [];
     for (const mentionSummary of pageResult.items) {
       const mentionId = safeText(readNestedString(mentionSummary, ["id"]) || "");
       if (mode === "interval" && mentionId && knownMentionIds.has(mentionId)) {
@@ -1116,34 +1291,71 @@ async function enqueueMentionSyncJobs(
       }
 
       sawOnlyExisting = false;
-      if (mentionId) {
-        knownMentionIds.add(mentionId);
-      }
-      queuedMentions.push(mentionSummary);
-    }
-
-    if (queuedMentions.length > 0) {
-      const now = new Date().toISOString();
-      if (useExternalizedMentionJobs()) {
-        const jobs = queuedMentions
-          .map((mentionSummary) => buildMentionJobRecord(mentionSummary, now))
-          .filter((job): job is BotMentionJobRecord => Boolean(job));
-        skippedInvalid += queuedMentions.length - jobs.length;
-        await enqueueStoredBotMentionJobs(jobs, {
-          forceRequeue: mode !== "interval"
-        });
-        await pruneBotMentionJobs(new Date(Date.now() - DEFAULT_JOB_RETENTION_MS).toISOString());
-      } else {
-        const enqueueResult = await runTransaction((data) =>
-          enqueueMentionJobs(data, queuedMentions, now, mode !== "interval")
-        );
-        skippedInvalid += enqueueResult.invalid;
-      }
+      enqueueMentionSummary(mentionSummary);
     }
 
     afterCursor = pageResult.nextCursor;
     if (!afterCursor || pageResult.items.length === 0 || sawOnlyExisting) {
       break;
+    }
+  }
+
+  if (normalizedBotHandle) {
+    for (const activeUser of readState.activeUsers) {
+      let ownerAccessToken: string | null;
+      try {
+        ownerAccessToken = await resolveRepliesAccessToken(activeUser.threadsUserId, activeUser.threadsHandle);
+      } catch {
+        continue;
+      }
+
+      if (!ownerAccessToken) {
+        continue;
+      }
+
+      let repliesCursor: string | null = null;
+      for (let page = 0; page < config.maxPages; page += 1) {
+        let replyPage: { items: ThreadsNode[]; nextCursor: string | null };
+        try {
+          replyPage = await fetchRepliesPage(config, ownerAccessToken, repliesCursor);
+        } catch {
+          break;
+        }
+
+        fetchedPages += 1;
+        fetchedMentions += replyPage.items.length;
+        for (const replySummary of replyPage.items) {
+          const mentionText = safeText(extractThreadText(replySummary) || "").toLowerCase();
+          if (!mentionText.includes(`@${normalizedBotHandle}`)) {
+            continue;
+          }
+          enqueueMentionSummary(replySummary);
+        }
+
+        repliesCursor = replyPage.nextCursor;
+        if (!repliesCursor || replyPage.items.length === 0) {
+          break;
+        }
+      }
+    }
+  }
+
+  if (queuedMentions.length > 0) {
+    const now = new Date().toISOString();
+    if (useExternalizedMentionJobs()) {
+      const jobs = queuedMentions
+        .map((mentionSummary) => buildMentionJobRecord(mentionSummary, now))
+        .filter((job): job is BotMentionJobRecord => Boolean(job));
+      skippedInvalid += queuedMentions.length - jobs.length;
+      await enqueueStoredBotMentionJobs(jobs, {
+        forceRequeue: mode !== "interval"
+      });
+      await pruneBotMentionJobs(new Date(Date.now() - DEFAULT_JOB_RETENTION_MS).toISOString());
+    } else {
+      const enqueueResult = await runTransaction((data) =>
+        enqueueMentionJobs(data, queuedMentions, now, mode !== "interval")
+      );
+      skippedInvalid += enqueueResult.invalid;
     }
   }
 
@@ -1490,14 +1702,21 @@ export function createBotMentionCollector(deps: {
     }
 
     const readState = await loadReadState();
-    return enqueueMentionSyncJobs(readState, config, mode, accessToken, deps.runTransaction);
+    return enqueueMentionSyncJobs(
+      readState,
+      config,
+      mode,
+      accessToken,
+      createCachedAccessTokenResolver(resolveRepliesAccessToken),
+      deps.runTransaction
+    );
   };
 
   const drainNow = async (mode: string): Promise<BotMentionSyncSummary> =>
     drainMentionSyncJobs(config, mode, {
       loadReadState,
       processingConcurrency: readProcessingConcurrency(),
-      resolveRepliesAccessToken,
+      resolveRepliesAccessToken: createCachedAccessTokenResolver(resolveRepliesAccessToken),
       runTransaction: deps.runTransaction,
       resolveCollectorAccessToken: resolveCollectorToken,
       jobBatchSize,
@@ -1645,7 +1864,7 @@ export function createBotMentionCollector(deps: {
       scheduleWorkerTimer();
     },
 
-    stop() {
+    async stop() {
       started = false;
       if (pollTimer) {
         clearInterval(pollTimer);
@@ -1654,6 +1873,13 @@ export function createBotMentionCollector(deps: {
       if (workerTimer) {
         clearInterval(workerTimer);
         workerTimer = null;
+      }
+
+      const inFlight = [syncInFlight, pollInFlight, drainInFlight].filter(
+        (value): value is Promise<BotMentionSyncSummary> => Boolean(value)
+      );
+      if (inFlight.length > 0) {
+        await Promise.allSettled(inFlight);
       }
     },
 

@@ -146,6 +146,116 @@ const checkoutUiCopyByLocale: Partial<Record<WebLocale, CheckoutUiCopy>> = {
     methodHint: "Choose the same payment method you reviewed above.",
     noteHint: "Leave invoice or team-related requests here.",
     submitCta: "Submit order"
+  },
+  ja: {
+    eyebrow: "ss-threads Plus",
+    methodsEyebrow: "お支払い方法",
+    methodsTitle: "お支払い方法を選択してください",
+    methodsCopy: "利用可能な方法のみが表示されています。下のフォームでも同じものを選択してください。",
+    fulfillmentSteps: [
+      "注文フォームを送信します。",
+      "選択した方法で支払いを完了します。",
+      "通常30分以内にメールで Plus キーが届きます。"
+    ],
+    supportLabel: "サポートメール",
+    supportCopy: "注文確認、返金、Plus に関するお問い合わせはこちらまで。",
+    refundLabel: "返金",
+    refundCopy: "購入後7日以内であれば返金リクエストを受け付けています。",
+    dataLabel: "データ処理",
+    dataCopy: "保存と検索はスクラップブックを中心に行われ、必要な連携機能のみサーバーを経由します。",
+    nameHint: "領収書やキーの案内に使用する名前です。",
+    emailHint: "Plus キーを受け取るメールアドレスを入力してください。",
+    methodHint: "上で確認したのと同じお支払い方法を選択してください。",
+    noteHint: "請求書やチームに関する要望があれば記入してください。",
+    submitCta: "注文を確定する"
+  },
+  "pt-BR": {
+    eyebrow: "ss-threads Plus",
+    methodsEyebrow: "Forma de pagamento",
+    methodsTitle: "Escolha uma forma de pagamento",
+    methodsCopy: "Apenas métodos disponíveis são mostrados. Escolha o mesmo novamente no formulário abaixo.",
+    fulfillmentSteps: [
+      "Envie o formulário de pedido.",
+      "Finalize o pagamento com o método escolhido.",
+      "Receba a chave Plus por email, geralmente em até 30 minutos."
+    ],
+    supportLabel: "Email de suporte",
+    supportCopy: "Use este email para confirmação de pedido, reembolsos e dúvidas sobre o Plus.",
+    refundLabel: "Reembolsos",
+    refundCopy: "Pedidos de reembolso são aceitos em até 7 dias após a compra.",
+    dataLabel: "Tratamento de dados",
+    dataCopy: "Salvamento e busca rodam no scrapbook, enquanto funções conectadas como ativação do Plus e Notion usam o servidor.",
+    nameHint: "Este nome será usado no recibo e na entrega da chave.",
+    emailHint: "Use o email que deve receber a chave Plus.",
+    methodHint: "Escolha a mesma forma de pagamento que você revisou acima.",
+    noteHint: "Deixe aqui solicitações de nota fiscal ou relacionadas à equipe.",
+    submitCta: "Enviar pedido"
+  },
+  es: {
+    eyebrow: "ss-threads Plus",
+    methodsEyebrow: "Método de pago",
+    methodsTitle: "Elige un método de pago",
+    methodsCopy: "Solo se muestran los métodos disponibles. Elige el mismo otra vez en el formulario de abajo.",
+    fulfillmentSteps: [
+      "Envía el formulario de pedido.",
+      "Termina el pago con el método elegido.",
+      "Recibe la clave Plus por correo, normalmente en unos 30 minutos."
+    ],
+    supportLabel: "Correo de soporte",
+    supportCopy: "Usa este correo para confirmación de pedidos, reembolsos y dudas sobre Plus.",
+    refundLabel: "Reembolsos",
+    refundCopy: "Se aceptan solicitudes de reembolso hasta 7 días después de la compra.",
+    dataLabel: "Manejo de datos",
+    dataCopy: "El guardado y la búsqueda se realizan en el scrapbook, mientras que funciones como Plus o Notion usan el servidor.",
+    nameHint: "Este nombre se usará para el recibo y la entrega de la clave.",
+    emailHint: "Usa el correo donde quieras recibir la clave Plus.",
+    methodHint: "Elige el mismo método de pago que revisaste arriba.",
+    noteHint: "Deja aquí solicitudes de factura o peticiones del equipo.",
+    submitCta: "Enviar pedido"
+  },
+  "zh-TW": {
+    eyebrow: "ss-threads Plus",
+    methodsEyebrow: "付款方式",
+    methodsTitle: "選擇付款方式",
+    methodsCopy: "僅顯示可用的付款方式。請在下方表單中再次選擇相同的項目。",
+    fulfillmentSteps: [
+      "送出訂單表單。",
+      "使用選擇的方式完成付款。",
+      "通常會在 30 分鐘內透過電子郵件收到 Plus 金鑰。"
+    ],
+    supportLabel: "支援信箱",
+    supportCopy: "訂單確認、退款及 Plus 相關問題請洽此信箱。",
+    refundLabel: "退款",
+    refundCopy: "購買後 7 天內可提出退款申請。",
+    dataLabel: "數據處理",
+    dataCopy: "儲存與搜尋以 Scrapbook 為核心，僅必要的串接功能會經過伺服器。",
+    nameHint: "此名稱將用於收據及金鑰寄送通知。",
+    emailHint: "請輸入接收 Plus 金鑰的電子郵件。",
+    methodHint: "請選擇與上方一致的付款方式。",
+    noteHint: "如有發票或團隊相關需求請在此留言。",
+    submitCta: "提交訂單"
+  },
+  vi: {
+    eyebrow: "ss-threads Plus",
+    methodsEyebrow: "Phương thức thanh toán",
+    methodsTitle: "Chọn phương thức thanh toán",
+    methodsCopy: "Chỉ hiển thị các phương thức khả dụng. Hãy chọn lại đúng phương thức đó ở form bên dưới.",
+    fulfillmentSteps: [
+      "Gửi form đặt hàng.",
+      "Hoàn tất thanh toán bằng phương thức đã chọn.",
+      "Nhận khóa Plus qua email, thường trong vòng 30 phút."
+    ],
+    supportLabel: "Email hỗ trợ",
+    supportCopy: "Dùng email này để xác nhận đơn hàng, hoàn tiền và các câu hỏi về Plus.",
+    refundLabel: "Hoàn tiền",
+    refundCopy: "Yêu cầu hoàn tiền được chấp nhận trong vòng 7 ngày sau khi mua.",
+    dataLabel: "Xử lý dữ liệu",
+    dataCopy: "Lưu và tìm kiếm hoạt động trên scrapbook, các tính năng như Plus hoặc Notion sẽ dùng máy chủ.",
+    nameHint: "Tên này được dùng cho hóa đơn và thông báo gửi khóa.",
+    emailHint: "Dùng email bạn muốn nhận khóa Plus.",
+    methodHint: "Chọn đúng phương thức thanh toán bạn đã xem ở trên.",
+    noteHint: "Để lại yêu cầu về hóa đơn hoặc yêu cầu của nhóm tại đây.",
+    submitCta: "Gửi đơn hàng"
   }
 };
 

@@ -1,6 +1,7 @@
 import { validateProLicenseToken } from "@threads/shared/license";
-import type { BotUserRecord, LicenseRecord, WebDatabase } from "@threads/web-schema";
+import type { BotArchiveRecord, BotUserRecord, LicenseRecord, WebDatabase } from "@threads/web-schema";
 import { upsertBotUser } from "./store";
+import { getRuntimeConfigSnapshot } from "./runtime-config";
 
 export const FREE_SCRAPBOOK_ARCHIVE_LIMIT = 100;
 export const FREE_SCRAPBOOK_FOLDER_LIMIT = 5;
@@ -20,6 +21,34 @@ export interface ScrapbookPlanState {
   plusLicenseId: string | null;
   plusActivatedAt: string | null;
   plusExpiresAt: string | null;
+}
+
+function safeText(value: string | null | undefined): string {
+  return value ?? "";
+}
+
+function normalizeThreadsHandle(value: string | null | undefined): string {
+  return safeText(value).trim().replace(/^@+/, "").toLowerCase();
+}
+
+function isTriggerOnlyArchiveRecord(
+  item: Pick<BotArchiveRecord, "mentionAuthorHandle" | "mentionUrl" | "targetAuthorHandle" | "targetText" | "targetUrl">,
+  botHandle: string | null | undefined
+): boolean {
+  const normalizedBotHandle = normalizeThreadsHandle(botHandle);
+  if (!normalizedBotHandle) {
+    return false;
+  }
+
+  const normalizedTargetText = safeText(item.targetText).trim().toLowerCase();
+  if (!normalizedTargetText.includes(`@${normalizedBotHandle}`)) {
+    return false;
+  }
+
+  return (
+    item.targetUrl === item.mentionUrl &&
+    normalizeThreadsHandle(item.targetAuthorHandle) === normalizeThreadsHandle(item.mentionAuthorHandle)
+  );
 }
 
 function hasLicenseExpired(license: LicenseRecord | null): boolean {
@@ -44,8 +73,11 @@ function isActivePlusLicense(license: LicenseRecord | null): boolean {
 }
 
 export function countScrapbookArchivesForUser(data: WebDatabase, userId: string): number {
+  const botHandle = getRuntimeConfigSnapshot().collector.botHandle || process.env.THREADS_BOT_HANDLE?.trim() || "";
   return (
-    data.botArchives.filter((candidate) => candidate.userId === userId).length +
+    data.botArchives.filter(
+      (candidate) => candidate.userId === userId && !isTriggerOnlyArchiveRecord(candidate, botHandle)
+    ).length +
     data.cloudArchives.filter((candidate) => candidate.userId === userId).length
   );
 }

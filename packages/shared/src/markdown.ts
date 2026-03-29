@@ -92,9 +92,14 @@ async function renderReplySection(post: ExtractedPost, mediaRefs: MarkdownMediaR
 
   const msg = await t();
   const section: string[] = [`## ${msg.mdReplySection}`, ""];
+  const total = post.authorReplies.length;
 
   post.authorReplies.forEach((reply, index) => {
-    section.push(`### ${msg.mdReplyLabel} ${index + 1}`, "", `${msg.mdSource}: ${reply.canonicalUrl}`);
+    if (index > 0) {
+      section.push("---", "");
+    }
+
+    section.push(`### ${msg.mdReplyLabel} ${index + 1}/${total}`, "", `${msg.mdSource}: ${reply.canonicalUrl}`);
     section.push(`${msg.mdAuthor}: @${reply.author}`);
 
     if (reply.publishedAt) {
@@ -136,9 +141,14 @@ async function renderReplySectionWithMessages(
   }
 
   const section: string[] = [`## ${msg.mdReplySection}`, ""];
+  const total = post.authorReplies.length;
 
   post.authorReplies.forEach((reply, index) => {
-    section.push(`### ${msg.mdReplyLabel} ${index + 1}`, "", `${msg.mdSource}: ${reply.canonicalUrl}`);
+    if (index > 0) {
+      section.push("---", "");
+    }
+
+    section.push(`### ${msg.mdReplyLabel} ${index + 1}/${total}`, "", `${msg.mdSource}: ${reply.canonicalUrl}`);
     section.push(`${msg.mdAuthor}: @${reply.author}`);
 
     if (reply.publishedAt) {

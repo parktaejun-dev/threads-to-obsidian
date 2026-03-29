@@ -26,7 +26,7 @@ Threads 글을 PC Chrome에서 Obsidian 또는 Notion으로 저장하는 Chrome 
 - **작성자 연속 답글** — 셀프 스레드(작성자 후속 답글)를 하나의 노트에 함께 저장
 - **이미지 저장** — 포스트 및 답글의 이미지를 로컬에 다운로드
 - **중복 저장 방지** — 같은 URL의 글을 중복 저장하지 않음
-- **한국어/영어 전환** — 브라우저 언어 자동 감지, 수동 전환 가능
+- **다국어 UI** — 한국어, 영어, 일본어, 포르투갈어(브라질), 스페인어, 번체중문, 베트남어를 직접 번역으로 제공
 
 고급 기능 도입 계획은 [docs/advanced-features-roadmap.md](docs/advanced-features-roadmap.md) 에 정리했습니다.
 
@@ -100,7 +100,11 @@ cp .env.example .env  # 운영용 변수 입력 후 서버 실행에 사용
 
 - SSH alias: `openclaw-oracle`
 - 배포 경로: `/home/ubuntu/projects/threads`
-- PM2 앱 이름: `threads-obsidian`
+- PM2 프로세스:
+  - `threads-obsidian-public`
+  - `threads-obsidian-public-2`
+  - `threads-obsidian-public-3`
+  - `threads-obsidian-worker`
 - public origin: `https://ss-threads.dahanda.dev`
 
 환경변수 예시:
@@ -113,11 +117,14 @@ cp .env.example .env
 
 - `THREADS_WEB_ADMIN_TOKEN` (서버 시작 시 필수, 기본값 없음)
 - `SS_THREADS_PRO_PRIVATE_JWK_FILE` 또는 `SS_THREADS_PRO_PRIVATE_JWK`
+- `THREADS_WEB_STORE_BACKEND=postgres`
+- `THREADS_WEB_POSTGRES_URL` 또는 `THREADS_WEB_DATABASE_URL`
 - `THREADS_WEBHOOK_SECRET_STABLEORDER`
 - `THREADS_WEBHOOK_SECRET_STRIPE`
 - `THREADS_PAYPAL_CLIENT_ID`, `THREADS_PAYPAL_CLIENT_SECRET`, `THREADS_PAYPAL_WEBHOOK_ID`
-- `THREADS_WEB_DB_FILE` (선택: 기본값 `output/web-admin-data.json`)
-- `THREADS_WEB_PORT` (선택: 기본값 `4173`)
+- `THREADS_WEB_RUNTIME_CONFIG_FILE` (선택: 기본값 `output/web-runtime-config.json`)
+- `THREADS_WEB_DB_FILE` (선택: 로컬/호환용 기본값 `output/web-admin-data.json`)
+- `THREADS_WEB_PUBLIC_PORT`, `THREADS_WEB_WORKER_PORT`, `THREADS_PM2_PUBLIC_INSTANCES` (split-role PM2 운영 시)
 - `THREADS_WEB_MAX_BODY_BYTES` (선택: 기본값 `1_000_000`, 최대 `2_000_000`)
 - `THREADS_WEB_PUBLIC_ORIGIN` (선택: 예시 `https://ss-threads.dahanda.dev`, 랜딩 canonical/공개 URL 고정)
 - `THREADS_BOT_HANDLE` (scrapbook 봇 handle, 예: `ss_threads_bot`)
@@ -133,8 +140,9 @@ cp .env.example .env
 - `THREADS_NOTION_CLIENT_ID` (Notion OAuth 사용 시 필수)
 - `THREADS_NOTION_CLIENT_SECRET` (Notion OAuth 사용 시 필수)
 - `THREADS_NOTION_ENCRYPTION_SECRET` (권장: Notion OAuth 토큰 암호화 전용 시크릿)
+- `THREADS_WEB_TRUST_PROXY_ALLOWLIST` (reverse proxy 뒤 운영 시 권장)
 
-기존 `THREADS_TO_OBSIDIAN_PRO_PRIVATE_JWK(_FILE)` 이름도 하위 호환용으로 계속 읽습니다.
+기존 `THREADS_TO_OBSIDIAN_PRO_PRIVATE_JWK(_FILE)` 이름도 하위 호환용으로는 읽지만, 신규 설정과 문서 예시는 `SS_THREADS_PRO_PRIVATE_JWK(_FILE)`를 기준으로 맞춘다.
 
 ### 익스텐션 ZIP 릴리스
 
@@ -154,7 +162,7 @@ SS_THREADS_PRO_PRIVATE_JWK_FILE=output/pro-license-private.jwk \
 npm run web:start
 ```
 
-PM2 운영 예시:
+로컬 단일 프로세스 PM2 예시:
 
 ```bash
 npm run build
@@ -162,7 +170,7 @@ pm2 start ecosystem.config.cjs
 pm2 save
 ```
 
-public pool + worker 분리 운영 예시:
+운영 split-role PM2 예시:
 
 ```bash
 npm run build
@@ -189,7 +197,7 @@ rsync -az --delete \
 ssh openclaw-oracle '
   cd /home/ubuntu/projects/threads &&
   npm run build &&
-  pm2 restart threads-obsidian --update-env &&
+  pm2 restart threads-obsidian-public threads-obsidian-public-2 threads-obsidian-public-3 threads-obsidian-worker --update-env &&
   pm2 save
 '
 
@@ -202,8 +210,11 @@ curl -fsS https://ss-threads.dahanda.dev/api/public/storefront | jq '.settings'
 중요:
 
 - 현재 운영 백엔드는 `postgres`다.
+- 프로덕션 런타임은 `reverse proxy -> public PM2 pool -> worker 1개` 구조다.
 - storefront 설정은 DB에 영구 저장되므로, 가격/플랜/FAQ 문구를 바꿨을 때 코드 기본값만 배포해서는 운영 화면이 바뀌지 않을 수 있다.
 - 이런 변경이 있으면 `/api/admin/storefront-settings` 또는 admin 화면에서 persisted storefront 설정도 같이 갱신해야 하며, 이 단계는 배포 절차의 필수 게이트다.
+- 비한국어 랜딩/설치/스크랩북 카피는 `persisted storefront` 한국어 문구를 자동 번안하지 않고, 코드에서 직접 번역으로 관리한다. 한국어 판매 문구를 바꿨다면 비한국어 카피도 별도로 갱신해야 한다.
+- 월간 가격 `US$2.99` 고정은 현재 정책이다.
 - 공개 URL 기준 `/ready` 응답에서 `trustProxy.ready`가 `true`인지 확인해야 reverse proxy 뒤 IP 기반 보호가 정상 동작한다.
 - public read 확장 토폴로지와 PM2 split-role 전환 절차는 `docs/public-scale-rollout.md`를 본다.
 
@@ -379,7 +390,7 @@ A Chrome extension that saves Threads posts to Obsidian or Notion from desktop C
 - **Author Reply Chains** — Capture self-thread replies in a single note
 - **Image Download** — Download post and reply images locally
 - **Duplicate Prevention** — Prevents saving the same post URL twice
-- **Korean / English** — Auto-detects browser language with manual toggle
+- **Localized UI** — Korean, English, Japanese, Brazilian Portuguese, Spanish, Traditional Chinese, and Vietnamese are maintained as direct translations
 
 The advanced feature roadmap lives in [docs/advanced-features-roadmap.md](docs/advanced-features-roadmap.md).
 
@@ -451,11 +462,14 @@ Required `.env` values:
 
 - `THREADS_WEB_ADMIN_TOKEN` (required, no fallback)
 - `SS_THREADS_PRO_PRIVATE_JWK_FILE` or `SS_THREADS_PRO_PRIVATE_JWK`
+- `THREADS_WEB_STORE_BACKEND=postgres`
+- `THREADS_WEB_POSTGRES_URL` or `THREADS_WEB_DATABASE_URL`
 - `THREADS_WEBHOOK_SECRET_STABLEORDER` (required for Stableorder webhook acceptance)
 - `THREADS_WEBHOOK_SECRET_STRIPE` (required for Stripe webhook acceptance)
 - `THREADS_PAYPAL_CLIENT_ID`, `THREADS_PAYPAL_CLIENT_SECRET`, `THREADS_PAYPAL_WEBHOOK_ID` (required for PayPal webhook verification)
-- `THREADS_WEB_DB_FILE` (optional, default: `output/web-admin-data.json`)
-- `THREADS_WEB_PORT` (optional, default: `4173`)
+- `THREADS_WEB_RUNTIME_CONFIG_FILE` (optional, default: `output/web-runtime-config.json`)
+- `THREADS_WEB_DB_FILE` (optional, compatibility/local file store example: `output/web-admin-data.json`)
+- `THREADS_WEB_PUBLIC_PORT`, `THREADS_WEB_WORKER_PORT`, `THREADS_PM2_PUBLIC_INSTANCES` (for split-role PM2)
 - `THREADS_WEB_MAX_BODY_BYTES` (optional, default: `1_000_000`, max `2_000_000`)
 - `THREADS_WEB_PUBLIC_ORIGIN` (optional, example: `https://ss-threads.dahanda.dev`, pins the public landing origin/canonical URL)
 - `THREADS_WEB_TRUST_PROXY_ALLOWLIST` (recommended when the app is behind Nginx, Caddy, or a load balancer so admin IP allowlists and IP-based rate limits use the real client IP)
@@ -463,7 +477,7 @@ Required `.env` values:
 - `THREADS_NOTION_CLIENT_SECRET` (required for Notion OAuth)
 - `THREADS_NOTION_ENCRYPTION_SECRET` (recommended dedicated secret for encrypting Notion OAuth tokens)
 
-The legacy `THREADS_TO_OBSIDIAN_PRO_PRIVATE_JWK(_FILE)` names are still accepted for backward compatibility.
+The legacy `THREADS_TO_OBSIDIAN_PRO_PRIVATE_JWK(_FILE)` names are still accepted for backward compatibility, but new setup should use `SS_THREADS_PRO_PRIVATE_JWK(_FILE)`.
 
 For testing, use these payload examples in the Sales and Plus key operations section (replace ORDER_ID with an existing order id).
 
@@ -476,7 +490,7 @@ SS_THREADS_PRO_PRIVATE_JWK_FILE=output/pro-license-private.jwk \
 npm run web:start
 ```
 
-PM2 example:
+Single-process PM2 example:
 
 ```bash
 npm run build
@@ -484,7 +498,7 @@ pm2 start ecosystem.config.cjs
 pm2 save
 ```
 
-Scaled PM2 example:
+Production split-role PM2 example:
 
 ```bash
 npm run build
@@ -494,12 +508,26 @@ pm2 save
 
 Use `https://ss-threads.dahanda.dev` for both `THREADS_WEB_PUBLIC_ORIGIN` and the registered Notion redirect URI.
 
+Production deployment currently targets the following PM2 processes:
+
+- `threads-obsidian-public`
+- `threads-obsidian-public-2`
+- `threads-obsidian-public-3`
+- `threads-obsidian-worker`
+
 Smoke checks:
 
 - `GET /health` => `200`
 - `GET /ready` => `200`
 - `GET /api/public/storefront` => `200`
 - `GET /admin`, `GET /landing` page render
+
+Operational notes:
+
+- Production requires the Postgres backend. File backend is for local or compatibility scenarios only.
+- Storefront price/plan/FAQ changes require a persisted storefront sync through `/api/admin/storefront-settings`.
+- Non-Korean landing/install/scrapbook copy is maintained as direct translation in code, not auto-derived from Korean persisted storefront copy.
+- Monthly pricing is intentionally fixed at `US$2.99`.
 
 ### Tech Stack
 

@@ -1,87 +1,66 @@
 # 출시 준비 체크리스트
 
-## 0. 상태 판단
+## 0. 운영 기준
 
-현재 버전은 상품성(무료 저장 + Plus 키 업그레이드) 기본 구조는 갖추어져 있으며, 즉시 웹 구매 페이지와 관리 화면을 통해 수동 운영이 가능합니다.
-
-## 1. 필수 사전 점검
-
-- [ ] 배포용 환경변수 점검 (`.env`)
-  - `THREADS_WEB_ADMIN_TOKEN` 고정 값 설정
-  - `SS_THREADS_PRO_PRIVATE_JWK_FILE` 또는 `SS_THREADS_PRO_PRIVATE_JWK` 설정
-  - 레거시 `THREADS_TO_OBSIDIAN_PRO_PRIVATE_JWK(_FILE)` 제거 일정 확인
-  - `THREADS_WEB_DB_FILE` 경로 설정
-- [ ] Plus 키 서명키 보관 방식 점검
-  - 운영 비밀은 코드에 커밋하지 않음
-  - 파일 권한 및 백업 정책 확정
-- [ ] Chrome Web Store 문서 일치 점검
-  - privacy policy 링크 최신 상태
-  - Store listing, permissions, data use 문구와 실제 동작 일치
-- [ ] 결제 수단 목록/안내 텍스트 확인
-  - 지원 가능한 결제 방식, 설명, 안내 문구가 정확한지 점검
-- [ ] reverse proxy 신뢰 설정 점검
-  - `THREADS_WEB_TRUST_PROXY_ALLOWLIST`가 실제 reverse proxy peer IP를 포함하는지 확인
-  - 공개 URL `https://ss-threads.dahanda.dev/ready` 호출 시 `trustProxy.ready`가 `true`인지 확인
-- [ ] persisted storefront 동기화 계획 확정
-  - 가격, 플랜 이름, FAQ, hero note, included updates 변경이 있으면 `/api/admin/storefront-settings` 반영 작업을 배포 단계에 포함
-  - 코드 기본값만 바꾸고 끝내지 않도록 담당자와 반영 순서를 명시
-
-## 2. 기능 안정성
-
-- [ ] 구매 API 응답 형식(`order`, `paymentMethod`)과 사용자 메시지 표기
-- [ ] 관리자 주문 처리 플로우
-  - 주문 생성 → 결제 확인 → 키 발급 → 이메일 템플릿 전달
-- [ ] Plus 키 검증
-- [ ] 중복/예외 처리
-  - 이메일 형식, 결제수단 선택 누락
-  - 존재하지 않는 주문/키 요청
-  - 결제 수단 비활성화 상태
-- [ ] 로그/이력 보존
-  - `output/web-admin-data.json` 변경 이력 및 백업
-- [ ] 공개 주문 API 보호
-  - `POST /api/public/orders` IP rate limit 동작 확인
-- [ ] 공개 페이지 보안 헤더
-  - `/`, `/landing`, `/checkout`에서 `Content-Security-Policy`, `Permissions-Policy`, `X-Frame-Options`, `Referrer-Policy` 확인
-
-## 3. 출시 자산
-
-- [ ] 팝업/옵션 UX(한/영) 최종 점검
-- [ ] 랜딩 페이지 실제 스크린샷 및 CWS 요구 해상도 반영
-- [ ] 스토어 아이콘, 배너, 스크린샷 정렬
-- [ ] Store description과 FAQ 문구 상호 일치
-
-## 4. 출시 후 운영(48시간)
-
-- [ ] 주문 응답 시간 SLA(예: 30분 이내) 준수 여부
-- [ ] 키 전달 지연/오류 재시도 체크
-- [ ] 관리자 이력 이벤트 모니터링
-- [ ] 사용자 문의 채널 응답
-- [ ] 설치/제거/저장 성공률 이상 징후 확인
-
-## 5. 실패 전환 기준
-
-- [ ] 결제 수단/키 발급 오류 발생이 반복될 경우 수동 구매폼 일시 중단
-- [ ] 확장 내 저장 핵심 기능의 안정성 저하 발생 시 Plus 판매 문구 보류
-- [ ] 개인정보/스토어 정책 이슈가 생기면 즉시 공지 업데이트 후 재심사 대응
-
-## 6. 실제 배포 절차 게이트
-
-- [ ] 로컬 검증 완료 후 운영 런타임 데이터와 설정 백업
-- [ ] `rsync` 반영 후 서버에서 `npm run build` 실행
-- [ ] split-role PM2 운영이면 `ecosystem.scale.config.cjs` 기준 public/worker 앱 이름과 포트 확인
+- [ ] 운영 토폴로지가 `Node + PM2 split-role + reverse proxy + postgres` 기준인지 확인
+- [ ] public origin이 `https://ss-threads.dahanda.dev`인지 확인
+- [ ] 운영 PM2 프로세스가 아래 4개인지 확인
   - `threads-obsidian-public`
   - `threads-obsidian-public-2`
   - `threads-obsidian-public-3`
   - `threads-obsidian-worker`
-  - worker 포트는 reverse proxy에 연결하지 않음
-- [ ] storefront 판매 문구 변경이 있으면 `/api/admin/storefront-settings`로 persisted storefront 먼저 동기화
-- [ ] `pm2 restart threads-obsidian --update-env && pm2 save` 실행
-  - split-role PM2면 `threads-obsidian-public`, `threads-obsidian-public-2`, `threads-obsidian-public-3`, `threads-obsidian-worker`를 재시작
-- [ ] `https://ss-threads.dahanda.dev/health` 확인
-- [ ] `https://ss-threads.dahanda.dev/ready` 확인
-  - `status=ready`
-  - `trustProxy.ready=true`
-  - `security.publicOrderRateLimit` 존재
-- [ ] `https://ss-threads.dahanda.dev/api/public/storefront` 응답이 intended persisted storefront와 일치하는지 확인
-  - `cache-control`, `etag` 헤더 존재 확인
-- [ ] `https://ss-threads.dahanda.dev/checkout` 페이지 로드 및 결제 기대치 문구 확인
+
+## 1. 환경변수와 비밀
+
+- [ ] `THREADS_WEB_ADMIN_TOKEN` 설정
+- [ ] `SS_THREADS_PRO_PRIVATE_JWK_FILE` 또는 `SS_THREADS_PRO_PRIVATE_JWK` 설정
+- [ ] `THREADS_WEB_STORE_BACKEND=postgres` 확인
+- [ ] `THREADS_WEB_POSTGRES_URL` 또는 `THREADS_WEB_DATABASE_URL` 확인
+- [ ] `THREADS_WEB_TRUST_PROXY_ALLOWLIST`가 실제 reverse proxy peer IP를 포함하는지 확인
+- [ ] `THREADS_BOT_HANDLE`, `THREADS_BOT_INGEST_TOKEN`, OAuth/App secret 계열 설정 확인
+- [ ] `THREADS_BOT_ENCRYPTION_SECRET`, `THREADS_NOTION_ENCRYPTION_SECRET` 별도 랜덤값 확인
+- [ ] 레거시 `THREADS_TO_OBSIDIAN_PRO_PRIVATE_JWK(_FILE)`는 하위 호환만 남기고 신규 설정은 `SS_THREADS_PRO_PRIVATE_JWK(_FILE)` 기준으로 사용
+
+## 2. 판매 문구와 다국어 정책
+
+- [ ] 월간 가격 `US$2.99` 고정 정책이 현재 운영 정책과 일치하는지 확인
+- [ ] 가격, 플랜 이름, FAQ, hero note, included updates를 바꿨다면 `/api/admin/storefront-settings` 동기화 절차를 배포 단계에 포함
+- [ ] 비한국어 랜딩/설치/스크랩북 문구는 직접 번역으로 관리한다는 점을 팀 내부 기준으로 확인
+- [ ] 한국어 persisted storefront를 수정했다면 비한국어 카피도 코드에서 별도 갱신했는지 확인
+- [ ] `/install`, `/scrapbook` 신규 UI의 직접 번역 누락이 없는지 확인
+
+## 3. 기능 안정성
+
+- [ ] 주문 생성, 결제 webhook, 키 발급, 전달 흐름 점검
+- [ ] scrapbook 로그인, mention 저장, 저장 상태 재확인 흐름 점검
+- [ ] 폴더 생성/이동/삭제, 묶음 내보내기, 선택 삭제 점검
+- [ ] `/`, `/install`, `/checkout`, `/scrapbook`, `/admin` 렌더 점검
+- [ ] 공개 페이지 보안 헤더와 주문 rate limit 점검
+
+## 4. 배포 직전 게이트
+
+- [ ] 로컬에서 `npm run typecheck` 통과
+- [ ] 로컬에서 `npm test` 통과
+- [ ] 로컬에서 `npm run build` 통과
+- [ ] 운영 런타임 데이터와 설정 백업
+  - 예: `/home/ubuntu/projects/threads/backups/deploy-YYYYMMDD-HHMMSS`
+- [ ] `rsync`로 운영 경로 `/home/ubuntu/projects/threads`에 반영
+- [ ] 서버에서 `npm run build` 실행
+- [ ] storefront 판매 문구 변경이 있었다면 persisted storefront 동기화 선반영
+- [ ] 아래 명령으로 split-role PM2 재시작
+
+```bash
+pm2 restart threads-obsidian-public threads-obsidian-public-2 threads-obsidian-public-3 threads-obsidian-worker --update-env && pm2 save
+```
+
+## 5. 배포 후 검증
+
+- [ ] `https://ss-threads.dahanda.dev/health` 응답 `200`
+- [ ] `https://ss-threads.dahanda.dev/ready` 응답 `200`
+- [ ] `/ready`에서 `status=ready`
+- [ ] `/ready`에서 `trustProxy.ready=true`
+- [ ] `/ready`에서 `security.publicOrderRateLimit` 존재
+- [ ] `https://ss-threads.dahanda.dev/api/public/storefront`가 intended persisted storefront와 일치
+- [ ] `https://ss-threads.dahanda.dev/checkout` 렌더 및 가격/플랜 문구 확인
+- [ ] `https://ss-threads.dahanda.dev/install` 렌더 및 직접 번역 CTA 확인
+- [ ] `https://ss-threads.dahanda.dev/scrapbook` 렌더 및 다국어 폴더/상태 UI 확인

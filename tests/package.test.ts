@@ -87,6 +87,18 @@ test("zip packaging includes consecutive author replies and reply assets", async
             videoUrl: null,
             externalUrl: "https://example.com/reply",
             thumbnailUrl: null
+          },
+          {
+            author: "writer",
+            canonicalUrl: "https://www.threads.com/@writer/post/ZIP125",
+            shortcode: "ZIP125",
+            text: "작성자가 이어서 단 두 번째 답글",
+            publishedAt: "2026-03-08T08:06:00.000Z",
+            sourceType: "text",
+            imageUrls: [],
+            videoUrl: null,
+            externalUrl: null,
+            thumbnailUrl: null
           }
         ]
       },
@@ -97,8 +109,9 @@ test("zip packaging includes consecutive author replies and reply assets", async
     const note = await zip.file(`2026-03-08_writer_ZIP123/${buildArchiveNoteFilename("2026-03-08_writer_ZIP123")}`)?.async("string");
 
     assert.ok(note?.includes("## Author Replies"));
-    assert.ok(note?.includes("Author: @writer"));
-    assert.ok(note?.includes("작성자가 이어서 단 첫 번째 답글"));
+    assert.ok(note?.includes("### Reply 1/2"));
+    assert.ok(note?.includes("### Reply 2/2"));
+    assert.ok(note?.includes("---"));
     assert.ok(note?.includes("![Reply image 1 1](03. reply-01-image-01.jpg)"));
     assert.ok(zip.file("2026-03-08_writer_ZIP123/03. reply-01-image-01.jpg"));
   } finally {
