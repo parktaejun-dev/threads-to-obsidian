@@ -32,8 +32,11 @@
             <img src="/assets/icons/icon-32.png" alt="" />
           </span>
           <span class="brand-copy">
-            <strong class="brand-name" id="brand-name"><span class="brand-accent">ss</span>-threads</strong>
-            <span class="brand-mark">__SITE_HOST__</span>
+            <strong class="brand-name brand-slogan">
+              <span class="brand-word"><span class="brand-accent">S</span>ave,</span>
+              <span class="brand-word"><span class="brand-accent">S</span>ync,</span>
+              <span class="brand-word"><span class="brand-accent">ss</span>-threads</span>
+            </strong>
           </span>
         </a>
 
@@ -49,59 +52,225 @@
               <option value="vi">Tiếng Việt</option>
             </select>
           </div>
-          <a id="topbar-primary-cta" class="topbar-link topbar-link-strong" href="/checkout" data-i18n="primaryCta">Plus 구매</a>
+          <a id="topbar-primary-cta" class="topbar-link topbar-link-strong" href="/scrapbook" data-i18n="productBCta">스크랩북 열기</a>
         </div>
       </header>
 
       <main>
         <section class="hero">
           <div class="hero-copy">
-            <p id="hero-eyebrow" class="eyebrow" data-i18n="heroEyebrow">Save&Store</p>
-            <h1 id="headline">
-              <span class="headline-row">Extension on PC. @Mentions on mobile.</span>
-              <span class="headline-row">Save&Sync, ss-threads</span>
-            </h1>
+            <p id="hero-eyebrow" class="eyebrow">Threads 저장</p>
+            <h1 id="headline">__LANDING_HEADLINE__</h1>
             <p id="subheadline" class="lead"></p>
 
-            <div class="hero-actions">
-              <a id="hero-mobile-cta" class="primary-cta" href="/scrapbook" data-i18n="productBCta">멘션 scrapbook</a>
-              <a id="hero-desktop-cta" class="secondary-cta" href="" data-i18n="productACta">extension 설치</a>
+            <div class="hero-proofline" aria-label="Trust signals">
+              <span id="hero-proof-1" class="hero-proof-pill">무료로 시작</span>
+              <span id="hero-proof-2" class="hero-proof-pill">7일 환불</span>
+              <span id="hero-proof-3" class="hero-proof-pill">이메일 지원</span>
             </div>
+
+            <div class="hero-actions">
+              <a id="hero-mobile-cta" class="primary-cta" href="/scrapbook" data-i18n="productBCta">스크랩북 열기</a>
+              <a id="hero-desktop-cta" class="secondary-cta" href="" data-i18n="productACta">Chrome 확장 설치</a>
+            </div>
+
+            <article class="hero-price-card">
+              <p id="price-label" class="hero-price-label">ss-threads Plus</p>
+              <div class="hero-price-row">
+                <strong id="price-value">US$19.99</strong>
+              </div>
+              <p id="included-updates" class="price-copy">
+                월 US$2.99 · 연 US$19.99 · Free는 저장, 태그, 검색 · Plus는 저장 한도, 관심 계정, 반응 보기
+              </p>
+            </article>
+          </div>
+
+          <div class="hero-visual">
+            <article class="panel hero-mention-box">
+              <span id="hero-mention-text"></span>
+            </article>
+
           </div>
         </section>
 
-        <section id="products" class="section">
-          <article id="mobile-flow" class="flow-row">
-            <div class="flow-copy">
-              <p id="product-b-tag" class="product-tag" data-i18n="productBTag">Mobile</p>
-              <h3 id="product-b-title" data-i18n="productBTitle"><span class="brand-accent">ss</span>-threads</h3>
-              <p id="product-b-desc" class="flow-desc" data-i18n="productBDesc"></p>
-            </div>
-          </article>
+        <section class="section route-section" aria-labelledby="routes-title">
+          <div class="section-head">
+            <p id="routes-eyebrow" class="eyebrow">저장 방법</p>
+            <h2 id="routes-title">PC와 모바일, 쓰는 방식이 다릅니다</h2>
+            <p id="routes-copy" class="section-copy">
+              PC는 보고 있는 글을 바로 저장합니다. 모바일은 댓글 한 줄로 나중에 볼 글을 모아 둡니다.
+            </p>
+          </div>
 
-          <article id="desktop-flow" class="flow-row">
-            <div class="flow-copy">
-              <p id="product-a-tag" class="product-tag" data-i18n="productATag">PC</p>
-              <h3 id="product-a-title" data-i18n="productATitle">Save&Sync</h3>
-              <p id="product-a-desc" class="flow-desc" data-i18n="productADesc"></p>
-            </div>
-          </article>
+          <div class="route-grid">
+            <article id="desktop-flow" class="route-card">
+              <div class="route-card-head">
+                <p id="product-a-tag" class="product-tag" data-i18n="productATag">PC</p>
+                <h3 id="product-a-title" data-i18n="productATitle">PC는 Chrome 확장</h3>
+                <p id="product-a-desc" class="flow-desc" data-i18n="productADesc"></p>
+              </div>
+
+              <ul id="product-a-points" class="route-points"></ul>
+
+              <div class="flow-actions">
+                <a id="product-a-cta" class="secondary-cta" href="/install" data-i18n="guideInstallCta">설치 안내</a>
+              </div>
+            </article>
+
+            <article id="mobile-flow" class="route-card">
+              <div class="route-card-head">
+                <p id="product-b-tag" class="product-tag" data-i18n="productBTag">모바일</p>
+                <h3 id="product-b-title" data-i18n="productBTitle">모바일은 댓글 저장</h3>
+                <p id="product-b-desc" class="flow-desc" data-i18n="productBDesc"></p>
+              </div>
+
+              <ul id="product-b-points" class="route-points"></ul>
+
+              <div class="flow-actions">
+                <a id="product-b-cta" class="secondary-cta" href="/scrapbook" data-i18n="productBCta">스크랩북 열기</a>
+              </div>
+            </article>
+          </div>
         </section>
 
+        <section class="section plan-section" aria-labelledby="plan-title">
+          <div class="section-head">
+            <p id="plan-eyebrow" class="eyebrow">요금</p>
+            <h2 id="plan-title">먼저 Free로 시작하고, 필요할 때 Plus</h2>
+            <p id="plan-copy" class="section-copy">
+              Free는 저장, 태그, 검색까지. Plus는 저장 한도를 넓히고 관심 계정과 반응 보기까지 지원합니다.
+            </p>
+          </div>
+
+          <div class="plan-grid">
+            <article class="plan-card">
+              <p class="plan-tier">Free</p>
+              <h3 id="plan-free-title">Free</h3>
+              <p id="plan-free-copy" class="plan-copy">
+                가볍게 저장하고 다시 찾기에 충분합니다.
+              </p>
+              <ul id="plan-free-list" class="plan-list"></ul>
+            </article>
+
+            <article class="plan-card plan-card-plus">
+              <p class="plan-tier plan-tier-plus">Plus</p>
+              <h3 id="plan-plus-title">Plus</h3>
+              <p id="plan-plus-copy" class="plan-copy">
+                저장을 많이 하거나, 더 자주 확인할 때 어울립니다.
+              </p>
+              <ul id="plan-plus-list" class="plan-list"></ul>
+              <a id="price-card-cta" class="primary-cta primary-cta-block" href="/checkout">Plus 보기</a>
+            </article>
+          </div>
+        </section>
+
+        <section class="section capability-section" aria-labelledby="capability-title">
+          <div class="capability-head">
+            <p id="capability-eyebrow" class="eyebrow">저장한 뒤</p>
+            <h2 id="capability-title">저장한 글을 다시 쓰기 쉽게</h2>
+            <p id="capability-copy" class="capability-copy">
+              태그와 검색으로 찾고, 관심 계정과 내 반응도 한곳에서 봅니다.
+            </p>
+          </div>
+
+          <div class="capability-grid">
+            <article class="capability-card">
+              <h3 id="capability-search-title">검색</h3>
+              <p id="capability-search-desc" class="capability-desc">저장한 글을 다시 찾습니다.</p>
+            </article>
+
+            <article class="capability-card">
+              <h3 id="capability-tag-title">태그</h3>
+              <p id="capability-tag-desc" class="capability-desc">태그로 묶어서 봅니다.</p>
+            </article>
+
+            <article class="capability-card">
+              <h3 id="capability-watchlists-title">관심 계정</h3>
+              <p id="capability-watchlists-desc" class="capability-desc">보고 싶은 계정의 새 글을 모아봅니다.</p>
+            </article>
+
+            <article class="capability-card">
+              <h3 id="capability-insights-title">반응 보기</h3>
+              <p id="capability-insights-desc" class="capability-desc">내 계정의 반응 변화를 확인합니다.</p>
+            </article>
+          </div>
+        </section>
+
+        <section class="section save-route-section hidden" aria-labelledby="save-route-title">
+          <div class="capability-head">
+            <p class="eyebrow">정리 방식</p>
+            <h2 id="save-route-title">저장한 글은 한곳에 모이고, 태그로 다시 찾습니다</h2>
+            <p class="capability-copy">저장 위치와 태그 흐름을 먼저 보여 주면, 쓰는 방법이 훨씬 빠르게 이해됩니다.</p>
+          </div>
+
+          <div class="save-route-grid">
+            <article class="save-route-card">
+              <p class="product-tag">PC 저장</p>
+              <h3>Notion, Obsidian, 스크랩북 중 선택</h3>
+              <p class="capability-desc">PC에서는 보고 있는 글을 원하는 곳에 바로 저장합니다.</p>
+            </article>
+
+            <article class="save-route-card">
+              <p class="product-tag">스크랩북</p>
+              <h3>저장한 글을 한곳에 모아 두기</h3>
+              <p class="capability-desc">스크랩북에 쌓아 두고 검색과 태그로 다시 찾습니다.</p>
+            </article>
+
+            <article class="save-route-card">
+              <p class="product-tag">댓글 태그</p>
+              <h3>댓글에 @mention과 #태그 함께 쓰기</h3>
+              <p class="capability-desc">모바일에서는 댓글 한 줄로 저장하고, #태그로 함께 정리합니다.</p>
+            </article>
+
+            <article class="save-route-card">
+              <p class="product-tag">태그 필터</p>
+              <h3>붙여 둔 태그로 필요한 글만 보기</h3>
+              <p class="capability-desc">같은 태그를 눌러 필요한 글만 바로 모아볼 수 있습니다.</p>
+            </article>
+          </div>
+        </section>
+
+        <section class="section trust-section" aria-labelledby="trust-title">
+          <div class="section-head">
+            <p id="trust-eyebrow" class="eyebrow">지원과 신뢰</p>
+            <h2 id="trust-title">결제 전 마지막 질문도 여기서 끝냅니다</h2>
+            <p id="trust-copy" class="section-copy">
+              지원 이메일, 환불, 데이터 처리 요약, 자주 묻는 질문을 한 번에 보여줍니다.
+            </p>
+          </div>
+
+          <div class="trust-grid">
+            <article class="panel trust-card">
+              <p id="trust-support-label" class="panel-title">지원 이메일</p>
+              <a
+                id="support-email-link-secondary"
+                class="support-email"
+                href="mailto:hello@oxcorp.ninja"
+              >hello@oxcorp.ninja</a>
+              <p id="trust-support-copy" class="panel-copy">
+                결제 확인, 환불 요청, 키 전달 문의는 이 이메일로 처리합니다.
+              </p>
+            </article>
+
+            <article class="panel trust-card">
+              <p id="trust-data-label" class="panel-title">데이터 처리</p>
+              <p id="trust-data-copy" class="panel-copy">
+                기본 저장과 검색은 웹 보관함 중심으로 작동하고, Plus 키 활성화나 Notion 저장, AI 정리처럼 일부 기능은 서버 연동이 포함됩니다.
+              </p>
+            </article>
+          </div>
+
+          <div id="faq-list" class="faq-list"></div>
+        </section>
       </main>
 
       <footer class="site-footer">
+        <a id="footer-extension-link" class="footer-link" href="">Chrome 확장 설치</a>
         <span class="footer-domain">__SITE_HOST__</span>
-        <a
-          id="footer-extension-link"
-          href=""
-          target="_blank"
-          rel="noreferrer"
-          data-i18n="productACta"
-        >extension 설치</a>
       </footer>
     </div>
 
+    <script id="landing-bootstrap" type="application/json">__LANDING_BOOTSTRAP__</script>
     <script type="module" src="/assets/landing.js"></script>
   </body>
 </html>
