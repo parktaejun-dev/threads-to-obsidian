@@ -32,6 +32,7 @@ function buildCloudArchive(overrides: Partial<CloudArchiveRecentRecord> = {}): C
     archiveId: "cloud-1",
     archiveUrl: "https://ss-threads.dahanda.dev/scrapbook/@writer/archive/cloud-1",
     title: "Cloud archive title",
+    savedAt: "2026-03-27T10:05:00.000Z",
     updatedAt: "2026-03-28T10:05:00.000Z",
     warning: null,
     origin: "cloud",
@@ -48,6 +49,7 @@ function buildRecentSave(overrides: Partial<RecentSave> = {}): RecentSave {
     shortcode: "LOCAL111",
     author: "writer",
     title: "Local archive",
+    savedAt: "2026-03-28T09:00:00.000Z",
     downloadedAt: "2026-03-28T09:00:00.000Z",
     archiveName: "Local archive",
     contentHash: "local-hash",
@@ -76,6 +78,7 @@ test("buildRecentSaveFromCloudArchive maps cloud archive metadata into a popup r
   assert.equal(recent.remotePageId, "cloud-1");
   assert.equal(recent.remotePageUrl, archive.archiveUrl);
   assert.equal(recent.remoteOrigin, "cloud");
+  assert.equal(recent.savedAt, archive.savedAt);
   assert.equal(recent.downloadedAt, archive.updatedAt);
 });
 
@@ -87,6 +90,7 @@ test("mergeRecentSavesWithCloudArchives replaces cloud cache with server archive
     savedVia: "cloud",
     canonicalUrl: "https://www.threads.com/@writer/post/AAA111",
     shortcode: "AAA111",
+    savedAt: "2026-03-20T08:00:00.000Z",
     downloadedAt: "2026-03-28T08:00:00.000Z",
     archiveName: "Old cloud cache",
     contentHash: "old-hash",
@@ -101,8 +105,8 @@ test("mergeRecentSavesWithCloudArchives replaces cloud cache with server archive
   const merged = mergeRecentSavesWithCloudArchives([localObsidian, staleCloud], [freshCloud]);
 
   assert.equal(merged.length, 2);
-  assert.equal(merged[0]?.id, "cloud-1");
-  assert.equal(merged[0]?.contentHash, "hash-1");
-  assert.equal(merged[1]?.id, "local-1");
+  assert.equal(merged[0]?.id, "local-1");
+  assert.equal(merged[1]?.id, "cloud-1");
+  assert.equal(merged[1]?.contentHash, "hash-1");
   assert.equal(merged.some((item) => item.id === "legacy-cloud-cache"), false);
 });

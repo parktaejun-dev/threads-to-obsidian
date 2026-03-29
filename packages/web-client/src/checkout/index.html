@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko">
+<html lang="__INITIAL_LOCALE__">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -15,7 +15,7 @@
     <link rel="apple-touch-icon" href="/assets/icons/icon-128.png" />
     <link rel="stylesheet" href="/checkout/styles.css" />
   </head>
-  <body data-site-host="__SITE_HOST__" data-site-url="__SITE_URL__">
+  <body data-site-host="__SITE_HOST__" data-site-url="__SITE_URL__" data-initial-locale="__INITIAL_LOCALE__">
     <div class="checkout-page">
       <header class="checkout-topbar">
         <a class="brand-link" href="/" aria-label="Back to home">
@@ -23,205 +23,274 @@
             <span class="brand-icon" aria-hidden="true">
               <img src="/assets/icons/icon-32.png" alt="" />
             </span>
-            <span class="brand-name">ss-threads</span>
+            <strong class="brand-name brand-slogan">
+              <span class="brand-word"><span class="brand-accent">S</span>ave,</span>
+              <span class="brand-word"><span class="brand-accent">S</span>ync,</span>
+              <span class="brand-word"><span class="brand-accent">ss</span>-threads</span>
+            </strong>
           </div>
         </a>
+
+        <div class="checkout-topbar-actions">
+          <div class="web-lang-switch" aria-label="Language switcher">
+            <select class="web-lang-select" data-web-lang-select aria-label="Select language">
+              <option value="ko">한국어</option>
+              <option value="en">English</option>
+              <option value="ja">日本語</option>
+              <option value="pt-BR">Português (Brasil)</option>
+              <option value="es">Español</option>
+              <option value="zh-TW">繁體中文</option>
+              <option value="vi">Tiếng Việt</option>
+            </select>
+          </div>
+        </div>
       </header>
 
       <main class="checkout-main">
-        <div class="checkout-card">
-          <div class="checkout-summary">
-            <h1 data-i18n="commerceH2">Plus 구매</h1>
-            <p class="checkout-lead" data-i18n="commerceLead">연 US$19.99 또는 월 US$2.99. 결제 확인 후 키를 이메일로 보냅니다.</p>
+        <div class="checkout-shell">
+          <section class="checkout-column checkout-overview">
+            <div class="checkout-summary">
+              <p id="checkout-eyebrow" class="checkout-eyebrow">ss-threads Plus</p>
+              <h1 id="checkout-title" data-i18n="commerceH2">Plus 구매</h1>
+              <p id="checkout-lead" class="checkout-lead" data-i18n="commerceLead">연 US$19.99 또는 월 US$2.99. 결제 확인 후 키를 이메일로 보냅니다.</p>
 
-            <div class="checkout-cycle-picker">
-              <label class="checkout-cycle-option">
-                <input type="radio" name="billingCycle" value="yearly" checked />
-                <span>연간</span>
-                <strong>US$19.99</strong>
+              <div class="checkout-cycle-picker">
+                <label class="checkout-cycle-option">
+                  <input type="radio" name="billingCycle" value="yearly" checked />
+                  <span>연간</span>
+                  <strong>US$19.99</strong>
+                </label>
+                <label class="checkout-cycle-option">
+                  <input type="radio" name="billingCycle" value="monthly" />
+                  <span>월간</span>
+                  <strong>US$2.99</strong>
+                </label>
+              </div>
+
+              <div class="checkout-price-card">
+                <div class="checkout-price-row">
+                  <span id="checkout-price-value" class="checkout-price">US$19.99</span>
+                  <span id="checkout-price-note" class="checkout-price-note" data-i18n="priceNote">연간 기본</span>
+                </div>
+
+                <ul class="checkout-includes">
+                  <li id="checkout-include-archive-limit">Scrapbook 저장글 1,000개</li>
+                  <li id="checkout-include-folder-limit">Scrapbook 폴더 50개</li>
+                  <li id="checkout-include-monitoring">Watchlists · Insights</li>
+                  <li id="checkout-include-extension-advanced">Extension 파일 규칙 · Notion · AI 정리</li>
+                  <li id="checkout-include-shared-key">같은 Plus 키로 scrapbook + extension 연결</li>
+                  <li data-i18n="commerceRefund">7일 환불</li>
+                </ul>
+              </div>
+
+              <div class="checkout-compare">
+                <table class="checkout-plan-table">
+                  <thead>
+                    <tr>
+                      <th data-i18n="compareColFeature">기능</th>
+                      <th>Free</th>
+                      <th>Plus</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr class="checkout-section-row">
+                      <td id="compare-section-current" colspan="3">현재 제공 기능</td>
+                    </tr>
+                    <tr>
+                      <td id="compare-row-save-post">현재 글 저장</td>
+                      <td class="cmp-check">✓</td>
+                      <td class="cmp-check">✓</td>
+                    </tr>
+                    <tr>
+                      <td id="compare-row-images">이미지 저장</td>
+                      <td class="cmp-check">✓</td>
+                      <td class="cmp-check">✓</td>
+                    </tr>
+                    <tr>
+                      <td id="compare-row-replies">작성자 연속 답글</td>
+                      <td class="cmp-check">✓</td>
+                      <td class="cmp-check">✓</td>
+                    </tr>
+                    <tr>
+                      <td id="compare-row-duplicates">중복 건너뜀</td>
+                      <td class="cmp-check">✓</td>
+                      <td class="cmp-check">✓</td>
+                    </tr>
+                    <tr>
+                      <td id="compare-row-mention-scrapbook">mention inbox</td>
+                      <td class="cmp-check">✓</td>
+                      <td class="cmp-check">✓</td>
+                    </tr>
+                    <tr>
+                      <td id="compare-row-searches">Searches</td>
+                      <td class="cmp-check">✓</td>
+                      <td class="cmp-check">✓</td>
+                    </tr>
+                    <tr>
+                      <td id="compare-row-markdown-export">Markdown export</td>
+                      <td class="cmp-check">✓</td>
+                      <td class="cmp-check">✓</td>
+                    </tr>
+                    <tr>
+                      <td id="compare-row-zip-export">ZIP export</td>
+                      <td class="cmp-check">✓</td>
+                      <td class="cmp-check">✓</td>
+                    </tr>
+                    <tr class="checkout-section-row">
+                      <td id="compare-section-plus" colspan="3">Plus로 확장되는 항목</td>
+                    </tr>
+                    <tr>
+                      <td id="compare-row-archive-limit">Scrapbook 저장글 한도</td>
+                      <td>100</td>
+                      <td>1,000</td>
+                    </tr>
+                    <tr>
+                      <td id="compare-row-folder-limit">Scrapbook 폴더 한도</td>
+                      <td>5</td>
+                      <td>50</td>
+                    </tr>
+                    <tr>
+                      <td id="compare-row-watchlists">Watchlists</td>
+                      <td class="cmp-dash">—</td>
+                      <td class="cmp-check">✓</td>
+                    </tr>
+                    <tr>
+                      <td id="compare-row-insights">Insights</td>
+                      <td class="cmp-dash">—</td>
+                      <td class="cmp-check">✓</td>
+                    </tr>
+                    <tr>
+                      <td id="compare-row-file-name">파일 이름 규칙</td>
+                      <td class="cmp-dash">—</td>
+                      <td class="cmp-check">✓</td>
+                    </tr>
+                    <tr>
+                      <td id="compare-row-save-path">저장 경로 규칙</td>
+                      <td class="cmp-dash">—</td>
+                      <td class="cmp-check">✓</td>
+                    </tr>
+                    <tr>
+                      <td id="compare-row-notion-data-source">Notion data source 저장</td>
+                      <td class="cmp-dash">—</td>
+                      <td class="cmp-check">✓</td>
+                    </tr>
+                    <tr>
+                      <td id="compare-row-notion-media-upload">Notion 내부 미디어 업로드</td>
+                      <td class="cmp-dash">—</td>
+                      <td class="cmp-check">✓</td>
+                    </tr>
+                    <tr>
+                      <td id="compare-row-ai-summary">AI 요약</td>
+                      <td class="cmp-dash">—</td>
+                      <td class="cmp-check">✓</td>
+                    </tr>
+                    <tr>
+                      <td id="compare-row-ai-tags">AI 태그</td>
+                      <td class="cmp-dash">—</td>
+                      <td class="cmp-check">✓</td>
+                    </tr>
+                    <tr>
+                      <td id="compare-row-ai-frontmatter">AI frontmatter</td>
+                      <td class="cmp-dash">—</td>
+                      <td class="cmp-check">✓</td>
+                    </tr>
+                  </tbody>
+                </table>
+                <p class="compare-note">
+                  <strong id="compare-note-title">Plus expands limits, watchlists, insights, and extension advanced save</strong><br>
+                  <span id="compare-note-body">이 체크아웃에서 받은 같은 Plus 키를 scrapbook과 extension 양쪽에 붙여넣을 수 있습니다.</span>
+                </p>
+                <p id="compare-scope-note" class="compare-note compare-note-secondary">
+                  searches는 Free에서도 사용할 수 있습니다. watchlists와 insights는 Plus에서 열리며, searches·watchlists·insights 사용에는 Threads 로그인과 일부 권한 재연결이 필요합니다.
+                </p>
+              </div>
+            </div>
+          </section>
+
+          <section class="checkout-column checkout-order-column">
+            <article class="checkout-panel checkout-methods-panel">
+              <div class="checkout-panel-head">
+                <p id="checkout-methods-eyebrow" class="checkout-panel-eyebrow">결제수단</p>
+                <h2 id="checkout-methods-title" class="checkout-panel-title">원하는 결제 방법을 먼저 고릅니다</h2>
+                <p id="checkout-methods-copy" class="checkout-panel-copy">
+                  활성화된 결제수단만 표시합니다. 미리 설명을 읽고 폼에서 같은 수단을 선택하면 됩니다.
+                </p>
+              </div>
+
+              <div id="payment-methods" class="method-grid"></div>
+            </article>
+
+            <article class="checkout-panel checkout-fulfillment">
+              <strong id="checkout-fulfillment-title">즉시 활성화 아님</strong>
+              <p id="checkout-fulfillment-copy">주문 접수 후 결제를 확인하고, 보통 30분 안에 Plus 키를 이메일로 보내드립니다.</p>
+              <ol id="checkout-fulfillment-steps" class="checkout-step-list"></ol>
+            </article>
+
+            <div class="checkout-trust-grid">
+              <article class="checkout-panel checkout-trust-card">
+                <p id="checkout-support-label" class="checkout-trust-label">지원 메일</p>
+                <a id="checkout-support-email" class="support-email" href="mailto:hello@oxcorp.ninja">hello@oxcorp.ninja</a>
+                <p id="checkout-support-copy" class="checkout-trust-copy">
+                  주문 확인, 환불, 키 전달 문의는 이 이메일로 처리합니다.
+                </p>
+              </article>
+
+              <article class="checkout-panel checkout-trust-card">
+                <p id="checkout-refund-label" class="checkout-trust-label">환불</p>
+                <p id="checkout-refund-copy" class="checkout-trust-copy">
+                  구매 후 7일 이내라면 환불 요청을 보낼 수 있습니다.
+                </p>
+              </article>
+
+              <article class="checkout-panel checkout-trust-card">
+                <p id="checkout-data-label" class="checkout-trust-label">데이터 처리</p>
+                <p id="checkout-data-copy" class="checkout-trust-copy">
+                  기본 저장과 검색은 웹 보관함 중심이며, Plus 키 활성화나 Notion 저장, AI 정리처럼 일부 기능은 서버 연동이 포함됩니다.
+                </p>
+              </article>
+            </div>
+
+            <form id="purchase-form" class="checkout-form">
+              <label>
+                <span data-i18n="formNameLabel">이름</span>
+                <small id="form-name-hint" class="form-hint">영수증과 라이선스에 표시할 이름입니다.</small>
+                <input type="text" name="buyerName" required placeholder="홍길동" data-i18n-ph="phName" />
               </label>
-              <label class="checkout-cycle-option">
-                <input type="radio" name="billingCycle" value="monthly" />
-                <span>월간</span>
-                <strong>US$2.99</strong>
+
+              <label>
+                <span data-i18n="formEmailLabel">이메일</span>
+                <small id="form-email-hint" class="form-hint">Plus 키를 받을 이메일을 적어주세요.</small>
+                <input type="email" name="buyerEmail" required placeholder="you@example.com" />
               </label>
-            </div>
 
-            <div class="checkout-price-row">
-              <span id="checkout-price-value" class="checkout-price">US$19.99</span>
-              <span id="checkout-price-note" class="checkout-price-note" data-i18n="priceNote">연간 기본</span>
-            </div>
+              <label>
+                <span data-i18n="formMethodLabel">결제수단</span>
+                <small id="form-method-hint" class="form-hint">위에서 확인한 결제수단을 여기서 선택합니다.</small>
+                <select name="paymentMethodId" required>
+                  <option value="" data-i18n="phMethod">결제수단을 선택하세요</option>
+                </select>
+              </label>
 
-            <ul class="checkout-includes">
-              <li id="checkout-include-archive-limit">Scrapbook 저장글 1,000개</li>
-              <li id="checkout-include-folder-limit">Scrapbook 폴더 50개</li>
-              <li id="checkout-include-monitoring">Watchlists · Insights</li>
-              <li id="checkout-include-extension-advanced">Extension 파일 규칙 · Notion · AI 정리</li>
-              <li id="checkout-include-shared-key">같은 Plus 키로 scrapbook + extension 연결</li>
-              <li data-i18n="commerceRefund">7일 환불</li>
-            </ul>
+              <input type="hidden" name="billingCycle" value="yearly" />
 
-            <div class="checkout-compare">
-              <table class="checkout-plan-table">
-                <thead>
-                  <tr>
-                    <th data-i18n="compareColFeature">기능</th>
-                    <th>Free</th>
-                    <th>Plus</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr class="checkout-section-row">
-                    <td id="compare-section-current" colspan="3">현재 제공 기능</td>
-                  </tr>
-                  <tr>
-                    <td id="compare-row-save-post">현재 글 저장</td>
-                    <td class="cmp-check">✓</td>
-                    <td class="cmp-check">✓</td>
-                  </tr>
-                  <tr>
-                    <td id="compare-row-images">이미지 저장</td>
-                    <td class="cmp-check">✓</td>
-                    <td class="cmp-check">✓</td>
-                  </tr>
-                  <tr>
-                    <td id="compare-row-replies">작성자 연속 답글</td>
-                    <td class="cmp-check">✓</td>
-                    <td class="cmp-check">✓</td>
-                  </tr>
-                  <tr>
-                    <td id="compare-row-duplicates">중복 건너뜀</td>
-                    <td class="cmp-check">✓</td>
-                    <td class="cmp-check">✓</td>
-                  </tr>
-                  <tr>
-                    <td id="compare-row-mention-scrapbook">mention inbox</td>
-                    <td class="cmp-check">✓</td>
-                    <td class="cmp-check">✓</td>
-                  </tr>
-                  <tr>
-                    <td id="compare-row-searches">Searches</td>
-                    <td class="cmp-check">✓</td>
-                    <td class="cmp-check">✓</td>
-                  </tr>
-                  <tr>
-                    <td id="compare-row-markdown-export">Markdown export</td>
-                    <td class="cmp-check">✓</td>
-                    <td class="cmp-check">✓</td>
-                  </tr>
-                  <tr>
-                    <td id="compare-row-zip-export">ZIP export</td>
-                    <td class="cmp-check">✓</td>
-                    <td class="cmp-check">✓</td>
-                  </tr>
-                  <tr class="checkout-section-row">
-                    <td id="compare-section-plus" colspan="3">Plus로 확장되는 항목</td>
-                  </tr>
-                  <tr>
-                    <td id="compare-row-archive-limit">Scrapbook 저장글 한도</td>
-                    <td>100</td>
-                    <td>1,000</td>
-                  </tr>
-                  <tr>
-                    <td id="compare-row-folder-limit">Scrapbook 폴더 한도</td>
-                    <td>5</td>
-                    <td>50</td>
-                  </tr>
-                  <tr>
-                    <td id="compare-row-watchlists">Watchlists</td>
-                    <td class="cmp-dash">—</td>
-                    <td class="cmp-check">✓</td>
-                  </tr>
-                  <tr>
-                    <td id="compare-row-insights">Insights</td>
-                    <td class="cmp-dash">—</td>
-                    <td class="cmp-check">✓</td>
-                  </tr>
-                  <tr>
-                    <td id="compare-row-file-name">파일 이름 규칙</td>
-                    <td class="cmp-dash">—</td>
-                    <td class="cmp-check">✓</td>
-                  </tr>
-                  <tr>
-                    <td id="compare-row-save-path">저장 경로 규칙</td>
-                    <td class="cmp-dash">—</td>
-                    <td class="cmp-check">✓</td>
-                  </tr>
-                  <tr>
-                    <td id="compare-row-notion-data-source">Notion data source 저장</td>
-                    <td class="cmp-dash">—</td>
-                    <td class="cmp-check">✓</td>
-                  </tr>
-                  <tr>
-                    <td id="compare-row-notion-media-upload">Notion 내부 미디어 업로드</td>
-                    <td class="cmp-dash">—</td>
-                    <td class="cmp-check">✓</td>
-                  </tr>
-                  <tr>
-                    <td id="compare-row-ai-summary">AI 요약</td>
-                    <td class="cmp-dash">—</td>
-                    <td class="cmp-check">✓</td>
-                  </tr>
-                  <tr>
-                    <td id="compare-row-ai-tags">AI 태그</td>
-                    <td class="cmp-dash">—</td>
-                    <td class="cmp-check">✓</td>
-                  </tr>
-                  <tr>
-                    <td id="compare-row-ai-frontmatter">AI frontmatter</td>
-                    <td class="cmp-dash">—</td>
-                    <td class="cmp-check">✓</td>
-                  </tr>
-                </tbody>
-              </table>
-              <p class="compare-note">
-                <strong id="compare-note-title">Plus expands limits, watchlists, insights, and extension advanced save</strong><br>
-                <span id="compare-note-body">이 체크아웃에서 받은 같은 Plus 키를 scrapbook과 extension 양쪽에 붙여넣을 수 있습니다.</span>
-              </p>
-              <p id="compare-scope-note" class="compare-note compare-note-secondary">
-                searches는 Free에서도 사용할 수 있습니다. watchlists와 insights는 Plus에서 열리며, searches·watchlists·insights 사용에는 Threads 로그인과 일부 권한 재연결이 필요합니다.
-              </p>
-            </div>
-          </div>
+              <label class="checkout-note-field">
+                <span data-i18n="formNoteLabel">메모</span>
+                <small id="form-note-hint" class="form-hint">세금계산서, 통화, 팀용 좌석, 특이사항이 있으면 남겨주세요.</small>
+                <textarea
+                  name="note"
+                  rows="3"
+                  placeholder="세금계산서, 통화, 팀용 좌석 요청 등"
+                  data-i18n-ph="phNote"
+                ></textarea>
+              </label>
 
-          <div id="payment-methods" class="method-grid"></div>
+              <button id="checkout-submit-button" type="submit" data-i18n="formSubmitBtn">구매 요청 보내기</button>
+              <p class="form-remark" data-i18n="formRemark">결제 확인 후 Plus 키를 이메일로 보내드립니다.</p>
+              <div id="purchase-status" class="status-panel hidden"></div>
+            </form>
 
-          <form id="purchase-form" class="checkout-form">
-            <label>
-              <span data-i18n="formNameLabel">이름</span>
-              <input type="text" name="buyerName" required placeholder="홍길동" data-i18n-ph="phName" />
-            </label>
-
-            <label>
-              <span data-i18n="formEmailLabel">이메일</span>
-              <input type="email" name="buyerEmail" required placeholder="you@example.com" />
-            </label>
-
-            <label>
-              <span data-i18n="formMethodLabel">결제수단</span>
-              <select name="paymentMethodId" required>
-                <option value="" data-i18n="phMethod">결제수단을 선택하세요</option>
-              </select>
-            </label>
-
-            <input type="hidden" name="billingCycle" value="yearly" />
-
-            <label class="checkout-note-field">
-              <span data-i18n="formNoteLabel">메모</span>
-              <textarea
-                name="note"
-                rows="2"
-                placeholder="세금계산서, 통화, 팀용 좌석 요청 등"
-                data-i18n-ph="phNote"
-              ></textarea>
-            </label>
-
-            <button type="submit" data-i18n="formSubmitBtn">구매 요청 보내기</button>
-            <p class="form-remark" data-i18n="formRemark">결제 확인 후 Plus 키를 이메일로 보내드립니다.</p>
-            <div id="purchase-status" class="status-panel hidden"></div>
-          </form>
-
-          <p class="checkout-note" data-i18n="commerceNote">주문 요청 후 결제를 확인하는 방식으로 운영합니다.</p>
+            <p class="checkout-note" data-i18n="commerceNote">주문 요청 후 결제를 확인하는 방식으로 운영합니다.</p>
+          </section>
         </div>
       </main>
 

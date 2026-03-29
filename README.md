@@ -162,6 +162,14 @@ pm2 start ecosystem.config.cjs
 pm2 save
 ```
 
+public pool + worker 분리 운영 예시:
+
+```bash
+npm run build
+pm2 start ecosystem.scale.config.cjs
+pm2 save
+```
+
 현재 운영 서버 재배포 예시:
 
 ```bash
@@ -195,7 +203,9 @@ curl -fsS https://ss-threads.dahanda.dev/api/public/storefront | jq '.settings'
 
 - 현재 운영 백엔드는 `postgres`다.
 - storefront 설정은 DB에 영구 저장되므로, 가격/플랜/FAQ 문구를 바꿨을 때 코드 기본값만 배포해서는 운영 화면이 바뀌지 않을 수 있다.
-- 이런 변경이 있으면 `/api/admin/storefront-settings` 또는 admin 화면에서 persisted storefront 설정도 같이 갱신해야 한다.
+- 이런 변경이 있으면 `/api/admin/storefront-settings` 또는 admin 화면에서 persisted storefront 설정도 같이 갱신해야 하며, 이 단계는 배포 절차의 필수 게이트다.
+- 공개 URL 기준 `/ready` 응답에서 `trustProxy.ready`가 `true`인지 확인해야 reverse proxy 뒤 IP 기반 보호가 정상 동작한다.
+- public read 확장 토폴로지와 PM2 split-role 전환 절차는 `docs/public-scale-rollout.md`를 본다.
 
 ### Supabase 멀티유저 전환
 
@@ -471,6 +481,14 @@ PM2 example:
 ```bash
 npm run build
 pm2 start ecosystem.config.cjs
+pm2 save
+```
+
+Scaled PM2 example:
+
+```bash
+npm run build
+pm2 start ecosystem.scale.config.cjs
 pm2 save
 ```
 

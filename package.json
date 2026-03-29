@@ -36,6 +36,7 @@
     "esbuild": "^0.25.0",
     "jsdom": "^26.0.0",
     "jszip": "^3.10.1",
+    "playwright": "^1.58.2",
     "tsx": "^4.19.3",
     "typescript": "^5.8.2"
   }

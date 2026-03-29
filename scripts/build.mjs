@@ -73,12 +73,14 @@ async function buildExtension() {
 async function buildWebClient() {
   await rm(webAssetsDist, { recursive: true, force: true });
   await rm(path.join(webDist, "landing"), { recursive: true, force: true });
+  await rm(path.join(webDist, "install"), { recursive: true, force: true });
   await rm(path.join(webDist, "admin"), { recursive: true, force: true });
   await rm(path.join(webDist, "scrapbook"), { recursive: true, force: true });
   await rm(path.join(webDist, "checkout"), { recursive: true, force: true });
   await rm(path.join(webDist, "mockups"), { recursive: true, force: true });
 
   await mkdir(path.join(webDist, "landing"), { recursive: true });
+  await mkdir(path.join(webDist, "install"), { recursive: true });
   await mkdir(path.join(webDist, "admin"), { recursive: true });
   await mkdir(path.join(webDist, "scrapbook"), { recursive: true });
   await mkdir(path.join(webDist, "checkout"), { recursive: true });
@@ -104,6 +106,7 @@ async function buildWebClient() {
 
   await cp(path.join(webClientRoot, "src", "landing", "index.html"), path.join(webDist, "landing", "index.html"));
   await cp(path.join(webClientRoot, "src", "landing", "styles.css"), path.join(webDist, "landing", "styles.css"));
+  await cp(path.join(webClientRoot, "src", "install", "index.html"), path.join(webDist, "install", "index.html"));
   await cp(path.join(webClientRoot, "src", "admin", "index.html"), path.join(webDist, "admin", "index.html"));
   await cp(path.join(webClientRoot, "src", "admin", "styles.css"), path.join(webDist, "admin", "styles.css"));
   await cp(path.join(webClientRoot, "src", "scrapbook", "index.html"), path.join(webDist, "scrapbook", "index.html"));

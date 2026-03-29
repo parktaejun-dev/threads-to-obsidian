@@ -1,7 +1,7 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { existsSync } from "node:fs";
-import { readFile } from "node:fs/promises";
+import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -10,10 +10,12 @@ import type { AiOrganizationResult, ExtractedPost } from "@threads/shared/types"
 import type {
   AdminRuntimeConfigResponse,
   AdminRuntimeConfigSecretState,
+  BotMentionJobRecord,
   BillingCycle,
   EmailDeliveryDraft,
   LicenseRecord,
   PaymentMethod,
+  PublicStorefrontResponse,
   PurchaseOrder,
   RuntimeCollectorConfig,
   RuntimeConfigTestResult,
@@ -88,6 +90,8 @@ import {
   closeDatabaseConnections,
   loadDatabase,
   loadDatabaseForConfig,
+  loadPublicStorefrontSnapshot,
+  pingDatabase,
   saveDatabaseForConfig,
   testDatabaseConfig,
   upsertLicense,
@@ -138,6 +142,16 @@ const BOT_SESSION_COOKIE_MAX_AGE_SECONDS = 30 * 24 * 60 * 60;
 const ADMIN_SESSION_COOKIE = "threads_admin_session";
 const ADMIN_SESSION_COOKIE_MAX_AGE_SECONDS = 12 * 60 * 60;
 const ADMIN_SESSION_VERSION = "v1";
+const DEFAULT_LANDING_BOT_HANDLE = "ss_threads_bot";
+const LANDING_HEADLINE_LINES: Record<SupportedLocale, string[]> = {
+  ko: ["Threads 글을 쉽게 저장하세요", "PC는 Chrome 확장,", "모바일은 댓글 한 줄"],
+  en: ["Save Threads the easy way.", "Use Chrome on desktop,", "or one reply on mobile."],
+  ja: ["Threads 保存をもっと手軽に", "PC は extension、Mobile は @mention", "返信で @{botHandle} と書くだけ。"],
+  "pt-BR": ["Salve Threads com menos atrito.", "Extension no PC, @mention no celular.", "Responda com @{botHandle}."],
+  es: ["Guarda Threads de forma simple.", "Extension en PC, @mention en móvil.", "Responde con @{botHandle}."],
+  "zh-TW": ["更輕鬆地保存 Threads", "PC 用 extension，Mobile 用 @mention", "回覆 @{botHandle} 就可以。"],
+  vi: ["Lưu Threads gọn hơn.", "Dùng extension trên PC, @mention trên mobile.", "Chỉ cần trả lời với @{botHandle}."]
+};
 const DEFAULT_ADMIN_ALLOWLIST = new Set(["127.0.0.1", "::1"]);
 const RATE_LIMIT_BUCKET_GC_INTERVAL_MS = 5 * 60_000;
 const DEFAULT_RATE_LIMIT_BUCKET_LIMIT = 50_000;
@@ -146,14 +160,37 @@ const DEFAULT_SERVER_REQUEST_TIMEOUT_MS = 30_000;
 const DEFAULT_SERVER_HEADERS_TIMEOUT_MS = 35_000;
 const DEFAULT_SERVER_KEEP_ALIVE_TIMEOUT_MS = 5_000;
 const DEFAULT_GRACEFUL_SHUTDOWN_TIMEOUT_MS = 15_000;
+const DEFAULT_PUBLIC_STOREFRONT_CACHE_TTL_MS = 60_000;
+const DEFAULT_PUBLIC_STOREFRONT_STALE_WHILE_REVALIDATE_MS = 5 * 60_000;
+const DEFAULT_PUBLIC_STOREFRONT_STALE_IF_ERROR_MS = 24 * 60 * 60_000;
+const DEFAULT_PUBLIC_STOREFRONT_SNAPSHOT_FILE = path.resolve(process.cwd(), "output", "public-storefront-snapshot.json");
 const PUBLIC_MARKETING_PAGE_CONTENT_SECURITY_POLICY =
   "default-src 'self'; script-src 'self'; style-src 'self' https://cdn.jsdelivr.net; font-src 'self' data: https://cdn.jsdelivr.net; img-src 'self' data: https:; connect-src 'self' https://cdn.jsdelivr.net; base-uri 'none'; object-src 'none'; frame-ancestors 'none'; form-action 'self'";
 const ADMIN_PAGE_CONTENT_SECURITY_POLICY =
   "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: https:; connect-src 'self'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'; form-action 'self'";
+const PUBLIC_PAGE_PERMISSIONS_POLICY =
+  "accelerometer=(), autoplay=(), camera=(), display-capture=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()";
 let ignoredForwardedForWarningLogged = false;
+
+type CachedPublicStorefront = {
+  loadedAt: number;
+  snapshot: PublicStorefrontResponse;
+};
+
+const publicStorefrontCache: {
+  current: CachedPublicStorefront | null;
+  diskLoadAttempted: boolean;
+  refreshInFlight: Promise<CachedPublicStorefront> | null;
+} = {
+  current: null,
+  diskLoadAttempted: false,
+  refreshInFlight: null
+};
+const staticTextTemplateCache = new Map<string, string>();
 
 interface ServerConfig {
   adminToken: string;
+  host: string;
   maxBodyBytes: number;
   port: number;
 }
@@ -216,6 +253,25 @@ type WebhookReason =
   | "no_change"
   | "payment_marked";
 
+type PublicMentionSaveState = "idle" | "queued" | "processing" | "completed" | "failed";
+
+type PublicMentionSaveStatus = {
+  currentState: PublicMentionSaveState;
+  completionSource: "job" | "archive_inferred" | null;
+  collectorEnabled: boolean;
+  pollIntervalMs: number;
+  collectorError: string | null;
+  lastCollectedAt: string | null;
+  latestMentionUrl: string | null;
+  latestMentionCreatedAt: string | null;
+  latestMentionUpdatedAt: string | null;
+  latestJobStatus: string | null;
+  latestJobError: string | null;
+  latestSavedAt: string | null;
+  expectedVisibleAt: string | null;
+  retryAvailableAt: string | null;
+};
+
 const PROVIDER_METHOD_DEFAULT_IDS: Record<PaymentProvider, string> = {
   stableorder: "pm-stableorder",
   stripe: "pm-stripe",
@@ -240,7 +296,7 @@ const PROVIDER_ACTION_URL_PATTERNS: Record<PaymentProvider, RegExp> = {
 };
 const DEFAULT_PUBLIC_ORIGIN = "https://ss-threads.dahanda.dev";
 const LEGACY_PUBLIC_HOSTS = new Set(["threads-obsidian.dahanda.dev"]);
-const LEGACY_PUBLIC_PAGE_PATHS = new Set(["/", "/landing", "/landing/", "/scrapbook", "/scrapbook/", "/checkout", "/checkout/"]);
+const LEGACY_PUBLIC_PAGE_PATHS = new Set(["/", "/landing", "/landing/", "/install", "/install/", "/scrapbook", "/scrapbook/", "/checkout", "/checkout/"]);
 const SCRAPBOOK_HANDLE_PATH_RE = /^\/scrapbook\/@[^/.?#/]+\/?$/;
 const SCRAPBOOK_ARCHIVE_PATH_RE = /^\/scrapbook(?:\/@[^/.?#/]+)?\/archive\/[^/]+\/?$/;
 
@@ -255,6 +311,15 @@ function parsePositiveInteger(raw: string | undefined, fallback: number): number
 
   const parsed = Number.parseInt(raw, 10);
   return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function parseBooleanFlag(raw: string | undefined): boolean {
+  if (!raw) {
+    return false;
+  }
+
+  const normalized = raw.trim().toLowerCase();
+  return normalized === "1" || normalized === "true" || normalized === "yes" || normalized === "on";
 }
 
 function parsePort(raw: string | undefined, fallback: number): number {
@@ -280,6 +345,11 @@ function parsePortFromArg(port: number | undefined, envPort: string | undefined)
   }
 
   return port;
+}
+
+function parseBindHost(raw: string | undefined): string {
+  const normalized = raw?.trim();
+  return normalized && normalized.length > 0 ? normalized : "0.0.0.0";
 }
 
 function parseMaxBodyBytes(raw: string | undefined): number {
@@ -333,6 +403,7 @@ function resolveConfig(portOverride?: number): ServerConfig {
 
   return {
     adminToken,
+    host: parseBindHost(trimEnv("THREADS_WEB_HOST")),
     maxBodyBytes: parseMaxBodyBytes(trimEnv("THREADS_WEB_MAX_BODY_BYTES")),
     port: parsePortFromArg(portOverride, trimEnv("THREADS_WEB_PORT"))
   };
@@ -362,13 +433,113 @@ function getGracefulShutdownTimeoutMs(): number {
   return parsePositiveInteger(trimEnv("THREADS_WEB_GRACEFUL_SHUTDOWN_TIMEOUT_MS"), DEFAULT_GRACEFUL_SHUTDOWN_TIMEOUT_MS);
 }
 
-function json(response: ServerResponse, statusCode: number, payload: unknown): void {
-  response.writeHead(statusCode, { "content-type": "application/json; charset=utf-8" });
+function isCollectorAutostartEnabled(): boolean {
+  return !parseBooleanFlag(trimEnv("THREADS_WEB_DISABLE_COLLECTOR"));
+}
+
+function isMonitoringAutostartEnabled(): boolean {
+  return !parseBooleanFlag(trimEnv("THREADS_WEB_DISABLE_MONITORING_AUTORUN"));
+}
+
+function isPrimaryBackgroundWorkerInstance(): boolean {
+  const instance = trimEnv("NODE_APP_INSTANCE");
+  return !instance || instance === "0";
+}
+
+function shouldAutostartCollector(): boolean {
+  return isCollectorAutostartEnabled() && isPrimaryBackgroundWorkerInstance();
+}
+
+function shouldAutostartMonitoring(): boolean {
+  return isMonitoringAutostartEnabled() && isPrimaryBackgroundWorkerInstance();
+}
+
+function getPublicStorefrontCacheTtlMs(): number {
+  return parsePositiveInteger(trimEnv("THREADS_WEB_PUBLIC_STOREFRONT_CACHE_TTL_MS"), DEFAULT_PUBLIC_STOREFRONT_CACHE_TTL_MS);
+}
+
+function getPublicStorefrontStaleWhileRevalidateMs(): number {
+  return parsePositiveInteger(
+    trimEnv("THREADS_WEB_PUBLIC_STOREFRONT_STALE_WHILE_REVALIDATE_MS"),
+    DEFAULT_PUBLIC_STOREFRONT_STALE_WHILE_REVALIDATE_MS
+  );
+}
+
+function getPublicStorefrontStaleIfErrorMs(): number {
+  return parsePositiveInteger(
+    trimEnv("THREADS_WEB_PUBLIC_STOREFRONT_STALE_IF_ERROR_MS"),
+    DEFAULT_PUBLIC_STOREFRONT_STALE_IF_ERROR_MS
+  );
+}
+
+function getPublicStorefrontSnapshotFilePath(): string {
+  return trimEnv("THREADS_WEB_PUBLIC_STOREFRONT_SNAPSHOT_FILE") || DEFAULT_PUBLIC_STOREFRONT_SNAPSHOT_FILE;
+}
+
+function buildEtag(value: unknown): string {
+  return `"${createHash("sha1").update(JSON.stringify(value)).digest("hex")}"`;
+}
+
+function formatPublicCacheControlHeader(): string {
+  const maxAgeSeconds = Math.max(0, Math.floor(getPublicStorefrontCacheTtlMs() / 1_000));
+  const staleWhileRevalidateSeconds = Math.max(0, Math.floor(getPublicStorefrontStaleWhileRevalidateMs() / 1_000));
+  const staleIfErrorSeconds = Math.max(0, Math.floor(getPublicStorefrontStaleIfErrorMs() / 1_000));
+  return `public, max-age=${maxAgeSeconds}, stale-while-revalidate=${staleWhileRevalidateSeconds}, stale-if-error=${staleIfErrorSeconds}`;
+}
+
+function readIfNoneMatchHeader(request: IncomingMessage): string | null {
+  const value = request.headers["if-none-match"];
+  if (Array.isArray(value)) {
+    return value[0]?.trim() || null;
+  }
+
+  return value?.trim() || null;
+}
+
+function buildPublicApiCacheHeaders(etag: string): Record<string, string> {
+  return {
+    "cache-control": formatPublicCacheControlHeader(),
+    etag
+  };
+}
+
+function buildPublicHtmlCacheHeaders(etag: string): Record<string, string> {
+  return {
+    "cache-control": formatPublicCacheControlHeader(),
+    etag,
+    vary: "accept-language, host"
+  };
+}
+
+async function loadCachedTextTemplate(absolutePath: string): Promise<string> {
+  const cached = staticTextTemplateCache.get(absolutePath);
+  if (typeof cached === "string") {
+    return cached;
+  }
+
+  const contents = await readFile(absolutePath, "utf8");
+  staticTextTemplateCache.set(absolutePath, contents);
+  return contents;
+}
+
+function json(response: ServerResponse, statusCode: number, payload: unknown, headers: Record<string, string> = {}): void {
+  response.writeHead(statusCode, {
+    "content-type": "application/json; charset=utf-8",
+    "x-content-type-options": "nosniff",
+    ...headers
+  });
   response.end(JSON.stringify(payload));
 }
 
-function html(response: ServerResponse, statusCode: number, markup: string): void {
-  response.writeHead(statusCode, { "content-type": "text/html; charset=utf-8" });
+function html(response: ServerResponse, statusCode: number, markup: string, headers: Record<string, string> = {}): void {
+  response.writeHead(statusCode, {
+    "content-type": "text/html; charset=utf-8",
+    "permissions-policy": PUBLIC_PAGE_PERMISSIONS_POLICY,
+    "referrer-policy": "strict-origin-when-cross-origin",
+    "x-content-type-options": "nosniff",
+    "x-frame-options": "DENY",
+    ...headers
+  });
   response.end(markup);
 }
 
@@ -1966,6 +2137,169 @@ function readClientIp(request: IncomingMessage): string {
   return peerIp;
 }
 
+function hasForwardedProxyHeaders(request: IncomingMessage): boolean {
+  return Boolean(
+    readForwardedValue(request.headers, "x-forwarded-for") ||
+      readForwardedValue(request.headers, "x-forwarded-host") ||
+      readForwardedValue(request.headers, "x-forwarded-proto")
+  );
+}
+
+function buildTrustProxyDiagnostics(request: IncomingMessage): {
+  ready: boolean;
+  peerIp: string;
+  clientIp: string;
+  forwardedHeadersSeen: boolean;
+  allowlistSize: number;
+  trustedPeer: boolean;
+  warning: string | null;
+} {
+  const allowlist = readTrustedProxyAllowlist();
+  const peerIp = readPeerIp(request);
+  const trustedPeer = allowlist.has(peerIp);
+  const forwardedHeadersSeen = hasForwardedProxyHeaders(request);
+  const ready = !forwardedHeadersSeen || trustedPeer;
+  const warning =
+    forwardedHeadersSeen && !trustedPeer
+      ? "Forwarded proxy headers are present but this peer is not trusted. Configure THREADS_WEB_TRUST_PROXY_ALLOWLIST so IP-based protections use the real client IP."
+      : null;
+
+  return {
+    ready,
+    peerIp,
+    clientIp: trustedPeer ? readClientIp(request) : peerIp,
+    forwardedHeadersSeen,
+    allowlistSize: allowlist.size,
+    trustedPeer,
+    warning
+  };
+}
+
+function toTimestamp(value: string | null | undefined, fallback = 0): number {
+  const parsed = Date.parse(`${value ?? ""}`.trim());
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function normalizeHandleForStatus(value: string | null | undefined): string {
+  return safeText(value).replace(/^@+/, "").toLowerCase();
+}
+
+async function buildPublicMentionSaveStatus(
+  sessionState: Awaited<ReturnType<typeof getBotSessionStateFromStore>>,
+  collector: BotMentionCollector
+): Promise<PublicMentionSaveStatus | null> {
+  if (!sessionState.authenticated || !sessionState.user) {
+    return null;
+  }
+
+  const collectorStatus = collector.getStatus();
+  return await withDatabaseTransaction(async (data) => {
+    let latestArchiveUpdatedAt: string | null = null;
+    for (const candidate of data.botArchives) {
+      if (candidate.userId !== sessionState.user?.id) {
+        continue;
+      }
+
+      if (
+        !latestArchiveUpdatedAt ||
+        toTimestamp(candidate.updatedAt) > toTimestamp(latestArchiveUpdatedAt)
+      ) {
+        latestArchiveUpdatedAt = candidate.updatedAt;
+      }
+    }
+
+    const userId = safeText(sessionState.user?.threadsUserId);
+    const userHandle = normalizeHandleForStatus(sessionState.user?.threadsHandle);
+    let latestMentionUrl: string | null = null;
+    let latestMentionCreatedAt: string | null = null;
+    let latestMentionUpdatedAt: string | null = null;
+    let latestMentionStatus: BotMentionJobRecord["status"] | null = null;
+    let latestMentionError: string | null = null;
+    let latestMentionAvailableAt: string | null = null;
+    let latestMentionTimestamp = -1;
+    for (const candidate of data.botMentionJobs) {
+      const matchesUser =
+        (userId && safeText(candidate.mentionAuthorUserId) === userId) ||
+        normalizeHandleForStatus(candidate.mentionAuthorHandle) === userHandle;
+      if (!matchesUser) {
+        continue;
+      }
+
+      const candidateTimestamp = toTimestamp(candidate.updatedAt || candidate.createdAt);
+      if (candidateTimestamp > latestMentionTimestamp) {
+        latestMentionTimestamp = candidateTimestamp;
+        latestMentionUrl = candidate.mentionUrl;
+        latestMentionCreatedAt = candidate.createdAt;
+        latestMentionUpdatedAt = candidate.updatedAt;
+        latestMentionStatus = candidate.status;
+        latestMentionError = candidate.lastError;
+        latestMentionAvailableAt = candidate.availableAt;
+      }
+    }
+
+    let currentState: PublicMentionSaveState = "idle";
+    let completionSource: "job" | "archive_inferred" | null = null;
+    if (latestMentionStatus === "queued") {
+      currentState = "queued";
+    } else if (latestMentionStatus === "processing") {
+      currentState = "processing";
+    } else if (
+      latestMentionStatus === "failed" ||
+      latestMentionStatus === "invalid" ||
+      latestMentionStatus === "unmatched"
+    ) {
+      currentState = "failed";
+    } else if (latestMentionStatus === "completed") {
+      currentState = "completed";
+      completionSource = "job";
+    } else if (
+      latestMentionTimestamp >= 0 &&
+      latestArchiveUpdatedAt &&
+      toTimestamp(latestArchiveUpdatedAt) >= toTimestamp(latestMentionUpdatedAt || latestMentionCreatedAt, 0)
+    ) {
+      currentState = "completed";
+      completionSource = "archive_inferred";
+    }
+
+    let expectedVisibleAt: string | null = null;
+    if (currentState === "queued" || currentState === "processing") {
+      expectedVisibleAt = new Date(
+        Math.max(Date.now(), toTimestamp(latestMentionAvailableAt, Date.now())) + collectorStatus.pollIntervalMs
+      ).toISOString();
+    } else if (currentState === "failed") {
+      expectedVisibleAt = latestMentionAvailableAt;
+    }
+
+    return {
+      currentState,
+      completionSource,
+      collectorEnabled: collectorStatus.enabled,
+      pollIntervalMs: collectorStatus.pollIntervalMs,
+      collectorError: collectorStatus.lastError,
+      lastCollectedAt: collectorStatus.lastSucceededAt ?? collectorStatus.lastCompletedAt,
+      latestMentionUrl,
+      latestMentionCreatedAt,
+      latestMentionUpdatedAt,
+      latestJobStatus: latestMentionStatus,
+      latestJobError: latestMentionError,
+      latestSavedAt: latestArchiveUpdatedAt,
+      expectedVisibleAt,
+      retryAvailableAt: currentState === "failed" ? latestMentionAvailableAt : null
+    };
+  });
+}
+
+async function buildPublicBotSessionResponse(
+  rawSession: string | null | undefined,
+  collector: BotMentionCollector
+): Promise<Awaited<ReturnType<typeof getBotSessionStateFromStore>> & { saveStatus: PublicMentionSaveStatus | null }> {
+  const state = await getBotSessionStateFromStore(rawSession);
+  return {
+    ...state,
+    saveStatus: await buildPublicMentionSaveStatus(state, collector)
+  };
+}
+
 function readAdminAllowlist(): Set<string> | null {
   const raw = trimEnv("THREADS_WEB_ADMIN_ALLOWLIST");
   if (!raw) {
@@ -2196,11 +2530,196 @@ function shouldRedirectLegacyPublicPage(request: IncomingMessage, requestUrl: UR
 
 function resolveLandingMeta(_siteHost: string): { title: string; description: string } {
   const botHandle = getBotPublicConfig().botHandle;
-  const publicHost = resolvePreferredPublicOrigin().replace(/^https?:\/\//, "");
   return {
     title: "ss-threads",
-    description: `Threads 저장용 Chrome extension과 @${botHandle} mention scrapbook을 ${publicHost}에서 함께 제공합니다.`
+    description: `ss-threads는 PC에서는 extension으로, 모바일에서는 댓글 @${botHandle} 멘션으로 Threads를 scrapbook에 저장합니다.`
   };
+}
+
+function normalizeLandingBotHandle(value: string | null | undefined): string {
+  return `${value ?? ""}`.trim().replace(/^@+/, "") || DEFAULT_LANDING_BOT_HANDLE;
+}
+
+function applyLandingBotHandleTemplate(value: string, botHandle: string): string {
+  return value.replaceAll("@{botHandle}", `@${normalizeLandingBotHandle(botHandle)}`);
+}
+
+function escapeInlineJson(value: unknown): string {
+  return JSON.stringify(value)
+    .replace(/</g, "\\u003c")
+    .replace(/>/g, "\\u003e")
+    .replace(/&/g, "\\u0026");
+}
+
+function renderLandingHeadlineLines(value: string): string {
+  const lines = value
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  if (lines.length === 0) {
+    return "";
+  }
+
+  const normalizedLines =
+    lines.length > 1
+      ? lines
+      : lines[0]
+          .split(/(?<=[.!?。！？])\s+/)
+          .map((line) => line.trim())
+          .filter(Boolean);
+
+  return normalizedLines.map((line) => `<span class="headline-row">${escapeHtml(line)}</span>`).join("");
+}
+
+function resolveInitialLandingHeadline(
+  locale: SupportedLocale,
+  siteHost: string,
+  storefrontSettings: StorefrontSettings | null
+): string {
+  const botHandle = getBotPublicConfig().botHandle;
+  void siteHost;
+  const defaultHeadline = LANDING_HEADLINE_LINES[locale]
+    .map((line) => `<span class="headline-row">${escapeHtml(applyLandingBotHandleTemplate(line, botHandle))}</span>`)
+    .join("");
+
+  if (locale !== "ko" || !storefrontSettings) {
+    return defaultHeadline;
+  }
+
+  const persistedHeadline = applyLandingBotHandleTemplate(storefrontSettings.headline, botHandle);
+  return persistedHeadline.trim() ? renderLandingHeadlineLines(persistedHeadline) : defaultHeadline;
+}
+
+function resolvePublicStorefrontSettings(settings: StorefrontSettings): StorefrontSettings {
+  const botHandle = getBotPublicConfig().botHandle;
+  return {
+    ...settings,
+    headline: applyLandingBotHandleTemplate(settings.headline, botHandle),
+    subheadline: applyLandingBotHandleTemplate(settings.subheadline, botHandle),
+    includedUpdates: applyLandingBotHandleTemplate(settings.includedUpdates, botHandle),
+    heroNotes: settings.heroNotes.map((note) => applyLandingBotHandleTemplate(note, botHandle)),
+    faqs: settings.faqs.map((faq) => ({
+      ...faq,
+      question: applyLandingBotHandleTemplate(faq.question, botHandle),
+      answer: applyLandingBotHandleTemplate(faq.answer, botHandle)
+    }))
+  };
+}
+
+function buildResolvedPublicStorefront(publicStorefront: PublicStorefrontResponse): PublicStorefrontResponse {
+  return {
+    ...publicStorefront,
+    settings: publicStorefront.settings ? resolvePublicStorefrontSettings(publicStorefront.settings) : publicStorefront.settings
+  };
+}
+
+async function readPersistedPublicStorefrontSnapshot(): Promise<PublicStorefrontResponse | null> {
+  try {
+    const raw = await readFile(getPublicStorefrontSnapshotFilePath(), "utf8");
+    const parsed = JSON.parse(raw) as Partial<PublicStorefrontResponse> | null;
+    if (!parsed || typeof parsed !== "object" || !parsed.settings || !Array.isArray(parsed.paymentMethods)) {
+      return null;
+    }
+
+    return parsed as PublicStorefrontResponse;
+  } catch (error) {
+    const fileError = error as NodeJS.ErrnoException;
+    if (fileError.code === "ENOENT") {
+      return null;
+    }
+
+    throw error;
+  }
+}
+
+async function persistPublicStorefrontSnapshot(snapshot: PublicStorefrontResponse): Promise<void> {
+  const filePath = getPublicStorefrontSnapshotFilePath();
+  await mkdir(path.dirname(filePath), { recursive: true });
+  const tempPath = `${filePath}.tmp.${process.pid}.${crypto.randomUUID()}`;
+  await writeFile(tempPath, JSON.stringify(snapshot, null, 2), "utf8");
+  await rename(tempPath, filePath);
+}
+
+function cachePublicStorefrontSnapshot(snapshot: PublicStorefrontResponse): CachedPublicStorefront {
+  const cached = {
+    loadedAt: Date.now(),
+    snapshot
+  };
+  publicStorefrontCache.current = cached;
+  publicStorefrontCache.diskLoadAttempted = true;
+  return cached;
+}
+
+function setPublicStorefrontSnapshotCache(snapshot: PublicStorefrontResponse): void {
+  cachePublicStorefrontSnapshot(snapshot);
+  void persistPublicStorefrontSnapshot(snapshot).catch((error) => {
+    logUnexpectedError("public storefront snapshot persist failed", error);
+  });
+}
+
+function resetPublicStorefrontSnapshotCache(): void {
+  publicStorefrontCache.current = null;
+  publicStorefrontCache.diskLoadAttempted = false;
+  publicStorefrontCache.refreshInFlight = null;
+}
+
+async function refreshPublicStorefrontSnapshotCache(): Promise<CachedPublicStorefront> {
+  if (publicStorefrontCache.refreshInFlight) {
+    return publicStorefrontCache.refreshInFlight;
+  }
+
+  const refreshPromise = (async () => {
+    const snapshot = await loadPublicStorefrontSnapshot();
+    const cached = cachePublicStorefrontSnapshot(snapshot);
+    await persistPublicStorefrontSnapshot(snapshot).catch((error) => {
+      logUnexpectedError("public storefront snapshot persist failed", error);
+    });
+    return cached;
+  })();
+
+  publicStorefrontCache.refreshInFlight = refreshPromise;
+  refreshPromise.finally(() => {
+    if (publicStorefrontCache.refreshInFlight === refreshPromise) {
+      publicStorefrontCache.refreshInFlight = null;
+    }
+  }).catch(() => undefined);
+  return refreshPromise;
+}
+
+function schedulePublicStorefrontSnapshotRefresh(): void {
+  if (publicStorefrontCache.refreshInFlight) {
+    return;
+  }
+
+  void refreshPublicStorefrontSnapshotCache().catch((error) => {
+    logUnexpectedError("public storefront cache refresh failed", error);
+  });
+}
+
+async function getPublicStorefrontSnapshotCached(): Promise<PublicStorefrontResponse> {
+  const cached = publicStorefrontCache.current;
+  if (cached) {
+    if (Date.now() - cached.loadedAt > getPublicStorefrontCacheTtlMs()) {
+      schedulePublicStorefrontSnapshotRefresh();
+    }
+    return cached.snapshot;
+  }
+
+  if (!publicStorefrontCache.diskLoadAttempted) {
+    const persisted = await readPersistedPublicStorefrontSnapshot().catch((error) => {
+      logUnexpectedError("public storefront snapshot load failed", error);
+      return null;
+    });
+    if (persisted) {
+      const diskCached = cachePublicStorefrontSnapshot(persisted);
+      schedulePublicStorefrontSnapshotRefresh();
+      return diskCached.snapshot;
+    }
+    publicStorefrontCache.diskLoadAttempted = true;
+  }
+
+  return (await refreshPublicStorefrontSnapshotCache()).snapshot;
 }
 
 function parsePaymentProvider(raw: string | undefined): PaymentProvider | null {
@@ -2667,6 +3186,10 @@ function getStaticCandidates(urlPath: string): string[] {
     return ["landing/index.html"];
   }
 
+  if (normalizedPath === "/install" || normalizedPath === "/install/") {
+    return ["install/index.html"];
+  }
+
   if (normalizedPath === "/admin" || normalizedPath === "/admin/") {
     return ["admin/index.html"];
   }
@@ -2722,6 +3245,9 @@ function buildPublicMarketingPageHeaders(contentType: string): Record<string, st
   return {
     ...buildStaticAssetHeaders(contentType),
     "content-security-policy": PUBLIC_MARKETING_PAGE_CONTENT_SECURITY_POLICY,
+    "cross-origin-opener-policy": "same-origin",
+    "cross-origin-resource-policy": "same-origin",
+    "permissions-policy": PUBLIC_PAGE_PERMISSIONS_POLICY,
     "referrer-policy": "strict-origin-when-cross-origin",
     "x-frame-options": "DENY"
   };
@@ -2732,6 +3258,9 @@ function buildAdminPageHeaders(contentType: string): Record<string, string> {
     ...buildStaticAssetHeaders(contentType),
     "cache-control": "no-store",
     "content-security-policy": ADMIN_PAGE_CONTENT_SECURITY_POLICY,
+    "cross-origin-opener-policy": "same-origin",
+    "cross-origin-resource-policy": "same-origin",
+    "permissions-policy": PUBLIC_PAGE_PERMISSIONS_POLICY,
     "referrer-policy": "no-referrer",
     "x-frame-options": "DENY"
   };
@@ -2752,29 +3281,88 @@ async function serveStatic(request: IncomingMessage, response: ServerResponse, p
         const siteHost = new URL(siteUrl).host;
         const landingMeta = resolveLandingMeta(siteHost);
         const initialLocale = resolveInitialLandingLocale(request, requestUrl);
-        const contents = (await readFile(absolutePath, "utf8"))
+        let storefrontSettings: StorefrontSettings | null = null;
+        try {
+          storefrontSettings = buildResolvedPublicStorefront(await getPublicStorefrontSnapshotCached()).settings ?? null;
+        } catch (error) {
+          logUnexpectedError("landing bootstrap load failed", error);
+        }
+        const landingHeadline = resolveInitialLandingHeadline(initialLocale, siteHost, storefrontSettings);
+        const landingBootstrap = escapeInlineJson({
+          botHandle: getBotPublicConfig().botHandle,
+          storefrontSettings
+        });
+        const contents = (await loadCachedTextTemplate(absolutePath))
+          .replaceAll("__SITE_TITLE__", escapeHtml(landingMeta.title))
+          .replaceAll("__SITE_DESCRIPTION__", escapeHtml(landingMeta.description))
+          .replaceAll("__SITE_URL__", escapeHtml(siteUrl))
+          .replaceAll("__SITE_HOST__", escapeHtml(siteHost))
+          .replaceAll("__INITIAL_LOCALE__", escapeHtml(initialLocale))
+          .replaceAll("__LANDING_HEADLINE__", landingHeadline)
+          .replaceAll("__LANDING_BOOTSTRAP__", landingBootstrap);
+        const etag = buildEtag({
+          siteUrl,
+          siteHost,
+          initialLocale,
+          storefrontSettings,
+          contents
+        });
+        if (readIfNoneMatchHeader(request) === etag) {
+          response.writeHead(304, {
+            ...buildPublicMarketingPageHeaders(MIME_TYPES[extension] ?? "application/octet-stream"),
+            ...buildPublicHtmlCacheHeaders(etag)
+          });
+          response.end();
+          return true;
+        }
+
+        response.writeHead(200, {
+          ...buildPublicMarketingPageHeaders(MIME_TYPES[extension] ?? "application/octet-stream"),
+          ...buildPublicHtmlCacheHeaders(etag)
+        });
+        response.end(contents);
+        return true;
+      }
+
+      if (relativePath === "checkout/index.html" || relativePath === "install/index.html") {
+        const requestUrl = new URL(request.url ?? "/", `http://${request.headers.host ?? "127.0.0.1"}`);
+        const siteUrl = resolvePublicOrigin(request, requestUrl);
+        const siteHost = new URL(siteUrl).host;
+        const landingMeta = resolveLandingMeta(siteHost);
+        const initialLocale = resolveInitialLandingLocale(request, requestUrl);
+        const contents = (await loadCachedTextTemplate(absolutePath))
           .replaceAll("__SITE_TITLE__", escapeHtml(landingMeta.title))
           .replaceAll("__SITE_DESCRIPTION__", escapeHtml(landingMeta.description))
           .replaceAll("__SITE_URL__", escapeHtml(siteUrl))
           .replaceAll("__SITE_HOST__", escapeHtml(siteHost))
           .replaceAll("__INITIAL_LOCALE__", escapeHtml(initialLocale));
 
-        response.writeHead(200, buildPublicMarketingPageHeaders(MIME_TYPES[extension] ?? "application/octet-stream"));
+        const etag = buildEtag({
+          relativePath,
+          siteUrl,
+          siteHost,
+          initialLocale,
+          contents
+        });
+        if (readIfNoneMatchHeader(request) === etag) {
+          response.writeHead(304, {
+            ...buildPublicMarketingPageHeaders(MIME_TYPES[extension] ?? "application/octet-stream"),
+            ...buildPublicHtmlCacheHeaders(etag)
+          });
+          response.end();
+          return true;
+        }
+
+        response.writeHead(200, {
+          ...buildPublicMarketingPageHeaders(MIME_TYPES[extension] ?? "application/octet-stream"),
+          ...buildPublicHtmlCacheHeaders(etag)
+        });
         response.end(contents);
         return true;
       }
 
-      if (relativePath === "checkout/index.html") {
-        const requestUrl = new URL(request.url ?? "/", `http://${request.headers.host ?? "127.0.0.1"}`);
-        const siteUrl = resolvePublicOrigin(request, requestUrl);
-        const siteHost = new URL(siteUrl).host;
-        const landingMeta = resolveLandingMeta(siteHost);
-        const contents = (await readFile(absolutePath, "utf8"))
-          .replaceAll("__SITE_TITLE__", escapeHtml(landingMeta.title))
-          .replaceAll("__SITE_DESCRIPTION__", escapeHtml(landingMeta.description))
-          .replaceAll("__SITE_URL__", escapeHtml(siteUrl))
-          .replaceAll("__SITE_HOST__", escapeHtml(siteHost));
-
+      if (relativePath === "scrapbook/index.html") {
+        const contents = await readFile(absolutePath);
         response.writeHead(200, buildPublicMarketingPageHeaders(MIME_TYPES[extension] ?? "application/octet-stream"));
         response.end(contents);
         return true;
@@ -2927,12 +3515,30 @@ function mapStorefrontSettingsInput(
   input: Partial<StorefrontSettings>,
   existing: StorefrontSettings
 ): StorefrontSettings {
-  const heroNotes = Array.isArray(input.heroNotes)
-    ? input.heroNotes.map((note) => safeText(note)).filter(Boolean)
+  const hasTextField = (key: keyof StorefrontSettings): boolean =>
+    Object.prototype.hasOwnProperty.call(input, key);
+
+  const resolveTextField = (
+    key: keyof Pick<
+      StorefrontSettings,
+      "productName" | "headline" | "subheadline" | "priceLabel" | "priceValue" | "supportEmail" | "includedUpdates"
+    >
+  ): string => {
+    if (!hasTextField(key)) {
+      return existing[key];
+    }
+
+    return safeText(input[key]);
+  };
+
+  const heroNotesInput = Array.isArray(input.heroNotes) ? input.heroNotes : null;
+  const heroNotes = heroNotesInput
+    ? heroNotesInput.map((note) => safeText(note)).filter(Boolean)
     : existing.heroNotes;
 
-  const faqs = Array.isArray(input.faqs)
-    ? input.faqs
+  const faqsInput = Array.isArray(input.faqs) ? input.faqs : null;
+  const faqs = faqsInput
+    ? faqsInput
         .map((candidate, index) => ({
           id: safeText(candidate?.id) || existing.faqs[index]?.id || crypto.randomUUID(),
           question: safeText(candidate?.question),
@@ -2942,15 +3548,15 @@ function mapStorefrontSettingsInput(
     : existing.faqs;
 
   return {
-    productName: safeText(input.productName) || existing.productName,
-    headline: safeText(input.headline) || existing.headline,
-    subheadline: safeText(input.subheadline) || existing.subheadline,
-    priceLabel: safeText(input.priceLabel) || existing.priceLabel,
-    priceValue: safeText(input.priceValue) || existing.priceValue,
-    supportEmail: safeText(input.supportEmail) || existing.supportEmail,
-    includedUpdates: safeText(input.includedUpdates) || existing.includedUpdates,
-    heroNotes: heroNotes.length > 0 ? heroNotes : existing.heroNotes,
-    faqs: faqs.length > 0 ? faqs : existing.faqs
+    productName: resolveTextField("productName"),
+    headline: resolveTextField("headline"),
+    subheadline: resolveTextField("subheadline"),
+    priceLabel: resolveTextField("priceLabel"),
+    priceValue: resolveTextField("priceValue"),
+    supportEmail: resolveTextField("supportEmail"),
+    includedUpdates: resolveTextField("includedUpdates"),
+    heroNotes: heroNotesInput ? heroNotes : existing.heroNotes,
+    faqs: faqsInput ? faqs : existing.faqs
   };
 }
 
@@ -3631,7 +4237,7 @@ async function handlePublicBotRoute(
     }
 
     const rawSession = readCookie(request.headers, BOT_SESSION_COOKIE);
-    const state = await getBotSessionStateFromStore(rawSession);
+    const state = await buildPublicBotSessionResponse(rawSession, collector);
     json(response, 200, state);
     return;
   }
@@ -3751,7 +4357,7 @@ async function handlePublicBotRoute(
 
   if (pathname === "/api/public/bot/sync") {
     const rawSession = readCookie(request.headers, BOT_SESSION_COOKIE);
-    const state = await getBotSessionStateFromStore(rawSession);
+    const state = await buildPublicBotSessionResponse(rawSession, collector);
     if (!state.authenticated || !state.user) {
       unauthorized(response);
       return;
@@ -3759,7 +4365,7 @@ async function handlePublicBotRoute(
 
     try {
       await collector.syncNow("user_sync");
-      const nextState = await getBotSessionStateFromStore(rawSession);
+      const nextState = await buildPublicBotSessionResponse(rawSession, collector);
       const workspace = await readScrapbookPlusStateFromStore(rawSession);
       json(response, 200, {
         ...nextState,
@@ -4729,9 +5335,13 @@ async function handleAdminRoutes(
         paymentMethodId: paymentMethod.id,
         licenseId: null
       });
-      return paymentMethod;
+      return {
+        paymentMethod,
+        publicStorefront: buildPublicStorefront(data)
+      };
     });
-    json(response, 201, created);
+    setPublicStorefrontSnapshotCache(created.publicStorefront);
+    json(response, 201, created.paymentMethod);
     return;
   }
 
@@ -4740,9 +5350,13 @@ async function handleAdminRoutes(
     const updatedSettings = await withDatabaseTransaction(async (data) => {
       const nextSettings = mapStorefrontSettingsInput(body, data.settings);
       data.settings = nextSettings;
-      return nextSettings;
+      return {
+        settings: nextSettings,
+        publicStorefront: buildPublicStorefront(data)
+      };
     });
-    json(response, 200, updatedSettings);
+    setPublicStorefrontSnapshotCache(updatedSettings.publicStorefront);
+    json(response, 200, updatedSettings.settings);
     return;
   }
 
@@ -4771,10 +5385,14 @@ async function handleAdminRoutes(
         paymentMethodId: updatedMethod.id,
         licenseId: null
       });
-      return updatedMethod;
+      return {
+        paymentMethod: updatedMethod,
+        publicStorefront: buildPublicStorefront(data)
+      };
     });
 
-    json(response, 200, updated);
+    setPublicStorefrontSnapshotCache(updated.publicStorefront);
+    json(response, 200, updated.paymentMethod);
     return;
   }
 
@@ -5064,11 +5682,25 @@ async function handleRequest(
         return;
       }
 
-      const data = await loadDatabase();
-      json(response, 200, {
-        status: "ready",
+      let databaseLoaded = false;
+      try {
+        await pingDatabase();
+        databaseLoaded = true;
+      } catch {
+        databaseLoaded = false;
+      }
+      const trustProxy = buildTrustProxyDiagnostics(request);
+      const publicOrderRateLimit = getRateLimitRule("/api/public/orders", "POST");
+      const isReady = databaseLoaded && trustProxy.ready;
+
+      json(response, isReady ? 200 : 503, {
+        status: isReady ? "ready" : "not_ready",
         service: "ss-threads-web",
-        databaseLoaded: Array.isArray(data.orders) && Array.isArray(data.paymentMethods)
+        databaseLoaded,
+        trustProxy,
+        security: {
+          publicOrderRateLimit
+        }
       });
       return;
     }
@@ -5079,8 +5711,15 @@ async function handleRequest(
         return;
       }
 
-      const data = await loadDatabase();
-      json(response, 200, buildPublicStorefront(data));
+      const publicStorefront = buildResolvedPublicStorefront(await getPublicStorefrontSnapshotCached());
+      const etag = buildEtag(publicStorefront);
+      if (readIfNoneMatchHeader(request) === etag) {
+        response.writeHead(304, buildPublicApiCacheHeaders(etag));
+        response.end();
+        return;
+      }
+
+      json(response, 200, publicStorefront, buildPublicApiCacheHeaders(etag));
       return;
     }
 
@@ -5164,6 +5803,7 @@ function createWebRuntime(port?: number): {
 } {
   const config = resolveConfig(port);
   assertSupportedProductionDatabaseConfig(getRuntimeConfigSnapshot().database);
+  resetPublicStorefrontSnapshotCache();
   const collector = createBotMentionCollector({
     runTransaction: withDatabaseTransaction,
     loadDatabase
@@ -5171,7 +5811,11 @@ function createWebRuntime(port?: number): {
   const rateLimitState = createRateLimitState();
   ensureRateLimitBucketGcTimer(rateLimitState);
   configureMonitoringService({
+    enableAutoRun: shouldAutostartMonitoring(),
     getCollectorStatus: () => collector.getStatus()
+  });
+  void getPublicStorefrontSnapshotCached().catch((error) => {
+    logUnexpectedError("public storefront warmup failed", error);
   });
 
   return {
@@ -5242,11 +5886,13 @@ export function startWebServer(port?: number): import("node:http").Server {
   server.headersTimeout = Math.max(server.requestTimeout + 1_000, getServerHeadersTimeoutMs());
   server.keepAliveTimeout = getServerKeepAliveTimeoutMs();
 
-  server.listen(config.port, () => {
-    console.log(`ss-threads Plus web app running at http://127.0.0.1:${config.port}`);
+  server.listen(config.port, config.host, () => {
+    console.log(`ss-threads Plus web app running at http://${config.host}:${config.port}`);
   });
 
-  collector.start();
+  if (shouldAutostartCollector()) {
+    collector.start();
+  }
   let shutdownPromise: Promise<void> | null = null;
   let runtimeClosed = false;
 

@@ -4,8 +4,10 @@ module.exports = {
       name: "threads-obsidian",
       cwd: __dirname,
       script: "/usr/bin/bash",
-      args: "-lc 'set -a; source ./.env; set +a; exec node dist/web/server.js'",
+      args: `-lc 'cd "${__dirname}" && set -a; source "${__dirname}/.env"; set +a; exec node "${__dirname}/dist/web/server.js"'`,
       autorestart: true,
+      exp_backoff_restart_delay: 100,
+      kill_timeout: 20000,
       watch: false,
       env: {
         NODE_ENV: "production"

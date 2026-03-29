@@ -20,7 +20,7 @@
     <link rel="canonical" href="https://ss-threads.dahanda.dev/scrapbook" />
     <link rel="stylesheet" href="/scrapbook/styles.css" />
   </head>
-  <body>
+  <body class="page-booting">
     <div class="page">
       <header class="topbar">
         <a class="brand-link" href="/" aria-label="ss-threads home">
@@ -29,8 +29,11 @@
               <img src="/assets/icons/icon-32.png" alt="" />
             </span>
             <div class="brand-copy">
-              <p class="brand-name">ss-threads</p>
-              <p class="brand-mark" data-site-host>ss-threads.dahanda.dev</p>
+              <p class="brand-name brand-slogan">
+                <span class="brand-word"><span class="brand-accent">S</span>ave,</span>
+                <span class="brand-word"><span class="brand-accent">S</span>ync,</span>
+                <span class="brand-word"><span class="brand-accent">ss</span>-threads</span>
+              </p>
             </div>
           </div>
         </a>
@@ -41,7 +44,7 @@
           </div>
           <a class="topbar-link" href="/" data-i18n="scrapbookNavHome">홈으로</a>
           <a id="topbar-current-link" class="topbar-link topbar-link-strong" href="/scrapbook" data-i18n="scrapbookNavCurrent">내 scrapbook</a>
-          <button class="primary-cta" type="button" data-bot-connect data-i18n="scrapbookConnectButton">Threads로 로그인</button>
+          <button class="primary-cta hidden" type="button" data-bot-connect data-i18n="scrapbookConnectButton">Threads로 로그인</button>
 
           <div id="session-panel" class="topbar-profile hidden">
             <button
@@ -85,19 +88,43 @@
       <main>
         <section class="section section-status">
           <p id="page-status" class="status-panel hidden"></p>
-          <div id="auth-panel" class="auth-panel panel">
+          <div id="auth-panel" class="auth-panel panel hidden">
             <div class="auth-panel-head">
               <div class="auth-panel-copy">
-                <p class="eyebrow" data-i18n="scrapbookConnectTag">Threads 연결</p>
                 <h2 data-i18n="scrapbookConnectTitle">내 Threads 계정 연결</h2>
-                <p class="section-copy" data-i18n="scrapbookConnectCopy">
-                  여기서는 내 scrapbook 소유 계정만 연결합니다. 서비스 계정은 @ss-threads로 따로 운영되고, 로그인한 계정과 댓글 작성 계정이 일치할 때만 내 보관함으로 들어옵니다.
-                </p>
               </div>
             </div>
             <p class="status-panel status-panel-warning hidden" data-mobile-oauth-note data-i18n="scrapbookMobileOauthNote">
               모바일에서는 브라우저용 연결 페이지에서 로그인 링크 복사를 누른 뒤, 새 탭 주소창에 붙여넣는 방식으로 진행해 주세요.
             </p>
+          </div>
+
+          <div id="save-status-panel" class="save-status-panel panel hidden">
+            <div class="save-status-head">
+              <div class="save-status-copy">
+                <p id="save-status-eyebrow" class="eyebrow">저장 상태</p>
+                <h2 id="save-status-title">Mention 저장 신뢰 상태</h2>
+                <p id="save-status-summary" class="section-copy"></p>
+              </div>
+              <button id="save-status-refresh" class="secondary-cta" type="button">새 댓글 확인</button>
+            </div>
+
+            <div class="save-status-grid">
+              <div class="save-status-card">
+                <span id="save-status-current-label" class="save-status-label">현재 상태</span>
+                <strong id="save-status-current-value">-</strong>
+              </div>
+              <div class="save-status-card">
+                <span id="save-status-last-label" class="save-status-label">마지막 수집</span>
+                <strong id="save-status-last-value">-</strong>
+              </div>
+              <div class="save-status-card">
+                <span id="save-status-eta-label" class="save-status-label">예상 반영</span>
+                <strong id="save-status-eta-value">-</strong>
+              </div>
+            </div>
+
+            <div id="save-status-detail" class="save-status-detail"></div>
           </div>
         </section>
 
@@ -120,7 +147,6 @@
               </label>
               <button id="archives-move-selected" class="secondary-cta" type="button">폴더 이동</button>
               <button id="archives-delete-selected" class="secondary-cta" type="button">선택 삭제</button>
-              <button id="archives-export-selected" class="secondary-cta" type="button" data-i18n="scrapbookExportSelected">선택 ZIP 내보내기</button>
               <button id="archives-export-all" class="primary-cta" type="button" data-i18n="scrapbookExportAll">전체 ZIP 내보내기</button>
             </div>
           </div>
@@ -129,10 +155,11 @@
             <div class="archives-search-wrap">
               <input id="archives-search" class="archives-search" type="search" data-i18n-ph="scrapbookSearchQueryPh" autocomplete="off" />
             </div>
+            <div id="archives-tag-panel" class="archives-tag-panel hidden"></div>
             <div id="archives-folder-strip" class="archives-folder-strip customer-hidden"></div>
           </div>
 
-          <div id="archives-empty" class="empty-state">
+          <div id="archives-empty" class="empty-state hidden">
             <strong data-i18n="scrapbookArchiveLoginTitle">로그인이 필요합니다.</strong>
             <span data-i18n="scrapbookArchiveLoginCopy">Threads 계정을 연결하면 inbox와 cloud 저장 항목이 여기에 나타납니다.</span>
           </div>
@@ -354,7 +381,6 @@
 
       <footer class="site-footer">
         <span class="footer-domain" data-site-host>ss-threads.dahanda.dev</span>
-        <span data-i18n="scrapbookFooterTagline">Public reply trigger, private scrapbook result.</span>
       </footer>
     </div>
 

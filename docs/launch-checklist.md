@@ -19,6 +19,12 @@
   - Store listing, permissions, data use 문구와 실제 동작 일치
 - [ ] 결제 수단 목록/안내 텍스트 확인
   - 지원 가능한 결제 방식, 설명, 안내 문구가 정확한지 점검
+- [ ] reverse proxy 신뢰 설정 점검
+  - `THREADS_WEB_TRUST_PROXY_ALLOWLIST`가 실제 reverse proxy peer IP를 포함하는지 확인
+  - 공개 URL `https://ss-threads.dahanda.dev/ready` 호출 시 `trustProxy.ready`가 `true`인지 확인
+- [ ] persisted storefront 동기화 계획 확정
+  - 가격, 플랜 이름, FAQ, hero note, included updates 변경이 있으면 `/api/admin/storefront-settings` 반영 작업을 배포 단계에 포함
+  - 코드 기본값만 바꾸고 끝내지 않도록 담당자와 반영 순서를 명시
 
 ## 2. 기능 안정성
 
@@ -32,6 +38,10 @@
   - 결제 수단 비활성화 상태
 - [ ] 로그/이력 보존
   - `output/web-admin-data.json` 변경 이력 및 백업
+- [ ] 공개 주문 API 보호
+  - `POST /api/public/orders` IP rate limit 동작 확인
+- [ ] 공개 페이지 보안 헤더
+  - `/`, `/landing`, `/checkout`에서 `Content-Security-Policy`, `Permissions-Policy`, `X-Frame-Options`, `Referrer-Policy` 확인
 
 ## 3. 출시 자산
 
@@ -53,3 +63,25 @@
 - [ ] 결제 수단/키 발급 오류 발생이 반복될 경우 수동 구매폼 일시 중단
 - [ ] 확장 내 저장 핵심 기능의 안정성 저하 발생 시 Plus 판매 문구 보류
 - [ ] 개인정보/스토어 정책 이슈가 생기면 즉시 공지 업데이트 후 재심사 대응
+
+## 6. 실제 배포 절차 게이트
+
+- [ ] 로컬 검증 완료 후 운영 런타임 데이터와 설정 백업
+- [ ] `rsync` 반영 후 서버에서 `npm run build` 실행
+- [ ] split-role PM2 운영이면 `ecosystem.scale.config.cjs` 기준 public/worker 앱 이름과 포트 확인
+  - `threads-obsidian-public`
+  - `threads-obsidian-public-2`
+  - `threads-obsidian-public-3`
+  - `threads-obsidian-worker`
+  - worker 포트는 reverse proxy에 연결하지 않음
+- [ ] storefront 판매 문구 변경이 있으면 `/api/admin/storefront-settings`로 persisted storefront 먼저 동기화
+- [ ] `pm2 restart threads-obsidian --update-env && pm2 save` 실행
+  - split-role PM2면 `threads-obsidian-public`, `threads-obsidian-public-2`, `threads-obsidian-public-3`, `threads-obsidian-worker`를 재시작
+- [ ] `https://ss-threads.dahanda.dev/health` 확인
+- [ ] `https://ss-threads.dahanda.dev/ready` 확인
+  - `status=ready`
+  - `trustProxy.ready=true`
+  - `security.publicOrderRateLimit` 존재
+- [ ] `https://ss-threads.dahanda.dev/api/public/storefront` 응답이 intended persisted storefront와 일치하는지 확인
+  - `cache-control`, `etag` 헤더 존재 확인
+- [ ] `https://ss-threads.dahanda.dev/checkout` 페이지 로드 및 결제 기대치 문구 확인

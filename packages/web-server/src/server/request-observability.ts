@@ -16,6 +16,15 @@ function requestLogsToStdoutEnabled(): boolean {
   return raw === "1" || raw === "true" || raw === "yes";
 }
 
+function persistRequestLogsEnabled(): boolean {
+  const raw = trimEnv("THREADS_WEB_PERSIST_REQUEST_LOGS");
+  if (!raw) {
+    return true;
+  }
+
+  return raw === "1" || raw === "true" || raw === "yes";
+}
+
 export function classifyRequestCategory(pathname: string): RequestLogCategory {
   if (pathname === "/health" || pathname === "/ready") {
     return "health";
@@ -33,7 +42,15 @@ export function classifyRequestCategory(pathname: string): RequestLogCategory {
 }
 
 export function shouldPersistRequestLog(pathname: string): boolean {
-  return pathname === "/health" || pathname === "/ready" || pathname.startsWith("/api/");
+  if (!persistRequestLogsEnabled()) {
+    return false;
+  }
+
+  if (pathname === "/health" || pathname === "/ready") {
+    return false;
+  }
+
+  return pathname.startsWith("/api/");
 }
 
 export function appendRequestLog(

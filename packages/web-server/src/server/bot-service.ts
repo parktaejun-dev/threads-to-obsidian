@@ -1371,6 +1371,7 @@ function toBotArchiveRecentRecord(item: BotArchiveRecord, publicOrigin: string, 
     archiveId: item.id,
     archiveUrl: buildCloudArchiveUrl(publicOrigin, item.id, userHandle),
     title: buildArchiveTitle(item.targetAuthorHandle, extractedPost.text || item.targetText),
+    savedAt: item.archivedAt,
     updatedAt: item.updatedAt,
     warning: null,
     origin: "mention",
@@ -1388,6 +1389,7 @@ function toCloudArchiveRecentRecord(
     archiveId: item.id,
     archiveUrl: buildCloudArchiveUrl(publicOrigin, item.id, userHandle),
     title: item.targetTitle,
+    savedAt: item.savedAt,
     updatedAt: item.updatedAt,
     warning: payload.aiWarning,
     origin: "cloud",
@@ -2638,17 +2640,17 @@ export function listExtensionCloudArchives(
     ...data.botArchives
       .filter((candidate) => candidate.userId === user.id)
       .map((item) => ({
-        updatedAt: item.updatedAt,
+        savedAt: item.archivedAt,
         record: toBotArchiveRecentRecord(item, publicOrigin, user.threadsHandle)
       })),
     ...data.cloudArchives
       .filter((candidate) => candidate.userId === user.id)
       .map((item) => ({
-        updatedAt: item.updatedAt,
+        savedAt: item.savedAt,
         record: toCloudArchiveRecentRecord(item, publicOrigin, user.threadsHandle)
       }))
   ]
-    .sort((left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt))
+    .sort((left, right) => Date.parse(right.savedAt) - Date.parse(left.savedAt))
     .slice(0, normalizedLimit)
     .map((entry) => entry.record);
 }

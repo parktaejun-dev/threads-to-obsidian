@@ -338,7 +338,7 @@ const ko: Messages = {
     statusReadyCloud: "준비 완료. 버튼을 누르면 Threads Archive scrapbook 클라우드에 저장합니다.",
     statusUnsupported: "개별 포스트 페이지를 먼저 열어주세요.",
     statusNoTab: "활성 탭을 찾지 못했습니다.",
-    statusSaving: "저장하는 중…",
+    statusSaving: "저장중, 잠시 기다려주세요.",
     statusSavedDirect: "Obsidian 폴더에 바로 저장했습니다.",
     statusSavedZip: "저장 완료. 파일 다운로드를 시작했습니다.",
     statusSavedNotion: "Notion에 저장했습니다.",

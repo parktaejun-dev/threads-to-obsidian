@@ -203,8 +203,12 @@ img {
   padding: 18px 0 12px;
 }
 
+.hero.hero-wide {
+  grid-template-columns: minmax(0, 1fr);
+  max-width: 52rem;
+}
+
 .hero-copy,
-.hero-visual,
 .section-head,
 .capability-head,
 .install-section-head {
@@ -272,16 +276,6 @@ h3 {
   word-break: keep-all;
 }
 
-.hero-proofline,
-.hero-actions,
-.flow-actions,
-.install-chip-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-}
-
-.hero-proof-pill,
 .install-chip,
 .product-tag,
 .plan-tier {
@@ -294,12 +288,6 @@ h3 {
   font-size: 14px;
   font-weight: 700;
   letter-spacing: 0;
-}
-
-.hero-proof-pill:not(:last-child)::after {
-  content: "·";
-  margin: 0 8px;
-  color: var(--line-strong);
 }
 
 .hero-price-card,
@@ -359,14 +347,12 @@ h3 {
   padding: 20px 0 0;
 }
 
-.hero-visual {
-  display: grid;
-  gap: 0;
-  align-content: start;
-}
-
-.hero-support-panel {
-  display: none;
+.hero-actions,
+.flow-actions,
+.install-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
 }
 
 .hero-mention-box {
@@ -377,6 +363,12 @@ h3 {
   background-color: var(--surface-hover);
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
+}
+
+.hero-mention-box-inline {
+  justify-content: flex-start;
+  width: fit-content;
+  padding: 14px 18px;
 }
 
 #hero-mention-text {

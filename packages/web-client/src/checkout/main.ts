@@ -1,7 +1,10 @@
-import type { BillingCycle, PaymentMethod, PublicStorefrontResponse } from "@threads/web-schema";
+import { DEFAULT_SETTINGS, type BillingCycle, type PaymentMethod, type PublicStorefrontResponse, type StorefrontSettings } from "@threads/web-schema";
+import { parseSupportedLocale } from "@threads/shared/locale";
 import {
   getLocale,
   applyTranslations,
+  applyLangToggle,
+  bindLangToggle,
   readWebLocale,
   landingMessages,
   getLandingVariant,
@@ -13,113 +16,235 @@ const paymentMethodsEl = document.querySelector<HTMLElement>("#payment-methods")
 const purchaseForm = document.querySelector<HTMLFormElement>("#purchase-form");
 const paymentSelect = document.querySelector<HTMLSelectElement>("select[name='paymentMethodId']");
 const purchaseStatus = document.querySelector<HTMLElement>("#purchase-status");
+const checkoutEyebrow = document.querySelector<HTMLElement>("#checkout-eyebrow");
+const checkoutTitle = document.querySelector<HTMLElement>("#checkout-title");
+const checkoutLead = document.querySelector<HTMLElement>("#checkout-lead");
 const checkoutPriceValue = document.querySelector<HTMLElement>("#checkout-price-value");
 const checkoutPriceNote = document.querySelector<HTMLElement>("#checkout-price-note");
+const checkoutMethodsEyebrow = document.querySelector<HTMLElement>("#checkout-methods-eyebrow");
+const checkoutMethodsTitle = document.querySelector<HTMLElement>("#checkout-methods-title");
+const checkoutMethodsCopy = document.querySelector<HTMLElement>("#checkout-methods-copy");
+const checkoutFulfillmentTitle = document.querySelector<HTMLElement>("#checkout-fulfillment-title");
+const checkoutFulfillmentCopy = document.querySelector<HTMLElement>("#checkout-fulfillment-copy");
+const checkoutFulfillmentSteps = document.querySelector<HTMLElement>("#checkout-fulfillment-steps");
+const checkoutSupportLabel = document.querySelector<HTMLElement>("#checkout-support-label");
+const checkoutSupportEmail = document.querySelector<HTMLAnchorElement>("#checkout-support-email");
+const checkoutSupportCopy = document.querySelector<HTMLElement>("#checkout-support-copy");
+const checkoutRefundLabel = document.querySelector<HTMLElement>("#checkout-refund-label");
+const checkoutRefundCopy = document.querySelector<HTMLElement>("#checkout-refund-copy");
+const checkoutDataLabel = document.querySelector<HTMLElement>("#checkout-data-label");
+const checkoutDataCopy = document.querySelector<HTMLElement>("#checkout-data-copy");
+const formNameHint = document.querySelector<HTMLElement>("#form-name-hint");
+const formEmailHint = document.querySelector<HTMLElement>("#form-email-hint");
+const formMethodHint = document.querySelector<HTMLElement>("#form-method-hint");
+const formNoteHint = document.querySelector<HTMLElement>("#form-note-hint");
+const checkoutSubmitButton = document.querySelector<HTMLButtonElement>("#checkout-submit-button");
 const billingCycleInput = document.querySelector<HTMLInputElement>("input[name='billingCycle'][type='hidden']");
 const billingCycleOptions = document.querySelectorAll<HTMLInputElement>("input[name='billingCycle'][type='radio']");
 const siteHost = document.body.dataset.siteHost?.trim() ?? "";
+const initialLocaleHint = parseSupportedLocale(document.body.dataset.initialLocale);
 const landingVariant = getLandingVariant(siteHost);
+const DEFAULT_YEARLY_PRICE = "US$19.99";
+const DEFAULT_MONTHLY_PRICE = "US$2.99";
 
-let storefront: PublicStorefrontResponse | null = null;
+let storefrontSettings: StorefrontSettings | null = null;
+let paymentMethods: PaymentMethod[] = [];
 let msg: LandingMsg = landingMessages.ko[landingVariant];
-let currentLocale: WebLocale = "ko";
+let currentLocale: WebLocale = getLocale(initialLocaleHint ?? "en");
+
+type CheckoutUiCopy = {
+  eyebrow: string;
+  methodsEyebrow: string;
+  methodsTitle: string;
+  methodsCopy: string;
+  fulfillmentSteps: string[];
+  supportLabel: string;
+  supportCopy: string;
+  refundLabel: string;
+  refundCopy: string;
+  dataLabel: string;
+  dataCopy: string;
+  nameHint: string;
+  emailHint: string;
+  methodHint: string;
+  noteHint: string;
+  submitCta: string;
+};
 
 const billingCycleCopy: Record<WebLocale, Record<BillingCycle, { title: string; price: string; note: string }>> = {
   ko: {
-    yearly: { title: "연간", price: "US$19.99", note: "연간 기본" },
-    monthly: { title: "월간", price: "US$2.99", note: "월간" }
+    yearly: { title: "연간", price: DEFAULT_YEARLY_PRICE, note: "권장" },
+    monthly: { title: "월간", price: DEFAULT_MONTHLY_PRICE, note: "유연 결제" }
   },
   en: {
-    yearly: { title: "Yearly", price: "US$19.99", note: "Yearly default" },
-    monthly: { title: "Monthly", price: "US$2.99", note: "Monthly" }
+    yearly: { title: "Yearly", price: DEFAULT_YEARLY_PRICE, note: "Recommended" },
+    monthly: { title: "Monthly", price: DEFAULT_MONTHLY_PRICE, note: "Flexible billing" }
   },
   ja: {
-    yearly: { title: "年額", price: "US$19.99", note: "年額が標準" },
-    monthly: { title: "月額", price: "US$2.99", note: "月額" }
+    yearly: { title: "年額", price: DEFAULT_YEARLY_PRICE, note: "年額が標準" },
+    monthly: { title: "月額", price: DEFAULT_MONTHLY_PRICE, note: "月額" }
   },
   "pt-BR": {
-    yearly: { title: "Anual", price: "US$19.99", note: "anual por padrão" },
-    monthly: { title: "Mensal", price: "US$2.99", note: "mensal" }
+    yearly: { title: "Anual", price: DEFAULT_YEARLY_PRICE, note: "anual por padrão" },
+    monthly: { title: "Mensal", price: DEFAULT_MONTHLY_PRICE, note: "mensal" }
   },
   es: {
-    yearly: { title: "Anual", price: "US$19.99", note: "anual por defecto" },
-    monthly: { title: "Mensual", price: "US$2.99", note: "mensual" }
+    yearly: { title: "Anual", price: DEFAULT_YEARLY_PRICE, note: "anual por defecto" },
+    monthly: { title: "Mensual", price: DEFAULT_MONTHLY_PRICE, note: "mensual" }
   },
   "zh-TW": {
-    yearly: { title: "年繳", price: "US$19.99", note: "預設為年繳" },
-    monthly: { title: "月繳", price: "US$2.99", note: "月繳" }
+    yearly: { title: "年繳", price: DEFAULT_YEARLY_PRICE, note: "預設為年繳" },
+    monthly: { title: "月繳", price: DEFAULT_MONTHLY_PRICE, note: "月繳" }
   },
   vi: {
-    yearly: { title: "Theo năm", price: "US$19.99", note: "mặc định theo năm" },
-    monthly: { title: "Hàng tháng", price: "US$2.99", note: "hàng tháng" }
+    yearly: { title: "Theo năm", price: DEFAULT_YEARLY_PRICE, note: "mặc định theo năm" },
+    monthly: { title: "Hàng tháng", price: DEFAULT_MONTHLY_PRICE, note: "hàng tháng" }
+  }
+};
+
+const checkoutUiCopyByLocale: Partial<Record<WebLocale, CheckoutUiCopy>> = {
+  ko: {
+    eyebrow: "ss-threads Plus",
+    methodsEyebrow: "결제수단",
+    methodsTitle: "결제 방법을 고르세요",
+    methodsCopy: "가능한 결제수단만 표시됩니다. 아래에서도 같은 수단을 고르면 됩니다.",
+    fulfillmentSteps: [
+      "주문서를 보냅니다.",
+      "선택한 결제수단으로 결제를 마칩니다.",
+      "보통 30분 안에 Plus 키를 이메일로 받습니다."
+    ],
+    supportLabel: "지원 메일",
+    supportCopy: "주문 확인, 환불, Plus 문의를 이 이메일로 받습니다.",
+    refundLabel: "환불",
+    refundCopy: "구매 후 7일 안에 환불 요청을 보낼 수 있습니다.",
+    dataLabel: "데이터 처리",
+    dataCopy: "저장과 검색은 스크랩북 중심으로 동작하고, 필요한 연결 기능만 서버를 거칩니다.",
+    nameHint: "영수증과 키 안내에 쓸 이름입니다.",
+    emailHint: "Plus 키를 받을 이메일을 적어주세요.",
+    methodHint: "위에서 본 결제수단과 같은 것을 고르세요.",
+    noteHint: "세금계산서나 팀 요청이 있으면 남겨주세요.",
+    submitCta: "주문 접수하기"
+  },
+  en: {
+    eyebrow: "ss-threads Plus",
+    methodsEyebrow: "Payment method",
+    methodsTitle: "Choose a payment method",
+    methodsCopy: "Only available methods are shown here. Pick the same one again in the form below.",
+    fulfillmentSteps: [
+      "Send the order form.",
+      "Finish payment with the method you picked.",
+      "Receive the Plus key by email, usually within 30 minutes."
+    ],
+    supportLabel: "Support email",
+    supportCopy: "Use this email for order confirmation, refunds, and Plus questions.",
+    refundLabel: "Refunds",
+    refundCopy: "Refund requests are accepted within 7 days after purchase.",
+    dataLabel: "Data handling",
+    dataCopy: "Saving and search run around scrapbook, while connected features such as Plus activation and Notion save use server-side processing.",
+    nameHint: "This name is used for the receipt and key delivery note.",
+    emailHint: "Use the email that should receive the Plus key.",
+    methodHint: "Choose the same payment method you reviewed above.",
+    noteHint: "Leave invoice or team-related requests here.",
+    submitCta: "Submit order"
+  }
+};
+
+const checkoutFulfillmentCopyByLocale: Record<WebLocale, { title: string; body: string }> = {
+  ko: {
+    title: "보통 30분 안에 이메일로 Plus 키 발송",
+    body: "즉시 활성화형이 아니라 주문 확인 뒤 발급됩니다."
+  },
+  en: {
+    title: "Plus key emailed in about 30 minutes",
+    body: "This is not instant activation. The key is issued after the order is reviewed and payment is confirmed."
+  },
+  ja: {
+    title: "即時有効化ではありません",
+    body: "注文受付後に支払いを確認し、通常30分以内に Plus キーをメールで送ります。"
+  },
+  "pt-BR": {
+    title: "Não é ativação instantânea",
+    body: "Depois que o pedido é recebido, confirmamos o pagamento e normalmente enviamos a chave Plus por email em até 30 minutos."
+  },
+  es: {
+    title: "No es activación instantánea",
+    body: "Después de recibir el pedido, confirmamos el pago y normalmente enviamos la clave Plus por correo en unos 30 minutos."
+  },
+  "zh-TW": {
+    title: "不是即時啟用",
+    body: "收到訂單後會先確認付款，通常會在 30 分鐘內透過電子郵件寄出 Plus 金鑰。"
+  },
+  vi: {
+    title: "Không kích hoạt ngay lập tức",
+    body: "Sau khi nhận đơn, chúng tôi xác nhận thanh toán và thường gửi khóa Plus qua email trong vòng 30 phút."
   }
 };
 
 const checkoutFeatureCopyEn: Record<string, string> = {
-  "checkout-include-archive-limit": "Scrapbook 1,000 saved posts",
-  "checkout-include-folder-limit": "Scrapbook 50 folders",
-  "checkout-include-monitoring": "Watchlists and insights",
-  "checkout-include-extension-advanced": "Extension rules, Notion save, AI organization",
+  "checkout-include-archive-limit": "Saved posts 100 -> 1,000",
+  "checkout-include-folder-limit": "Folders 5 -> 50",
+  "checkout-include-monitoring": "Followed accounts and account activity",
+  "checkout-include-extension-advanced": "Notion save, save rules, automatic organization",
   "checkout-include-shared-key": "Use the same Plus key in scrapbook and extension",
   "compare-section-current": "Current features",
   "compare-row-save-post": "Save current post",
   "compare-row-images": "Save images",
   "compare-row-replies": "Author reply chain",
   "compare-row-duplicates": "Skip duplicates",
-  "compare-row-mention-scrapbook": "mention inbox",
-  "compare-row-watchlists": "Watchlists",
-  "compare-row-searches": "Searches",
-  "compare-row-insights": "Insights",
+  "compare-row-mention-scrapbook": "Mobile mention save",
+  "compare-row-watchlists": "Followed accounts",
+  "compare-row-searches": "Saved post search",
+  "compare-row-insights": "Account activity",
   "compare-row-markdown-export": "Markdown export",
   "compare-row-zip-export": "ZIP export",
   "compare-section-plus": "Unlocked on Plus",
-  "compare-row-archive-limit": "Scrapbook save limit",
-  "compare-row-folder-limit": "Scrapbook folder limit",
-  "compare-row-file-name": "File name rules",
-  "compare-row-save-path": "Save path rules",
+  "compare-row-archive-limit": "Saved post limit",
+  "compare-row-folder-limit": "Folder limit",
+  "compare-row-file-name": "File naming rules",
+  "compare-row-save-path": "Save location rules",
   "compare-row-notion-data-source": "Notion data source save",
-  "compare-row-notion-media-upload": "Notion internal media upload",
-  "compare-row-ai-summary": "AI summary",
-  "compare-row-ai-tags": "AI tags",
-  "compare-row-ai-frontmatter": "AI frontmatter",
-  "compare-note-title": "Plus expands limits, watchlists, insights, and extension advanced save",
+  "compare-row-notion-media-upload": "Upload media into Notion",
+  "compare-row-ai-summary": "Automatic summary",
+  "compare-row-ai-tags": "Automatic tags",
+  "compare-row-ai-frontmatter": "Automatic metadata",
+  "compare-note-title": "Free covers saving and review. Plus expands limits and opens account views.",
   "compare-note-body": "Paste the same Plus key into scrapbook and extension.",
   "compare-scope-note":
-    "Searches stay available on Free. Watchlists and insights unlock on Plus. Searches, watchlists, and insights require Threads sign-in, and some actions need a reconnect for discovery, search, and insights scopes."
+    "Saved post search stays available on Free. Followed accounts and activity unlock on Plus after you sign in with Threads."
 };
 
 const checkoutFeatureCopy: Record<WebLocale, Record<string, string>> = {
   ko: {
-    "checkout-include-archive-limit": "Scrapbook 저장글 1,000개",
-    "checkout-include-folder-limit": "Scrapbook 폴더 50개",
-    "checkout-include-monitoring": "Watchlists · Insights",
-    "checkout-include-extension-advanced": "Extension 파일 규칙 · Notion · AI 정리",
-    "checkout-include-shared-key": "같은 Plus 키로 scrapbook + extension 연결",
+    "checkout-include-archive-limit": "저장글 100 -> 1,000",
+    "checkout-include-folder-limit": "폴더 5 -> 50",
+    "checkout-include-monitoring": "관심 계정 새 글 + 내 계정 반응",
+    "checkout-include-extension-advanced": "PC 저장 자동 정리와 Notion 저장",
+    "checkout-include-shared-key": "같은 Plus 키를 스크랩북과 PC 저장에 함께 사용",
     "compare-section-current": "현재 제공 기능",
     "compare-row-save-post": "현재 글 저장",
     "compare-row-images": "이미지 저장",
     "compare-row-replies": "작성자 연속 답글",
     "compare-row-duplicates": "중복 건너뜀",
-    "compare-row-mention-scrapbook": "mention inbox",
-    "compare-row-watchlists": "Watchlists",
-    "compare-row-searches": "Searches",
-    "compare-row-insights": "Insights",
-    "compare-row-markdown-export": "Markdown export",
-    "compare-row-zip-export": "ZIP export",
+    "compare-row-mention-scrapbook": "모바일 댓글 저장",
+    "compare-row-watchlists": "관심 계정 새 글",
+    "compare-row-searches": "저장글 검색",
+    "compare-row-insights": "내 계정 반응 보기",
+    "compare-row-markdown-export": "글 내보내기",
+    "compare-row-zip-export": "묶음 내보내기",
     "compare-section-plus": "Plus로 확장되는 항목",
-    "compare-row-archive-limit": "Scrapbook 저장글 한도",
-    "compare-row-folder-limit": "Scrapbook 폴더 한도",
-    "compare-row-file-name": "파일 이름 규칙",
-    "compare-row-save-path": "저장 경로 규칙",
-    "compare-row-notion-data-source": "Notion data source 저장",
-    "compare-row-notion-media-upload": "Notion 내부 미디어 업로드",
-    "compare-row-ai-summary": "AI 요약",
-    "compare-row-ai-tags": "AI 태그",
-    "compare-row-ai-frontmatter": "AI frontmatter",
-    "compare-note-title": "Plus는 한도, watchlists, insights, extension 고급 저장을 확장합니다",
-    "compare-note-body": "이 체크아웃에서 받은 같은 Plus 키를 scrapbook과 extension 양쪽에 붙여넣을 수 있습니다.",
+    "compare-row-archive-limit": "저장글 한도",
+    "compare-row-folder-limit": "폴더 한도",
+    "compare-row-file-name": "파일 이름 자동 정리",
+    "compare-row-save-path": "저장 위치 자동 정리",
+    "compare-row-notion-data-source": "Notion 데이터베이스 저장",
+    "compare-row-notion-media-upload": "Notion 안에 이미지 저장",
+    "compare-row-ai-summary": "요약 자동 정리",
+    "compare-row-ai-tags": "태그 자동 정리",
+    "compare-row-ai-frontmatter": "메모 자동 정리",
+    "compare-note-title": "Free는 저장과 다시 보기까지, Plus는 한도와 계정 보기를 넓힙니다.",
+    "compare-note-body": "받은 Plus 키는 스크랩북과 PC 저장에 같이 씁니다.",
     "compare-scope-note":
-      "searches는 Free에서도 사용할 수 있습니다. watchlists와 insights는 Plus에서 열리며, searches·watchlists·insights 사용에는 Threads 로그인과 일부 권한 재연결이 필요합니다."
+      "저장글 검색은 Free에서도 쓸 수 있습니다. 관심 계정과 내 계정 반응 보기는 Plus에서 열리며, Threads 로그인 뒤 사용할 수 있습니다."
   },
   en: checkoutFeatureCopyEn,
   ja: {
@@ -306,10 +431,110 @@ function setTextById(id: string, value: string): void {
   }
 }
 
+function setText(element: HTMLElement | null, value: string): void {
+  if (!element) {
+    return;
+  }
+
+  element.textContent = value;
+}
+
+function setList(element: HTMLElement | null, items: string[]): void {
+  if (!element) {
+    return;
+  }
+
+  element.innerHTML = items.map((item) => `<li>${escapeHtml(item)}</li>`).join("");
+}
+
+function setEmailLink(element: HTMLAnchorElement | null, email: string): void {
+  if (!element) {
+    return;
+  }
+
+  element.href = `mailto:${email}`;
+  element.textContent = email;
+}
+
+function getCheckoutUiCopy(locale: WebLocale): CheckoutUiCopy {
+  return checkoutUiCopyByLocale[locale] ?? checkoutUiCopyByLocale.en!;
+}
+
+function replaceYearlyPrice(value: string): string {
+  const yearlyPrice = storefrontSettings?.priceValue.trim() || DEFAULT_YEARLY_PRICE;
+  return value.replaceAll(DEFAULT_YEARLY_PRICE, yearlyPrice);
+}
+
+function getBillingCycleCopy(locale: WebLocale, cycle: BillingCycle): { title: string; price: string; note: string } {
+  const baseCopy = billingCycleCopy[locale][cycle];
+  if (cycle !== "yearly") {
+    return baseCopy;
+  }
+
+  return {
+    ...baseCopy,
+    price: storefrontSettings?.priceValue.trim() || baseCopy.price
+  };
+}
+
 function applyCheckoutFeatureCopy(locale: WebLocale): void {
   const copy = checkoutFeatureCopy[locale];
   for (const [id, value] of Object.entries(copy)) {
     setTextById(id, value);
+  }
+}
+
+function applyCheckoutStorefrontCopy(): void {
+  const uiCopy = getCheckoutUiCopy(currentLocale);
+  const title = storefrontSettings?.priceLabel.trim() || msg.commerceH2;
+  const lead = replaceYearlyPrice(msg.commerceLead);
+
+  setText(checkoutEyebrow, uiCopy.eyebrow);
+  if (checkoutTitle) {
+    checkoutTitle.textContent = title;
+  }
+
+  if (checkoutLead) {
+    checkoutLead.textContent = lead;
+  }
+
+  document.title = [title, siteHost].filter(Boolean).join(" | ");
+}
+
+function applyCheckoutFulfillmentCopy(locale: WebLocale): void {
+  const copy = checkoutFulfillmentCopyByLocale[locale];
+
+  if (checkoutFulfillmentTitle) {
+    checkoutFulfillmentTitle.textContent = copy.title;
+  }
+
+  if (checkoutFulfillmentCopy) {
+    checkoutFulfillmentCopy.textContent = copy.body;
+  }
+
+  setList(checkoutFulfillmentSteps, getCheckoutUiCopy(locale).fulfillmentSteps);
+}
+
+function applyCheckoutUiCopy(locale: WebLocale): void {
+  const uiCopy = getCheckoutUiCopy(locale);
+  const supportEmail = storefrontSettings?.supportEmail.trim() || DEFAULT_SETTINGS.supportEmail;
+
+  setText(checkoutMethodsEyebrow, uiCopy.methodsEyebrow);
+  setText(checkoutMethodsTitle, uiCopy.methodsTitle);
+  setText(checkoutMethodsCopy, uiCopy.methodsCopy);
+  setText(checkoutSupportLabel, uiCopy.supportLabel);
+  setEmailLink(checkoutSupportEmail, supportEmail);
+  setText(checkoutSupportCopy, uiCopy.supportCopy);
+  setText(checkoutRefundLabel, uiCopy.refundLabel);
+  setText(checkoutRefundCopy, uiCopy.refundCopy);
+  setText(checkoutDataLabel, uiCopy.dataLabel);
+  setText(checkoutDataCopy, uiCopy.dataCopy);
+  setText(formNameHint, uiCopy.nameHint);
+  setText(formEmailHint, uiCopy.emailHint);
+  setText(formMethodHint, uiCopy.methodHint);
+  setText(formNoteHint, uiCopy.noteHint);
+  if (checkoutSubmitButton) {
+    checkoutSubmitButton.textContent = uiCopy.submitCta;
   }
 }
 
@@ -318,10 +543,12 @@ function renderPaymentMethods(methods: PaymentMethod[]): void {
     return;
   }
 
+  const selectedPaymentMethodId = paymentSelect.value;
+
   paymentMethodsEl.innerHTML = methods
     .map(
       (method) => `
-        <article class="method-card">
+        <article class="method-card${method.id === selectedPaymentMethodId ? " is-selected" : ""}" data-method-id="${escapeHtml(method.id)}">
           <div class="method-card-meta">
             <strong>${escapeHtml(method.name)}</strong>
             <span class="method-badge">${escapeHtml(msg.methodBadge)}</span>
@@ -335,7 +562,7 @@ function renderPaymentMethods(methods: PaymentMethod[]): void {
               href="${escapeHtml(method.actionUrl)}"
               target="_blank"
               rel="noreferrer"
-            >${escapeHtml(method.actionLabel || "Open payment page")}</a>
+            >${escapeHtml(method.actionLabel || (currentLocale === "ko" ? "결제 페이지 열기" : "Open payment page"))}</a>
           `
               : ""
           }
@@ -351,6 +578,23 @@ function renderPaymentMethods(methods: PaymentMethod[]): void {
     option.textContent = method.name;
     paymentSelect.appendChild(option);
   }
+
+  if (selectedPaymentMethodId && methods.some((method) => method.id === selectedPaymentMethodId)) {
+    paymentSelect.value = selectedPaymentMethodId;
+  }
+
+  syncSelectedMethodCard();
+}
+
+function syncSelectedMethodCard(): void {
+  if (!paymentMethodsEl || !paymentSelect) {
+    return;
+  }
+
+  const selectedId = paymentSelect.value;
+  for (const card of paymentMethodsEl.querySelectorAll<HTMLElement>(".method-card")) {
+    card.classList.toggle("is-selected", card.dataset.methodId === selectedId);
+  }
 }
 
 function getSelectedBillingCycle(): BillingCycle {
@@ -360,7 +604,7 @@ function getSelectedBillingCycle(): BillingCycle {
 
 function applyBillingCycleUi(): void {
   const cycle = getSelectedBillingCycle();
-  const cycleCopy = billingCycleCopy[currentLocale][cycle];
+  const cycleCopy = getBillingCycleCopy(currentLocale, cycle);
   if (billingCycleInput) {
     billingCycleInput.value = cycle;
   }
@@ -372,7 +616,7 @@ function applyBillingCycleUi(): void {
   }
 
   for (const option of billingCycleOptions) {
-    const copy = billingCycleCopy[currentLocale][option.value === "monthly" ? "monthly" : "yearly"];
+    const copy = getBillingCycleCopy(currentLocale, option.value === "monthly" ? "monthly" : "yearly");
     const label = option.closest(".checkout-cycle-option");
     const title = label?.querySelector("span");
     const price = label?.querySelector("strong");
@@ -402,8 +646,11 @@ async function loadStorefront(): Promise<void> {
     throw new Error("Could not load storefront data.");
   }
 
-  storefront = (await response.json()) as PublicStorefrontResponse;
-  renderPaymentMethods(storefront.paymentMethods);
+  const data = (await response.json()) as PublicStorefrontResponse;
+  storefrontSettings = data.settings;
+  paymentMethods = data.paymentMethods;
+  renderPaymentMethods(paymentMethods);
+  applyLocale(currentLocale);
 }
 
 async function submitPurchaseRequest(event: SubmitEvent): Promise<void> {
@@ -451,6 +698,8 @@ async function submitPurchaseRequest(event: SubmitEvent): Promise<void> {
   ].filter((line) => line !== "");
   setStatus(lines.join("\n"));
   purchaseForm.reset();
+  applyBillingCycleUi();
+  syncSelectedMethodCard();
 }
 
 function applyLocale(locale: WebLocale): void {
@@ -458,34 +707,60 @@ function applyLocale(locale: WebLocale): void {
   msg = landingMessages[locale][landingVariant];
   document.documentElement.lang = locale;
   applyTranslations(buildTranslationDict(msg));
+  applyLangToggle(locale);
   applyCheckoutFeatureCopy(locale);
+  applyCheckoutStorefrontCopy();
+  applyCheckoutUiCopy(locale);
+  applyCheckoutFulfillmentCopy(locale);
   applyBillingCycleUi();
+  if (paymentMethods.length > 0) {
+    renderPaymentMethods(paymentMethods);
+  }
 }
 
 void (async () => {
-  currentLocale = getLocale();
-  msg = landingMessages[currentLocale][landingVariant];
-  applyTranslations(buildTranslationDict(msg));
-  document.documentElement.lang = currentLocale;
-
-  // Detect locale from query param (shared with landing)
   const params = new URLSearchParams(window.location.search);
   const langParam = readWebLocale(params.get("lang"));
   if (langParam) {
-    applyLocale(langParam);
+    currentLocale = langParam;
   }
+
+  msg = landingMessages[currentLocale][landingVariant];
+  applyLocale(currentLocale);
+
+  bindLangToggle((next) => {
+    applyLocale(next);
+  });
 
   try {
     await loadStorefront();
   } catch (error) {
     setStatus(error instanceof Error ? error.message : "Could not load checkout.", true);
   }
-
-  applyBillingCycleUi();
 })();
 
 purchaseForm?.addEventListener("submit", (event) => {
   void submitPurchaseRequest(event);
+});
+
+paymentSelect?.addEventListener("change", () => {
+  syncSelectedMethodCard();
+});
+
+paymentMethodsEl?.addEventListener("click", (event) => {
+  const target = event.target as HTMLElement | null;
+  const card = target?.closest<HTMLElement>(".method-card");
+  if (!card || !paymentSelect) {
+    return;
+  }
+
+  const methodId = card.dataset.methodId ?? "";
+  if (!methodId) {
+    return;
+  }
+
+  paymentSelect.value = methodId;
+  syncSelectedMethodCard();
 });
 
 for (const option of billingCycleOptions) {

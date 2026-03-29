@@ -292,9 +292,17 @@ function buildOverviewFromData(
 }
 
 export function configureMonitoringService(options: {
+  enableAutoRun?: boolean;
   getCollectorStatus: () => BotMentionCollectorStatus | null;
 }): void {
   collectorStatusReader = options.getCollectorStatus;
+  if (options.enableAutoRun === false) {
+    if (autoRunTimer) {
+      clearInterval(autoRunTimer);
+      autoRunTimer = null;
+    }
+    return;
+  }
   if (autoRunTimer) {
     return;
   }

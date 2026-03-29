@@ -2802,6 +2802,37 @@ function normalizeStorefrontSettings(
   parsed: Partial<StorefrontSettings> | undefined,
   fallback: StorefrontSettings
 ): StorefrontSettings {
+  const legacyHeroNotes = [
+    "한 제품, 두 진입 경로: PC extension + 모바일 mention scrapbook",
+    "Free: mention inbox + searches + Markdown / ZIP export",
+    "Plus: 1,000 saves + 50 folders + watchlists · insights"
+  ];
+  const legacyFaqs = [
+    {
+      question: "저장하려면 Plus가 필요한가요?",
+      answer:
+        "아니요. Free에서도 저장, 이미지 포함, 연속 답글, 중복 건너뜀이 가능합니다. 저장글 100개, 폴더 5개, searches까지 Free에서 사용할 수 있고, watchlists와 insights는 Plus에서 열립니다."
+    },
+    {
+      question: "누가 Plus를 쓰면 좋나요?",
+      answer:
+        "scrapbook 저장글이 100개를 넘거나, 폴더를 5개 이상 쓰고 싶은 사용자, 그리고 watchlists와 insights가 필요한 사용자에게 맞습니다. 같은 키를 extension에도 연결할 수 있습니다."
+    },
+    {
+      question: "Plus에서는 뭐가 달라지나요?",
+      answer:
+        "scrapbook 저장글 1,000개, 폴더 50개까지 확장되고, watchlists와 insights가 열리며, 동일한 키를 extension에도 연결할 수 있습니다."
+    },
+    {
+      question: "Plus 키는 어떻게 전달되나요?",
+      answer: "결제가 확인되면 보통 30분 안에 Plus 키를 이메일로 보내드립니다."
+    },
+    {
+      question: "환불 정책은 있나요?",
+      answer: "구매 후 7일 내에 환불 요청을 보내면 확인 후 처리합니다."
+    }
+  ];
+
   const merged: StorefrontSettings = {
     ...fallback,
     ...(parsed ?? {})
@@ -2811,7 +2842,11 @@ function normalizeStorefrontSettings(
   if (!parsed || parsed.productName === "Threads to Obsidian" || parsed.productName === "Threads Saver") {
     merged.productName = fallback.productName;
   }
-  if (!parsed || parsed.headline === "Threads를 Obsidian에 저장.") {
+  if (
+    !parsed ||
+    parsed.headline === "Threads를 Obsidian에 저장." ||
+    parsed.headline === "Threads 저장을 편하게\nPC는 extension, 모바일은 @mention\n댓글로 @ss_threads_bot 만 적으세요."
+  ) {
     merged.headline = fallback.headline;
   }
   if (
@@ -2831,13 +2866,29 @@ function normalizeStorefrontSettings(
   if (!parsed || parsed.priceValue === "$19") {
     merged.priceValue = fallback.priceValue;
   }
-  if (!parsed || parsed.includedUpdates === "1회 결제 · 7일 환불 · 업데이트 1년") {
+  if (
+    !parsed ||
+    parsed.includedUpdates === "1회 결제 · 7일 환불 · 업데이트 1년" ||
+    parsed.includedUpdates === "월 US$2.99 · 연 US$19.99 · Free 100/5 + searches -> Plus 1000/50 + watchlists/insights"
+  ) {
     merged.includedUpdates = fallback.includedUpdates;
   }
-  if (!Array.isArray(parsed?.heroNotes) || parsed.heroNotes.length === 0) {
+  if (
+    !Array.isArray(parsed?.heroNotes) ||
+    (parsed.heroNotes.length === legacyHeroNotes.length &&
+      parsed.heroNotes.every((note, index) => note === legacyHeroNotes[index]))
+  ) {
     merged.heroNotes = fallback.heroNotes;
   }
-  if (!Array.isArray(parsed?.faqs) || parsed.faqs.length === 0) {
+  if (
+    !Array.isArray(parsed?.faqs) ||
+    (parsed.faqs.length === legacyFaqs.length &&
+      parsed.faqs.every(
+        (faq, index) =>
+          faq.question === legacyFaqs[index]?.question &&
+          faq.answer === legacyFaqs[index]?.answer
+      ))
+  ) {
     merged.faqs = fallback.faqs;
   }
 
@@ -2846,7 +2897,7 @@ function normalizeStorefrontSettings(
 
 async function saveFileDatabase(data: WebDatabase, filePath: string): Promise<void> {
   await ensureParentDirectory(filePath);
-  const tmpFilePath = `${filePath}.tmp.${process.pid}.${Date.now()}`;
+  const tmpFilePath = `${filePath}.tmp.${process.pid}.${crypto.randomUUID()}`;
   const payload = JSON.stringify(data, null, 2);
   await writeFile(tmpFilePath, payload, "utf8");
   await rename(tmpFilePath, filePath);
@@ -2886,6 +2937,31 @@ async function loadDatabaseFromPostgres(backend: PostgresDatabaseBackend): Promi
   const pool = await getPostgresPool(backend.connectionString);
   await ensurePrimaryPostgresStoreRow(pool, backend);
   return hydratePostgresDatabase(pool, backend, await loadPrimaryDatabasePayload(pool, backend));
+}
+
+async function loadPublicStorefrontFromPostgres(backend: PostgresDatabaseBackend): Promise<PublicStorefrontResponse> {
+  const pool = await getPostgresPool(backend.connectionString);
+  await ensurePostgresStore(pool, backend.tableName);
+  const escapedTableName = escapeQualifiedIdentifier(backend.tableName);
+  const selected = await pool.query<{ settings: unknown; payment_methods: unknown }>(
+    `SELECT payload -> 'settings' AS settings,
+            payload -> 'paymentMethods' AS payment_methods
+     FROM ${escapedTableName}
+     WHERE store_key = $1
+     LIMIT 1`,
+    [backend.storeKey]
+  );
+
+  if (!selected.rows[0]) {
+    return buildPublicStorefront(buildDefaultDatabase());
+  }
+
+  return buildPublicStorefront(
+    normalizeDatabasePayload({
+      settings: selected.rows[0].settings,
+      paymentMethods: selected.rows[0].payment_methods
+    })
+  );
 }
 
 async function withPostgresDatabaseTransaction<T>(
@@ -2948,6 +3024,30 @@ export async function loadDatabase(filePath?: string): Promise<WebDatabase> {
     }
 
     return loadDatabaseUnsafe(backend.filePath);
+  });
+}
+
+export async function pingDatabase(filePath?: string): Promise<void> {
+  await withDatabaseAccess(async () => {
+    const backend = resolveDatabaseBackend(filePath);
+    if (backend.kind === "postgres") {
+      const pool = await getPostgresPool(backend.connectionString);
+      await pool.query("SELECT 1");
+      return;
+    }
+
+    await ensureParentDirectory(backend.filePath);
+  });
+}
+
+export async function loadPublicStorefrontSnapshot(filePath?: string): Promise<PublicStorefrontResponse> {
+  return withDatabaseAccess(async () => {
+    const backend = resolveDatabaseBackend(filePath);
+    if (backend.kind === "postgres") {
+      return loadPublicStorefrontFromPostgres(backend);
+    }
+
+    return buildPublicStorefront(await loadDatabaseUnsafe(backend.filePath));
   });
 }
 

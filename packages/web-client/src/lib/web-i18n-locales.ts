@@ -1181,8 +1181,8 @@ export const landingStorefrontLocales = {
         "heroSecondaryHref": "/scrapbook",
         "heroPrimaryHref": "/checkout",
         "priceCardHref": "/checkout",
-        "productAHref": "/scrapbook",
-        "productBHref": "#install"
+        "productAHref": EXTENSION_RELEASE_DOWNLOAD_URL,
+        "productBHref": "/scrapbook"
       },
       "faqs": [
         {
@@ -1279,8 +1279,8 @@ export const landingStorefrontLocales = {
         "heroSecondaryHref": "/scrapbook",
         "heroPrimaryHref": "/checkout",
         "priceCardHref": "/checkout",
-        "productAHref": "/scrapbook",
-        "productBHref": "#install"
+        "productAHref": EXTENSION_RELEASE_DOWNLOAD_URL,
+        "productBHref": "/scrapbook"
       },
       "faqs": [
         {
@@ -1377,8 +1377,8 @@ export const landingStorefrontLocales = {
         "heroSecondaryHref": "/scrapbook",
         "heroPrimaryHref": "/checkout",
         "priceCardHref": "/checkout",
-        "productAHref": "/scrapbook",
-        "productBHref": "#install"
+        "productAHref": EXTENSION_RELEASE_DOWNLOAD_URL,
+        "productBHref": "/scrapbook"
       },
       "faqs": [
         {
@@ -1475,8 +1475,8 @@ export const landingStorefrontLocales = {
         "heroSecondaryHref": "/scrapbook",
         "heroPrimaryHref": "/checkout",
         "priceCardHref": "/checkout",
-        "productAHref": "/scrapbook",
-        "productBHref": "#install"
+        "productAHref": EXTENSION_RELEASE_DOWNLOAD_URL,
+        "productBHref": "/scrapbook"
       },
       "faqs": [
         {
@@ -1573,8 +1573,8 @@ export const landingStorefrontLocales = {
         "heroSecondaryHref": "/scrapbook",
         "heroPrimaryHref": "/checkout",
         "priceCardHref": "/checkout",
-        "productAHref": "/scrapbook",
-        "productBHref": "#install"
+        "productAHref": EXTENSION_RELEASE_DOWNLOAD_URL,
+        "productBHref": "/scrapbook"
       },
       "faqs": [
         {

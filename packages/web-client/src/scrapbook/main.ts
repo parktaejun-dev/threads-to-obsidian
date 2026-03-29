@@ -64,10 +64,28 @@ interface BotSessionState {
   oauthConfigured: boolean;
   user: BotUserView | null;
   archives: BotArchiveView[];
+  saveStatus: BotSaveStatusView | null;
 }
 
 interface BotSyncState extends BotSessionState {
   workspace?: ScrapbookPlusState;
+}
+
+interface BotSaveStatusView {
+  currentState: "idle" | "queued" | "processing" | "completed" | "failed";
+  completionSource: "job" | "archive_inferred" | null;
+  collectorEnabled: boolean;
+  pollIntervalMs: number;
+  collectorError: string | null;
+  lastCollectedAt: string | null;
+  latestMentionUrl: string | null;
+  latestMentionCreatedAt: string | null;
+  latestMentionUpdatedAt: string | null;
+  latestJobStatus: "queued" | "processing" | "completed" | "failed" | "invalid" | "unmatched" | null;
+  latestJobError: string | null;
+  latestSavedAt: string | null;
+  expectedVisibleAt: string | null;
+  retryAvailableAt: string | null;
 }
 
 interface BotOauthStartResult {
@@ -222,8 +240,11 @@ let connectButtonsBusy = false;
 let connectButtonsAvailable = true;
 let sessionMenuOpen = false;
 let isExportingArchives = false;
+let isRefreshingSaveStatus = false;
 let archiveSearchQuery = "";
+let activeArchiveTag: string | null = null;
 let activeFolderId: string | null = null;
+let pendingConnectedStatus = false;
 
 interface FolderEntry {
   id: string;
@@ -280,6 +301,18 @@ const sessionPanel = document.querySelector<HTMLElement>("#session-panel");
 const sessionTrigger = document.querySelector<HTMLButtonElement>("#session-trigger");
 const sessionMenu = document.querySelector<HTMLElement>("#session-menu");
 const pageStatus = document.querySelector<HTMLParagraphElement>("#page-status");
+const saveStatusPanel = document.querySelector<HTMLElement>("#save-status-panel");
+const saveStatusEyebrow = document.querySelector<HTMLElement>("#save-status-eyebrow");
+const saveStatusTitle = document.querySelector<HTMLElement>("#save-status-title");
+const saveStatusSummary = document.querySelector<HTMLParagraphElement>("#save-status-summary");
+const saveStatusRefresh = document.querySelector<HTMLButtonElement>("#save-status-refresh");
+const saveStatusCurrentLabel = document.querySelector<HTMLElement>("#save-status-current-label");
+const saveStatusCurrentValue = document.querySelector<HTMLElement>("#save-status-current-value");
+const saveStatusLastLabel = document.querySelector<HTMLElement>("#save-status-last-label");
+const saveStatusLastValue = document.querySelector<HTMLElement>("#save-status-last-value");
+const saveStatusEtaLabel = document.querySelector<HTMLElement>("#save-status-eta-label");
+const saveStatusEtaValue = document.querySelector<HTMLElement>("#save-status-eta-value");
+const saveStatusDetail = document.querySelector<HTMLElement>("#save-status-detail");
 const planTitle = document.querySelector<HTMLElement>("#plan-title");
 const planCopy = document.querySelector<HTMLElement>("#plan-copy");
 const planTierBadge = document.querySelector<HTMLElement>("#plan-tier-badge");
@@ -313,12 +346,12 @@ let archivesPerPage = 10;
 const archivesToolbar = document.querySelector<HTMLElement>("#archives-toolbar");
 const archivesToolbarMeta = document.querySelector<HTMLElement>("#archives-toolbar-meta");
 const archivesSelectAll = document.querySelector<HTMLInputElement>("#archives-select-all");
-const archivesExportSelected = document.querySelector<HTMLButtonElement>("#archives-export-selected");
 const archivesExportAll = document.querySelector<HTMLButtonElement>("#archives-export-all");
 const archivesMoveSelected = document.querySelector<HTMLButtonElement>("#archives-move-selected");
 const archivesDeleteSelected = document.querySelector<HTMLButtonElement>("#archives-delete-selected");
 const archivesFilterBar = document.querySelector<HTMLElement>("#archives-filter-bar");
 const archivesSearchInput = document.querySelector<HTMLInputElement>("#archives-search");
+const archivesTagPanel = document.querySelector<HTMLElement>("#archives-tag-panel");
 const archivesFolderStrip = document.querySelector<HTMLElement>("#archives-folder-strip");
 const logoutButton = document.querySelector<HTMLButtonElement>("#logout");
 const workspaceTabs = document.querySelector<HTMLElement>("#workspace-tabs");
@@ -358,8 +391,522 @@ function t<K extends keyof ScrapbookMsg>(key: K, params?: Record<string, string 
   return formatMessage(msg[key], params);
 }
 
-function uiText(ko: string, en: string): string {
-  return currentLocale === "ko" ? ko : en;
+type SecondaryWebLocale = Exclude<WebLocale, "ko" | "en">;
+type SecondaryLocaleCopy = Partial<Record<SecondaryWebLocale, string>>;
+
+function buildUiTextKey(ko: string, en: string): string {
+  return `${ko}\u241f${en}`;
+}
+
+const staticUiTextOverrides: Record<string, SecondaryLocaleCopy> = {
+  [buildUiTextKey("폴더 이동", "Move to folder")]: {
+    ja: "フォルダへ移動",
+    "pt-BR": "Mover para pasta",
+    es: "Mover a carpeta",
+    "zh-TW": "移動到資料夾",
+    vi: "Chuyển vào thư mục"
+  },
+  [buildUiTextKey("선택 삭제", "Delete selected")]: {
+    ja: "選択を削除",
+    "pt-BR": "Excluir selecionados",
+    es: "Eliminar seleccionados",
+    "zh-TW": "刪除所選",
+    vi: "Xóa mục đã chọn"
+  },
+  [buildUiTextKey("로그인하면 현재 계정의 저장글 한도와 Plus 연결 상태를 확인할 수 있습니다.", "Sign in to see your current save limits and Plus status for this scrapbook account.")]: {
+    ja: "ログインすると、この scrapbook アカウントの保存上限と Plus 連携状態を確認できます。",
+    "pt-BR": "Ao entrar, você verá os limites atuais e o estado do Plus desta conta do scrapbook.",
+    es: "Al iniciar sesión podrás ver los límites actuales y el estado de Plus de esta cuenta del scrapbook.",
+    "zh-TW": "登入後即可查看此 scrapbook 帳號目前的保存上限與 Plus 連線狀態。",
+    vi: "Đăng nhập để xem giới hạn hiện tại và trạng thái Plus của tài khoản scrapbook này."
+  },
+  [buildUiTextKey("이 계정은 Plus입니다. 저장글 1,000개와 폴더 50개까지 사용할 수 있습니다.", "This account is on Plus. You can save up to 1,000 posts and use up to 50 folders.")]: {
+    ja: "このアカウントは Plus です。保存は 1,000 件、フォルダは 50 個まで使えます。",
+    "pt-BR": "Esta conta está no Plus. Você pode salvar até 1.000 posts e usar até 50 pastas.",
+    es: "Esta cuenta tiene Plus. Puedes guardar hasta 1.000 publicaciones y usar hasta 50 carpetas.",
+    "zh-TW": "此帳號目前為 Plus，可保存最多 1,000 則內容並使用 50 個資料夾。",
+    vi: "Tài khoản này đang ở gói Plus. Bạn có thể lưu tối đa 1.000 bài và dùng 50 thư mục."
+  },
+  [buildUiTextKey("Free는 저장글 100개와 폴더 5개까지 사용할 수 있습니다.", "Free includes up to 100 saved posts and 5 folders.")]: {
+    ja: "Free では保存 100 件、フォルダ 5 個まで使えます。",
+    "pt-BR": "O Free inclui até 100 posts salvos e 5 pastas.",
+    es: "Free incluye hasta 100 publicaciones guardadas y 5 carpetas.",
+    "zh-TW": "Free 最多可保存 100 則內容並使用 5 個資料夾。",
+    vi: "Gói Free cho phép lưu tối đa 100 bài và dùng 5 thư mục."
+  },
+  [buildUiTextKey("Plus 키", "Plus key")]: {
+    ja: "Plus キー",
+    "pt-BR": "Chave Plus",
+    es: "Clave Plus",
+    "zh-TW": "Plus 金鑰",
+    vi: "Khóa Plus"
+  },
+  [buildUiTextKey("구매한 Plus 키를 붙여넣기", "Paste your Plus key")]: {
+    ja: "購入した Plus キーを貼り付ける",
+    "pt-BR": "Cole sua chave Plus",
+    es: "Pega tu clave Plus",
+    "zh-TW": "貼上你購買的 Plus 金鑰",
+    vi: "Dán khóa Plus bạn đã mua"
+  },
+  [buildUiTextKey("Plus 연결", "Activate Plus")]: {
+    ja: "Plus を連携",
+    "pt-BR": "Ativar Plus",
+    es: "Activar Plus",
+    "zh-TW": "啟用 Plus",
+    vi: "Kích hoạt Plus"
+  },
+  [buildUiTextKey("키 제거", "Remove key")]: {
+    ja: "キーを削除",
+    "pt-BR": "Remover chave",
+    es: "Quitar clave",
+    "zh-TW": "移除金鑰",
+    vi: "Gỡ khóa"
+  },
+  [buildUiTextKey("먼저 Threads로 로그인해야 이 scrapbook 계정에 Plus 키를 연결할 수 있습니다.", "Sign in with Threads before linking a Plus key to this scrapbook account.")]: {
+    ja: "この scrapbook アカウントに Plus キーを連携するには、先に Threads へログインしてください。",
+    "pt-BR": "Entre com Threads antes de vincular uma chave Plus a esta conta do scrapbook.",
+    es: "Inicia sesión con Threads antes de vincular una clave Plus a esta cuenta del scrapbook.",
+    "zh-TW": "要將 Plus 金鑰連到此 scrapbook 帳號，請先用 Threads 登入。",
+    vi: "Hãy đăng nhập bằng Threads trước khi liên kết khóa Plus với tài khoản scrapbook này."
+  },
+  [buildUiTextKey("Plus 활성화됨. 같은 키를 extension에도 사용할 수 있습니다.", "Plus is active. The same key also works in the extension.")]: {
+    ja: "Plus は有効です。同じキーを extension でも使えます。",
+    "pt-BR": "O Plus está ativo. A mesma chave também funciona na extension.",
+    es: "Plus está activo. La misma clave también funciona en la extension.",
+    "zh-TW": "Plus 已啟用，同一把金鑰也可用在 extension。",
+    vi: "Plus đã được kích hoạt. Cùng khóa này cũng dùng được trong extension."
+  },
+  [buildUiTextKey("이 scrapbook 계정에 연결된 Plus 키가 만료되었습니다. 새 키를 붙여넣거나 연장된 키로 다시 연결하세요.", "The Plus key linked to this scrapbook account has expired. Paste a renewed key to restore higher limits.")]: {
+    ja: "この scrapbook アカウントに連携した Plus キーは期限切れです。更新済みのキーを貼り付けて上限を復元してください。",
+    "pt-BR": "A chave Plus vinculada a esta conta do scrapbook expirou. Cole uma chave renovada para restaurar os limites maiores.",
+    es: "La clave Plus vinculada a esta cuenta del scrapbook ha expirado. Pega una clave renovada para recuperar los límites ampliados.",
+    "zh-TW": "此 scrapbook 帳號連結的 Plus 金鑰已過期。請貼上續期後的金鑰以恢復較高上限。",
+    vi: "Khóa Plus liên kết với tài khoản scrapbook này đã hết hạn. Hãy dán khóa đã gia hạn để khôi phục giới hạn cao hơn."
+  },
+  [buildUiTextKey("이 scrapbook 계정에 연결된 Plus 키가 비활성화되었습니다. 다른 키로 다시 연결하세요.", "The Plus key linked to this scrapbook account has been revoked. Paste another key to reconnect.")]: {
+    ja: "この scrapbook アカウントに連携した Plus キーは無効化されました。別のキーを貼り付けて再接続してください。",
+    "pt-BR": "A chave Plus vinculada a esta conta do scrapbook foi revogada. Cole outra chave para reconectar.",
+    es: "La clave Plus vinculada a esta cuenta del scrapbook fue revocada. Pega otra clave para volver a conectar.",
+    "zh-TW": "此 scrapbook 帳號連結的 Plus 金鑰已被停用。請改用另一把金鑰重新連結。",
+    vi: "Khóa Plus liên kết với tài khoản scrapbook này đã bị thu hồi. Hãy dán khóa khác để liên kết lại."
+  },
+  [buildUiTextKey("이 scrapbook 계정의 Plus 연결 정보를 찾을 수 없습니다. 키를 다시 붙여넣어 주세요.", "The stored Plus link could not be verified. Paste your key again to reconnect this scrapbook account.")]: {
+    ja: "この scrapbook アカウントの Plus 連携情報を確認できません。キーをもう一度貼り付けてください。",
+    "pt-BR": "Não foi possível verificar o vínculo Plus salvo. Cole a chave novamente para reconectar esta conta do scrapbook.",
+    es: "No se pudo verificar el vínculo Plus guardado. Pega la clave de nuevo para reconectar esta cuenta del scrapbook.",
+    "zh-TW": "無法驗證此 scrapbook 帳號儲存的 Plus 連線資訊。請重新貼上金鑰。",
+    vi: "Không thể xác minh liên kết Plus đã lưu. Hãy dán lại khóa để kết nối lại tài khoản scrapbook này."
+  },
+  [buildUiTextKey("Free 플랜입니다. Plus 키를 붙여넣으면 저장글 1,000개와 폴더 50개로 확장됩니다.", "This account is on Free. Paste a Plus key to raise your limits to 1,000 saved posts and 50 folders.")]: {
+    ja: "このアカウントは Free です。Plus キーを貼り付けると保存 1,000 件、フォルダ 50 個まで拡張されます。",
+    "pt-BR": "Esta conta está no Free. Cole uma chave Plus para elevar os limites para 1.000 posts salvos e 50 pastas.",
+    es: "Esta cuenta está en Free. Pega una clave Plus para ampliar los límites a 1.000 publicaciones guardadas y 50 carpetas.",
+    "zh-TW": "此帳號目前為 Free。貼上 Plus 金鑰後可將上限提升到 1,000 則保存與 50 個資料夾。",
+    vi: "Tài khoản này đang ở gói Free. Hãy dán khóa Plus để nâng giới hạn lên 1.000 bài đã lưu và 50 thư mục."
+  },
+  [buildUiTextKey("Threads 로그인 응답은 도착했지만 세션을 확인하지 못했습니다. 잠시 후 새로고침해 다시 확인해 주세요.", "The Threads sign-in response arrived, but the session could not be confirmed. Refresh and check again in a moment.")]: {
+    ja: "Threads のログイン応答は届きましたが、セッションを確認できませんでした。少し待ってから更新して再確認してください。",
+    "pt-BR": "A resposta de login do Threads chegou, mas não foi possível confirmar a sessão. Atualize em instantes e verifique novamente.",
+    es: "La respuesta de inicio de sesión de Threads llegó, pero no se pudo confirmar la sesión. Actualiza en un momento y vuelve a comprobar.",
+    "zh-TW": "已收到 Threads 登入回應，但無法確認工作階段。請稍後重新整理再檢查一次。",
+    vi: "Đã nhận phản hồi đăng nhập từ Threads nhưng không thể xác nhận phiên. Hãy làm mới sau ít phút rồi kiểm tra lại."
+  },
+  [buildUiTextKey("불러오는 중", "Loading")]: {
+    ja: "読み込み中",
+    "pt-BR": "Carregando",
+    es: "Cargando",
+    "zh-TW": "載入中",
+    vi: "Đang tải"
+  },
+  [buildUiTextKey("저장 대기", "Queued")]: {
+    ja: "保存待ち",
+    "pt-BR": "Na fila",
+    es: "En cola",
+    "zh-TW": "排隊中",
+    vi: "Đang chờ"
+  },
+  [buildUiTextKey("처리 중", "Processing")]: {
+    ja: "処理中",
+    "pt-BR": "Processando",
+    es: "Procesando",
+    "zh-TW": "處理中",
+    vi: "Đang xử lý"
+  },
+  [buildUiTextKey("반영 추정", "Likely reflected")]: {
+    ja: "反映済み推定",
+    "pt-BR": "Provavelmente refletido",
+    es: "Probablemente reflejado",
+    "zh-TW": "推定已反映",
+    vi: "Có vẻ đã phản ánh"
+  },
+  [buildUiTextKey("반영 완료", "Saved")]: {
+    ja: "反映完了",
+    "pt-BR": "Salvo",
+    es: "Guardado",
+    "zh-TW": "已保存",
+    vi: "Đã lưu"
+  },
+  [buildUiTextKey("확인 필요", "Needs review")]: {
+    ja: "確認が必要",
+    "pt-BR": "Precisa de revisão",
+    es: "Necesita revisión",
+    "zh-TW": "需要確認",
+    vi: "Cần kiểm tra"
+  },
+  [buildUiTextKey("새 요청 대기", "Waiting")]: {
+    ja: "新しいリクエスト待ち",
+    "pt-BR": "Aguardando novo pedido",
+    es: "Esperando una nueva solicitud",
+    "zh-TW": "等待新請求",
+    vi: "Đang chờ yêu cầu mới"
+  },
+  [buildUiTextKey("가장 최근 mention job이 완료로 기록됐습니다.", "The latest mention job was recorded as completed.")]: {
+    ja: "最新の mention ジョブが完了として記録されました。",
+    "pt-BR": "O job de mention mais recente foi registrado como concluído.",
+    es: "El job de mention más reciente quedó registrado como completado.",
+    "zh-TW": "最新的 mention 工作已記錄為完成。",
+    vi: "Tác vụ mention gần nhất đã được ghi nhận là hoàn tất."
+  },
+  [buildUiTextKey("최근 archive 반영 시각이 마지막 mention 요청보다 늦어서 반영된 것으로 추정합니다.", "A newer archive save time than the latest mention request suggests it has likely been reflected.")]: {
+    ja: "最新の mention リクエストより後の archive 保存時刻があるため、反映済みと推定します。",
+    "pt-BR": "Um horário de salvamento de archive mais recente que o último pedido de mention indica que ele provavelmente já foi refletido.",
+    es: "Un guardado de archive más reciente que la última solicitud de mention indica que probablemente ya fue reflejado.",
+    "zh-TW": "最近一次 archive 保存時間晚於最後一次 mention 請求，因此推定已反映。",
+    vi: "Thời điểm lưu archive mới hơn yêu cầu mention gần nhất nên có thể xem là đã được phản ánh."
+  },
+  [buildUiTextKey("멘션 댓글을 작성한 Threads 계정이 현재 연결된 scrapbook 계정과 일치하지 않았습니다.", "The reply author did not match the Threads account connected to this scrapbook.")]: {
+    ja: "返信を書いた Threads アカウントが、この scrapbook に接続されたアカウントと一致しませんでした。",
+    "pt-BR": "O autor da resposta não corresponde à conta do Threads conectada a este scrapbook.",
+    es: "El autor de la respuesta no coincide con la cuenta de Threads conectada a este scrapbook.",
+    "zh-TW": "留下回覆的 Threads 帳號與此 scrapbook 目前連結的帳號不一致。",
+    vi: "Tài khoản Threads đã viết reply không khớp với tài khoản đang kết nối với scrapbook này."
+  },
+  [buildUiTextKey("멘션 요청을 유효한 저장 요청으로 해석하지 못했습니다.", "The mention could not be parsed as a valid save request.")]: {
+    ja: "mention リクエストを有効な保存リクエストとして解釈できませんでした。",
+    "pt-BR": "Não foi possível interpretar o mention como um pedido de salvamento válido.",
+    es: "No se pudo interpretar el mention como una solicitud de guardado válida.",
+    "zh-TW": "無法將這次 mention 解析為有效的保存請求。",
+    vi: "Không thể phân tích mention này thành một yêu cầu lưu hợp lệ."
+  },
+  [buildUiTextKey("저장 요청 댓글을 작성한 계정과 이 scrapbook에 로그인한 계정이 같은지 확인하세요.", "Check that the reply was written from the same account that is signed in to this scrapbook.")]: {
+    ja: "保存リクエストの返信を書いたアカウントと、この scrapbook にログインしているアカウントが同じか確認してください。",
+    "pt-BR": "Verifique se a resposta foi escrita pela mesma conta que está conectada a este scrapbook.",
+    es: "Comprueba que la respuesta fue escrita desde la misma cuenta que inició sesión en este scrapbook.",
+    "zh-TW": "請確認發送保存回覆的帳號與登入此 scrapbook 的帳號是否相同。",
+    vi: "Hãy kiểm tra reply được viết từ cùng tài khoản đang đăng nhập vào scrapbook này."
+  },
+  [buildUiTextKey("잠시 후 자동 재시도가 잡혀 있을 수 있습니다. 지금 다시 확인 버튼으로 즉시 반영도 시도할 수 있습니다.", "An automatic retry may already be queued. You can also use Check now to force another fetch.")]: {
+    ja: "しばらくすると自動再試行が予定されている場合があります。今すぐ確認で再取得を強制することもできます。",
+    "pt-BR": "Talvez já exista uma nova tentativa automática na fila. Você também pode usar Verificar agora para forçar outra coleta.",
+    es: "Es posible que ya haya un reintento automático en cola. También puedes usar Comprobar ahora para forzar otra captura.",
+    "zh-TW": "稍後可能會自動重新嘗試。你也可以用立即確認強制再抓取一次。",
+    vi: "Có thể đã có một lần thử lại tự động đang xếp hàng. Bạn cũng có thể dùng Kiểm tra ngay để ép lấy lại dữ liệu."
+  },
+  [buildUiTextKey("최근 저장 기준", "Based on recent save")]: {
+    ja: "最近の保存基準",
+    "pt-BR": "Com base no salvamento recente",
+    es: "Según el guardado reciente",
+    "zh-TW": "依最近保存判定",
+    vi: "Dựa trên lần lưu gần nhất"
+  },
+  [buildUiTextKey("이미 반영됨", "Already reflected")]: {
+    ja: "すでに反映済み",
+    "pt-BR": "Já refletido",
+    es: "Ya reflejado",
+    "zh-TW": "已反映",
+    vi: "Đã phản ánh"
+  },
+  [buildUiTextKey("저장 상태를 아직 불러오지 못했습니다.", "Save status has not loaded yet.")]: {
+    ja: "保存状態はまだ読み込まれていません。",
+    "pt-BR": "O estado do salvamento ainda não foi carregado.",
+    es: "El estado de guardado aún no se ha cargado.",
+    "zh-TW": "保存狀態尚未載入。",
+    vi: "Trạng thái lưu vẫn chưa được tải."
+  },
+  [buildUiTextKey("최근 멘션 저장 요청이 대기열에 들어왔습니다. 보통 다음 수집 주기 안에 inbox에 반영됩니다.", "The latest mention save request is queued. It usually appears in the inbox within the next collection cycle.")]: {
+    ja: "最新の mention 保存リクエストはキューに入りました。通常は次の収集周期内に inbox に反映されます。",
+    "pt-BR": "O pedido de salvamento por mention mais recente entrou na fila. Normalmente ele aparece na inbox no próximo ciclo de coleta.",
+    es: "La solicitud de guardado por mention más reciente está en cola. Normalmente aparece en la inbox en el siguiente ciclo de recopilación.",
+    "zh-TW": "最近一次 mention 保存請求已進入佇列，通常會在下一輪收集內出現在 inbox。",
+    vi: "Yêu cầu lưu bằng mention gần nhất đã vào hàng đợi. Thường nó sẽ xuất hiện trong inbox ở chu kỳ thu thập kế tiếp."
+  },
+  [buildUiTextKey("최근 멘션 저장 요청을 처리 중입니다. 수집 완료 직후 inbox에 반영됩니다.", "The latest mention save request is being processed and should appear right after the next completed fetch.")]: {
+    ja: "最新の mention 保存リクエストを処理中です。次の収集完了直後に inbox へ反映されます。",
+    "pt-BR": "O pedido de salvamento por mention mais recente está sendo processado e deve aparecer logo após a próxima coleta concluída.",
+    es: "La solicitud de guardado por mention más reciente se está procesando y debería aparecer justo después de la próxima recopilación completada.",
+    "zh-TW": "最近一次 mention 保存請求正在處理中，通常會在下一次收集完成後立即出現在 inbox。",
+    vi: "Yêu cầu lưu bằng mention gần nhất đang được xử lý và sẽ xuất hiện ngay sau lần thu thập hoàn tất tiếp theo."
+  },
+  [buildUiTextKey("가장 최근 멘션 저장 요청은 최근 저장 시각 기준으로 반영된 것으로 보입니다. 아래에서 최근 멘션과 반영 시각을 다시 확인해 주세요.", "The latest mention save request looks reflected based on the recent save time. Review the latest mention and save timing below.")]: {
+    ja: "最新の mention 保存リクエストは、最近の保存時刻から見て反映済みに見えます。下で最新 mention と反映時刻を確認してください。",
+    "pt-BR": "O pedido de salvamento por mention mais recente parece refletido com base no horário do último salvamento. Revise abaixo o último mention e o horário de refletir.",
+    es: "La solicitud de guardado por mention más reciente parece reflejada según la hora del último guardado. Revisa abajo el último mention y la hora de reflejo.",
+    "zh-TW": "依最近保存時間判斷，最近一次 mention 保存請求看起來已反映。請在下方再次確認最新 mention 與反映時間。",
+    vi: "Dựa trên thời điểm lưu gần nhất, yêu cầu lưu bằng mention mới nhất có vẻ đã được phản ánh. Hãy xem lại mention mới nhất và thời điểm phản ánh bên dưới."
+  },
+  [buildUiTextKey("가장 최근 멘션 저장 요청이 반영되었습니다. 필요하면 아래에서 최근 멘션과 반영 시각을 다시 확인할 수 있습니다.", "The latest mention save request has been reflected. You can review the latest mention and save timing below.")]: {
+    ja: "最新の mention 保存リクエストは反映されました。必要なら下で最新 mention と反映時刻を確認できます。",
+    "pt-BR": "O pedido de salvamento por mention mais recente foi refletido. Se quiser, revise abaixo o último mention e o horário de refletir.",
+    es: "La solicitud de guardado por mention más reciente ya fue reflejada. Si quieres, revisa abajo el último mention y la hora de reflejo.",
+    "zh-TW": "最近一次 mention 保存請求已反映。如有需要，可在下方再次確認最新 mention 與反映時間。",
+    vi: "Yêu cầu lưu bằng mention gần nhất đã được phản ánh. Bạn có thể xem lại mention mới nhất và thời điểm phản ánh bên dưới nếu cần."
+  },
+  [buildUiTextKey("가장 최근 멘션 저장 요청이 자동 반영되지 않았습니다. 실패 이유를 확인한 뒤 즉시 다시 확인할 수 있습니다.", "The latest mention save request did not reflect automatically. Review the failure reason and check again right away.")]: {
+    ja: "最新の mention 保存リクエストは自動では反映されませんでした。失敗理由を確認して、すぐに再確認できます。",
+    "pt-BR": "O pedido de salvamento por mention mais recente não foi refletido automaticamente. Revise o motivo da falha e verifique de novo agora.",
+    es: "La solicitud de guardado por mention más reciente no se reflejó automáticamente. Revisa el motivo del fallo y vuelve a comprobar ahora mismo.",
+    "zh-TW": "最近一次 mention 保存請求未自動反映。請先確認失敗原因，再立即重新檢查。",
+    vi: "Yêu cầu lưu bằng mention gần nhất không được phản ánh tự động. Hãy xem lý do thất bại rồi kiểm tra lại ngay."
+  },
+  [buildUiTextKey("새 멘션 저장 요청을 기다리는 중입니다. 요청이 들어오면 보통 다음 수집 주기 안에 inbox에 반영됩니다.", "Waiting for a new mention save request. Once it arrives, it usually reaches the inbox within the next collection cycle.")]: {
+    ja: "新しい mention 保存リクエストを待っています。届くと通常は次の収集周期内に inbox へ反映されます。",
+    "pt-BR": "Aguardando um novo pedido de salvamento por mention. Quando ele chegar, normalmente entra na inbox no próximo ciclo de coleta.",
+    es: "Esperando una nueva solicitud de guardado por mention. Cuando llegue, normalmente se refleja en la inbox dentro del siguiente ciclo de recopilación.",
+    "zh-TW": "正在等待新的 mention 保存請求。請求進來後通常會在下一輪收集內出現在 inbox。",
+    vi: "Đang chờ một yêu cầu lưu bằng mention mới. Khi yêu cầu đến, nó thường vào inbox trong chu kỳ thu thập kế tiếp."
+  },
+  [buildUiTextKey("저장 상태", "Save status")]: {
+    ja: "保存状態",
+    "pt-BR": "Estado do salvamento",
+    es: "Estado de guardado",
+    "zh-TW": "保存狀態",
+    vi: "Trạng thái lưu"
+  },
+  [buildUiTextKey("댓글 저장 상태", "Reply save status")]: {
+    ja: "返信保存状態",
+    "pt-BR": "Estado do salvamento por reply",
+    es: "Estado del guardado por reply",
+    "zh-TW": "回覆保存狀態",
+    vi: "Trạng thái lưu bằng reply"
+  },
+  [buildUiTextKey("현재 상태", "Current state")]: {
+    ja: "現在の状態",
+    "pt-BR": "Estado atual",
+    es: "Estado actual",
+    "zh-TW": "目前狀態",
+    vi: "Trạng thái hiện tại"
+  },
+  [buildUiTextKey("마지막 수집", "Last collection")]: {
+    ja: "最終収集",
+    "pt-BR": "Última coleta",
+    es: "Última recopilación",
+    "zh-TW": "最後收集",
+    vi: "Lần thu thập gần nhất"
+  },
+  [buildUiTextKey("예상 반영", "Expected reflection")]: {
+    ja: "反映予定",
+    "pt-BR": "Previsão de refletir",
+    es: "Reflejo esperado",
+    "zh-TW": "預期反映",
+    vi: "Dự kiến phản ánh"
+  },
+  [buildUiTextKey("새 댓글 확인 중...", "Checking replies...")]: {
+    ja: "新しい返信を確認中...",
+    "pt-BR": "Verificando replies...",
+    es: "Comprobando replies...",
+    "zh-TW": "正在確認新回覆...",
+    vi: "Đang kiểm tra reply mới..."
+  },
+  [buildUiTextKey("새 댓글 확인", "Check replies")]: {
+    ja: "新しい返信を確認",
+    "pt-BR": "Verificar replies",
+    es: "Comprobar replies",
+    "zh-TW": "確認新回覆",
+    vi: "Kiểm tra reply mới"
+  },
+  [buildUiTextKey("최근 저장 요청", "Latest request")]: {
+    ja: "最新の保存リクエスト",
+    "pt-BR": "Pedido mais recente",
+    es: "Solicitud más reciente",
+    "zh-TW": "最近一次保存請求",
+    vi: "Yêu cầu gần nhất"
+  },
+  [buildUiTextKey("마지막 반영 시각", "Last reflected")]: {
+    ja: "最終反映時刻",
+    "pt-BR": "Último refletido",
+    es: "Último reflejo",
+    "zh-TW": "最後反映時間",
+    vi: "Lần phản ánh gần nhất"
+  },
+  [buildUiTextKey("완료 판정 근거", "Completion basis")]: {
+    ja: "完了判定根拠",
+    "pt-BR": "Base da conclusão",
+    es: "Base de la finalización",
+    "zh-TW": "完成判定依據",
+    vi: "Cơ sở hoàn tất"
+  },
+  [buildUiTextKey("실패 이유", "Failure reason")]: {
+    ja: "失敗理由",
+    "pt-BR": "Motivo da falha",
+    es: "Motivo del fallo",
+    "zh-TW": "失敗原因",
+    vi: "Lý do thất bại"
+  },
+  [buildUiTextKey("다음 자동 재시도", "Next automatic retry")]: {
+    ja: "次の自動再試行",
+    "pt-BR": "Próxima tentativa automática",
+    es: "Próximo reintento automático",
+    "zh-TW": "下一次自動重試",
+    vi: "Lần thử lại tự động tiếp theo"
+  },
+  [buildUiTextKey("재시도 안내", "Retry guidance")]: {
+    ja: "再試行ガイド",
+    "pt-BR": "Orientação de nova tentativa",
+    es: "Guía para reintentar",
+    "zh-TW": "重試指引",
+    vi: "Hướng dẫn thử lại"
+  },
+  [buildUiTextKey("현재 메모", "Current note")]: {
+    ja: "現在のメモ",
+    "pt-BR": "Nota atual",
+    es: "Nota actual",
+    "zh-TW": "目前備註",
+    vi: "Ghi chú hiện tại"
+  },
+  [buildUiTextKey("아직 최근 멘션 요청 기록이 없습니다. 새 저장 요청이 들어오면 여기에서 대기와 반영 상태를 확인할 수 있습니다.", "There is no recent mention request yet. Once a new save request arrives, its queue and reflection status will appear here.")]: {
+    ja: "最近の mention リクエスト記録はまだありません。新しい保存リクエストが来ると、ここで待機と反映状態を確認できます。",
+    "pt-BR": "Ainda não há pedido recente por mention. Quando um novo pedido chegar, o estado de fila e reflexão aparecerá aqui.",
+    es: "Todavía no hay una solicitud reciente por mention. Cuando llegue una nueva solicitud, aquí aparecerán su estado en cola y de reflejo.",
+    "zh-TW": "目前還沒有最近的 mention 請求紀錄。新的保存請求進來後，這裡會顯示排隊與反映狀態。",
+    vi: "Hiện chưa có yêu cầu mention gần đây. Khi có yêu cầu lưu mới, trạng thái hàng đợi và phản ánh sẽ xuất hiện ở đây."
+  },
+  [buildUiTextKey("최근 멘션 보기", "Open latest mention")]: {
+    ja: "最新のメンションを見る",
+    "pt-BR": "Abrir mention mais recente",
+    es: "Abrir el mention más reciente",
+    "zh-TW": "查看最近 mention",
+    vi: "Mở mention gần nhất"
+  },
+  [buildUiTextKey("내 태그", "My tags")]: {
+    ja: "自分のタグ",
+    "pt-BR": "Minhas tags",
+    es: "Mis etiquetas",
+    "zh-TW": "我的標籤",
+    vi: "Thẻ của tôi"
+  },
+  [buildUiTextKey("눌러서 같은 태그 글만 다시 봅니다.", "Click a tag to filter the list.")]: {
+    ja: "タグを押すと同じタグの記事だけを見直せます。",
+    "pt-BR": "Clique em uma tag para filtrar a lista.",
+    es: "Haz clic en una etiqueta para filtrar la lista.",
+    "zh-TW": "點一下標籤即可只看相同標籤的內容。",
+    vi: "Nhấn vào thẻ để lọc danh sách."
+  },
+  [buildUiTextKey("전체", "All")]: {
+    ja: "すべて",
+    "pt-BR": "Todos",
+    es: "Todos",
+    "zh-TW": "全部",
+    vi: "Tất cả"
+  },
+  [buildUiTextKey("Plus가 필요합니다.", "Plus required.")]: {
+    ja: "Plus が必要です。",
+    "pt-BR": "É necessário ter Plus.",
+    es: "Se necesita Plus.",
+    "zh-TW": "需要 Plus。",
+    vi: "Cần Plus."
+  },
+  [buildUiTextKey("watchlists는 Plus에서 열립니다. Plus 키를 연결하면 공개 계정 모니터링을 사용할 수 있습니다.", "Watchlists unlock on Plus. Activate Plus to monitor public Threads accounts.")]: {
+    ja: "watchlists は Plus で開放されます。Plus キーを連携すると公開アカウント監視を使えます。",
+    "pt-BR": "Watchlists são liberadas no Plus. Ative o Plus para monitorar contas públicas do Threads.",
+    es: "Las watchlists se desbloquean con Plus. Activa Plus para vigilar cuentas públicas de Threads.",
+    "zh-TW": "watchlists 需在 Plus 中解鎖。啟用 Plus 後即可監看公開 Threads 帳號。",
+    vi: "Watchlists chỉ mở trong Plus. Hãy kích hoạt Plus để theo dõi các tài khoản Threads công khai."
+  },
+  [buildUiTextKey("insights는 Plus에서 열립니다. Plus 키를 연결하면 계정 성과 추적을 사용할 수 있습니다.", "Insights unlock on Plus. Activate Plus to track your Threads account performance.")]: {
+    ja: "insights は Plus で開放されます。Plus キーを連携するとアカウント成果追跡を使えます。",
+    "pt-BR": "Insights são liberados no Plus. Ative o Plus para acompanhar o desempenho da sua conta do Threads.",
+    es: "Los insights se desbloquean con Plus. Activa Plus para seguir el rendimiento de tu cuenta de Threads.",
+    "zh-TW": "insights 需在 Plus 中解鎖。啟用 Plus 後即可追蹤你的 Threads 帳號表現。",
+    vi: "Insights chỉ mở trong Plus. Hãy kích hoạt Plus để theo dõi hiệu suất tài khoản Threads của bạn."
+  },
+  [buildUiTextKey("Threads 로그인 응답을 확인하는 중입니다...", "Confirming your Threads sign-in...")]: {
+    ja: "Threads ログイン応答を確認中...",
+    "pt-BR": "Confirmando seu login no Threads...",
+    es: "Confirmando tu inicio de sesión en Threads...",
+    "zh-TW": "正在確認你的 Threads 登入...",
+    vi: "Đang xác nhận đăng nhập Threads của bạn..."
+  },
+  [buildUiTextKey("먼저 Plus 키를 입력하세요.", "Enter a Plus key first.")]: {
+    ja: "先に Plus キーを入力してください。",
+    "pt-BR": "Digite primeiro uma chave Plus.",
+    es: "Introduce primero una clave Plus.",
+    "zh-TW": "請先輸入 Plus 金鑰。",
+    vi: "Hãy nhập khóa Plus trước."
+  },
+  [buildUiTextKey("Plus가 이 scrapbook 계정에 연결되었습니다.", "Plus is now linked to this scrapbook account.")]: {
+    ja: "Plus がこの scrapbook アカウントに連携されました。",
+    "pt-BR": "O Plus agora está vinculado a esta conta do scrapbook.",
+    es: "Plus ahora está vinculado a esta cuenta del scrapbook.",
+    "zh-TW": "Plus 已連結到此 scrapbook 帳號。",
+    vi: "Plus hiện đã được liên kết với tài khoản scrapbook này."
+  },
+  [buildUiTextKey("Plus 연결에 실패했습니다.", "Could not activate Plus.")]: {
+    ja: "Plus の連携に失敗しました。",
+    "pt-BR": "Não foi possível ativar o Plus.",
+    es: "No se pudo activar Plus.",
+    "zh-TW": "無法啟用 Plus。",
+    vi: "Không thể kích hoạt Plus."
+  },
+  [buildUiTextKey("이 scrapbook 계정에서 Plus 키 연결을 제거할까요?", "Remove the Plus key from this scrapbook account?")]: {
+    ja: "この scrapbook アカウントから Plus キー連携を削除しますか？",
+    "pt-BR": "Remover a chave Plus desta conta do scrapbook?",
+    es: "¿Quitar la clave Plus de esta cuenta del scrapbook?",
+    "zh-TW": "要從這個 scrapbook 帳號移除 Plus 金鑰連結嗎？",
+    vi: "Gỡ liên kết khóa Plus khỏi tài khoản scrapbook này?"
+  },
+  [buildUiTextKey("Plus 키 연결이 제거되었습니다.", "The Plus key was removed from this scrapbook account.")]: {
+    ja: "この scrapbook アカウントから Plus キー連携を削除しました。",
+    "pt-BR": "A chave Plus foi removida desta conta do scrapbook.",
+    es: "La clave Plus se eliminó de esta cuenta del scrapbook.",
+    "zh-TW": "已從此 scrapbook 帳號移除 Plus 金鑰連結。",
+    vi: "Đã gỡ khóa Plus khỏi tài khoản scrapbook này."
+  },
+  [buildUiTextKey("Plus 키 제거에 실패했습니다.", "Could not remove the Plus key.")]: {
+    ja: "Plus キーの削除に失敗しました。",
+    "pt-BR": "Não foi possível remover a chave Plus.",
+    es: "No se pudo quitar la clave Plus.",
+    "zh-TW": "無法移除 Plus 金鑰。",
+    vi: "Không thể gỡ khóa Plus."
+  },
+  [buildUiTextKey("새 댓글 저장 상태를 확인했습니다. 현재 검색이나 태그 필터 때문에 일부 항목이 바로 안 보일 수 있습니다.", "Checked the latest reply saves. Some items may still be hidden by your current search or tag filters.")]: {
+    ja: "最新の返信保存状態を確認しました。現在の検索やタグフィルタのため、一部項目はすぐには表示されない場合があります。",
+    "pt-BR": "O estado mais recente dos salvamentos por reply foi verificado. Alguns itens ainda podem estar ocultos pelos filtros atuais de busca ou tags.",
+    es: "Se comprobó el estado más reciente de los guardados por reply. Algunos elementos pueden seguir ocultos por tus filtros actuales de búsqueda o etiquetas.",
+    "zh-TW": "已確認最新的 reply 保存狀態。由於目前的搜尋或標籤篩選，部分項目可能暫時不會顯示。",
+    vi: "Đã kiểm tra trạng thái lưu bằng reply mới nhất. Một số mục có thể vẫn bị ẩn bởi bộ lọc tìm kiếm hoặc thẻ hiện tại."
+  },
+  [buildUiTextKey("새 댓글 저장 상태를 다시 확인했습니다.", "Checked the latest reply save status.")]: {
+    ja: "最新の返信保存状態を再確認しました。",
+    "pt-BR": "O estado mais recente do salvamento por reply foi verificado novamente.",
+    es: "Se volvió a comprobar el estado más reciente del guardado por reply.",
+    "zh-TW": "已重新確認最新的 reply 保存狀態。",
+    vi: "Đã kiểm tra lại trạng thái lưu bằng reply mới nhất."
+  },
+  [buildUiTextKey("저장 상태를 다시 확인할 수 없습니다.", "Could not refresh save status.")]: {
+    ja: "保存状態を再確認できませんでした。",
+    "pt-BR": "Não foi possível atualizar o estado do salvamento.",
+    es: "No se pudo actualizar el estado de guardado.",
+    "zh-TW": "無法重新整理保存狀態。",
+    vi: "Không thể làm mới trạng thái lưu."
+  }
+};
+
+function uiText(
+  ko: string,
+  en: string,
+  extras?: SecondaryLocaleCopy,
+  params?: Record<string, string | number>
+): string {
+  const key = buildUiTextKey(ko, en);
+  const locale = currentLocale as SecondaryWebLocale;
+  const template =
+    currentLocale === "ko"
+      ? ko
+      : currentLocale === "en"
+        ? en
+        : extras?.[locale] ?? staticUiTextOverrides[key]?.[locale] ?? en;
+
+  return formatMessage(template, params);
 }
 
 type RuntimeLocaleLabels = {
@@ -469,8 +1016,16 @@ function ensureFolderLimitAvailable(): boolean {
 
   setStatus(
     uiText(
-      `${folderLimit}개까지 폴더를 만들 수 있습니다. Plus로 올리면 50개까지 확장됩니다.`,
-      `You can create up to ${folderLimit} folders on this plan. Upgrade to Plus to raise it to 50.`
+      "{folderLimit}개까지 폴더를 만들 수 있습니다. Plus로 올리면 50개까지 확장됩니다.",
+      "You can create up to {folderLimit} folders on this plan. Upgrade to Plus to raise it to 50.",
+      {
+        ja: "このプランではフォルダを最大{folderLimit}個まで作成できます。Plus にすると 50 個まで拡張されます。",
+        "pt-BR": "Neste plano, você pode criar até {folderLimit} pastas. Faça upgrade para o Plus para aumentar para 50.",
+        es: "En este plan puedes crear hasta {folderLimit} carpetas. Cámbiate a Plus para ampliarlo a 50.",
+        "zh-TW": "此方案最多可建立 {folderLimit} 個資料夾。升級 Plus 後可擴充到 50 個。",
+        vi: "Gói này cho phép tạo tối đa {folderLimit} thư mục. Nâng lên Plus để tăng lên 50."
+      },
+      { folderLimit }
     ),
     true
   );
@@ -538,8 +1093,16 @@ function renderPlanPanel(): void {
     } else if (plan.plusStatus === "active") {
       statusText = plan.plusExpiresAt
         ? uiText(
-            `Plus 활성화됨. 만료일: ${formatDate(plan.plusExpiresAt)}. 같은 키를 extension에도 사용할 수 있습니다.`,
-            `Plus is active. Expires on ${formatDate(plan.plusExpiresAt)}. The same key also works in the extension.`
+            "Plus 활성화됨. 만료일: {date}. 같은 키를 extension에도 사용할 수 있습니다.",
+            "Plus is active. Expires on {date}. The same key also works in the extension.",
+            {
+              ja: "Plus が有効です。有効期限: {date}。同じキーを extension でも使えます。",
+              "pt-BR": "O Plus está ativo. Expira em {date}. A mesma chave também funciona na extensão.",
+              es: "Plus está activo. Vence el {date}. La misma clave también funciona en la extensión.",
+              "zh-TW": "Plus 已啟用。到期日：{date}。同一組金鑰也可在擴充功能中使用。",
+              vi: "Plus đang hoạt động. Hết hạn vào {date}. Cùng một khóa cũng dùng được trong tiện ích mở rộng."
+            },
+            { date: formatDate(plan.plusExpiresAt) }
           )
         : uiText(
             "Plus 활성화됨. 같은 키를 extension에도 사용할 수 있습니다.",
@@ -704,10 +1267,6 @@ function applyStaticTranslations(): void {
     formatMessage(t("scrapbookFlowStep2"), { handleInline })
   );
   setLocalizedHtml(
-    "[data-i18n='scrapbookConnectCopy']",
-    formatMessage(t("scrapbookConnectCopy"), { handleInline })
-  );
-  setLocalizedHtml(
     "[data-i18n='scrapbookHowStep2Desc']",
     formatMessage(t("scrapbookHowStep2Desc"), { handleInline })
   );
@@ -854,6 +1413,311 @@ function setStatus(message: string, isError = false): void {
   pageStatus.classList.toggle("is-error", isError);
 }
 
+function resolvePendingConnectedStatus(state: BotSessionState | null): void {
+  if (!pendingConnectedStatus) {
+    return;
+  }
+
+  if (state?.authenticated && state.user) {
+    pendingConnectedStatus = false;
+    setStatus(t("scrapbookStatusConnected"));
+  }
+}
+
+function finalizePendingConnectedStatus(): void {
+  if (!pendingConnectedStatus) {
+    return;
+  }
+
+  pendingConnectedStatus = false;
+  if (pageStatus?.classList.contains("is-error") && pageStatus.textContent?.trim()) {
+    return;
+  }
+
+  setStatus(
+    uiText(
+      "Threads 로그인 응답은 도착했지만 세션을 확인하지 못했습니다. 잠시 후 새로고침해 다시 확인해 주세요.",
+      "The Threads sign-in response arrived, but the session could not be confirmed. Refresh and check again in a moment."
+    ),
+    true
+  );
+}
+
+function setElementText(element: HTMLElement | null, value: string): void {
+  if (element) {
+    element.textContent = value;
+  }
+}
+
+function getSaveStatusStateLabel(saveStatus: BotSaveStatusView | null): string {
+  if (!saveStatus) {
+    return uiText("불러오는 중", "Loading");
+  }
+
+  switch (saveStatus.currentState) {
+    case "queued":
+      return uiText("저장 대기", "Queued");
+    case "processing":
+      return uiText("처리 중", "Processing");
+    case "completed":
+      return saveStatus.completionSource === "archive_inferred"
+        ? uiText("반영 추정", "Likely reflected")
+        : uiText("반영 완료", "Saved");
+    case "failed":
+      return uiText("확인 필요", "Needs review");
+    default:
+      return uiText("새 요청 대기", "Waiting");
+  }
+}
+
+function getSaveStatusCompletionBasis(saveStatus: BotSaveStatusView | null): string {
+  if (!saveStatus || saveStatus.currentState !== "completed") {
+    return "";
+  }
+
+  if (saveStatus.completionSource === "job") {
+    return uiText(
+      "가장 최근 mention job이 완료로 기록됐습니다.",
+      "The latest mention job was recorded as completed."
+    );
+  }
+
+  if (saveStatus.completionSource === "archive_inferred") {
+    return uiText(
+      "최근 archive 반영 시각이 마지막 mention 요청보다 늦어서 반영된 것으로 추정합니다.",
+      "A newer archive save time than the latest mention request suggests it has likely been reflected."
+    );
+  }
+
+  return "";
+}
+
+function getSaveStatusFailureReason(saveStatus: BotSaveStatusView | null): string {
+  if (!saveStatus) {
+    return "";
+  }
+
+  if (saveStatus.latestJobError?.trim()) {
+    return saveStatus.latestJobError;
+  }
+
+  switch (saveStatus.latestJobStatus) {
+    case "unmatched":
+      return uiText(
+        "멘션 댓글을 작성한 Threads 계정이 현재 연결된 scrapbook 계정과 일치하지 않았습니다.",
+        "The reply author did not match the Threads account connected to this scrapbook."
+      );
+    case "invalid":
+      return uiText(
+        "멘션 요청을 유효한 저장 요청으로 해석하지 못했습니다.",
+        "The mention could not be parsed as a valid save request."
+      );
+    default:
+      return saveStatus.collectorError?.trim() ?? "";
+  }
+}
+
+function getSaveStatusGuidance(saveStatus: BotSaveStatusView | null): string {
+  if (!saveStatus || saveStatus.currentState !== "failed") {
+    return "";
+  }
+
+  switch (saveStatus.latestJobStatus) {
+    case "unmatched":
+      return uiText(
+        "저장 요청 댓글을 작성한 계정과 이 scrapbook에 로그인한 계정이 같은지 확인하세요.",
+        "Check that the reply was written from the same account that is signed in to this scrapbook."
+      );
+    case "invalid":
+      return uiText(
+        "저장할 글에 새 댓글로 @{handle}만 멘션해 다시 시도하세요.",
+        "Try again by posting a fresh reply that only mentions @{handle}.",
+        {
+          ja: "保存したい投稿に新しい返信で @{handle} だけをメンションして、もう一度試してください。",
+          "pt-BR": "Tente de novo publicando uma nova resposta que mencione apenas @{handle}.",
+          es: "Inténtalo de nuevo publicando una respuesta nueva que solo mencione a @{handle}.",
+          "zh-TW": "請在要保存的貼文下以新回覆只提及 @{handle}，然後再試一次。",
+          vi: "Hãy thử lại bằng cách đăng một phản hồi mới chỉ nhắc tới @{handle}."
+        },
+        { handle: getCurrentBotHandle() }
+      );
+    default:
+      return uiText(
+        "잠시 후 자동 재시도가 잡혀 있을 수 있습니다. 지금 다시 확인 버튼으로 즉시 반영도 시도할 수 있습니다.",
+        "An automatic retry may already be queued. You can also use Check now to force another fetch."
+      );
+  }
+}
+
+function getSaveStatusEta(saveStatus: BotSaveStatusView | null): string {
+  if (!saveStatus) {
+    return t("scrapbookDateNone");
+  }
+
+  if (saveStatus.expectedVisibleAt) {
+    return formatDate(saveStatus.expectedVisibleAt);
+  }
+
+  if (saveStatus.currentState === "completed") {
+    return saveStatus.completionSource === "archive_inferred"
+      ? uiText("최근 저장 기준", "Based on recent save")
+      : uiText("이미 반영됨", "Already reflected");
+  }
+
+  if (saveStatus.pollIntervalMs > 0) {
+    const seconds = Math.max(1, Math.round(saveStatus.pollIntervalMs / 1000));
+    return uiText(
+      "멘션 후 약 {seconds}초",
+      "About {seconds}s after mention",
+      {
+        ja: "メンション後およそ {seconds} 秒",
+        "pt-BR": "Cerca de {seconds}s após a menção",
+        es: "Aproximadamente {seconds}s después de la mención",
+        "zh-TW": "提及後約 {seconds} 秒",
+        vi: "Khoảng {seconds} giây sau khi nhắc tới"
+      },
+      { seconds }
+    );
+  }
+
+  return t("scrapbookDateNone");
+}
+
+function getSaveStatusSummary(saveStatus: BotSaveStatusView | null): string {
+  if (!saveStatus) {
+    return uiText("저장 상태를 아직 불러오지 못했습니다.", "Save status has not loaded yet.");
+  }
+
+  switch (saveStatus.currentState) {
+    case "queued":
+      return uiText(
+        "최근 멘션 저장 요청이 대기열에 들어왔습니다. 보통 다음 수집 주기 안에 inbox에 반영됩니다.",
+        "The latest mention save request is queued. It usually appears in the inbox within the next collection cycle."
+      );
+    case "processing":
+      return uiText(
+        "최근 멘션 저장 요청을 처리 중입니다. 수집 완료 직후 inbox에 반영됩니다.",
+        "The latest mention save request is being processed and should appear right after the next completed fetch."
+      );
+    case "completed":
+      return saveStatus.completionSource === "archive_inferred"
+        ? uiText(
+            "가장 최근 멘션 저장 요청은 최근 저장 시각 기준으로 반영된 것으로 보입니다. 아래에서 최근 멘션과 반영 시각을 다시 확인해 주세요.",
+            "The latest mention save request looks reflected based on the recent save time. Review the latest mention and save timing below."
+          )
+        : uiText(
+            "가장 최근 멘션 저장 요청이 반영되었습니다. 필요하면 아래에서 최근 멘션과 반영 시각을 다시 확인할 수 있습니다.",
+            "The latest mention save request has been reflected. You can review the latest mention and save timing below."
+          );
+    case "failed":
+      return uiText(
+        "가장 최근 멘션 저장 요청이 자동 반영되지 않았습니다. 실패 이유를 확인한 뒤 즉시 다시 확인할 수 있습니다.",
+        "The latest mention save request did not reflect automatically. Review the failure reason and check again right away."
+      );
+    default:
+      return uiText(
+        "새 멘션 저장 요청을 기다리는 중입니다. 요청이 들어오면 보통 다음 수집 주기 안에 inbox에 반영됩니다.",
+        "Waiting for a new mention save request. Once it arrives, it usually reaches the inbox within the next collection cycle."
+      );
+  }
+}
+
+function renderSaveStatus(state: BotSessionState | null): void {
+  const isAuthenticated = Boolean(state?.authenticated && state.user);
+  saveStatusPanel?.classList.toggle("hidden", !isAuthenticated);
+
+  if (!isAuthenticated) {
+    return;
+  }
+
+  const saveStatus = state?.saveStatus ?? null;
+  setElementText(saveStatusEyebrow, uiText("저장 상태", "Save status"));
+  setElementText(saveStatusTitle, uiText("댓글 저장 상태", "Reply save status"));
+  setElementText(saveStatusSummary, getSaveStatusSummary(saveStatus));
+  setElementText(saveStatusCurrentLabel, uiText("현재 상태", "Current state"));
+  setElementText(saveStatusCurrentValue, getSaveStatusStateLabel(saveStatus));
+  setElementText(saveStatusLastLabel, uiText("마지막 수집", "Last collection"));
+  setElementText(saveStatusLastValue, saveStatus?.lastCollectedAt ? formatDate(saveStatus.lastCollectedAt) : t("scrapbookDateNone"));
+  setElementText(saveStatusEtaLabel, uiText("예상 반영", "Expected reflection"));
+  setElementText(saveStatusEtaValue, getSaveStatusEta(saveStatus));
+
+  if (saveStatusRefresh) {
+    saveStatusRefresh.disabled = isRefreshingSaveStatus;
+    saveStatusRefresh.textContent = isRefreshingSaveStatus
+      ? uiText("새 댓글 확인 중...", "Checking replies...")
+      : uiText("새 댓글 확인", "Check replies");
+  }
+
+  if (!saveStatusDetail) {
+    return;
+  }
+
+  const failureReason = getSaveStatusFailureReason(saveStatus);
+  const guidance = getSaveStatusGuidance(saveStatus);
+  const completionBasis = getSaveStatusCompletionBasis(saveStatus);
+  const rows: string[] = [];
+
+  if (saveStatus?.latestMentionCreatedAt) {
+    rows.push(
+      `<div class="save-status-detail-row"><strong>${escapeHtml(uiText("최근 저장 요청", "Latest request"))}</strong><span>${escapeHtml(formatDate(saveStatus.latestMentionCreatedAt))}</span></div>`
+    );
+  }
+
+  if (saveStatus?.latestSavedAt) {
+    rows.push(
+      `<div class="save-status-detail-row"><strong>${escapeHtml(uiText("마지막 반영 시각", "Last reflected"))}</strong><span>${escapeHtml(formatDate(saveStatus.latestSavedAt))}</span></div>`
+    );
+  }
+
+  if (completionBasis) {
+    rows.push(
+      `<div class="save-status-detail-row"><strong>${escapeHtml(uiText("완료 판정 근거", "Completion basis"))}</strong><span>${escapeHtml(completionBasis)}</span></div>`
+    );
+  }
+
+  if (failureReason) {
+    rows.push(
+      `<div class="save-status-detail-row"><strong>${escapeHtml(uiText("실패 이유", "Failure reason"))}</strong><span>${escapeHtml(failureReason)}</span></div>`
+    );
+  }
+
+  if (saveStatus?.retryAvailableAt) {
+    rows.push(
+      `<div class="save-status-detail-row"><strong>${escapeHtml(uiText("다음 자동 재시도", "Next automatic retry"))}</strong><span>${escapeHtml(formatDate(saveStatus.retryAvailableAt))}</span></div>`
+    );
+  }
+
+  if (guidance) {
+    rows.push(
+      `<div class="save-status-detail-row"><strong>${escapeHtml(uiText("재시도 안내", "Retry guidance"))}</strong><span>${escapeHtml(guidance)}</span></div>`
+    );
+  }
+
+  if (rows.length === 0) {
+    rows.push(
+      `<div class="save-status-detail-row"><strong>${escapeHtml(uiText("현재 메모", "Current note"))}</strong><span>${escapeHtml(
+        uiText(
+          "아직 최근 멘션 요청 기록이 없습니다. 새 저장 요청이 들어오면 여기에서 대기와 반영 상태를 확인할 수 있습니다.",
+          "There is no recent mention request yet. Once a new save request arrives, its queue and reflection status will appear here."
+        )
+      )}</span></div>`
+    );
+  }
+
+  const actions: string[] = [];
+  if (saveStatus?.latestMentionUrl) {
+    actions.push(
+      `<a class="topbar-link" href="${escapeHtml(saveStatus.latestMentionUrl)}" target="_blank" rel="noreferrer">${escapeHtml(
+        uiText("최근 멘션 보기", "Open latest mention")
+      )}</a>`
+    );
+  }
+
+  saveStatusDetail.innerHTML =
+    rows.join("") +
+    (actions.length > 0 ? `<div class="save-status-actions">${actions.join("")}</div>` : "");
+}
+
 function setSessionMenuOpen(open: boolean): void {
   const shouldOpen = open && Boolean(latestState?.authenticated && latestState.user);
   sessionMenuOpen = shouldOpen;
@@ -924,8 +1788,207 @@ function buildArchiveTitle(item: BotArchiveView): string {
   return t("scrapbookArchiveFallbackSavedItem");
 }
 
+function buildArchiveAuthorMeta(item: BotArchiveView): string {
+  const displayName = item.targetAuthorDisplayName?.trim() ?? "";
+  const handle = item.targetAuthorHandle?.trim().replace(/^@+/, "") ?? "";
+  if (!displayName && !handle) {
+    return "";
+  }
+
+  if (!displayName) {
+    return `@${handle}`;
+  }
+
+  if (!handle || displayName.toLowerCase() === handle.toLowerCase()) {
+    return displayName;
+  }
+
+  return `${displayName} · @${handle}`;
+}
+
 function buildArchiveTagsLabel(item: BotArchiveView): string {
   return item.tags.map((tag) => `#${tag}`).join(" ");
+}
+
+function normalizeArchiveSearchValue(value: string): string {
+  return value
+    .normalize("NFKD")
+    .replace(/\p{M}+/gu, "")
+    .toLowerCase()
+    .replace(/https?:\/\//g, " ")
+    .replace(/[@#._:/\\-]+/g, " ")
+    .replace(/[^\p{L}\p{N}\s]+/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function buildArchiveSearchText(item: BotArchiveView, activeBotHandle: string): string {
+  return [
+    buildArchiveTitle(item),
+    buildArchiveTagsLabel(item),
+    item.originLabel,
+    item.targetText,
+    item.markdownContent,
+    item.targetAuthorHandle ?? "",
+    item.targetAuthorDisplayName ?? "",
+    item.noteText ?? "",
+    item.targetUrl,
+    ...item.tags,
+    item.mentionUrl ?? "",
+    item.mentionAuthorHandle ?? "",
+    item.mentionAuthorDisplayName ?? "",
+    ...item.authorReplies.flatMap((reply) => [reply.author, reply.text, reply.canonicalUrl]),
+    activeBotHandle
+  ].join("\n");
+}
+
+function hasActiveArchiveFilters(): boolean {
+  return Boolean(archiveSearchQuery.trim() || activeArchiveTag || activeFolderId);
+}
+
+function finishInitialBoot(): void {
+  document.body.classList.remove("page-booting");
+}
+
+function filterArchivesByFolder(items: BotArchiveView[]): BotArchiveView[] {
+  if (!activeFolderId) {
+    return items;
+  }
+
+  const folderMap = loadFolderMap();
+  return items.filter((item) => folderMap[item.id] === activeFolderId);
+}
+
+function filterArchivesBySearchQuery(items: BotArchiveView[]): BotArchiveView[] {
+  if (!archiveSearchQuery.trim()) {
+    return items;
+  }
+
+  const rawQuery = archiveSearchQuery.trim().toLowerCase();
+  const normalizedQuery = normalizeArchiveSearchValue(archiveSearchQuery);
+  const queryTokens = normalizedQuery.split(/\s+/u).filter(Boolean);
+  const activeBotHandle = (latestConfig?.botHandle || latestState?.botHandle || "").toLowerCase();
+  return items.filter((item) => {
+    const searchable = buildArchiveSearchText(item, activeBotHandle);
+    const searchableRaw = searchable.toLowerCase();
+    if (searchableRaw.includes(rawQuery)) {
+      return true;
+    }
+
+    if (queryTokens.length === 0) {
+      return false;
+    }
+
+    const searchableNormalized = normalizeArchiveSearchValue(searchable);
+    return queryTokens.every((token) => searchableNormalized.includes(token));
+  });
+}
+
+type ArchiveTagSummary = {
+  tag: string;
+  count: number;
+};
+
+function summarizeArchiveTags(items: BotArchiveView[]): ArchiveTagSummary[] {
+  const counts = new Map<string, number>();
+  for (const item of items) {
+    const uniqueTags = new Set(item.tags);
+    for (const tag of uniqueTags) {
+      counts.set(tag, (counts.get(tag) || 0) + 1);
+    }
+  }
+
+  return [...counts.entries()]
+    .map(([tag, count]) => ({ tag, count }))
+    .sort((left, right) => {
+      if (right.count !== left.count) {
+        return right.count - left.count;
+      }
+      return left.tag.localeCompare(right.tag);
+    });
+}
+
+function renderArchiveTagPanel(items: BotArchiveView[], isAuthenticated: boolean): void {
+  if (!archivesTagPanel) {
+    return;
+  }
+
+  if (!isAuthenticated || items.length === 0) {
+    activeArchiveTag = null;
+    archivesTagPanel.innerHTML = "";
+    archivesTagPanel.classList.add("hidden");
+    return;
+  }
+
+  const scopedItems = filterArchivesBySearchQuery(filterArchivesByFolder(items));
+  const tags = summarizeArchiveTags(scopedItems);
+
+  if (activeArchiveTag && !tags.some((entry) => entry.tag === activeArchiveTag)) {
+    activeArchiveTag = null;
+  }
+
+  if (tags.length === 0) {
+    archivesTagPanel.innerHTML = "";
+    archivesTagPanel.classList.add("hidden");
+    return;
+  }
+
+  const title = uiText("내 태그", "My tags");
+  const caption = activeArchiveTag
+    ? uiText(
+        "#{tag} 태그만 보는 중",
+        "Filtering by #{tag}",
+        {
+          ja: "#{tag} タグだけを表示中",
+          "pt-BR": "Filtrando por #{tag}",
+          es: "Filtrando por #{tag}",
+          "zh-TW": "目前只顯示 #{tag} 標籤",
+          vi: "Đang lọc theo #{tag}"
+        },
+        { tag: activeArchiveTag }
+      )
+    : uiText("눌러서 같은 태그 글만 다시 봅니다.", "Click a tag to filter the list.");
+  const allLabel = uiText("전체", "All");
+
+  archivesTagPanel.classList.remove("hidden");
+  archivesTagPanel.innerHTML = `
+    <div class="archives-tag-head">
+      <div class="archives-tag-copy">
+        <strong class="archives-tag-title">${escapeHtml(title)}</strong>
+        <p class="archives-tag-caption">${escapeHtml(caption)}</p>
+      </div>
+    </div>
+    <div class="archives-tag-strip">
+      <button class="archive-tag-pill ${activeArchiveTag === null ? "is-active" : ""}" type="button" data-tag-filter="" aria-pressed="${String(activeArchiveTag === null)}">
+        ${escapeHtml(allLabel)}
+      </button>
+      ${tags
+        .map(
+          (entry) => `
+            <button
+              class="archive-tag-pill ${activeArchiveTag === entry.tag ? "is-active" : ""}"
+              type="button"
+              data-tag-filter="${escapeHtml(entry.tag)}"
+              aria-pressed="${String(activeArchiveTag === entry.tag)}"
+            >
+              <span>#${escapeHtml(entry.tag)}</span>
+              <span class="archive-tag-count">${escapeHtml(String(entry.count))}</span>
+            </button>
+          `
+        )
+        .join("")}
+    </div>
+  `;
+
+  for (const button of archivesTagPanel.querySelectorAll<HTMLButtonElement>("[data-tag-filter]")) {
+    button.addEventListener("click", () => {
+      activeArchiveTag = button.dataset.tagFilter?.trim() || null;
+      archivesPage = 1;
+      if (latestState) {
+        renderArchives(latestState.archives, latestState.authenticated && Boolean(latestState.user));
+      }
+    });
+  }
 }
 
 function buildArchiveSelectionTitle(count: number, total: number): string {
@@ -1027,7 +2090,7 @@ function syncSelectedArchiveIds(items: BotArchiveView[]): void {
 }
 
 function updateArchivesToolbar(items: BotArchiveView[], isAuthenticated: boolean): void {
-  if (!archivesToolbar || !archivesToolbarMeta || !archivesSelectAll || !archivesExportSelected || !archivesExportAll) {
+  if (!archivesToolbar || !archivesToolbarMeta || !archivesSelectAll || !archivesExportAll) {
     return;
   }
 
@@ -1036,7 +2099,6 @@ function updateArchivesToolbar(items: BotArchiveView[], isAuthenticated: boolean
   if (!hasItems) {
     archivesSelectAll.checked = false;
     archivesSelectAll.indeterminate = false;
-    archivesExportSelected.disabled = true;
     archivesExportAll.disabled = true;
     if (archivesMoveSelected) archivesMoveSelected.disabled = true;
     if (archivesDeleteSelected) archivesDeleteSelected.disabled = true;
@@ -1048,41 +2110,22 @@ function updateArchivesToolbar(items: BotArchiveView[], isAuthenticated: boolean
   archivesToolbarMeta.textContent = buildArchiveSelectionTitle(selectedCount, items.length);
   archivesSelectAll.checked = selectedCount > 0 && selectedCount === items.length;
   archivesSelectAll.indeterminate = selectedCount > 0 && selectedCount < items.length;
-  archivesExportSelected.disabled = isExportingArchives || selectedCount === 0;
   archivesExportAll.disabled = isExportingArchives || items.length === 0;
-  archivesExportSelected.textContent = isExportingArchives ? t("scrapbookExportPreparing") : t("scrapbookExportSelected");
-  archivesExportAll.textContent = isExportingArchives ? t("scrapbookExportPreparing") : t("scrapbookExportAll");
+  archivesExportAll.textContent = isExportingArchives
+    ? t("scrapbookExportPreparing")
+    : selectedCount > 0
+      ? t("scrapbookExportSelected")
+      : t("scrapbookExportAll");
   if (archivesMoveSelected) archivesMoveSelected.disabled = selectedCount === 0;
   if (archivesDeleteSelected) archivesDeleteSelected.disabled = selectedCount === 0;
 }
 
 function filterArchives(items: BotArchiveView[]): BotArchiveView[] {
-  let filtered = items;
+  let filtered = filterArchivesBySearchQuery(filterArchivesByFolder(items));
 
-  if (activeFolderId) {
-    const folderMap = loadFolderMap();
-    filtered = filtered.filter((item) => folderMap[item.id] === activeFolderId);
-  }
-
-  if (archiveSearchQuery.trim()) {
-    const query = archiveSearchQuery.trim().toLowerCase();
-    const activeBotHandle = (latestConfig?.botHandle || latestState?.botHandle || "").toLowerCase();
-    filtered = filtered.filter((item) => {
-      const searchable = [
-        item.targetText,
-        item.targetAuthorHandle ?? "",
-        item.targetAuthorDisplayName ?? "",
-        item.noteText ?? "",
-        item.targetUrl,
-        ...item.tags,
-        item.mentionUrl ?? "",
-        item.mentionAuthorHandle ?? "",
-        item.mentionAuthorDisplayName ?? "",
-        ...item.authorReplies.map((r) => r.text),
-        activeBotHandle
-      ].join(" ").toLowerCase();
-      return searchable.includes(query);
-    });
+  if (activeArchiveTag) {
+    const selectedTag = activeArchiveTag;
+    filtered = filtered.filter((item) => item.tags.includes(selectedTag));
   }
 
   return filtered;
@@ -1105,8 +2148,20 @@ function renderFolderStrip(allItems: BotArchiveView[]): void {
     }
   }
 
-  const allLabel = currentLocale === "ko" ? "전체" : currentLocale === "ja" ? "すべて" : "All";
-  const newFolderLabel = currentLocale === "ko" ? "+ 새 폴더" : currentLocale === "ja" ? "+ 新規" : "+ New";
+  const allLabel = uiText("전체", "All", {
+    ja: "すべて",
+    "pt-BR": "Todas",
+    es: "Todo",
+    "zh-TW": "全部",
+    vi: "Tất cả"
+  });
+  const newFolderLabel = uiText("+ 새 폴더", "+ New folder", {
+    ja: "+ 新しいフォルダ",
+    "pt-BR": "+ Nova pasta",
+    es: "+ Nueva carpeta",
+    "zh-TW": "+ 新資料夾",
+    vi: "+ Thư mục mới"
+  });
 
   let html = `<button class="folder-pill ${activeFolderId === null ? "is-active" : ""}" type="button" data-folder-id="">
     ${escapeHtml(allLabel)}
@@ -1152,7 +2207,13 @@ function createFolderPrompt(): void {
     return;
   }
 
-  const labelPrompt = currentLocale === "ko" ? "폴더 이름을 입력하세요:" : "Enter folder name:";
+  const labelPrompt = uiText("폴더 이름을 입력하세요:", "Enter folder name:", {
+    ja: "フォルダ名を入力してください:",
+    "pt-BR": "Digite o nome da pasta:",
+    es: "Introduce el nombre de la carpeta:",
+    "zh-TW": "請輸入資料夾名稱：",
+    vi: "Nhập tên thư mục:"
+  });
   const name = window.prompt(labelPrompt);
   if (!name?.trim()) return;
 
@@ -1170,7 +2231,18 @@ function createFolderPrompt(): void {
   }
   renderPlanPanel();
 
-  const label = currentLocale === "ko" ? `폴더 "${newFolder.name}" 생성됨` : `Folder "${newFolder.name}" created`;
+  const label = uiText(
+    '폴더 "{name}" 생성됨',
+    'Folder "{name}" created',
+    {
+      ja: 'フォルダ「{name}」を作成しました',
+      "pt-BR": 'Pasta "{name}" criada',
+      es: 'Carpeta "{name}" creada',
+      "zh-TW": '已建立資料夾「{name}」',
+      vi: 'Đã tạo thư mục "{name}"'
+    },
+    { name: newFolder.name }
+  );
   setStatus(label);
 }
 
@@ -1182,8 +2254,20 @@ function showFolderContextMenu(folderId: string, event: MouseEvent): void {
   const folder = folders.find((f) => f.id === folderId);
   if (!folder) return;
 
-  const renameLabel = currentLocale === "ko" ? "이름 변경" : "Rename";
-  const deleteLabel = currentLocale === "ko" ? "폴더 삭제" : "Delete folder";
+  const renameLabel = uiText("이름 변경", "Rename", {
+    ja: "名前を変更",
+    "pt-BR": "Renomear",
+    es: "Cambiar nombre",
+    "zh-TW": "重新命名",
+    vi: "Đổi tên"
+  });
+  const deleteLabel = uiText("폴더 삭제", "Delete folder", {
+    ja: "フォルダを削除",
+    "pt-BR": "Excluir pasta",
+    es: "Eliminar carpeta",
+    "zh-TW": "刪除資料夾",
+    vi: "Xóa thư mục"
+  });
 
   const menu = document.createElement("div");
   menu.className = "folder-context-menu";
@@ -1201,7 +2285,18 @@ function showFolderContextMenu(folderId: string, event: MouseEvent): void {
 
   menu.querySelector<HTMLButtonElement>("[data-action='rename']")?.addEventListener("click", () => {
     dismiss();
-    const prompt = currentLocale === "ko" ? `새 이름 입력 (현재: ${folder.name}):` : `New name (current: ${folder.name}):`;
+    const prompt = uiText(
+      "새 이름 입력 (현재: {name}):",
+      "New name (current: {name}):",
+      {
+        ja: "新しい名前を入力してください（現在: {name}）:",
+        "pt-BR": "Novo nome (atual: {name}):",
+        es: "Nuevo nombre (actual: {name}):",
+        "zh-TW": "輸入新名稱（目前：{name}）：",
+        vi: "Tên mới (hiện tại: {name}):"
+      },
+      { name: folder.name }
+    );
     const newName = window.prompt(prompt, folder.name);
     if (!newName?.trim()) return;
     folder.name = newName.trim();
@@ -1214,9 +2309,18 @@ function showFolderContextMenu(folderId: string, event: MouseEvent): void {
 
   menu.querySelector<HTMLButtonElement>("[data-action='delete']")?.addEventListener("click", () => {
     dismiss();
-    const confirmMsg = currentLocale === "ko"
-      ? `폴더 "${folder.name}"를 삭제하시겠습니까? (안의 아이템은 삭제되지 않습니다)`
-      : `Delete folder "${folder.name}"? (Items inside will not be deleted)`;
+    const confirmMsg = uiText(
+      '폴더 "{name}"를 삭제하시겠습니까? (안의 아이템은 삭제되지 않습니다)',
+      'Delete folder "{name}"? (Items inside will not be deleted)',
+      {
+        ja: 'フォルダ「{name}」を削除しますか？（中の項目は削除されません）',
+        "pt-BR": 'Excluir a pasta "{name}"? (Os itens dentro dela não serão excluídos)',
+        es: '¿Eliminar la carpeta "{name}"? (Los elementos dentro no se eliminarán)',
+        "zh-TW": '要刪除資料夾「{name}」嗎？（裡面的項目不會被刪除）',
+        vi: 'Xóa thư mục "{name}"? (Các mục bên trong sẽ không bị xóa)'
+      },
+      { name: folder.name }
+    );
     if (!window.confirm(confirmMsg)) return;
 
     const updatedFolders = folders.filter((f) => f.id !== folderId);
@@ -1246,13 +2350,33 @@ function showMoveToFolderMenu(): void {
   existing?.remove();
 
   const folders = loadFolders();
-  const removeLabel = currentLocale === "ko" ? "폴더에서 제거" : "Remove from folder";
-  const newLabel = currentLocale === "ko" ? "+ 새 폴더에 이동" : "+ Move to new folder";
+  const removeLabel = uiText("폴더에서 제거", "Remove from folder", {
+    ja: "フォルダから外す",
+    "pt-BR": "Remover da pasta",
+    es: "Quitar de la carpeta",
+    "zh-TW": "從資料夾移除",
+    vi: "Gỡ khỏi thư mục"
+  });
+  const newLabel = uiText("+ 새 폴더에 이동", "+ Move to new folder", {
+    ja: "+ 新しいフォルダへ移動",
+    "pt-BR": "+ Mover para nova pasta",
+    es: "+ Mover a una carpeta nueva",
+    "zh-TW": "+ 移到新資料夾",
+    vi: "+ Chuyển vào thư mục mới"
+  });
 
   const menu = document.createElement("div");
   menu.className = "folder-move-menu";
 
-  let html = `<div class="folder-move-menu-title">${escapeHtml(currentLocale === "ko" ? "폴더 선택" : "Choose folder")}</div>`;
+  let html = `<div class="folder-move-menu-title">${escapeHtml(
+    uiText("폴더 선택", "Choose folder", {
+      ja: "フォルダを選択",
+      "pt-BR": "Escolher pasta",
+      es: "Elegir carpeta",
+      "zh-TW": "選擇資料夾",
+      vi: "Chọn thư mục"
+    })
+  )}</div>`;
   for (const folder of folders) {
     html += `<button class="folder-move-item" type="button" data-move-folder="${escapeHtml(folder.id)}">${escapeHtml(folder.name)}</button>`;
   }
@@ -1291,7 +2415,13 @@ function showMoveToFolderMenu(): void {
       if (latestState) {
         renderArchives(latestState.archives, latestState.authenticated && Boolean(latestState.user));
       }
-      const label = currentLocale === "ko" ? "이동 완료" : "Moved";
+      const label = uiText("이동 완료", "Moved", {
+        ja: "移動しました",
+        "pt-BR": "Movido",
+        es: "Movido",
+        "zh-TW": "已移動",
+        vi: "Đã chuyển"
+      });
       setStatus(label);
     });
   }
@@ -1301,7 +2431,13 @@ function showMoveToFolderMenu(): void {
     if (!ensureFolderLimitAvailable()) {
       return;
     }
-    const labelPrompt = currentLocale === "ko" ? "새 폴더 이름:" : "New folder name:";
+    const labelPrompt = uiText("새 폴더 이름:", "New folder name:", {
+      ja: "新しいフォルダ名:",
+      "pt-BR": "Nome da nova pasta:",
+      es: "Nombre de la nueva carpeta:",
+      "zh-TW": "新資料夾名稱：",
+      vi: "Tên thư mục mới:"
+    });
     const name = window.prompt(labelPrompt);
     if (!name?.trim()) return;
 
@@ -1325,7 +2461,18 @@ function showMoveToFolderMenu(): void {
       renderArchives(latestState.archives, latestState.authenticated && Boolean(latestState.user));
     }
     renderPlanPanel();
-    const label = currentLocale === "ko" ? `"${newFolder.name}" 폴더로 이동됨` : `Moved to "${newFolder.name}"`;
+    const label = uiText(
+      '"{name}" 폴더로 이동됨',
+      'Moved to "{name}"',
+      {
+        ja: '「{name}」フォルダへ移動しました',
+        "pt-BR": 'Movido para "{name}"',
+        es: 'Movido a "{name}"',
+        "zh-TW": '已移動到「{name}」資料夾',
+        vi: 'Đã chuyển vào "{name}"'
+      },
+      { name: newFolder.name }
+    );
     setStatus(label);
   });
 }
@@ -1334,9 +2481,18 @@ async function bulkDeleteSelectedArchives(): Promise<void> {
   const count = selectedArchiveIds.size;
   if (count === 0) return;
 
-  const confirmMsg = currentLocale === "ko"
-    ? `선택한 ${count}개 항목을 삭제하시겠습니까?`
-    : `Delete ${count} selected items?`;
+  const confirmMsg = uiText(
+    "선택한 {count}개 항목을 삭제하시겠습니까?",
+    "Delete {count} selected items?",
+    {
+      ja: "選択した {count} 件を削除しますか？",
+      "pt-BR": "Excluir {count} itens selecionados?",
+      es: "¿Eliminar los {count} elementos seleccionados?",
+      "zh-TW": "要刪除所選的 {count} 個項目嗎？",
+      vi: "Xóa {count} mục đã chọn?"
+    },
+    { count }
+  );
   if (!window.confirm(confirmMsg)) return;
 
   const ids = [...selectedArchiveIds];
@@ -1360,7 +2516,18 @@ async function bulkDeleteSelectedArchives(): Promise<void> {
   saveFolderMap(folderMap);
 
   await refreshEverything();
-  const label = currentLocale === "ko" ? `${ids.length}개 삭제됨` : `${ids.length} deleted`;
+  const label = uiText(
+    "{count}개 삭제됨",
+    "{count} deleted",
+    {
+      ja: "{count} 件を削除しました",
+      "pt-BR": "{count} excluído(s)",
+      es: "{count} eliminado(s)",
+      "zh-TW": "已刪除 {count} 個",
+      vi: "Đã xóa {count} mục"
+    },
+    { count: ids.length }
+  );
   setStatus(label);
 }
 
@@ -1437,7 +2604,6 @@ function renderArchiveDetailHtml(item: BotArchiveView): string {
         ${triggerLink}
         <button class="topbar-link archive-copy" type="button" data-copy="${item.id}">${escapeHtml(t("scrapbookCopyMarkdown"))}</button>
         <a class="topbar-link archive-action-link" href="/api/public/bot/archive/${encodeURIComponent(item.id)}.md">${escapeHtml(t("scrapbookDownloadMarkdown"))}</a>
-        <a class="topbar-link archive-action-link" href="/api/public/bot/archive/${encodeURIComponent(item.id)}.zip">${escapeHtml(t("scrapbookDownloadZip"))}</a>
         <button class="topbar-link archive-action-link" type="button" data-archive-delete="${item.id}">${escapeHtml(t("scrapbookDelete"))}</button>
       </div>
     </div>
@@ -1460,6 +2626,7 @@ function renderArchives(items: BotArchiveView[], isAuthenticated: boolean): void
     archivesPaginationEl?.classList.add("hidden");
     updateArchivesToolbar([], isAuthenticated);
     archivesFilterBar?.classList.toggle("hidden", true);
+    renderArchiveTagPanel([], false);
     syncScrapbookHistory();
     return;
   }
@@ -1473,6 +2640,7 @@ function renderArchives(items: BotArchiveView[], isAuthenticated: boolean): void
     return Date.parse(right.updatedAt) - Date.parse(left.updatedAt);
   });
   renderFolderStrip(ordered);
+  renderArchiveTagPanel(ordered, isAuthenticated);
 
   const filtered = filterArchives(ordered);
 
@@ -1507,6 +2675,7 @@ function renderArchives(items: BotArchiveView[], isAuthenticated: boolean): void
     const isSelected = selectedArchiveIds.has(item.id);
     const isActive = activeArchiveId === item.id;
     const tagsLabel = buildArchiveTagsLabel(item);
+    const authorMeta = buildArchiveAuthorMeta(item);
     html += `
         <tr class="${isActive ? "is-active" : ""}" data-open="${item.id}">
           <td class="archive-table-select">
@@ -1515,7 +2684,10 @@ function renderArchives(items: BotArchiveView[], isAuthenticated: boolean): void
             </label>
           </td>
           <td>
-            <button class="archive-row-title" type="button" data-open="${item.id}">${escapeHtml(buildArchiveTitle(item))}</button>
+            <div class="archive-row-main">
+              <button class="archive-row-title" type="button" data-open="${item.id}">${escapeHtml(buildArchiveTitle(item))}</button>
+              ${authorMeta ? `<div class="archive-row-meta">${escapeHtml(authorMeta)}</div>` : ""}
+            </div>
           </td>
           <td class="archive-row-date">${escapeHtml(formatDate(item.archivedAt))}</td>
           <td class="archive-row-tags">${escapeHtml(tagsLabel)}</td>
@@ -2088,8 +3260,10 @@ function applySessionState(config: BotPublicConfig, state: BotSessionState): voi
     }
   }
   renderArchives(state.archives, isAuthenticated);
+  renderSaveStatus(state);
   renderPlanPanel();
   syncScrapbookHistory();
+  resolvePendingConnectedStatus(state);
 }
 
 function applyWorkspaceState(workspace: ScrapbookPlusState): void {
@@ -2110,7 +3284,11 @@ function applyQueryStatus(): void {
   const authError = currentUrl.searchParams.get("authError");
   const archiveId = routeState.archiveId ?? currentUrl.searchParams.get("archive");
   if (connected === "1") {
-    setStatus(t("scrapbookStatusConnected"));
+    pendingConnectedStatus = true;
+    setStatus(
+      uiText("Threads 로그인 응답을 확인하는 중입니다...", "Confirming your Threads sign-in..."),
+      false
+    );
   } else if (authError) {
     setStatus(authError, true);
   }
@@ -2144,41 +3322,15 @@ async function initializeScrapbook(): Promise<void> {
     requestJson<BotSessionState>("/api/public/bot/session")
   ]);
   latestConfig = config;
-  if (state.authenticated && state.user) {
-    try {
-      const synced = await requestJson<BotSyncState>("/api/public/bot/sync", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: "{}"
-      });
-      applySessionState(config, {
-        ...synced,
-        botHandle: config.botHandle,
-        oauthConfigured: config.oauthConfigured
-      });
-      if (synced.workspace) {
-        applyWorkspaceState(synced.workspace);
-      } else {
-        await refreshWorkspace();
-      }
-      return;
-    } catch (error) {
-      applySessionState(config, {
-        ...state,
-        botHandle: config.botHandle,
-        oauthConfigured: config.oauthConfigured
-      });
-      await refreshWorkspace();
-      throw error;
-    }
-  }
-
   applySessionState(config, {
     ...state,
     botHandle: config.botHandle,
     oauthConfigured: config.oauthConfigured
   });
-  await refreshWorkspace();
+
+  if (state.authenticated && state.user) {
+    void refreshWorkspace().catch(() => undefined);
+  }
 }
 
 async function refreshWorkspace(): Promise<void> {
@@ -2265,18 +3417,35 @@ async function syncLatestMentions(): Promise<void> {
   if (!latestConfig) {
     return;
   }
-  const state = await requestJson<BotSyncState>("/api/public/bot/sync", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: "{}"
-  });
-  applySessionState(latestConfig, {
-    ...state,
-    botHandle: latestConfig.botHandle,
-    oauthConfigured: latestConfig.oauthConfigured
-  });
-  if (state.workspace) {
-    applyWorkspaceState(state.workspace);
+  isRefreshingSaveStatus = true;
+  renderSaveStatus(latestState);
+
+  try {
+    const state = await requestJson<BotSyncState>("/api/public/bot/sync", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: "{}"
+    });
+    applySessionState(latestConfig, {
+      ...state,
+      botHandle: latestConfig.botHandle,
+      oauthConfigured: latestConfig.oauthConfigured
+    });
+    if (state.workspace) {
+      applyWorkspaceState(state.workspace);
+    }
+    const filteredCount = filterArchives(state.archives).length;
+    setStatus(
+      hasActiveArchiveFilters() && state.archives.length > filteredCount
+        ? uiText(
+            "새 댓글 저장 상태를 확인했습니다. 현재 검색이나 태그 필터 때문에 일부 항목이 바로 안 보일 수 있습니다.",
+            "Checked the latest reply saves. Some items may still be hidden by your current search or tag filters."
+          )
+        : uiText("새 댓글 저장 상태를 다시 확인했습니다.", "Checked the latest reply save status.")
+    );
+  } finally {
+    isRefreshingSaveStatus = false;
+    renderSaveStatus(latestState);
   }
 }
 
@@ -2505,7 +3674,22 @@ logoutButton?.addEventListener("click", async () => {
     selectedArchiveIds.clear();
     expandedMediaArchiveIds.clear();
     activeArchiveId = null;
-    await refreshEverything();
+    latestWorkspace = null;
+    if (latestConfig) {
+      applySessionState(latestConfig, {
+        authenticated: false,
+        botHandle: latestConfig.botHandle,
+        oauthConfigured: latestConfig.oauthConfigured,
+        user: null,
+        archives: [],
+        saveStatus: null
+      });
+    }
+    renderScopeStatus(null);
+    renderWatchlists(null);
+    renderSearches(null);
+    renderInsights(null);
+    renderPlanPanel();
   } catch (error) {
     setStatus(error instanceof Error ? error.message : t("scrapbookLogoutFail"), true);
   }
@@ -2532,6 +3716,14 @@ insightsRefresh?.addEventListener("click", () => {
   void refreshInsightsRequest();
 });
 
+saveStatusRefresh?.addEventListener("click", () => {
+  void syncLatestMentions().catch((error) => {
+    isRefreshingSaveStatus = false;
+    renderSaveStatus(latestState);
+    setStatus(error instanceof Error ? error.message : uiText("저장 상태를 다시 확인할 수 없습니다.", "Could not refresh save status."), true);
+  });
+});
+
 planKeyForm?.addEventListener("submit", (event) => {
   void submitPlusActivation(event);
 });
@@ -2555,18 +3747,12 @@ archivesSelectAll?.addEventListener("change", () => {
   renderArchives(latestState.archives, true);
 });
 
-archivesExportSelected?.addEventListener("click", async () => {
-  if (!latestState?.authenticated || !latestState.user) {
-    return;
-  }
-  await exportArchivesZip(latestState.archives.filter((item) => selectedArchiveIds.has(item.id)).map((item) => item.id));
-});
-
 archivesExportAll?.addEventListener("click", async () => {
   if (!latestState?.authenticated || !latestState.user) {
     return;
   }
-  await exportArchivesZip(latestState.archives.map((item) => item.id));
+  const selectedIds = latestState.archives.filter((item) => selectedArchiveIds.has(item.id)).map((item) => item.id);
+  await exportArchivesZip(selectedIds.length > 0 ? selectedIds : latestState.archives.map((item) => item.id));
 });
 
 archivesMoveSelected?.addEventListener("click", () => {
@@ -2604,9 +3790,13 @@ void (async () => {
     await initializeScrapbook();
   } catch (error) {
     setStatus(error instanceof Error ? error.message : t("scrapbookStatusLoadFailed"), true);
+    authPanel?.classList.remove("hidden");
+    archivesEmptyEl?.classList.remove("hidden");
   } finally {
+    finalizePendingConnectedStatus();
     setConnectButtonsIdle();
     renderConnectButtons();
+    finishInitialBoot();
   }
 })();
 

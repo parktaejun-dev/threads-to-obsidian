@@ -262,6 +262,7 @@ test("admin can update storefront settings", async () => {
       body: JSON.stringify({
         productName: "SS Threads Max",
         headline: "Archive Threads with one click.",
+        subheadline: "Temporary storefront copy.",
         heroNotes: ["One line", "Second line"],
         faqs: [
           {
@@ -284,6 +285,7 @@ test("admin can update storefront settings", async () => {
       settings?: {
         productName?: string;
         headline?: string;
+        subheadline?: string;
         heroNotes?: string[];
         faqs?: Array<{ question: string; answer: string }>;
       };
@@ -291,6 +293,7 @@ test("admin can update storefront settings", async () => {
 
     assert.equal(dashboardPayload.settings?.productName, "SS Threads Max");
     assert.equal(dashboardPayload.settings?.headline, "Archive Threads with one click.");
+    assert.equal(dashboardPayload.settings?.subheadline, "Temporary storefront copy.");
     assert.deepEqual(dashboardPayload.settings?.heroNotes, ["One line", "Second line"]);
     assert.deepEqual(dashboardPayload.settings?.faqs, [
       {
@@ -299,6 +302,40 @@ test("admin can update storefront settings", async () => {
         answer: "Yes."
       }
     ]);
+
+    const clearSettings = await fetch(`${origin}/api/admin/storefront-settings`, {
+      method: "PUT",
+      headers: {
+        authorization: "Bearer threads-admin-secret",
+        origin,
+        "x-forwarded-for": "10.0.0.1",
+        "content-type": "application/json"
+      },
+      body: JSON.stringify({
+        subheadline: "",
+        heroNotes: [],
+        faqs: []
+      })
+    });
+    assert.equal(clearSettings.status, 200);
+
+    const clearedDashboardResponse = await fetch(`${origin}/api/admin/dashboard`, {
+      headers: {
+        authorization: "Bearer threads-admin-secret",
+        "x-forwarded-for": "10.0.0.1"
+      }
+    });
+    const clearedDashboardPayload = await clearedDashboardResponse.json() as {
+      settings?: {
+        subheadline?: string;
+        heroNotes?: string[];
+        faqs?: Array<{ question: string; answer: string }>;
+      };
+    };
+
+    assert.equal(clearedDashboardPayload.settings?.subheadline, "");
+    assert.deepEqual(clearedDashboardPayload.settings?.heroNotes, []);
+    assert.deepEqual(clearedDashboardPayload.settings?.faqs, []);
   } finally {
     await stopTestServer(server);
     if (typeof previousAdminToken === "string") {

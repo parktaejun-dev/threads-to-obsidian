@@ -1020,7 +1020,7 @@ test("dashboard and monitoring expose recent request metrics", async () => {
       recentRequests?: Array<{ pathname: string; statusCode: number }>;
     };
     assert.ok(dashboardBody.requestMetrics);
-    assert.equal((dashboardBody.requestMetrics?.totalRequests ?? 0) >= 23, true);
+    assert.equal((dashboardBody.requestMetrics?.totalRequests ?? 0) >= 22, true);
     assert.equal((dashboardBody.requestMetrics?.clientErrors ?? 0) >= 2, true);
     assert.equal((dashboardBody.requestMetrics?.rateLimitedResponses ?? 0) >= 1, true);
     assert.equal(
@@ -1042,8 +1042,137 @@ test("dashboard and monitoring expose recent request metrics", async () => {
         rateLimitedResponses: number;
       };
     };
-    assert.equal((overviewBody.requestMetrics?.totalRequests ?? 0) >= 23, true);
+    assert.equal((overviewBody.requestMetrics?.totalRequests ?? 0) >= 22, true);
     assert.equal((overviewBody.requestMetrics?.rateLimitedResponses ?? 0) >= 1, true);
+  } finally {
+    await stopTestServer(server);
+    if (typeof previousAdminToken === "string") {
+      process.env.THREADS_WEB_ADMIN_TOKEN = previousAdminToken;
+    } else {
+      delete process.env.THREADS_WEB_ADMIN_TOKEN;
+    }
+    if (typeof previousDbFile === "string") {
+      process.env.THREADS_WEB_DB_FILE = previousDbFile;
+    } else {
+      delete process.env.THREADS_WEB_DB_FILE;
+    }
+  }
+});
+
+test("public storefront responses expose cache headers and support etag revalidation", async () => {
+  const previousAdminToken = process.env.THREADS_WEB_ADMIN_TOKEN;
+  const previousDbFile = process.env.THREADS_WEB_DB_FILE;
+  const tempDir = await mkdtemp(path.join(tmpdir(), "threads-server-hardening-"));
+  const dbFile = path.join(tempDir, "web-admin-data.json");
+
+  process.env.THREADS_WEB_ADMIN_TOKEN = "threads-admin-secret";
+  process.env.THREADS_WEB_DB_FILE = dbFile;
+
+  const { server, origin } = await startTestServer();
+
+  try {
+    const firstResponse = await fetch(`${origin}/api/public/storefront`);
+    assert.equal(firstResponse.status, 200);
+    const etag = firstResponse.headers.get("etag");
+    assert.ok(etag);
+    assert.match(firstResponse.headers.get("cache-control") ?? "", /stale-while-revalidate=/);
+
+    const secondResponse = await fetch(`${origin}/api/public/storefront`, {
+      headers: {
+        "if-none-match": etag ?? ""
+      }
+    });
+    assert.equal(secondResponse.status, 304);
+    assert.equal(secondResponse.headers.get("etag"), etag);
+  } finally {
+    await stopTestServer(server);
+    if (typeof previousAdminToken === "string") {
+      process.env.THREADS_WEB_ADMIN_TOKEN = previousAdminToken;
+    } else {
+      delete process.env.THREADS_WEB_ADMIN_TOKEN;
+    }
+    if (typeof previousDbFile === "string") {
+      process.env.THREADS_WEB_DB_FILE = previousDbFile;
+    } else {
+      delete process.env.THREADS_WEB_DB_FILE;
+    }
+  }
+});
+
+test("checkout page responses expose cache headers and support etag revalidation", async () => {
+  const previousAdminToken = process.env.THREADS_WEB_ADMIN_TOKEN;
+  const previousDbFile = process.env.THREADS_WEB_DB_FILE;
+  const tempDir = await mkdtemp(path.join(tmpdir(), "threads-server-hardening-"));
+  const dbFile = path.join(tempDir, "web-admin-data.json");
+
+  process.env.THREADS_WEB_ADMIN_TOKEN = "threads-admin-secret";
+  process.env.THREADS_WEB_DB_FILE = dbFile;
+
+  const { server, origin } = await startTestServer();
+
+  try {
+    const firstResponse = await fetch(`${origin}/checkout`);
+    assert.equal(firstResponse.status, 200);
+    const etag = firstResponse.headers.get("etag");
+    assert.ok(etag);
+    assert.match(firstResponse.headers.get("cache-control") ?? "", /stale-while-revalidate=/);
+
+    const secondResponse = await fetch(`${origin}/checkout`, {
+      headers: {
+        "if-none-match": etag ?? ""
+      }
+    });
+    assert.equal(secondResponse.status, 304);
+    assert.equal(secondResponse.headers.get("etag"), etag);
+  } finally {
+    await stopTestServer(server);
+    if (typeof previousAdminToken === "string") {
+      process.env.THREADS_WEB_ADMIN_TOKEN = previousAdminToken;
+    } else {
+      delete process.env.THREADS_WEB_ADMIN_TOKEN;
+    }
+    if (typeof previousDbFile === "string") {
+      process.env.THREADS_WEB_DB_FILE = previousDbFile;
+    } else {
+      delete process.env.THREADS_WEB_DB_FILE;
+    }
+  }
+});
+
+test("storefront cache updates immediately after admin settings changes", async () => {
+  const previousAdminToken = process.env.THREADS_WEB_ADMIN_TOKEN;
+  const previousDbFile = process.env.THREADS_WEB_DB_FILE;
+  const tempDir = await mkdtemp(path.join(tmpdir(), "threads-server-hardening-"));
+  const dbFile = path.join(tempDir, "web-admin-data.json");
+
+  process.env.THREADS_WEB_ADMIN_TOKEN = "threads-admin-secret";
+  process.env.THREADS_WEB_DB_FILE = dbFile;
+
+  const { server, origin } = await startTestServer();
+
+  try {
+    const adminCookie = await loginAdminSession(origin);
+    const updateResponse = await fetch(`${origin}/api/admin/storefront-settings`, {
+      method: "PUT",
+      headers: {
+        origin,
+        cookie: adminCookie,
+        "content-type": "application/json"
+      },
+      body: JSON.stringify({
+        headline: "Updated headline for cache"
+      })
+    });
+    assert.equal(updateResponse.status, 200);
+
+    const storefrontResponse = await fetch(`${origin}/api/public/storefront`);
+    assert.equal(storefrontResponse.status, 200);
+    const storefrontBody = await storefrontResponse.json() as {
+      settings?: {
+        headline?: string;
+      };
+    };
+    assert.equal(storefrontBody.settings?.headline, "Updated headline for cache");
   } finally {
     await stopTestServer(server);
     if (typeof previousAdminToken === "string") {

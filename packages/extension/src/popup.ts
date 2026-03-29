@@ -254,7 +254,7 @@ function renderRecentSaves(items: RecentSave[]): void {
       return `
         <li class="recent-item">
           <div class="recent-title">${escapeHtml(displayText)}</div>
-          <div class="recent-meta">@${escapeHtml(item.author)} · ${escapeHtml(new Date(item.downloadedAt).toLocaleString())}</div>
+          <div class="recent-meta">@${escapeHtml(item.author)} · ${escapeHtml(new Date(item.savedAt ?? item.downloadedAt).toLocaleString())}</div>
           ${item.warning ? `<div class="recent-warning">${escapeHtml(item.warning)}</div>` : ""}
           <a class="recent-url" href="${escapeAttribute(item.canonicalUrl)}" target="_blank" rel="noreferrer">${escapeHtml(item.canonicalUrl)}</a>
           ${item.remotePageUrl && item.saveTarget !== "cloud" ? `<a class="recent-url" href="${escapeAttribute(item.remotePageUrl)}" target="_blank" rel="noreferrer">${escapeHtml(msg.popupOpenRemote)}</a>` : ""}
@@ -494,6 +494,7 @@ function mergeZipFallbackStatus(status: SaveStatus, reason: string | null): Save
 
 async function recordDirectSave(post: ExtractedPost, archiveName: string, savedRelativePath: string, warning: string | null): Promise<RecentSave> {
   const duplicate = await findDuplicateSave(post.canonicalUrl, post.contentHash, "obsidian");
+  const now = new Date().toISOString();
   const recent: RecentSave = duplicate
     ? {
       ...duplicate,
@@ -502,7 +503,8 @@ async function recordDirectSave(post: ExtractedPost, archiveName: string, savedR
       shortcode: post.shortcode,
       author: post.author,
       title: post.title,
-      downloadedAt: new Date().toISOString(),
+      savedAt: duplicate.savedAt ?? duplicate.downloadedAt,
+      downloadedAt: now,
       archiveName,
       contentHash: post.contentHash,
       status: "complete",
@@ -520,7 +522,8 @@ async function recordDirectSave(post: ExtractedPost, archiveName: string, savedR
       shortcode: post.shortcode,
       author: post.author,
       title: post.title,
-      downloadedAt: new Date().toISOString(),
+      savedAt: now,
+      downloadedAt: now,
       archiveName,
       contentHash: post.contentHash,
       status: "complete",
@@ -708,6 +711,7 @@ async function resaveRecent(item: RecentSave): Promise<void> {
     const updatedSave: RecentSave = {
       ...item,
       saveTarget: "obsidian",
+      savedAt: item.savedAt ?? item.downloadedAt,
       downloadedAt: new Date().toISOString(),
       archiveName: result.archiveName,
       savedVia: "direct",

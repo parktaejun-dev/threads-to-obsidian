@@ -725,10 +725,10 @@ const installMetaCopyByLocale: Partial<Record<WebLocale, InstallMetaCopy>> = {
     safetyTitle: "なぜデベロッパーモードが必要ですか？",
     safetyCopy: "まだ ZIP 配布の段階なので、Chrome の Load unpacked フローが必要です。",
     downloadCardTitle: "更新方法",
-    downloadCardCopy: "新しい版が出たら ZIP を 다시 받아 같은 폴더로 바꾸면 됩니다.",
+    downloadCardCopy: "新しい版が出たら ZIP をもう一度ダウンロードして同じフォルダを置き換えてください。",
     verifyTitle: "インストール確認",
     verifyItems: [
-      "extension アイコンを固定します。",
+      "拡張機能アイコンを固定します。",
       "Threads の個別投稿ページを開きます。",
       "一度保存して動作を確認します。"
     ]
@@ -740,14 +740,14 @@ const installMetaCopyByLocale: Partial<Record<WebLocale, InstallMetaCopy>> = {
     chip1: "Entrega por ZIP",
     chip2: "Modo de desenvolvedor necessário",
     chip3: "Ainda sem atualização automática",
-    metaCopy: "No momento, a extension é distribuída como ZIP. Registre uma vez e comece a usar.",
+    metaCopy: "No momento, a extensão é distribuída como ZIP. Registre uma vez e comece a usar.",
     safetyTitle: "Por que o modo de desenvolvedor é necessário?",
-    safetyCopy: "Como a extension ainda é distribuída em ZIP, o Chrome precisa do fluxo Carregar sem compactação na instalação.",
+    safetyCopy: "Como a extensão ainda é distribuída em ZIP, o Chrome precisa do fluxo Carregar sem compactação na instalação.",
     downloadCardTitle: "Como atualizar",
     downloadCardCopy: "Quando sair uma nova versão, baixe o ZIP novamente e substitua a mesma pasta.",
     verifyTitle: "Verificar instalação",
     verifyItems: [
-      "Fixe o ícone da extension.",
+      "Fixe o ícone da extensão.",
       "Abra uma página de post individual no Threads.",
       "Faça um teste de salvamento para confirmar o fluxo."
     ]
@@ -759,14 +759,14 @@ const installMetaCopyByLocale: Partial<Record<WebLocale, InstallMetaCopy>> = {
     chip1: "Entrega por ZIP",
     chip2: "Se necesita modo de desarrollador",
     chip3: "Todavía sin actualización automática",
-    metaCopy: "Por ahora la extension se distribuye como ZIP. Regístrala una vez y empieza a usarla.",
+    metaCopy: "Por ahora la extensión se distribuye como ZIP. Regístrala una vez y empieza a usarla.",
     safetyTitle: "¿Por qué se necesita el modo de desarrollador?",
-    safetyCopy: "Como la extension aún se distribuye como ZIP, Chrome necesita el flujo Cargar descomprimida durante la instalación.",
+    safetyCopy: "Como la extensión aún se distribuye como ZIP, Chrome necesita el flujo Cargar descomprimida durante la instalación.",
     downloadCardTitle: "Cómo actualizar",
     downloadCardCopy: "Cuando salga una nueva versión, descarga el ZIP otra vez y reemplaza la misma carpeta.",
     verifyTitle: "Verificar instalación",
     verifyItems: [
-      "Fija el icono de la extension.",
+      "Fija el icono de la extensión.",
       "Abre una página de publicación individual en Threads.",
       "Haz una prueba de guardado para confirmar el flujo."
     ]
@@ -785,7 +785,7 @@ const installMetaCopyByLocale: Partial<Record<WebLocale, InstallMetaCopy>> = {
     downloadCardCopy: "有新版本時，再次下載 ZIP 並替換同一個資料夾即可。",
     verifyTitle: "安裝確認",
     verifyItems: [
-      "把 extension 圖示固定起來。",
+      "將擴充功能圖示固定。",
       "打開 Threads 的單篇貼文頁面。",
       "實際執行一次儲存確認流程正常。"
     ]
@@ -797,14 +797,14 @@ const installMetaCopyByLocale: Partial<Record<WebLocale, InstallMetaCopy>> = {
     chip1: "Phát hành bằng ZIP",
     chip2: "Cần bật chế độ nhà phát triển",
     chip3: "Chưa có tự động cập nhật",
-    metaCopy: "Hiện tại extension được phát hành dưới dạng ZIP. Chỉ cần đăng ký một lần là dùng được ngay.",
+    metaCopy: "Hiện tại tiện ích mở rộng được phát hành dưới dạng ZIP. Chỉ cần đăng ký một lần là dùng được ngay.",
     safetyTitle: "Vì sao cần chế độ nhà phát triển?",
-    safetyCopy: "Vì extension vẫn đang phát hành bằng ZIP, Chrome cần luồng Load unpacked trong lúc cài đặt.",
+    safetyCopy: "Vì tiện ích mở rộng vẫn đang phát hành bằng ZIP, Chrome cần luồng Load unpacked trong lúc cài đặt.",
     downloadCardTitle: "Cách cập nhật",
     downloadCardCopy: "Khi có phiên bản mới, hãy tải lại file ZIP và thay thế cùng thư mục đó.",
     verifyTitle: "Kiểm tra cài đặt",
     verifyItems: [
-      "Ghim biểu tượng extension.",
+      "Ghim biểu tượng tiện ích mở rộng.",
       "Mở trang bài viết đơn trên Threads.",
       "Thử lưu một lần để xác nhận luồng hoạt động."
     ]

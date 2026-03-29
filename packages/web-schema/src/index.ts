@@ -698,37 +698,37 @@ export interface EmailDeliveryDraft {
 
 export const DEFAULT_SETTINGS: StorefrontSettings = {
   productName: "ss-threads",
-  headline: "Threads 저장을 한 곳에서.",
-  subheadline: "Free는 저장글 100개와 폴더 5개, 그리고 searches까지. Plus는 저장글 1,000개, 폴더 50개, watchlists/insights, 그리고 기존 extension 고급 저장 기능까지 함께 엽니다.",
+  headline: "Threads 글을 모아두세요\nPC는 바로 저장\n모바일은 댓글 한 줄",
+  subheadline: "",
   priceLabel: "ss-threads Plus",
   priceValue: "US$19.99",
   supportEmail: "hello@oxcorp.ninja",
-  includedUpdates: "US$2.99 monthly · US$19.99 yearly · Free 100/5 + searches -> Plus 1000/50 + watchlists/insights + extension advanced",
+  includedUpdates: "Free는 저장글 100개와 폴더 5개. Plus는 1,000개와 50개, 관심 계정과 반응 보기.",
   heroNotes: [
-    "Free: 저장글 100개 · 폴더 5개 · searches · Markdown / ZIP export",
-    "Plus: 저장글 1,000개 · 폴더 50개 · watchlists · insights",
-    "Plus bonus: extension 파일 규칙 · Notion 고급 저장 · AI 정리"
+    "PC는 설치 후 바로 저장",
+    "모바일은 댓글 한 줄로 스크랩북에 저장",
+    "저장한 글은 태그와 검색으로 다시 찾기"
   ],
   faqs: [
     {
       id: "faq-1",
-      question: "무료에서도 저장할 수 있나요?",
-      answer: "네. Free는 저장글 100개, 폴더 5개까지 사용할 수 있습니다."
+      question: "저장하려면 Plus가 필요한가요?",
+      answer: "아니요. Free에서도 저장과 검색, 태그 정리를 쓸 수 있습니다. Plus는 저장 공간과 보기 범위를 넓혀 주는 선택지입니다."
     },
     {
       id: "faq-2",
       question: "누가 Plus를 쓰면 좋나요?",
-      answer: "저장글을 많이 쌓고 폴더를 촘촘히 쓰는 사용자, watchlists와 insights가 필요한 사용자, 그리고 extension의 규칙 저장과 AI 정리까지 함께 쓰려는 사용자에게 맞습니다."
+      answer: "저장글이 100개를 넘기 시작하거나, 폴더를 더 쓰고 싶거나, 관심 계정과 반응 보기까지 같이 쓰고 싶은 사용자에게 맞습니다."
     },
     {
       id: "faq-3",
-      question: "Plus에 extension 고급 기능도 포함되나요?",
-      answer: "네. Plus는 scrapbook 저장 한도와 watchlists/insights를 함께 열고, 같은 키를 extension에 넣으면 파일명·경로 규칙, Notion 고급 저장, AI 요약과 태그 같은 기존 고급 기능도 함께 활성화됩니다. searches는 Free에서도 계속 사용할 수 있습니다."
+      question: "Plus에서는 뭐가 달라지나요?",
+      answer: "저장글 1,000개, 폴더 50개까지 넓어지고 관심 계정과 반응 보기가 열립니다. 같은 키를 확장에도 연결할 수 있습니다."
     },
     {
       id: "faq-4",
       question: "Plus 키는 어떻게 전달되나요?",
-      answer: "결제가 확인되면 Plus 키를 이메일로 보내드립니다."
+      answer: "결제가 확인되면 보통 30분 안에 Plus 키를 이메일로 보내드립니다."
     },
     {
       id: "faq-5",

@@ -92,6 +92,7 @@ export interface CloudArchiveRecentRecord {
   archiveId: string;
   archiveUrl: string;
   title: string;
+  savedAt: string;
   updatedAt: string;
   warning: string | null;
   origin?: "mention" | "cloud";
@@ -173,6 +174,7 @@ export interface RecentSave {
   shortcode: string;
   author: string;
   title: string;
+  savedAt: string;
   downloadedAt: string;
   archiveName: string;
   contentHash: string;

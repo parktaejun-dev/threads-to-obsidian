@@ -101,6 +101,7 @@ function normalizeRecentSave(item: RecentSave & { zipFilename?: string }): Recen
     ...item,
     archiveName,
     saveTarget,
+    savedAt: item.savedAt ?? item.downloadedAt,
     savedVia: item.savedVia ?? "zip",
     savedRelativePath: item.savedRelativePath ?? null,
     remotePageId: item.remotePageId ?? null,
@@ -452,6 +453,16 @@ export async function getEffectiveOptions(): Promise<ExtensionOptions> {
   };
 }
 
+function getRecentSaveSortTimestamp(item: Pick<RecentSave, "savedAt" | "downloadedAt">): number {
+  const savedAt = Date.parse(item.savedAt);
+  if (Number.isFinite(savedAt)) {
+    return savedAt;
+  }
+
+  const downloadedAt = Date.parse(item.downloadedAt);
+  return Number.isFinite(downloadedAt) ? downloadedAt : 0;
+}
+
 export async function getRecentSaves(): Promise<RecentSave[]> {
   const stored = await chrome.storage.local.get(RECENT_SAVES_KEY);
   const recent = ((stored[RECENT_SAVES_KEY] as Array<RecentSave & { zipFilename?: string }> | undefined) ?? []).map(normalizeRecentSave);
@@ -472,6 +483,7 @@ export function buildRecentSaveFromCloudArchive(record: CloudArchiveRecentRecord
     shortcode: record.post.shortcode,
     author: record.post.author,
     title: record.post.title,
+    savedAt: record.savedAt,
     downloadedAt: record.updatedAt,
     archiveName: record.title,
     contentHash: record.post.contentHash,
@@ -490,7 +502,7 @@ export function mergeRecentSavesWithCloudArchives(recent: RecentSave[], cloudArc
   const cloudRecentSaves = cloudArchives.map(buildRecentSaveFromCloudArchive);
   const nonCloudRecentSaves = recent.filter((item) => item.saveTarget !== "cloud");
   return [...cloudRecentSaves, ...nonCloudRecentSaves]
-    .sort((left, right) => Date.parse(right.downloadedAt) - Date.parse(left.downloadedAt))
+    .sort((left, right) => getRecentSaveSortTimestamp(right) - getRecentSaveSortTimestamp(left))
     .slice(0, MAX_RECENT_SAVES);
 }
 

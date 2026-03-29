@@ -4,7 +4,8 @@ import assert from "node:assert/strict";
 import { buildDefaultDatabase } from "@threads/web-schema";
 import {
   appendRequestLog,
-  buildRequestMetricsSummary
+  buildRequestMetricsSummary,
+  shouldPersistRequestLog
 } from "../packages/web-server/src/server/request-observability";
 
 test("request metrics summary counts statuses, request classes, and latency percentiles", () => {
@@ -62,4 +63,10 @@ test("request metrics summary counts statuses, request classes, and latency perc
   assert.equal(summary.averageDurationMs, 68);
   assert.equal(summary.p95DurationMs, 120);
   assert.equal(summary.lastRequestAt, "2026-03-28T00:03:00.090Z");
+});
+
+test("health and readiness checks are excluded from persisted request logs", () => {
+  assert.equal(shouldPersistRequestLog("/health"), false);
+  assert.equal(shouldPersistRequestLog("/ready"), false);
+  assert.equal(shouldPersistRequestLog("/api/public/storefront"), true);
 });

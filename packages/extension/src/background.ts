@@ -127,6 +127,7 @@ async function createUnsupportedState(url: string | null): Promise<SaveStatus> {
 }
 
 async function createZipRecentSave(post: RecentSave["post"], archiveName: string, warning: string | null): Promise<RecentSave> {
+  const now = new Date().toISOString();
   return {
     id: crypto.randomUUID(),
     saveTarget: "obsidian",
@@ -134,7 +135,8 @@ async function createZipRecentSave(post: RecentSave["post"], archiveName: string
     shortcode: post.shortcode,
     author: post.author,
     title: post.title,
-    downloadedAt: new Date().toISOString(),
+    savedAt: now,
+    downloadedAt: now,
     archiveName,
     contentHash: post.contentHash,
     status: "complete",
@@ -153,6 +155,7 @@ async function createNotionRecentSave(
   pageUrl: string,
   warning: string | null
 ): Promise<RecentSave> {
+  const now = new Date().toISOString();
   return {
     id: crypto.randomUUID(),
     saveTarget: "notion",
@@ -160,7 +163,8 @@ async function createNotionRecentSave(
     shortcode: post.shortcode,
     author: post.author,
     title: post.title,
-    downloadedAt: new Date().toISOString(),
+    savedAt: now,
+    downloadedAt: now,
     archiveName: post.title,
     contentHash: post.contentHash,
     status: "complete",
@@ -180,6 +184,7 @@ async function createCloudRecentSave(
   archiveTitle: string,
   warning: string | null
 ): Promise<RecentSave> {
+  const now = new Date().toISOString();
   return {
     id: archiveId,
     saveTarget: "cloud",
@@ -187,7 +192,8 @@ async function createCloudRecentSave(
     shortcode: post.shortcode,
     author: post.author,
     title: post.title,
-    downloadedAt: new Date().toISOString(),
+    savedAt: now,
+    downloadedAt: now,
     archiveName: archiveTitle,
     contentHash: post.contentHash,
     status: "complete",
@@ -348,6 +354,7 @@ async function saveCurrentPost(
       const ai = await organizePostWithAi(post, options.aiOrganization);
       const cloudResult = await savePostToCloudWithServer(post, ai.result, ai.warning);
       const duplicate = await findDuplicateSave(post.canonicalUrl, post.contentHash, "cloud");
+      const now = new Date().toISOString();
       const recent = duplicate && allowDuplicate
         ? {
             ...duplicate,
@@ -357,7 +364,8 @@ async function saveCurrentPost(
             shortcode: post.shortcode,
             author: post.author,
             title: post.title,
-            downloadedAt: new Date().toISOString(),
+            savedAt: duplicate.savedAt ?? duplicate.downloadedAt,
+            downloadedAt: now,
             archiveName: cloudResult.title,
             contentHash: post.contentHash,
             status: "complete" as const,
@@ -403,6 +411,7 @@ async function saveCurrentPost(
 
       const ai = await organizePostWithAi(post, options.aiOrganization);
       const notionResult = await savePostToNotionWithServer(post, options.notion, options.includeImages, ai.result, ai.warning);
+      const now = new Date().toISOString();
       const recent = duplicate && allowDuplicate
         ? {
             ...duplicate,
@@ -411,7 +420,8 @@ async function saveCurrentPost(
             shortcode: post.shortcode,
             author: post.author,
             title: post.title,
-            downloadedAt: new Date().toISOString(),
+            savedAt: duplicate.savedAt ?? duplicate.downloadedAt,
+            downloadedAt: now,
             archiveName: notionResult.title,
             contentHash: post.contentHash,
             status: "complete" as const,
@@ -452,6 +462,7 @@ async function saveCurrentPost(
       options.aiOrganization
     );
     await downloadBlob(packaged.blob, packaged.zipFilename);
+    const now = new Date().toISOString();
     const recent =
       duplicate && !allowDuplicate
         ? {
@@ -461,7 +472,8 @@ async function saveCurrentPost(
           shortcode: post.shortcode,
           author: post.author,
           title: post.title,
-          downloadedAt: new Date().toISOString(),
+          savedAt: duplicate.savedAt ?? duplicate.downloadedAt,
+          downloadedAt: now,
           archiveName: packaged.archiveName,
           contentHash: post.contentHash,
           status: "complete" as const,
@@ -526,6 +538,7 @@ async function redownloadSave(
         ...recentSave,
         id: cloudResult.archiveId,
         saveTarget: "cloud",
+        savedAt: recentSave.savedAt ?? recentSave.downloadedAt,
         downloadedAt: new Date().toISOString(),
         archiveName: cloudResult.title,
         savedVia: "cloud",
@@ -558,6 +571,7 @@ async function redownloadSave(
       const updatedSave: RecentSave = {
         ...recentSave,
         saveTarget: "notion",
+        savedAt: recentSave.savedAt ?? recentSave.downloadedAt,
         downloadedAt: new Date().toISOString(),
         archiveName: notionResult.title,
         savedVia: "notion",
@@ -597,6 +611,7 @@ async function redownloadSave(
     const updatedSave: RecentSave = {
       ...recentSave,
       saveTarget: "obsidian",
+      savedAt: recentSave.savedAt ?? recentSave.downloadedAt,
       downloadedAt: new Date().toISOString(),
       archiveName: packaged.archiveName,
       savedVia: "zip",

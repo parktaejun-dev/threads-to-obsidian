@@ -107,6 +107,8 @@ let activeRuntimeDatabase: RuntimeDatabaseConfig | null = null;
 let collector: BotMentionCollectorStatus | null = null;
 let currentEmailDraft = "";
 let adminAuthenticated = false;
+let adminSessionResolved = false;
+let adminDataLoading = true;
 let msg: AdminMsg = adminMessages.en;
 
 const statusElements = [
@@ -259,6 +261,18 @@ function tableEmptyMarkup(title: string, copy: string, colspan: number): string 
 
 function getLockedEmptyCopy(): string {
   return msg.authOverlayLabel ?? "Sign in to unlock this section.";
+}
+
+function getLoadingTitle(): string {
+  return msg.loadingTitle ?? "Loading...";
+}
+
+function getLoadingCopy(): string {
+  return msg.loadingCopy ?? "Checking the admin session and loading live data.";
+}
+
+function shouldShowLoadingState(): boolean {
+  return !adminSessionResolved || (adminAuthenticated && adminDataLoading && !dashboard);
 }
 
 function parseExpiryIsoFromInput(): { ok: true; iso: string | null } | { ok: false } {
@@ -505,26 +519,34 @@ function clearAdminState(): void {
 
 function updateAdminSessionUi(): void {
   document.body.classList.toggle("admin-authenticated", adminAuthenticated);
-  authBanner?.toggleAttribute("hidden", adminAuthenticated);
+  authBanner?.toggleAttribute("hidden", adminAuthenticated && adminSessionResolved);
 
   if (authState) {
-    authState.textContent = adminAuthenticated
-      ? (msg.authStateLoggedIn ?? "Signed in")
-      : (msg.authStateLoggedOut ?? "Sign in required");
-    authState.dataset.state = adminAuthenticated ? "success" : "warning";
+    const isChecking = !adminSessionResolved;
+    authState.textContent = isChecking
+      ? (msg.authStateChecking ?? "Checking session")
+      : adminAuthenticated
+        ? (msg.authStateLoggedIn ?? "Signed in")
+        : (msg.authStateLoggedOut ?? "Sign in required");
+    authState.dataset.state = isChecking ? "warning" : adminAuthenticated ? "success" : "warning";
   }
 
   if (authDetail) {
-    authDetail.textContent = adminAuthenticated
-      ? (msg.authDetailLoggedIn ?? "Live changes are enabled.")
-      : (msg.authDetailLoggedOut ?? "Live changes are locked.");
+    const isChecking = !adminSessionResolved;
+    authDetail.textContent = isChecking
+      ? (msg.authDetailChecking ?? getLoadingCopy())
+      : adminAuthenticated && adminDataLoading
+        ? getLoadingCopy()
+        : adminAuthenticated
+          ? (msg.authDetailLoggedIn ?? "Live changes are enabled.")
+          : (msg.authDetailLoggedOut ?? "Live changes are locked.");
   }
 
-  const lockLabel = msg.authOverlayLabel ?? "Sign in to unlock this section.";
+  const lockLabel = shouldShowLoadingState() ? getLoadingTitle() : getLockedEmptyCopy();
   for (const section of protectedSections) {
-    section.classList.toggle("is-locked", !adminAuthenticated);
+    section.classList.toggle("is-locked", !adminAuthenticated || shouldShowLoadingState());
     section.dataset.lockLabel = lockLabel;
-    section.setAttribute("aria-hidden", adminAuthenticated ? "false" : "true");
+    section.setAttribute("aria-hidden", adminAuthenticated && !shouldShowLoadingState() ? "false" : "true");
 
     for (const control of section.querySelectorAll<HTMLInputElement | HTMLButtonElement | HTMLSelectElement | HTMLTextAreaElement>("input, button, select, textarea")) {
       if (control === issueExpiryInput || control === issueExpiryClearButton) {
@@ -554,7 +576,16 @@ function updateAdminSessionUi(): void {
     logoutButton.hidden = !adminAuthenticated;
   }
   if (authBannerStatus) {
-    setStatus(authBannerStatus, msg.authBannerCopy ?? "Sign in before changing live settings or issuing keys.");
+    setStatus(
+      authBannerStatus,
+      shouldShowLoadingState()
+        ? getLoadingCopy()
+        : (msg.authBannerCopy ?? "Sign in before changing live settings or issuing keys.")
+    );
+  }
+
+  if (emailPreview && !currentEmailDraft) {
+    emailPreview.placeholder = msg.emailStatusDefault;
   }
 }
 
@@ -885,13 +916,15 @@ function renderRevenue(): void {
 
   if (revenue.byMethod) {
     revenue.byMethod.innerHTML = !rep
-      ? tableEmptyMarkup(
-          msg.revenueEmptyTitle ?? "Revenue is locked",
-          adminAuthenticated
-            ? msg.revenueEmptyCopy ?? "Completed payments will show up here."
-            : getLockedEmptyCopy(),
-          3
-        )
+      ? shouldShowLoadingState()
+        ? tableEmptyMarkup(getLoadingTitle(), getLoadingCopy(), 3)
+        : tableEmptyMarkup(
+            msg.revenueEmptyTitle ?? "Revenue is locked",
+            adminAuthenticated
+              ? msg.revenueEmptyCopy ?? "Completed payments will show up here."
+              : getLockedEmptyCopy(),
+            3
+          )
       : rep.byPaymentMethod.length === 0
         ? tableEmptyMarkup(
             msg.revenueEmptyTitle ?? "No payment method revenue yet",
@@ -909,13 +942,15 @@ function renderRevenue(): void {
 
   if (revenue.byMonth) {
     revenue.byMonth.innerHTML = !rep
-      ? tableEmptyMarkup(
-          msg.revenueEmptyTitle ?? "Revenue is locked",
-          adminAuthenticated
-            ? msg.revenueEmptyCopy ?? "Completed payments will show up here."
-            : getLockedEmptyCopy(),
-          3
-        )
+      ? shouldShowLoadingState()
+        ? tableEmptyMarkup(getLoadingTitle(), getLoadingCopy(), 3)
+        : tableEmptyMarkup(
+            msg.revenueEmptyTitle ?? "Revenue is locked",
+            adminAuthenticated
+              ? msg.revenueEmptyCopy ?? "Completed payments will show up here."
+              : getLockedEmptyCopy(),
+            3
+          )
       : rep.byMonth.length === 0
         ? tableEmptyMarkup(
             msg.revenueEmptyTitle ?? "No monthly revenue yet",
@@ -938,13 +973,15 @@ function renderPaymentMethods(): void {
   }
 
   if (!dashboard) {
-    methodList.innerHTML = tableEmptyMarkup(
-      msg.methodsEmptyTitle ?? "Payment methods are locked",
-      adminAuthenticated
-        ? msg.methodsEmptyCopy ?? "Add the first payment method to publish checkout choices."
-        : getLockedEmptyCopy(),
-      5
-    );
+    methodList.innerHTML = shouldShowLoadingState()
+      ? tableEmptyMarkup(getLoadingTitle(), getLoadingCopy(), 5)
+      : tableEmptyMarkup(
+          msg.methodsEmptyTitle ?? "Payment methods are locked",
+          adminAuthenticated
+            ? msg.methodsEmptyCopy ?? "Add the first payment method to publish checkout choices."
+            : getLockedEmptyCopy(),
+          5
+        );
     return;
   }
 
@@ -985,13 +1022,15 @@ function renderOrders(): void {
   }
 
   if (!dashboard) {
-    ordersList.innerHTML = tableEmptyMarkup(
-      msg.ordersEmptyTitle ?? "Purchase requests are locked",
-      adminAuthenticated
-        ? msg.ordersEmptyCopy ?? "New purchase requests will appear here."
-        : getLockedEmptyCopy(),
-      6
-    );
+    ordersList.innerHTML = shouldShowLoadingState()
+      ? tableEmptyMarkup(getLoadingTitle(), getLoadingCopy(), 6)
+      : tableEmptyMarkup(
+          msg.ordersEmptyTitle ?? "Purchase requests are locked",
+          adminAuthenticated
+            ? msg.ordersEmptyCopy ?? "New purchase requests will appear here."
+            : getLockedEmptyCopy(),
+          6
+        );
     return;
   }
 
@@ -1055,13 +1094,15 @@ function renderLicenses(): void {
   }
 
   if (!dashboard) {
-    licenseList.innerHTML = tableEmptyMarkup(
-      msg.licensesEmptyTitle ?? "Issued keys are locked",
-      adminAuthenticated
-        ? msg.licensesEmptyCopy ?? "Issued keys will appear here."
-        : getLockedEmptyCopy(),
-      5
-    );
+    licenseList.innerHTML = shouldShowLoadingState()
+      ? tableEmptyMarkup(getLoadingTitle(), getLoadingCopy(), 5)
+      : tableEmptyMarkup(
+          msg.licensesEmptyTitle ?? "Issued keys are locked",
+          adminAuthenticated
+            ? msg.licensesEmptyCopy ?? "Issued keys will appear here."
+            : getLockedEmptyCopy(),
+          5
+        );
     return;
   }
 
@@ -1078,13 +1119,13 @@ function renderLicenses(): void {
     .map(
       (license) => `
         <tr>
-          <td data-label="${escapeHtml(msg.colHolder)}">
+          <td data-label="${escapeHtml(msg.colHolder)}" class="license-holder-cell">
             <strong>${escapeHtml(license.holderName)}</strong><br />
             <span class="table-subtle">${escapeHtml(license.holderEmail)}</span>
           </td>
           <td data-label="${escapeHtml(msg.colIssuedAt)}">${new Date(license.issuedAt).toLocaleString()}</td>
-          <td data-label="${escapeHtml(msg.colPreview)}"><code>${escapeHtml(license.tokenPreview)}</code></td>
-          <td data-label="${escapeHtml(msg.colStatus)}">${statusPill(license.status, license.status === "active" ? "success" : "warning")}</td>
+          <td data-label="${escapeHtml(msg.colPreview)}" class="license-preview-cell"><code>${escapeHtml(license.tokenPreview)}</code></td>
+          <td data-label="${escapeHtml(msg.colStatus)}" class="license-status-cell">${statusPill(license.status, license.status === "active" ? "success" : "warning")}</td>
           <td data-label="${escapeHtml(msg.colActions)}" class="action-cell">
             ${license.status === "active" ? `<button class="ghost small" data-revoke-license="${license.id}" type="button">${msg.btnRevoke}</button>` : ""}
           </td>
@@ -1100,13 +1141,15 @@ function renderHistory(): void {
   }
 
   if (!dashboard) {
-    historyList.innerHTML = tableEmptyMarkup(
-      msg.historyEmptyTitle ?? "History is locked",
-      adminAuthenticated
-        ? msg.historyEmptyCopy ?? "Key, payment, and webhook events will appear here."
-        : getLockedEmptyCopy(),
-      6
-    );
+    historyList.innerHTML = shouldShowLoadingState()
+      ? tableEmptyMarkup(getLoadingTitle(), getLoadingCopy(), 6)
+      : tableEmptyMarkup(
+          msg.historyEmptyTitle ?? "History is locked",
+          adminAuthenticated
+            ? msg.historyEmptyCopy ?? "Key, payment, and webhook events will appear here."
+            : getLockedEmptyCopy(),
+          6
+        );
     return;
   }
 
@@ -1176,8 +1219,10 @@ async function refreshAdminData(): Promise<void> {
 
 async function refreshAdminSession(): Promise<boolean> {
   const session = await requestJson<AdminSessionResponse>("/api/admin/session");
+  adminSessionResolved = true;
   adminAuthenticated = session.authenticated === true;
   if (!adminAuthenticated) {
+    adminDataLoading = false;
     clearAdminState();
     renderAll();
   }
@@ -1210,9 +1255,18 @@ async function loginAdminSession(): Promise<void> {
     return;
   }
 
+  adminSessionResolved = true;
   adminAuthenticated = true;
+  adminDataLoading = true;
+  renderAll();
   updateAdminSessionUi();
-  await refreshAdminData();
+  try {
+    await refreshAdminData();
+  } finally {
+    adminDataLoading = false;
+    renderAll();
+    updateAdminSessionUi();
+  }
 }
 
 async function logoutAdminSession(): Promise<void> {
@@ -1884,16 +1938,29 @@ void (async () => {
   try {
     authenticated = await refreshAdminSession();
   } catch (error) {
+    adminSessionResolved = true;
+    adminDataLoading = false;
     setTokenFeedback(error instanceof Error ? error.message : msg.dashboardError, "error");
+    renderAll();
+    updateAdminSessionUi();
   }
 
   if (!authenticated) {
     return;
   }
 
+  adminDataLoading = true;
+  renderAll();
+  updateAdminSessionUi();
   try {
     await refreshAdminData();
+    adminDataLoading = false;
+    renderAll();
+    updateAdminSessionUi();
   } catch (error) {
+    adminDataLoading = false;
     setTokenFeedback(error instanceof Error ? error.message : msg.dashboardError, "error");
+    renderAll();
+    updateAdminSessionUi();
   }
 })();
