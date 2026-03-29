@@ -166,6 +166,45 @@ export function extractTitleExcerpt(text: string, author: string | null | undefi
   return "";
 }
 
+export function extractFirstLineTitle(text: string | null | undefined): string {
+  const normalized = decodeEscapedJsonString(text ?? "").replace(/\r\n?/g, "\n");
+  if (!normalized.includes("\n")) {
+    return "";
+  }
+
+  const firstLine = normalized.split("\n", 1)[0]?.trim() ?? "";
+  return firstLine ? firstLine.replace(/\s+/g, " ") : "";
+}
+
+export interface ArchiveTitleOptions {
+  noteText?: string | null;
+  maxLength?: number;
+  fallbackWithAuthor?: string;
+  fallbackWithoutAuthor?: string;
+}
+
+export function buildArchiveTitle(
+  author: string | null | undefined,
+  targetText: string,
+  options: ArchiveTitleOptions = {}
+): string {
+  const explicitTitle = extractFirstLineTitle(options.noteText ?? "");
+  if (explicitTitle) {
+    return explicitTitle;
+  }
+
+  const excerpt = extractTitleExcerpt(targetText, author, options.maxLength ?? 30);
+  if (excerpt) {
+    return excerpt;
+  }
+
+  if (author) {
+    return options.fallbackWithAuthor ?? `Threads post by @${author}`;
+  }
+
+  return options.fallbackWithoutAuthor ?? "Saved Threads mention";
+}
+
 function resolvePatternTokens(pattern: string, post: ExtractedPost): string {
   const date = (post.publishedAt ?? post.capturedAt).slice(0, 10);
   const firstSentence = extractTitleExcerpt(post.text, post.author, 80) || post.title || post.shortcode;

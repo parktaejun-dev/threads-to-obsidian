@@ -1926,6 +1926,13 @@ h3 {
   }
 }
 
+.archive-row-date {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: keep-all;
+  line-height: 1.2;
+}
+
 .archives-select-all {
   display: inline-flex;
   align-items: center;
@@ -1979,6 +1986,68 @@ h3 {
   color: #991b1b;
   font-size: 13px;
   line-height: 1.5;
+}
+
+.archive-edit-form {
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-raised);
+}
+
+.archive-edit-label {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--ink-tertiary);
+}
+
+.archive-edit-textarea {
+  width: 100%;
+  min-height: 80px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.6;
+  resize: vertical;
+  transition: border-color 0.15s ease;
+  box-sizing: border-box;
+}
+
+.archive-edit-textarea:focus {
+  outline: none;
+  border-color: var(--primary, #2563eb);
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
+}
+
+.archive-edit-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.archive-edit-save {
+  padding: 6px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: var(--radius-sm);
+}
+
+.archive-edit-cancel {
+  padding: 6px 16px;
+  font-size: 13px;
+  border-radius: var(--radius-sm);
+}
+
+.archive-edit-toggle {
+  font-weight: 500;
 }
 
 .archive-detail-body {

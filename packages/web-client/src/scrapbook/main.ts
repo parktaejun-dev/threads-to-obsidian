@@ -16,7 +16,7 @@ import {
   selectHighlight,
   type GrowthInsightsData
 } from "./growth-tier";
-import { extractTitleExcerpt } from "@threads/shared/utils";
+import { buildArchiveTitle as buildArchiveTitleText } from "@threads/shared/utils";
 interface BotPublicConfig {
   botHandle: string;
   oauthConfigured: boolean;
@@ -280,6 +280,7 @@ let latestState: BotSessionState | null = null;
 let latestWorkspace: ScrapbookPlusState | null = null;
 let activeTab: WorkspaceTab = "inbox";
 let activeArchiveId: string | null = null;
+let editingArchiveId: string | null = null;
 let activeScrapbookHandle: string | null = null;
 const selectedArchiveIds = new Set<string>();
 const expandedMediaArchiveIds = new Set<string>();
@@ -2005,19 +2006,13 @@ function setConnectButtonsIdle(): void {
   renderConnectButtons();
 }
 
-function extractArchiveTitleExcerpt(text: string, author: string | null, maxChars = 30): string {
-  return extractTitleExcerpt(text, author, maxChars);
-}
-
 function buildArchiveTitle(item: BotArchiveView): string {
-  const excerpt = extractArchiveTitleExcerpt(item.targetText, item.targetAuthorHandle, 30);
-  if (excerpt) {
-    return excerpt;
-  }
-  if (item.targetAuthorHandle) {
-    return t("scrapbookArchiveFallbackAuthorPost", { handle: item.targetAuthorHandle });
-  }
-  return t("scrapbookArchiveFallbackSavedItem");
+  return buildArchiveTitleText(item.targetAuthorHandle, item.targetText, {
+    noteText: item.origin === "mention" ? item.noteText : null,
+    maxLength: 30,
+    fallbackWithAuthor: item.targetAuthorHandle ? t("scrapbookArchiveFallbackAuthorPost", { handle: item.targetAuthorHandle }) : undefined,
+    fallbackWithoutAuthor: t("scrapbookArchiveFallbackSavedItem")
+  });
 }
 
 function normalizeArchiveHandle(value: string | null | undefined): string {
@@ -2902,6 +2897,7 @@ function renderArchiveDetailHtml(item: BotArchiveView): string {
   const hasMedia = totalMediaCount > 0;
   const showMedia = expandedMediaArchiveIds.has(item.id);
   const hasParseIssue = isLikelyArchiveParseIssue(item);
+  const isEditing = editingArchiveId === item.id;
 
   return `
     <div class="archive-detail-inline">
@@ -2918,6 +2914,18 @@ function renderArchiveDetailHtml(item: BotArchiveView): string {
       ${
         hasParseIssue
           ? `<div class="archive-parse-warning"><strong>${escapeHtml(uiText("파싱 결과가 불안정할 수 있어요.", "This item may have been parsed poorly."))}</strong><span>${escapeHtml(uiText("원문추적과 원문보기를 눌러 원본을 확인하세요.", "Use trace source and view original to inspect the source."))}</span></div>`
+          : ""
+      }
+      ${
+        isEditing
+          ? `<div class="archive-edit-form">
+              <label class="archive-edit-label">${escapeHtml(uiText("메모 편집", "Edit note"))}</label>
+              <textarea class="archive-edit-textarea" data-edit-textarea="${item.id}" rows="4" placeholder="${escapeHtml(uiText("메모를 입력하세요 (#태그 사용 가능)", "Enter a note (#tags supported)"))}">${escapeHtml(item.noteText ?? "")}</textarea>
+              <div class="archive-edit-actions">
+                <button class="primary-cta archive-edit-save" type="button" data-edit-save="${item.id}">${escapeHtml(uiText("저장", "Save"))}</button>
+                <button class="secondary-cta archive-edit-cancel" type="button" data-edit-cancel="${item.id}">${escapeHtml(uiText("취소", "Cancel"))}</button>
+              </div>
+            </div>`
           : ""
       }
       <div class="archive-detail-links">
@@ -2938,6 +2946,7 @@ function renderArchiveDetailHtml(item: BotArchiveView): string {
       ${hasMedia && showMedia && item.mediaUrls.length > 0 ? renderMediaPreviewUrls(item.mediaUrls) : ""}
       ${renderReplyBlocks(item, showMedia)}
       <div class="archive-actions">
+        <button class="topbar-link archive-edit-toggle" type="button" data-archive-edit="${item.id}">${escapeHtml(isEditing ? uiText("편집 닫기", "Close edit") : uiText("편집", "Edit"))}</button>
         <button class="topbar-link archive-copy" type="button" data-copy="${item.id}">${escapeHtml(t("scrapbookCopyMarkdown"))}</button>
         <a class="topbar-link archive-action-link" href="/api/public/bot/archive/${encodeURIComponent(item.id)}.md">${escapeHtml(t("scrapbookDownloadMarkdown"))}</a>
         <button class="topbar-link archive-action-link" type="button" data-archive-delete="${item.id}">${escapeHtml(t("scrapbookDelete"))}</button>
@@ -3100,6 +3109,31 @@ function renderArchives(items: BotArchiveView[], isAuthenticated: boolean): void
     const archiveDeleteButton = archivesEl.querySelector<HTMLButtonElement>("[data-archive-delete]");
     if (archiveDeleteButton) {
       archiveDeleteButton.addEventListener("click", () => void deleteArchiveRequest(detailItem.id));
+    }
+
+    const archiveEditButton = archivesEl.querySelector<HTMLButtonElement>("[data-archive-edit]");
+    if (archiveEditButton) {
+      archiveEditButton.addEventListener("click", () => {
+        editingArchiveId = editingArchiveId === detailItem.id ? null : detailItem.id;
+        renderArchives(items, isAuthenticated);
+      });
+    }
+
+    const editSaveButton = archivesEl.querySelector<HTMLButtonElement>("[data-edit-save]");
+    if (editSaveButton) {
+      editSaveButton.addEventListener("click", () => {
+        const textarea = archivesEl?.querySelector<HTMLTextAreaElement>(`[data-edit-textarea="${detailItem.id}"]`);
+        if (!textarea) return;
+        void updateArchiveNoteRequest(detailItem.id, textarea.value);
+      });
+    }
+
+    const editCancelButton = archivesEl.querySelector<HTMLButtonElement>("[data-edit-cancel]");
+    if (editCancelButton) {
+      editCancelButton.addEventListener("click", () => {
+        editingArchiveId = null;
+        renderArchives(items, isAuthenticated);
+      });
     }
   }
 
@@ -4261,6 +4295,26 @@ async function deleteArchiveRequest(archiveId: string): Promise<void> {
   }
   await refreshEverything();
   setStatus(t("scrapbookStatusArchiveDeleted"));
+}
+
+async function updateArchiveNoteRequest(archiveId: string, noteText: string): Promise<void> {
+  const normalizedId = archiveId.trim();
+  if (!normalizedId) {
+    return;
+  }
+
+  try {
+    await requestJson<BotSessionState>(`/api/public/bot/archive/${encodeURIComponent(normalizedId)}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ noteText })
+    });
+    editingArchiveId = null;
+    await refreshEverything();
+    setStatus(uiText("메모가 저장되었습니다.", "Note saved."));
+  } catch (error) {
+    setStatus(error instanceof Error ? error.message : uiText("메모 저장에 실패했습니다.", "Failed to save note."), true);
+  }
 }
 
 async function archiveTrackedPostRequest(trackedPostId: string): Promise<void> {

@@ -380,8 +380,59 @@ test("scrapbook archive title uses the first sentence and truncates it to 30 cha
   });
 
   const exported = readBotArchiveMarkdown(data, "session-token-1", ingest.archiveId as string);
-  assert.equal(exported.filename, "this-is-the-first-sentence-tha.md");
-  assert.match(exported.markdownContent, /^# This is the first sentence tha$/m);
+  assert.equal(exported.filename, "this-is-the-first-sentence.md");
+  assert.match(exported.markdownContent, /^# This is the first sentence$/m);
+});
+
+test("scrapbook archive title prefers first-line note text over the target post body", async () => {
+  const data = buildDefaultDatabase("2026-03-25T00:00:00.000Z");
+  data.botUsers.push({
+    id: "user-1",
+    threadsUserId: "threads-user-1",
+    threadsHandle: "writer",
+    displayName: "Writer",
+    profilePictureUrl: null,
+    biography: null,
+    isVerified: false,
+    accessTokenCiphertext: null,
+    tokenExpiresAt: null,
+    email: null,
+    grantedScopes: [],
+    scopeVersion: 0,
+    lastScopeUpgradeAt: null,
+    createdAt: "2026-03-25T00:00:00.000Z",
+    updatedAt: "2026-03-25T00:00:00.000Z",
+    lastLoginAt: "2026-03-25T00:00:00.000Z",
+    status: "active"
+  });
+  data.botSessions.push({
+    id: "session-1",
+    userId: "user-1",
+    sessionHash: createHash("sha256").update("session-token-1").digest("hex"),
+    createdAt: "2026-03-25T00:00:00.000Z",
+    expiresAt: "2026-04-25T00:00:00.000Z",
+    lastSeenAt: "2026-03-25T00:00:00.000Z",
+    revokedAt: null,
+    status: "active"
+  });
+
+  const ingest = ingestBotMention(data, {
+    mentionId: "mention-quoted-1",
+    mentionUrl: "https://www.threads.com/@writer/post/MENTIONQ1",
+    mentionAuthorUserId: "threads-user-1",
+    mentionAuthorHandle: "writer",
+    mentionAuthorDisplayName: "Writer",
+    noteText: "AI 뉴스\n감사합니다. @ss_threads_bot",
+    targetUrl: "https://www.threads.com/@target/post/TARGETQ1",
+    targetAuthorHandle: "target",
+    targetAuthorDisplayName: "Target",
+    targetText: "This target body should not appear in the title.",
+    targetPublishedAt: "2026-03-25T01:00:00.000Z",
+    mediaUrls: []
+  });
+
+  const exported = readBotArchiveMarkdown(data, "session-token-1", ingest.archiveId as string);
+  assert.match(exported.markdownContent, /^# AI 뉴스$/m);
 });
 
 test("repairBotSessionArchives rewrites mention captures to the original post thread", async () => {
@@ -773,13 +824,16 @@ test("scrapbook ZIP export keeps one markdown file and flat image files per arch
 
   try {
     const exported = await readBotArchiveZip(data, "session-token-zip", [ingest.archiveId as string]);
-    assert.equal(exported.filename, "archive-this-source-body-for-z.zip");
+    assert.match(exported.filename, /^archive-this-source-body-for(?:_[0-9]{6}_[0-9]{4})?\.zip$/);
 
     const zip = await JSZip.loadAsync(exported.content);
     const fileNames = Object.keys(zip.files).sort();
-    assert.deepEqual(fileNames, ["archive-this-source-body-for-z.md", "image-01.jpg", "reply-01-image-01.jpg"]);
+    const noteFilename = fileNames.find((name) => name.endsWith(".md"));
+    assert.ok(noteFilename);
+    assert.match(noteFilename, /^archive-this-source-body-for(?:_[0-9]{6}_[0-9]{4})?\.md$/);
+    assert.deepEqual(fileNames.filter((name) => !name.endsWith(".md")), ["image-01.jpg", "reply-01-image-01.jpg"]);
 
-    const note = await zip.file("archive-this-source-body-for-z.md")?.async("text");
+    const note = await zip.file(noteFilename)?.async("text");
     assert.ok(note?.includes("# Archive this source"));
     assert.ok(note?.includes("(image-01.jpg)"));
     assert.ok(note?.includes("## Author Replies"));
@@ -986,6 +1040,7 @@ test("extension cloud link issues a scoped token, saves archives, and can be rev
     mentionUrl: "https://www.threads.com/@writer/post/MENTIONEXT1",
     mentionAuthorUserId: "threads-user-ext-1",
     mentionAuthorHandle: "writer",
+    noteText: "AI 뉴스\n감사합니다. @ss_threads_bot",
     targetUrl: "https://www.threads.com/@target/post/TARGETEXT1",
     targetAuthorHandle: "target",
     targetText: "Mention-saved archive for scrapbook sync."
@@ -995,6 +1050,7 @@ test("extension cloud link issues a scoped token, saves archives, and can be rev
   const syncedArchives = listExtensionCloudArchives(data, completed.token, "https://ss-threads.dahanda.dev");
   assert.equal(syncedArchives.length, 2);
   assert.equal(syncedArchives[0]?.origin, "mention");
+  assert.equal(syncedArchives[0]?.title, "AI 뉴스");
   assert.equal(syncedArchives[0]?.archiveUrl, `https://ss-threads.dahanda.dev/scrapbook/@writer/archive/${mentionResult.archiveId}`);
   assert.equal(syncedArchives[1]?.origin, "cloud");
   assert.equal(syncedArchives[1]?.archiveUrl, `https://ss-threads.dahanda.dev/scrapbook/@writer/archive/${saveResult.archiveId}`);

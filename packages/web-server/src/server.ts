@@ -45,6 +45,7 @@ import {
   type BotIngestPayload,
   createExtensionLinkCodeFromStore,
   deleteArchiveFromStore,
+  updateArchiveFromStore,
   deleteExtensionCloudArchiveFromStore,
   completeBotOauthFromStore,
   getExtensionCloudConnectionStatusFromStore,
@@ -4362,6 +4363,25 @@ async function handlePublicBotRoute(
       } catch (error) {
         json(response, 400, {
           error: toPublicErrorMessage(error, "Could not delete the archive.")
+        });
+      }
+      return;
+    }
+
+    const archivePatchMatch = pathname.match(/^\/api\/public\/bot\/archive\/([^/]+)$/);
+    if ((request.method ?? "GET") === "PATCH" && archivePatchMatch) {
+      const rawSession = readCookie(request.headers, BOT_SESSION_COOKIE);
+      const body = await parseJsonBody<{ noteText?: string }>(request, config.maxBodyBytes);
+      try {
+        const state = await updateArchiveFromStore(
+          rawSession,
+          decodeURIComponent(archivePatchMatch[1] ?? ""),
+          typeof body.noteText === "string" ? body.noteText : ""
+        );
+        json(response, 200, state);
+      } catch (error) {
+        json(response, 400, {
+          error: toPublicErrorMessage(error, "Could not update the archive.")
         });
       }
       return;
