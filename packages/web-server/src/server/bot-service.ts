@@ -1774,15 +1774,21 @@ function refreshBotSessionKeepAlive(data: WebDatabase, session: BotSessionRecord
 }
 
 function getBotSessionRecord(data: WebDatabase, rawSession: string | null | undefined): BotSessionRecord | null {
-  touchExpiredSessions(data);
   const normalized = safeText(rawSession);
   if (!normalized) {
     return null;
   }
 
+  const nowMs = Date.now();
   const hash = hashSecret(normalized);
   const session = data.botSessions.find((candidate) => candidate.sessionHash === hash && candidate.status === "active") ?? null;
   if (!session) {
+    return null;
+  }
+
+  if (isExpired(session.expiresAt, nowMs)) {
+    session.status = "expired";
+    upsertBotSession(data, session);
     return null;
   }
 
@@ -1794,14 +1800,25 @@ function findBotExtensionAccessTokenRecord(
   data: WebDatabase,
   rawToken: string | null | undefined
 ): BotExtensionAccessTokenRecord | null {
-  touchExpiredExtensionAccessTokens(data);
   const normalized = safeText(rawToken);
   if (!normalized) {
     return null;
   }
 
+  const nowMs = Date.now();
   const hash = hashSecret(normalized);
-  return data.botExtensionAccessTokens.find((candidate) => candidate.tokenHash === hash) ?? null;
+  const token = data.botExtensionAccessTokens.find((candidate) => candidate.tokenHash === hash) ?? null;
+  if (!token) {
+    return null;
+  }
+
+  if (isExpired(token.expiresAt, nowMs)) {
+    token.status = "expired";
+    upsertBotExtensionAccessToken(data, token);
+    return null;
+  }
+
+  return token;
 }
 
 async function exchangeAuthorizationCode(code: string, publicOrigin: string): Promise<ThreadsTokenResponse> {
@@ -2373,6 +2390,10 @@ export function getBotSessionState(data: WebDatabase, rawSession: string | null 
 }
 
 async function resolveSessionUserId(rawSession: string | null | undefined): Promise<string | null> {
+  if (!safeText(rawSession)) {
+    return null;
+  }
+
   return withBotAuthDatabaseTransaction((data) => {
     const session = getBotSessionRecord(data, rawSession);
     return session?.userId ?? null;
@@ -2380,6 +2401,10 @@ async function resolveSessionUserId(rawSession: string | null | undefined): Prom
 }
 
 async function resolveExtensionTokenUserId(rawToken: string | null | undefined): Promise<string | null> {
+  if (!safeText(rawToken)) {
+    return null;
+  }
+
   return withBotAuthDatabaseTransaction((data) => {
     const tokenRecord = findBotExtensionAccessTokenRecord(data, rawToken);
     return tokenRecord?.userId ?? null;
@@ -2477,12 +2502,23 @@ export async function syncExtensionCloudLicenseLinkFromStore(
 export async function getBotSessionStateFromStore(
   rawSession: string | null | undefined
 ): Promise<BotSessionState> {
+  if (!safeText(rawSession)) {
+    return {
+      ...buildUnauthenticatedSessionAuthState(),
+      archives: []
+    };
+  }
+
   return withBotSessionDatabaseTransaction(rawSession, (data) => getBotSessionState(data, rawSession));
 }
 
 export async function getBotSessionAuthStateFromStore(
   rawSession: string | null | undefined
 ): Promise<BotSessionAuthState> {
+  if (!safeText(rawSession)) {
+    return buildUnauthenticatedSessionAuthState();
+  }
+
   return withBotSessionDatabaseTransaction(rawSession, (data) => getBotSessionAuthState(data, rawSession));
 }
 

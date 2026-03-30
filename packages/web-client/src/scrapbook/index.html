@@ -95,6 +95,7 @@
             <div class="auth-panel-head">
               <div class="auth-panel-copy">
                 <h2 data-i18n="scrapbookConnectTitle">내 Threads 계정 연결</h2>
+                <p id="auth-panel-copy-note" class="section-copy auth-panel-copy-note"></p>
               </div>
             </div>
             <p class="status-panel status-panel-warning hidden" data-mobile-oauth-note data-i18n="scrapbookMobileOauthNote">
@@ -105,6 +106,10 @@
         <div id="save-status-panel" class="save-status-panel panel hidden">
           <div class="save-status-head">
             <div class="save-status-copy">
+              <p class="save-status-connection">
+                <span id="save-status-connection-badge" class="save-status-connection-badge">연결됨</span>
+                <span id="save-status-connection-copy" class="save-status-connection-copy">연결되면 이곳에 수집된 글들이 보입니다.</span>
+              </p>
               <p class="save-status-stamp">
                 <span id="save-status-last-label" class="save-status-label">마지막 반영 시각</span>
                 <strong id="save-status-last-value">-</strong>

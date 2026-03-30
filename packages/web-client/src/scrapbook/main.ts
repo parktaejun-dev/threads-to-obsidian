@@ -503,11 +503,14 @@ const metaDescription = document.querySelector<HTMLMetaElement>("#scrapbook-meta
 const topbarCurrentLink = document.querySelector<HTMLAnchorElement>("#topbar-current-link");
 const topbarPlanBadge = document.querySelector<HTMLElement>("#topbar-plan-badge");
 const authPanel = document.querySelector<HTMLElement>("#auth-panel");
+const authPanelCopyNote = document.querySelector<HTMLElement>("#auth-panel-copy-note");
 const sessionPanel = document.querySelector<HTMLElement>("#session-panel");
 const sessionTrigger = document.querySelector<HTMLButtonElement>("#session-trigger");
 const sessionMenu = document.querySelector<HTMLElement>("#session-menu");
 const pageStatus = document.querySelector<HTMLParagraphElement>("#page-status");
 const saveStatusPanel = document.querySelector<HTMLElement>("#save-status-panel");
+const saveStatusConnectionBadge = document.querySelector<HTMLElement>("#save-status-connection-badge");
+const saveStatusConnectionCopy = document.querySelector<HTMLElement>("#save-status-connection-copy");
 const saveStatusLastLabel = document.querySelector<HTMLElement>("#save-status-last-label");
 const saveStatusLastValue = document.querySelector<HTMLElement>("#save-status-last-value");
 const saveStatusPlan = document.querySelector<HTMLElement>("#save-status-plan");
@@ -1672,6 +1675,13 @@ function applyStaticTranslations(): void {
     "[data-i18n='scrapbookHowStep2Desc']",
     formatMessage(t("scrapbookHowStep2Desc"), { handleInline })
   );
+  setElementText(
+    authPanelCopyNote,
+    uiText(
+      "Threads 계정을 연결하면 수집된 글이 이곳에 모입니다. 연결 확인에는 1분 이상 걸릴 수 있습니다.",
+      "Connect your Threads account and the collected posts will gather here. Confirmation can take over a minute."
+    )
+  );
 }
 
 function syncLocaleSelect(): void {
@@ -1817,22 +1827,22 @@ function setMetricValue(valueEl: HTMLElement | null, deltaEl: HTMLElement | null
 }
 
 function getPendingConnectStatusMessage(): string {
-  return uiText("Threads 로그인 응답을 확인하는 중입니다...", "Confirming your Threads sign-in...", {
-    ja: "Threads ログインの応答を確認しています...",
-    "pt-BR": "Confirmando a resposta do login do Threads...",
-    es: "Confirmando la respuesta del inicio de sesión de Threads...",
-    "zh-TW": "正在確認 Threads 登入回應...",
-    vi: "Đang xác nhận phản hồi đăng nhập Threads..."
+  return uiText("Threads 로그인 응답을 확인하는 중입니다. 연결이 끝나면 아래에 수집된 글이 표시됩니다. 1분 이상 걸릴 수 있습니다.", "Confirming your Threads sign-in. Once connected, the collected posts will appear below. This can take over a minute.", {
+    ja: "Threads ログイン応答を確認しています。接続が完了すると、下に収集済みの投稿が表示されます。1 分以上かかることがあります。",
+    "pt-BR": "Confirmando a resposta do login do Threads. Quando conectar, as postagens coletadas aparecerão abaixo. Isso pode levar mais de um minuto.",
+    es: "Confirmando la respuesta del inicio de sesión de Threads. Cuando se conecte, las publicaciones recopiladas aparecerán abajo. Puede tardar más de un minuto.",
+    "zh-TW": "正在確認 Threads 登入回應。連線完成後，收集到的貼文會顯示在下方。這可能需要一分鐘以上。",
+    vi: "Đang xác nhận phản hồi đăng nhập Threads. Khi kết nối xong, các bài đã thu thập sẽ xuất hiện bên dưới. Việc này có thể mất hơn một phút."
   });
 }
 
 function getPendingConnectButtonLabel(): string {
-  return uiText("로그인 확인 중...", "Confirming sign-in...", {
+  return uiText("연결 확인 중...", "Confirming connection...", {
     ja: "ログインを確認中...",
-    "pt-BR": "Confirmando login...",
-    es: "Confirmando acceso...",
-    "zh-TW": "正在確認登入...",
-    vi: "Đang xác nhận đăng nhập..."
+    "pt-BR": "Confirmando conexão...",
+    es: "Confirmando conexión...",
+    "zh-TW": "正在確認連線...",
+    vi: "Đang xác nhận kết nối..."
   });
 }
 
@@ -1915,6 +1925,15 @@ function renderSaveStatus(state: BotSessionState | null): void {
   const plan = getCurrentPlanState();
   const folderCount = loadFolders().length;
   saveStatusPanel?.classList.toggle("hidden", !isAuthenticated);
+  saveStatusPanel?.classList.toggle("is-connected", isAuthenticated);
+
+  setElementText(
+    authPanelCopyNote,
+    uiText(
+      "Threads 계정을 연결하면 수집된 글이 이곳에 모입니다. 연결 확인에는 1분 이상 걸릴 수 있습니다.",
+      "Connect your Threads account and the collected posts will gather here. Confirmation can take over a minute."
+    )
+  );
 
   if (sessionPlanClear) {
     sessionPlanClear.textContent = getDisconnectPlusLabel();
@@ -1933,19 +1952,32 @@ function renderSaveStatus(state: BotSessionState | null): void {
   }
 
   const saveStatus = state?.saveStatus ?? null;
+  const latestSavedAt = saveStatus?.latestSavedAt ?? null;
+  const hasCollectedItems = Boolean(latestSavedAt);
+  if (saveStatusConnectionBadge) {
+    saveStatusConnectionBadge.textContent = uiText("연결됨", "Connected");
+    saveStatusConnectionBadge.classList.add("is-connected");
+    saveStatusConnectionBadge.classList.remove("is-loading");
+  }
+  setElementText(
+    saveStatusConnectionCopy,
+    hasCollectedItems
+      ? uiText(
+          "연결이 완료됐습니다. 수집된 글은 이곳에 표시됩니다.",
+          "Connection is complete. The collected posts appear here."
+        )
+      : uiText(
+          "연결이 완료됐습니다. 수집된 글이 들어오면 이곳에 표시됩니다.",
+          "Connection is complete. New collected posts will appear here."
+        )
+  );
   setElementText(
     saveStatusLastLabel,
-    uiText("업데이트", "Updated", {
-      ja: "更新",
-      "pt-BR": "Atualizado",
-      es: "Actualizado",
-      "zh-TW": "更新",
-      vi: "Cập nhật"
-    })
+    hasCollectedItems ? uiText("마지막 수집", "Last collected") : uiText("수집 상태", "Collection status")
   );
   setElementText(
     saveStatusLastValue,
-    saveStatus ? (saveStatus.latestSavedAt ? formatDate(saveStatus.latestSavedAt) : t("scrapbookDateNone")) : uiText("불러오는 중", "Loading")
+    hasCollectedItems ? formatDate(latestSavedAt) : uiText("첫 수집 대기", "Waiting for the first collection")
   );
   saveStatusPlan?.classList.remove("hidden");
   setElementText(saveStatusPlanSummary, buildPlanUsageSummary(plan, folderCount));
@@ -3524,26 +3556,6 @@ function renderArchiveDetailHtml(item: BotArchiveView): string {
           ? `<div class="archive-parse-warning"><strong>${escapeHtml(uiText("파싱 결과가 불안정할 수 있어요.", "This item may have been parsed poorly."))}</strong><span>${escapeHtml(uiText("원문추적과 원문보기를 눌러 원본을 확인하세요.", "Use trace source and view original to inspect the source."))}</span></div>`
           : ""
       }
-      ${
-        isEditing
-          ? `<div class="archive-edit-form">
-              <label class="archive-edit-label">${escapeHtml(uiText("제목 · 메모 편집", "Edit title and note"))}</label>
-              <p class="archive-edit-help">${escapeHtml(
-                uiText(
-                  "첫 줄은 제목, 다음 줄부터는 메모입니다. #태그도 여기서 함께 수정할 수 있어요.",
-                  "The first line becomes the title, lines below are notes, and you can edit #tags here too."
-                )
-              )}</p>
-              <textarea class="archive-edit-textarea" data-edit-textarea="${item.id}" rows="4" placeholder="${escapeHtml(
-                uiText("첫 줄은 제목, 다음 줄부터 메모를 입력하세요. #태그 가능", "First line is the title, lines below are notes. #tags supported.")
-              )}">${escapeHtml(item.noteText ?? "")}</textarea>
-              <div class="archive-edit-actions">
-                <button class="topbar-link topbar-link-strong archive-edit-save" type="button" data-edit-save="${item.id}">${escapeHtml(uiText("저장", "Save"))}</button>
-                <button class="topbar-link archive-edit-cancel" type="button" data-edit-cancel="${item.id}">${escapeHtml(uiText("취소", "Cancel"))}</button>
-              </div>
-            </div>`
-          : ""
-      }
       <div class="archive-detail-links">
         ${
           item.mentionUrl
@@ -3569,6 +3581,26 @@ function renderArchiveDetailHtml(item: BotArchiveView): string {
         <a class="topbar-link archive-action-link" href="/api/public/bot/archive/${encodeURIComponent(item.id)}.md">${escapeHtml(t("scrapbookDownloadMarkdown"))}</a>
         <button class="topbar-link archive-action-link" type="button" data-archive-delete="${item.id}">${escapeHtml(t("scrapbookDelete"))}</button>
       </div>
+      ${
+        isEditing
+          ? `<div class="archive-edit-form">
+              <label class="archive-edit-label">${escapeHtml(uiText("제목 · 메모 편집", "Edit title and note"))}</label>
+              <p class="archive-edit-help">${escapeHtml(
+                uiText(
+                  "첫 줄은 제목, 다음 줄부터는 메모입니다. #태그도 여기서 함께 수정할 수 있어요.",
+                  "The first line becomes the title, lines below are notes, and you can edit #tags here too."
+                )
+              )}</p>
+              <textarea class="archive-edit-textarea" data-edit-textarea="${item.id}" rows="4" placeholder="${escapeHtml(
+                uiText("첫 줄은 제목, 다음 줄부터 메모를 입력하세요. #태그 가능", "First line is the title, lines below are notes. #tags supported.")
+              )}">${escapeHtml(item.noteText ?? "")}</textarea>
+              <div class="archive-edit-actions">
+                <button class="topbar-link topbar-link-strong archive-edit-save" type="button" data-edit-save="${item.id}">${escapeHtml(uiText("저장", "Save"))}</button>
+                <button class="topbar-link archive-edit-cancel" type="button" data-edit-cancel="${item.id}">${escapeHtml(uiText("취소", "Cancel"))}</button>
+              </div>
+            </div>`
+          : ""
+      }
     </div>
   `;
 }
@@ -3625,8 +3657,18 @@ function renderArchives(items: BotArchiveView[], isAuthenticated: boolean): void
     archivesBoard.classList.add("hidden");
     archivesEmptyEl.classList.remove("hidden");
     archivesEmptyEl.innerHTML = !isAuthenticated
-      ? `<strong>${escapeHtml(t("scrapbookArchiveLoginTitle"))}</strong><span>${escapeHtml(t("scrapbookArchiveLoginRequiredCopy"))}</span>`
-      : `<strong>${escapeHtml(t("scrapbookArchiveEmptyTitle"))}</strong><span>${escapeHtml(t("scrapbookArchiveEmptyCopy"))}</span>`;
+      ? `<strong>${escapeHtml(t("scrapbookArchiveLoginTitle"))}</strong><span>${escapeHtml(
+          uiText(
+            "Threads 계정을 연결하면 수집된 글이 여기에 모입니다.",
+            "Connect your Threads account and the collected posts will gather here."
+          )
+        )}</span>`
+      : `<strong>${escapeHtml(t("scrapbookArchiveEmptyTitle"))}</strong><span>${escapeHtml(
+          uiText(
+            "연결이 완료되면 멘션, 클라우드 저장, 모니터링에서 모인 글이 여기에 표시됩니다.",
+            "Once connected, posts from mentions, cloud saves, and monitoring will appear here."
+          )
+        )}</span>`;
     activeArchiveId = null;
     activeArchiveInlineEdit = null;
     archivesPaginationEl?.classList.add("hidden");
@@ -3694,14 +3736,12 @@ function renderArchives(items: BotArchiveView[], isAuthenticated: boolean): void
                 <button class="archive-row-inline-action ${isArchiveInlineEditActive(item, "title") ? "is-active" : ""}" type="button" data-row-edit="${item.id}" data-row-edit-mode="title" aria-pressed="${String(isArchiveInlineEditActive(item, "title"))}">${escapeHtml(uiText("제목 편집", "Edit title"))}</button>
                 <button class="archive-row-inline-action ${isArchiveInlineEditActive(item, "tags") ? "is-active" : ""}" type="button" data-row-edit="${item.id}" data-row-edit-mode="tags" aria-pressed="${String(isArchiveInlineEditActive(item, "tags"))}">${escapeHtml(uiText("태그 편집", "Edit tags"))}</button>
               </div>
+              ${hasInlineEdit ? `<div class="archive-row-inline-panel">${renderArchiveInlineEditHtml(item)}</div>` : ""}
             </div>
           </td>
           <td class="archive-row-date">${escapeHtml(formatDate(item.archivedAt))}</td>
         </tr>
       `;
-    if (hasInlineEdit) {
-      html += `<tr class="archive-row-edit"><td colspan="3">${renderArchiveInlineEditHtml(item)}</td></tr>`;
-    }
     if (isActive) {
       html += `<tr class="archive-row-detail"><td colspan="3">${renderArchiveDetailHtml(item)}</td></tr>`;
     }
@@ -3738,7 +3778,12 @@ function renderArchives(items: BotArchiveView[], isAuthenticated: boolean): void
       if (!(event.target instanceof HTMLElement)) {
         return;
       }
-      if (event.target.closest(".archive-row-checkbox") || event.target.closest(".archive-row-inline-actions")) {
+      if (
+        event.target.closest(".archive-row-checkbox") ||
+        event.target.closest(".archive-row-inline-actions") ||
+        event.target.closest(".archive-row-inline-panel") ||
+        event.target.closest(".archive-inline-edit")
+      ) {
         return;
       }
       toggleArchiveOpen(archiveId);
@@ -4833,27 +4878,31 @@ async function refreshBootstrap(): Promise<void> {
   applyWorkspaceState(workspace);
 }
 
-async function refreshEverything(): Promise<void> {
-  const failures: unknown[] = [];
+async function initializeScrapbook(): Promise<void> {
+  let sessionLoaded = false;
+
   try {
     await refreshSession();
-  } catch (error) {
-    failures.push(error);
+    sessionLoaded = Boolean(latestState?.authenticated && latestState.user);
+  } catch {
+    sessionLoaded = false;
   }
 
-  try {
-    await refreshBootstrap();
-  } catch (error) {
-    failures.push(error);
+  if (sessionLoaded) {
+    // Paint auth-connected state first; load the heavier bootstrap payload in the background.
+    void refreshBootstrap()
+      .then(() => {
+        if (latestState?.authenticated && latestState.user) {
+          void syncLatestMentions({ silent: true, suppressErrors: true }).catch(() => undefined);
+        }
+      })
+      .catch((error) => {
+        setStatus(error instanceof Error ? error.message : t("scrapbookStatusLoadFailed"), true);
+      });
+    return;
   }
 
-  if (failures.length === 2) {
-    throw failures[0] ?? failures[1];
-  }
-}
-
-async function initializeScrapbook(): Promise<void> {
-  await refreshEverything();
+  await refreshBootstrap();
   if (latestState?.authenticated && latestState.user) {
     void syncLatestMentions({ silent: true, suppressErrors: true }).catch(() => undefined);
   }
