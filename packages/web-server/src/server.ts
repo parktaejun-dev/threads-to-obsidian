@@ -2343,10 +2343,10 @@ async function buildPublicBotBootstrapResponse(
     workspace: Awaited<ReturnType<typeof readScrapbookPlusStateFromStore>>;
   }
 > {
-  const [state, workspace] = await Promise.all([
-    getBotSessionStateFromStore(rawSession),
-    readScrapbookPlusStateFromStore(rawSession)
-  ]);
+  // Keep these user-scoped reads sequential so we do not open overlapping
+  // write-capable transactions against the same tables during login/bootstrap.
+  const state = await getBotSessionStateFromStore(rawSession);
+  const workspace = await readScrapbookPlusStateFromStore(rawSession);
   const saveStatus = state.authenticated && state.user ? await buildPublicMentionSaveStatus(state, collector) : null;
   return {
     ...state,

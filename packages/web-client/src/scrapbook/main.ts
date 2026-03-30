@@ -4834,12 +4834,21 @@ async function refreshBootstrap(): Promise<void> {
 }
 
 async function refreshEverything(): Promise<void> {
-  const [sessionResult, bootstrapResult] = await Promise.allSettled([refreshSession(), refreshBootstrap()]);
-  const failures = [sessionResult, bootstrapResult].filter(
-    (result): result is PromiseRejectedResult => result.status === "rejected"
-  );
+  const failures: unknown[] = [];
+  try {
+    await refreshSession();
+  } catch (error) {
+    failures.push(error);
+  }
+
+  try {
+    await refreshBootstrap();
+  } catch (error) {
+    failures.push(error);
+  }
+
   if (failures.length === 2) {
-    throw failures[0]?.reason ?? failures[1]?.reason;
+    throw failures[0] ?? failures[1];
   }
 }
 
