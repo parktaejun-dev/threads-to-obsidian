@@ -1,5 +1,7 @@
 # 로그인이 자꾸 풀리는 원인 분석 보고서
 
+> 2026-03-30 기준: 이 문서는 과거 원인 분석 기록이다. 현재 운영 기준은 [login-session-stability-plan.md](./login-session-stability-plan.md)를 따른다.
+
 ## 1. 결론
 
 **`bot 세션`의 로그인이 풀리는 원인은 크게 두 가지로 좁혀진다.**

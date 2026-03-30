@@ -21,6 +21,11 @@ interface BotPublicConfig {
   oauthConfigured: boolean;
 }
 
+interface BotSessionAuthState extends BotPublicConfig {
+  authenticated: boolean;
+  user: BotUserView | null;
+}
+
 interface BotUserView {
   id: string;
   threadsUserId: string | null;
@@ -65,11 +70,7 @@ interface BotArchiveView {
   updatedAt: string;
 }
 
-interface BotSessionState {
-  authenticated: boolean;
-  botHandle: string;
-  oauthConfigured: boolean;
-  user: BotUserView | null;
+interface BotSessionState extends BotSessionAuthState {
   archives: BotArchiveView[];
   saveStatus: BotSaveStatusView | null;
 }
@@ -104,8 +105,8 @@ interface NotionExportResult {
   pages: NotionExportPageResult[];
 }
 
-interface BotSyncState extends BotSessionState {
-  workspace?: ScrapbookPlusState;
+interface BotBootstrapState extends BotSessionState {
+  workspace: ScrapbookPlusState;
 }
 
 interface BotSaveStatusView {
@@ -2939,7 +2940,7 @@ async function bulkDeleteSelectedArchives(): Promise<void> {
   }
   saveFolderMap(folderMap);
 
-  await refreshEverything();
+  void refreshBootstrap().catch(() => undefined);
   const label = uiText(
     "{count}개 삭제됨",
     "{count} deleted",
@@ -4746,6 +4747,31 @@ function applySessionState(
   }
 }
 
+function materializeSessionStateFromAuth(authState: BotSessionAuthState): BotSessionState {
+  if (!authState.authenticated || !authState.user) {
+    return {
+      ...authState,
+      archives: [],
+      saveStatus: null
+    };
+  }
+
+  const currentUserId = latestState?.user?.id ?? null;
+  if (latestState?.authenticated && currentUserId === authState.user.id) {
+    return {
+      ...latestState,
+      ...authState,
+      user: { ...authState.user }
+    };
+  }
+
+  return {
+    ...authState,
+    archives: [],
+    saveStatus: null
+  };
+}
+
 function applyWorkspaceState(workspace: ScrapbookPlusState, options: { persist?: boolean } = {}): void {
   latestWorkspace = workspace;
   renderScopeStatus(workspace);
@@ -4786,58 +4812,66 @@ function applyQueryStatus(): void {
 }
 
 async function refreshSession(): Promise<void> {
-  const [config, state] = await Promise.all([
-    requestJson<BotPublicConfig>("/api/public/bot/config"),
-    requestJson<BotSessionState>("/api/public/bot/session")
-  ]);
+  const state = await requestJson<BotSessionAuthState>("/api/public/bot/session");
+  const config = {
+    botHandle: state.botHandle,
+    oauthConfigured: state.oauthConfigured
+  };
   latestConfig = config;
-  applySessionState(config, {
-    ...state,
-    botHandle: config.botHandle,
-    oauthConfigured: config.oauthConfigured
-  });
+  applySessionState(config, materializeSessionStateFromAuth(state));
 }
 
-async function initializeScrapbook(): Promise<void> {
-  const workspacePromise = requestJson<ScrapbookPlusState>("/api/public/bot/plus").catch(() => null);
-  const [config, state, workspace] = await Promise.all([
-    requestJson<BotPublicConfig>("/api/public/bot/config"),
-    requestJson<BotSessionState>("/api/public/bot/session"),
-    workspacePromise
-  ]);
+async function refreshBootstrap(): Promise<void> {
+  const state = await requestJson<BotBootstrapState>("/api/public/bot/bootstrap");
+  const config = {
+    botHandle: state.botHandle,
+    oauthConfigured: state.oauthConfigured
+  };
+  const { workspace, ...sessionState } = state;
   latestConfig = config;
-  applySessionState(config, {
-    ...state,
-    botHandle: config.botHandle,
-    oauthConfigured: config.oauthConfigured
-  });
-
-  if (workspace) {
-    applyWorkspaceState(workspace);
-  }
-
-  if (state.authenticated && state.user) {
-    void syncLatestMentions({ silent: true, suppressErrors: true }).catch(() => undefined);
-  }
-}
-
-async function refreshWorkspace(): Promise<void> {
-  const workspace = await requestJson<ScrapbookPlusState>("/api/public/bot/plus");
+  applySessionState(config, sessionState);
   applyWorkspaceState(workspace);
 }
 
 async function refreshEverything(): Promise<void> {
-  await Promise.all([refreshSession(), refreshWorkspace()]);
+  const [sessionResult, bootstrapResult] = await Promise.allSettled([refreshSession(), refreshBootstrap()]);
+  const failures = [sessionResult, bootstrapResult].filter(
+    (result): result is PromiseRejectedResult => result.status === "rejected"
+  );
+  if (failures.length === 2) {
+    throw failures[0]?.reason ?? failures[1]?.reason;
+  }
+}
+
+async function initializeScrapbook(): Promise<void> {
+  await refreshEverything();
+  if (latestState?.authenticated && latestState.user) {
+    void syncLatestMentions({ silent: true, suppressErrors: true }).catch(() => undefined);
+  }
 }
 
 function applyArchiveMutationState(state: BotSessionState): void {
   if (!latestConfig) {
-    latestState = state;
+    latestState =
+      latestState?.authenticated && latestState.user?.id === state.user?.id
+        ? {
+            ...state,
+            saveStatus: state.saveStatus ?? latestState.saveStatus ?? null
+          }
+        : state;
     return;
   }
 
+  const nextState =
+    latestState?.authenticated && latestState.user?.id === state.user?.id
+      ? {
+          ...state,
+          saveStatus: state.saveStatus ?? latestState.saveStatus ?? null
+        }
+      : state;
+
   applySessionState(latestConfig, {
-    ...state,
+    ...nextState,
     botHandle: latestConfig.botHandle,
     oauthConfigured: latestConfig.oauthConfigured
   });
@@ -4922,19 +4956,19 @@ async function syncLatestMentions(options: { silent?: boolean; suppressErrors?: 
   renderSaveStatus(latestState);
 
   try {
-    const state = await requestJson<BotSyncState>("/api/public/bot/sync", {
+    const state = await requestJson<BotBootstrapState>("/api/public/bot/sync", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: "{}"
     });
-    applySessionState(latestConfig, {
-      ...state,
-      botHandle: latestConfig.botHandle,
-      oauthConfigured: latestConfig.oauthConfigured
-    });
-    if (state.workspace) {
-      applyWorkspaceState(state.workspace);
-    }
+    const config = {
+      botHandle: state.botHandle,
+      oauthConfigured: state.oauthConfigured
+    };
+    const { workspace, ...sessionState } = state;
+    latestConfig = config;
+    applySessionState(config, sessionState);
+    applyWorkspaceState(workspace);
     if (!options.silent) {
       const filteredCount = filterArchives(state.archives).length;
       setStatus(
@@ -4996,7 +5030,7 @@ async function syncWatchlistRequest(watchlistId: string): Promise<void> {
     body: "{}"
   });
   applyWorkspaceState(workspace);
-  await refreshSession();
+  void refreshBootstrap().catch(() => undefined);
   setStatus(t("scrapbookStatusWatchlistSynced"));
 }
 
@@ -5021,7 +5055,7 @@ async function deleteArchiveRequest(archiveId: string): Promise<void> {
     return;
   }
 
-  await requestJson<BotSessionState>(`/api/public/bot/archive/${encodeURIComponent(normalizedId)}`, {
+  const state = await requestJson<BotSessionState>(`/api/public/bot/archive/${encodeURIComponent(normalizedId)}`, {
     method: "DELETE"
   });
   selectedArchiveIds.delete(normalizedId);
@@ -5032,7 +5066,7 @@ async function deleteArchiveRequest(archiveId: string): Promise<void> {
   if (activeArchiveInlineEdit?.archiveId === normalizedId) {
     activeArchiveInlineEdit = null;
   }
-  await refreshEverything();
+  applyArchiveMutationState(state);
   setStatus(t("scrapbookStatusArchiveDeleted"));
 }
 
@@ -5103,7 +5137,7 @@ async function archiveTrackedPostRequest(trackedPostId: string): Promise<void> {
     body: "{}"
   });
   applyWorkspaceState(workspace);
-  await refreshSession();
+  void refreshBootstrap().catch(() => undefined);
   setStatus(t("scrapbookStatusTrackedSaved"));
 }
 
@@ -5141,7 +5175,7 @@ async function runSearchRequest(searchId: string): Promise<void> {
     body: "{}"
   });
   applyWorkspaceState(workspace);
-  await refreshSession();
+  void refreshBootstrap().catch(() => undefined);
   setStatus(t("scrapbookStatusSearchRun"));
 }
 
@@ -5160,7 +5194,7 @@ async function archiveSearchResultRequest(resultId: string): Promise<void> {
     body: "{}"
   });
   applyWorkspaceState(workspace);
-  await refreshSession();
+  void refreshBootstrap().catch(() => undefined);
   setStatus(t("scrapbookStatusSearchArchived"));
 }
 
@@ -5253,7 +5287,7 @@ async function archiveInsightPostRequest(postId: string): Promise<void> {
     body: JSON.stringify({ postId })
   });
   applyWorkspaceState(workspace);
-  await refreshSession();
+  void refreshBootstrap().catch(() => undefined);
   setStatus(t("scrapbookStatusInsightSaved"));
 }
 

@@ -140,6 +140,13 @@ export interface BotSessionState {
   archives: BotArchiveView[];
 }
 
+export interface BotSessionAuthState {
+  authenticated: boolean;
+  botHandle: string;
+  oauthConfigured: boolean;
+  user: BotUserView | null;
+}
+
 export interface BotSessionAuthContext {
   user: BotUserRecord;
   accessToken: string;
@@ -2310,16 +2317,19 @@ export function revokeExtensionCloudConnection(
   return buildCloudConnectionStatusFromTokenRecord(data, tokenRecord);
 }
 
-export function getBotSessionState(data: WebDatabase, rawSession: string | null | undefined): BotSessionState {
+function buildUnauthenticatedSessionAuthState(): BotSessionAuthState {
+  return {
+    authenticated: false,
+    botHandle: readBotHandle(),
+    oauthConfigured: isThreadsOauthConfigured(),
+    user: null
+  };
+}
+
+export function getBotSessionAuthState(data: WebDatabase, rawSession: string | null | undefined): BotSessionAuthState {
   const session = getBotSessionRecord(data, rawSession);
   if (!session) {
-    return {
-      authenticated: false,
-      botHandle: readBotHandle(),
-      oauthConfigured: isThreadsOauthConfigured(),
-      user: null,
-      archives: []
-    };
+    return buildUnauthenticatedSessionAuthState();
   }
 
   const user = data.botUsers.find((candidate) => candidate.id === session.userId && candidate.status === "active");
@@ -2327,38 +2337,38 @@ export function getBotSessionState(data: WebDatabase, rawSession: string | null 
     session.status = "revoked";
     session.revokedAt = new Date().toISOString();
     upsertBotSession(data, session);
-    return {
-      authenticated: false,
-      botHandle: readBotHandle(),
-      oauthConfigured: isThreadsOauthConfigured(),
-      user: null,
-      archives: []
-    };
+    return buildUnauthenticatedSessionAuthState();
   }
-
-  const archives = [
-    ...data.botArchives
-      .filter((candidate) => candidate.userId === user.id && !isTriggerOnlyArchiveRecord(candidate))
-      .map(toBotArchiveView),
-    ...data.cloudArchives.filter((candidate) => candidate.userId === user.id).map(toCloudArchiveView)
-  ].sort((left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt));
 
   return {
     authenticated: true,
     botHandle: readBotHandle(),
     oauthConfigured: isThreadsOauthConfigured(),
-    user: toBotUserView(user),
-    archives
+    user: toBotUserView(user)
   };
 }
 
-function buildUnauthenticatedSessionState(): BotSessionState {
+export function getBotSessionState(data: WebDatabase, rawSession: string | null | undefined): BotSessionState {
+  const authState = getBotSessionAuthState(data, rawSession);
+  if (!authState.authenticated || !authState.user) {
+    return {
+      ...authState,
+      archives: []
+    };
+  }
+
+  const userId = authState.user.id;
+
+  const archives = [
+    ...data.botArchives
+      .filter((candidate) => candidate.userId === userId && !isTriggerOnlyArchiveRecord(candidate))
+      .map(toBotArchiveView),
+    ...data.cloudArchives.filter((candidate) => candidate.userId === userId).map(toCloudArchiveView)
+  ].sort((left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt));
+
   return {
-    authenticated: false,
-    botHandle: readBotHandle(),
-    oauthConfigured: isThreadsOauthConfigured(),
-    user: null,
-    archives: []
+    ...authState,
+    archives
   };
 }
 
@@ -2468,6 +2478,12 @@ export async function getBotSessionStateFromStore(
   rawSession: string | null | undefined
 ): Promise<BotSessionState> {
   return withBotSessionDatabaseTransaction(rawSession, (data) => getBotSessionState(data, rawSession));
+}
+
+export async function getBotSessionAuthStateFromStore(
+  rawSession: string | null | undefined
+): Promise<BotSessionAuthState> {
+  return withBotSessionDatabaseTransaction(rawSession, (data) => getBotSessionAuthState(data, rawSession));
 }
 
 export async function repairBotSessionArchives(

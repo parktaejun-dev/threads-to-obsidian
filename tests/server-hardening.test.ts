@@ -127,9 +127,85 @@ test("public bot session endpoints disable browser caching", async () => {
   const { server, origin } = await startTestServer();
 
   try {
-    const response = await fetch(`${origin}/api/public/bot/session`);
+    const sessionResponse = await fetch(`${origin}/api/public/bot/session`);
+    assert.equal(sessionResponse.status, 200);
+    assert.match(sessionResponse.headers.get("cache-control") ?? "", /no-store/);
+
+    const sessionBody = await sessionResponse.json() as {
+      authenticated?: boolean;
+      archives?: unknown;
+      saveStatus?: unknown;
+    };
+    assert.equal(sessionBody.authenticated, false);
+    assert.equal("archives" in sessionBody, false);
+    assert.equal("saveStatus" in sessionBody, false);
+
+    const bootstrapResponse = await fetch(`${origin}/api/public/bot/bootstrap`);
+    assert.equal(bootstrapResponse.status, 200);
+    assert.match(bootstrapResponse.headers.get("cache-control") ?? "", /no-store/);
+
+    const bootstrapBody = await bootstrapResponse.json() as {
+      authenticated?: boolean;
+      archives?: unknown[];
+      saveStatus?: unknown;
+      workspace?: { authenticated?: boolean };
+    };
+    assert.equal(bootstrapBody.authenticated, false);
+    assert.ok(Array.isArray(bootstrapBody.archives));
+    assert.equal(bootstrapBody.archives?.length, 0);
+    assert.equal("saveStatus" in bootstrapBody, true);
+    assert.equal(bootstrapBody.workspace?.authenticated, false);
+  } finally {
+    await stopTestServer(server);
+    if (typeof previousAdminToken === "string") {
+      process.env.THREADS_WEB_ADMIN_TOKEN = previousAdminToken;
+    } else {
+      delete process.env.THREADS_WEB_ADMIN_TOKEN;
+    }
+    if (typeof previousDbFile === "string") {
+      process.env.THREADS_WEB_DB_FILE = previousDbFile;
+    } else {
+      delete process.env.THREADS_WEB_DB_FILE;
+    }
+  }
+});
+
+test("public bot bootstrap endpoint includes session data and workspace state", async () => {
+  const previousAdminToken = process.env.THREADS_WEB_ADMIN_TOKEN;
+  const previousDbFile = process.env.THREADS_WEB_DB_FILE;
+  const tempDir = await mkdtemp(path.join(tmpdir(), "threads-public-bot-bootstrap-"));
+  const dbFile = path.join(tempDir, "web-bot-data.json");
+
+  process.env.THREADS_WEB_ADMIN_TOKEN = "threads-admin-secret";
+  process.env.THREADS_WEB_DB_FILE = dbFile;
+
+  const { server, origin } = await startTestServer();
+
+  try {
+    const response = await fetch(`${origin}/api/public/bot/bootstrap`);
     assert.equal(response.status, 200);
-    assert.match(response.headers.get("cache-control") ?? "", /no-store/);
+
+    const body = await response.json() as {
+      authenticated?: boolean;
+      archives?: unknown[];
+      saveStatus?: unknown;
+      workspace?: {
+        authenticated?: boolean;
+        watchlists?: unknown[];
+        searches?: unknown[];
+        insights?: { ready?: boolean };
+      };
+    };
+
+    assert.equal(body.authenticated, false);
+    assert.ok(Array.isArray(body.archives));
+    assert.equal(body.archives?.length, 0);
+    assert.equal("saveStatus" in body, true);
+    assert.equal(body.saveStatus, null);
+    assert.equal(body.workspace?.authenticated, false);
+    assert.ok(Array.isArray(body.workspace?.watchlists));
+    assert.ok(Array.isArray(body.workspace?.searches));
+    assert.equal(body.workspace?.insights?.ready, false);
   } finally {
     await stopTestServer(server);
     if (typeof previousAdminToken === "string") {

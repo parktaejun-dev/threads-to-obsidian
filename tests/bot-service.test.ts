@@ -12,6 +12,7 @@ import {
   deleteArchive,
   failBotOauthSession,
   getExtensionCloudConnectionStatus,
+  getBotSessionAuthState,
   getBotSessionState,
   ingestBotMention,
   listExtensionCloudArchives,
@@ -113,6 +114,13 @@ test("bot Threads OAuth sign-in and mention ingest create a scrapbook archive", 
     assert.equal(initialState.user?.threadsUserId, "user-1");
     assert.equal(initialState.user?.isVerified, true);
     assert.equal(initialState.archives.length, 0);
+
+    const authState = getBotSessionAuthState(data, session.sessionToken);
+    assert.equal(authState.authenticated, true);
+    assert.equal(authState.oauthConfigured, true);
+    assert.equal(authState.user?.threadsHandle, "writer");
+    assert.equal(authState.user?.threadsUserId, "user-1");
+    assert.equal("archives" in authState, false);
 
     validateBotIngestRequest("Bearer test-ingest-token");
     const ingest = ingestBotMention(data, {

@@ -50,6 +50,7 @@ import {
   completeBotOauthFromStore,
   getExtensionCloudConnectionStatusFromStore,
   getBotPublicConfig,
+  getBotSessionAuthStateFromStore,
   getBotSessionStateFromStore,
   listExtensionCloudArchivesFromStore,
   readBotArchiveZipFromStore,
@@ -92,7 +93,6 @@ import {
   buildPublicStorefront,
   buildRevenueReport,
   closeDatabaseConnections,
-  loadBotArchives,
   loadBotMentionJobs,
   loadDatabase,
   loadDatabaseForConfig,
@@ -281,6 +281,27 @@ type PublicMentionSaveStatus = {
   expectedVisibleAt: string | null;
   retryAvailableAt: string | null;
 };
+
+const pendingBotSessionRepairRequests = new Set<string>();
+
+function scheduleBotSessionRepair(rawSession: string | null | undefined): void {
+  const sessionKey = safeText(rawSession);
+  if (!sessionKey || pendingBotSessionRepairRequests.has(sessionKey)) {
+    return;
+  }
+
+  pendingBotSessionRepairRequests.add(sessionKey);
+  const timer = setTimeout(() => {
+    void repairBotSessionArchivesFromStore(sessionKey)
+      .catch((error) => {
+        logUnexpectedError("bot session repair failed", error);
+      })
+      .finally(() => {
+        pendingBotSessionRepairRequests.delete(sessionKey);
+      });
+  }, 0);
+  timer.unref?.();
+}
 
 const PROVIDER_METHOD_DEFAULT_IDS: Record<PaymentProvider, string> = {
   stableorder: "pm-stableorder",
@@ -2215,17 +2236,10 @@ async function buildPublicMentionSaveStatus(
   }
 
   const collectorStatus = collector.getStatus();
-  const [botArchives, botMentionJobs] = await Promise.all([
-    loadBotArchives(),
-    loadBotMentionJobs()
-  ]);
+  const botMentionJobs = await loadBotMentionJobs();
 
   let latestArchiveUpdatedAt: string | null = null;
-  for (const candidate of botArchives) {
-    if (candidate.userId !== sessionState.user?.id) {
-      continue;
-    }
-
+  for (const candidate of sessionState.archives) {
     if (
       !latestArchiveUpdatedAt ||
       toTimestamp(candidate.updatedAt) > toTimestamp(latestArchiveUpdatedAt)
@@ -2314,15 +2328,30 @@ async function buildPublicMentionSaveStatus(
   };
 }
 
-async function buildPublicBotSessionResponse(
+async function buildPublicBotAuthResponse(
+  rawSession: string | null | undefined,
+): Promise<Awaited<ReturnType<typeof getBotSessionAuthStateFromStore>>> {
+  return getBotSessionAuthStateFromStore(rawSession);
+}
+
+async function buildPublicBotBootstrapResponse(
   rawSession: string | null | undefined,
   collector: BotMentionCollector
-): Promise<Awaited<ReturnType<typeof getBotSessionStateFromStore>> & { saveStatus: PublicMentionSaveStatus | null }> {
-  await repairBotSessionArchivesFromStore(rawSession);
-  const state = await getBotSessionStateFromStore(rawSession);
+): Promise<
+  Awaited<ReturnType<typeof getBotSessionStateFromStore>> & {
+    saveStatus: PublicMentionSaveStatus | null;
+    workspace: Awaited<ReturnType<typeof readScrapbookPlusStateFromStore>>;
+  }
+> {
+  const [state, workspace] = await Promise.all([
+    getBotSessionStateFromStore(rawSession),
+    readScrapbookPlusStateFromStore(rawSession)
+  ]);
+  const saveStatus = state.authenticated && state.user ? await buildPublicMentionSaveStatus(state, collector) : null;
   return {
     ...state,
-    saveStatus: await buildPublicMentionSaveStatus(state, collector)
+    saveStatus,
+    workspace
   };
 }
 
@@ -3275,7 +3304,7 @@ function resolveStaticPath(candidate: string): string | null {
 }
 
 function buildStaticAssetHeaders(contentType: string, etag?: string): Record<string, string> {
-  const headers = {
+  const headers: Record<string, string> = {
     "content-type": contentType,
     "x-content-type-options": "nosniff",
     "cache-control": "no-cache, must-revalidate"
@@ -4324,9 +4353,28 @@ async function handlePublicBotRoute(
     }
 
     const rawSession = readCookie(request.headers, BOT_SESSION_COOKIE);
-    const state = await buildPublicBotSessionResponse(rawSession, collector);
+    const state = await buildPublicBotAuthResponse(rawSession);
     refreshActiveBotSessionCookie(response, rawSession, secureCookie, state.authenticated);
     json(response, 200, state);
+    if (state.authenticated) {
+      scheduleBotSessionRepair(rawSession);
+    }
+    return;
+  }
+
+  if (pathname === "/api/public/bot/bootstrap") {
+    if ((request.method ?? "GET") !== "GET") {
+      methodNotAllowed(response);
+      return;
+    }
+
+    const rawSession = readCookie(request.headers, BOT_SESSION_COOKIE);
+    const state = await buildPublicBotBootstrapResponse(rawSession, collector);
+    refreshActiveBotSessionCookie(response, rawSession, secureCookie, state.authenticated);
+    json(response, 200, state);
+    if (state.authenticated) {
+      scheduleBotSessionRepair(rawSession);
+    }
     return;
   }
 
@@ -4479,20 +4527,19 @@ async function handlePublicBotRoute(
 
   if (pathname === "/api/public/bot/sync") {
     const rawSession = readCookie(request.headers, BOT_SESSION_COOKIE);
-    const state = await buildPublicBotSessionResponse(rawSession, collector);
-    if (!state.authenticated || !state.user) {
+    const authState = await buildPublicBotAuthResponse(rawSession);
+    if (!authState.authenticated || !authState.user) {
       unauthorized(response);
       return;
     }
 
     try {
       await collector.syncNow("user_sync");
-      const nextState = await buildPublicBotSessionResponse(rawSession, collector);
-      const workspace = await readScrapbookPlusStateFromStore(rawSession);
+      const nextState = await buildPublicBotBootstrapResponse(rawSession, collector);
       json(response, 200, {
-        ...nextState,
-        workspace
+        ...nextState
       });
+      scheduleBotSessionRepair(rawSession);
     } catch (error) {
       json(response, 502, {
         error: toPublicErrorMessage(error, "Could not sync the latest mentions.")
@@ -4712,7 +4759,7 @@ async function handlePublicBotRoute(
     }
 
     const rawSession = readCookie(request.headers, BOT_SESSION_COOKIE);
-    const state = await buildPublicBotSessionResponse(rawSession, collector);
+    const state = await getBotSessionStateFromStore(rawSession);
     if (!state.authenticated || !state.user) {
       json(response, 401, { error: "You need to sign in first." });
       return;
@@ -4735,7 +4782,7 @@ async function handlePublicBotRoute(
     }
 
     const rawSession = readCookie(request.headers, BOT_SESSION_COOKIE);
-    const state = await buildPublicBotSessionResponse(rawSession, collector);
+    const state = await getBotSessionStateFromStore(rawSession);
     if (!state.authenticated || !state.user) {
       json(response, 401, { error: "You need to sign in first." });
       return;
@@ -4763,7 +4810,7 @@ async function handlePublicBotRoute(
     }
 
     const rawSession = readCookie(request.headers, BOT_SESSION_COOKIE);
-    const state = await buildPublicBotSessionResponse(rawSession, collector);
+    const state = await buildPublicBotAuthResponse(rawSession);
     if (!state.authenticated || !state.user) {
       json(response, 401, { error: "You need to sign in first." });
       return;
@@ -4786,7 +4833,7 @@ async function handlePublicBotRoute(
     }
 
     const rawSession = readCookie(request.headers, BOT_SESSION_COOKIE);
-    const state = await buildPublicBotSessionResponse(rawSession, collector);
+    const state = await buildPublicBotAuthResponse(rawSession);
     if (!state.authenticated || !state.user) {
       json(response, 401, { error: "You need to sign in first." });
       return;
@@ -4818,7 +4865,7 @@ async function handlePublicBotRoute(
     }
 
     const rawSession = readCookie(request.headers, BOT_SESSION_COOKIE);
-    const state = await buildPublicBotSessionResponse(rawSession, collector);
+    const state = await buildPublicBotAuthResponse(rawSession);
     if (!state.authenticated || !state.user) {
       json(response, 401, { error: "You need to sign in first." });
       return;
@@ -4863,7 +4910,7 @@ async function handlePublicBotRoute(
     }
 
     const rawSession = readCookie(request.headers, BOT_SESSION_COOKIE);
-    const state = await buildPublicBotSessionResponse(rawSession, collector);
+    const state = await getBotSessionStateFromStore(rawSession);
     if (!state.authenticated || !state.user) {
       json(response, 401, { error: "You need to sign in first." });
       return;
