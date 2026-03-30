@@ -573,7 +573,7 @@ async function extractRenderedPost(page: Page, sourceUrl: string): Promise<Extra
         return firstBlock;
       };
 
-      const getVisibleImages = (root: HTMLElement | null, author: string): string[] => {
+      const getVisibleImages = (root: HTMLElement | null, author: string, minimumDimension = 140): string[] => {
         if (!root) {
           return [];
         }
@@ -589,7 +589,7 @@ async function extractRenderedPost(page: Page, sourceUrl: string): Promise<Extra
             if (alt.includes("프로필 사진") || alt.includes(author)) {
               return false;
             }
-            return width >= 140 || height >= 140;
+            return width >= minimumDimension || height >= minimumDimension;
           })
           .map((img) => img.currentSrc || img.src);
         return urls.length > 0 ? dedupeStrings(urls) : [];
@@ -741,7 +741,12 @@ async function extractRenderedPost(page: Page, sourceUrl: string): Promise<Extra
         return author;
       };
 
-      const extractDomText = (root: HTMLElement | null, author: string, canonicalUrl: string): string => {
+      const extractDomText = (
+        root: HTMLElement | null,
+        author: string,
+        canonicalUrl: string,
+        stopAtForeignPost = true
+      ): string => {
         if (!root) {
           return "";
         }
@@ -752,7 +757,7 @@ async function extractRenderedPost(page: Page, sourceUrl: string): Promise<Extra
         while (currentNode) {
           const text = currentNode.textContent?.trim();
           const parent = currentNode.parentElement;
-          if (cutoffBlock && parent && cutoffBlock.contains(parent)) {
+          if (stopAtForeignPost && cutoffBlock && parent && cutoffBlock.contains(parent)) {
             break;
           }
           if (text && parent && !parent.closest("button, time, a, script, style, svg, video, picture, figure, img")) {
@@ -807,11 +812,11 @@ async function extractRenderedPost(page: Page, sourceUrl: string): Promise<Extra
             continue;
           }
           startedChain = true;
-          const text = extractDomText(candidate.block, author, candidate.url);
+          const text = extractDomText(candidate.block, author, candidate.url, false);
           if (!text || text.startsWith("이전 글")) {
             continue;
           }
-          const imageUrls = getVisibleImages(candidate.block, author);
+          const imageUrls = getVisibleImages(candidate.block, author, 48);
           const videoUrl = getVideoUrl(candidate.block);
           const videoPosterUrl = getVideoPosterUrl(candidate.block);
           const sourceType = detectSourceType(imageUrls, candidate.block, videoUrl, videoPosterUrl);

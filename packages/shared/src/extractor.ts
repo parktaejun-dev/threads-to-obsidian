@@ -238,7 +238,7 @@ function findFirstForeignPostBlock(root: HTMLElement | null, canonicalUrl: strin
   return firstBlock;
 }
 
-function getVisibleImages(root: HTMLElement | null, author: string): string[] {
+function getVisibleImages(root: HTMLElement | null, author: string, minimumDimension = 140): string[] {
   if (!root) {
     return [];
   }
@@ -257,7 +257,7 @@ function getVisibleImages(root: HTMLElement | null, author: string): string[] {
         return false;
       }
 
-      return width >= 140 || height >= 140;
+      return width >= minimumDimension || height >= minimumDimension;
     })
     .map((img) => img.currentSrc || img.src);
 
@@ -477,7 +477,13 @@ function getPostTitle(_document: Document, author: string, text: string, _extern
   return author;
 }
 
-function extractDomText(root: HTMLElement | null, author: string, canonicalUrl: string, config: ExtractorConfig): string {
+function extractDomText(
+  root: HTMLElement | null,
+  author: string,
+  canonicalUrl: string,
+  config: ExtractorConfig,
+  stopAtForeignPost = true
+): string {
   if (!root) {
     return "";
   }
@@ -491,7 +497,7 @@ function extractDomText(root: HTMLElement | null, author: string, canonicalUrl: 
   while (currentNode) {
     const text = currentNode.textContent?.trim();
     const parent = currentNode.parentElement;
-    if (cutoffBlock && parent && cutoffBlock.contains(parent)) {
+    if (stopAtForeignPost && cutoffBlock && parent && cutoffBlock.contains(parent)) {
       break;
     }
     if (text && parent && !parent.closest("button, time, a, script, style, svg, video, picture, figure, img")) {
@@ -563,12 +569,12 @@ function extractAuthorReplies(document: Document, root: HTMLElement | null, auth
     }
 
     startedChain = true;
-    const text = extractDomText(candidate.block, author, candidate.url, config);
+    const text = extractDomText(candidate.block, author, candidate.url, config, false);
     if (!text || text.startsWith("이전 글")) {
       continue;
     }
 
-    const imageUrls = getVisibleImages(candidate.block, author);
+    const imageUrls = getVisibleImages(candidate.block, author, 48);
     const videoUrl = getVideoUrl(candidate.block);
     const videoPosterUrl = getVideoPosterUrl(candidate.block);
     const sourceType = detectSourceType(imageUrls, candidate.block, videoUrl, videoPosterUrl);

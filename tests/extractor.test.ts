@@ -302,6 +302,39 @@ const authorRepliesWithMediaFixture = `
 </html>
 `;
 
+const quotedReplyFixture = `
+<!doctype html>
+<html lang="ko">
+  <head>
+    <link rel="canonical" href="https://www.threads.com/@choi.openai/post/ROOT999" />
+    <meta property="og:title" content="choi.openai on Threads" />
+  </head>
+  <body>
+    <main>
+      <article>
+        <a href="https://www.threads.com/@choi.openai/post/ROOT999"><time datetime="2026-03-30T00:15:00.000Z">19시간</time></a>
+        <div>choi.openai</div>
+        <div>메인 글입니다.</div>
+        <button>좋아요 5</button>
+      </article>
+      <article>
+        <a href="https://www.threads.com/@choi.openai/post/REPLY444"><time datetime="2026-03-30T00:25:00.000Z">10분</time></a>
+        <div>choi.openai</div>
+        <div>.</div>
+        <div class="quoted-post">
+          <a href="https://www.threads.com/@XRarchitect/post/QUOTE123"><time datetime="2026-03-30T00:22:00.000Z">13분</time></a>
+          <div>작성자</div>
+          <div>4/ x@XRarchitect</div>
+          <img src="https://cdn.example.com/quoted-thumb.jpg" alt="quoted media" width="80" height="80" />
+          <div>죄송합니다. 이 동영상을 재생하는 중 문제가 발생했습니다.</div>
+        </div>
+        <button>좋아요 2</button>
+      </article>
+    </main>
+  </body>
+</html>
+`;
+
 const buttonlessThreadChainFixture = `
 <!doctype html>
 <html lang="ko">
@@ -446,6 +479,17 @@ test("author replies ignore same-post media links and previous post cards", asyn
     ["DVmARgugabq", "DVmBSklgSp1"]
   );
   assert.equal(post.authorReplies.some((reply) => reply.text.includes("이전 글")), false);
+});
+
+test("quoted reply text keeps the embedded quote and captures small quote media", async () => {
+  const dom = new JSDOM(quotedReplyFixture, { url: "https://www.threads.com/@choi.openai/post/ROOT999" });
+  const post = await extractPostFromDocument(dom.window.document, dom.window.location.href);
+
+  assert.equal(post.authorReplies.length, 1);
+  assert.equal(post.authorReplies[0]?.shortcode, "REPLY444");
+  assert.match(post.authorReplies[0]?.text ?? "", /XRarchitect/);
+  assert.match(post.authorReplies[0]?.text ?? "", /죄송합니다/);
+  assert.deepEqual(post.authorReplies[0]?.imageUrls, ["https://cdn.example.com/quoted-thumb.jpg"]);
 });
 
 test("buttonless thread cards still capture the main post and follow-up author replies", async () => {
