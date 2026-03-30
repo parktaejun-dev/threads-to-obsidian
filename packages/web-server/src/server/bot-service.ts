@@ -17,7 +17,7 @@ import type {
   FrontmatterPrimitive
 } from "@threads/shared/types";
 import { extractPostFromDocument } from "@threads/shared/extractor";
-import { buildArchiveTitle as buildArchiveTitleText, dedupeStrings } from "@threads/shared/utils";
+import { buildArchiveTitle as buildArchiveTitleText, dedupeStrings, extractFirstLineTitle } from "@threads/shared/utils";
 import type {
   BotArchiveRecord,
   BotExtensionAccessTokenRecord,
@@ -106,6 +106,7 @@ export interface BotArchiveView {
   id: string;
   origin: "mention" | "cloud";
   originLabel: string;
+  title: string;
   mentionUrl: string | null;
   mentionAuthorHandle: string | null;
   mentionAuthorDisplayName: string | null;
@@ -256,6 +257,12 @@ type StoredArchiveRecord = BotArchiveRecord | CloudArchiveRecord;
 export interface BotArchiveZipResult {
   filename: string;
   content: Buffer;
+}
+
+export interface ArchiveUpdatePatch {
+  noteText?: string;
+  title?: string;
+  tags?: string[];
 }
 
 const MAX_ARCHIVE_TAGS = 3;
@@ -764,6 +771,109 @@ function extractArchiveTags(noteText: string | null | undefined): string[] {
   return tags;
 }
 
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function normalizeArchiveNoteInput(value: string | null | undefined): string | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const normalized = value.replace(/\r\n?/g, "\n");
+  if (!/\S/u.test(normalized)) {
+    return null;
+  }
+
+  return normalized;
+}
+
+function normalizeArchiveTitleInput(value: string | null | undefined): string | null {
+  return safeText(value) || null;
+}
+
+function normalizeArchiveTagsInput(tags: string[] | null | undefined): string[] {
+  if (!Array.isArray(tags)) {
+    return [];
+  }
+
+  return dedupeStrings(
+    tags
+      .map((tag) => safeText(tag).replace(/^#+/u, "").toLowerCase())
+      .filter(Boolean)
+  ).slice(0, MAX_ARCHIVE_TAGS);
+}
+
+function normalizeArchiveBodyInput(value: string | null | undefined): string | null {
+  const normalized = normalizeArchiveNoteInput(value);
+  return normalized ? normalized.trim() : null;
+}
+
+function stripArchiveTagsFromText(value: string): string {
+  const matches = value.match(/#[\p{L}\p{N}_-]+/gu) ?? [];
+  let cleaned = value;
+  for (const match of matches) {
+    cleaned = cleaned.replace(
+      new RegExp(`(^|[\\s(\\[{])${escapeRegExp(match)}(?=$|[\\s)\\]}.,!?;:])`, "gu"),
+      "$1"
+    );
+  }
+
+  return cleaned
+    .split("\n")
+    .map((line) => line.replace(/\s{2,}/gu, " ").trim())
+    .filter((line, index, lines) => line.length > 0 || (index > 0 && index < lines.length - 1))
+    .join("\n")
+    .replace(/\n{3,}/gu, "\n\n")
+    .trim();
+}
+
+function parseMentionArchiveEditorState(noteText: string | null | undefined): {
+  title: string | null;
+  body: string | null;
+  tags: string[];
+} {
+  const normalized = normalizeArchiveNoteInput(noteText) ?? "";
+  const title = extractFirstLineTitle(normalized) || null;
+  const bodySource = title && normalized.includes("\n") ? normalized.slice(normalized.indexOf("\n") + 1) : normalized;
+
+  return {
+    title,
+    body: normalizeArchiveBodyInput(stripArchiveTagsFromText(bodySource)),
+    tags: extractArchiveTags(normalized)
+  };
+}
+
+function composeMentionArchiveNoteText(parts: {
+  title?: string | null;
+  body?: string | null;
+  tags?: string[] | null;
+}): string | null {
+  const title = normalizeArchiveTitleInput(parts.title);
+  const body = normalizeArchiveBodyInput(parts.body);
+  const tags = normalizeArchiveTagsInput(parts.tags ?? []);
+  const lines: string[] = [];
+
+  if (title) {
+    lines.push(title);
+  }
+  if (body) {
+    lines.push(body);
+  }
+  if (tags.length > 0) {
+    lines.push(tags.map((tag) => `#${tag}`).join(" "));
+  }
+
+  if (lines.length === 0) {
+    return null;
+  }
+  if (lines.length === 1 && title) {
+    return `${title}\n`;
+  }
+
+  return lines.join("\n");
+}
+
 function createOpaqueToken(): string {
   return randomBytes(32).toString("base64url");
 }
@@ -903,10 +1013,12 @@ function buildArchiveMarkdownFromExtractedPost(
   archivedAt: string,
   tags: string[],
   mediaRefs: BotArchiveMarkdownMediaRefs,
-  noteText: string | null = null
+  noteText: string | null = null,
+  titleOverride: string | null = null
 ): string {
+  const title = safeText(titleOverride) || buildArchiveTitle(post.author, post.text, noteText);
   const lines: string[] = [
-    `# ${buildArchiveTitle(post.author, post.text, noteText)}`,
+    `# ${title}`,
     "",
     `Saved: ${archivedAt}`,
     `Source: ${post.canonicalUrl}`,
@@ -1391,10 +1503,12 @@ function toBotUserView(user: BotUserRecord): BotUserView {
 function toBotArchiveView(item: BotArchiveRecord): BotArchiveView {
   const extractedPost = readArchiveExtractedPost(item.rawPayloadJson);
   const mediaUrls = extractedPost ? summarizeExtractedPostPreviewMediaUrls(extractedPost) : [...item.mediaUrls];
+  const titleSource = extractedPost?.text || item.targetText;
   return {
     id: item.id,
     origin: "mention",
     originLabel: "Saved",
+    title: buildArchiveTitle(item.targetAuthorHandle, titleSource, item.noteText),
     mentionUrl: item.mentionUrl,
     mentionAuthorHandle: item.mentionAuthorHandle,
     mentionAuthorDisplayName: item.mentionAuthorDisplayName,
@@ -1443,6 +1557,7 @@ function toCloudArchiveView(item: CloudArchiveRecord): BotArchiveView {
     id: item.id,
     origin: "cloud",
     originLabel: "클라우드 저장",
+    title: item.targetTitle,
     mentionUrl: null,
     mentionAuthorHandle: null,
     mentionAuthorDisplayName: null,
@@ -2568,23 +2683,57 @@ export function materializeBotMentionArchive(
     | "rawPayloadJson"
     | "archivedAt"
   >;
+  const markdownContent = buildArchiveMarkdownFromRecord(archiveDraft, mediaUrls);
   const unresolvedTargetCapture = isTriggerOnlyArchiveRecord(archiveDraft);
   if (unresolvedTargetCapture) {
-    const preservedArchive =
-      existingArchive && !isTriggerOnlyArchiveRecord(existingArchive) ? existingArchive : null;
+    const archive: BotArchiveRecord = existingArchive
+      ? {
+          ...existingArchive,
+          mentionAuthorHandle: mentionAuthorHandle || existingArchive.mentionAuthorHandle,
+          mentionAuthorDisplayName:
+            safeText(payload.mentionAuthorDisplayName) || existingArchive.mentionAuthorDisplayName,
+          noteText: noteText ?? existingArchive.noteText,
+          targetUrl,
+          targetAuthorHandle: safeText(payload.targetAuthorHandle) || extractedPost?.author || null,
+          targetAuthorDisplayName: safeText(payload.targetAuthorDisplayName) || null,
+          targetText,
+          targetPublishedAt: safeText(extractedPost?.publishedAt ?? payload.targetPublishedAt) || null,
+          mediaUrls,
+          markdownContent,
+          rawPayloadJson: rawPayloadJson ?? existingArchive.rawPayloadJson,
+          updatedAt: now
+        }
+      : {
+          id: crypto.randomUUID(),
+          userId: user.id,
+          mentionId: safeText(payload.mentionId) || null,
+          mentionUrl,
+          mentionAuthorHandle: mentionAuthorHandle || user.threadsHandle,
+          mentionAuthorDisplayName: safeText(payload.mentionAuthorDisplayName) || user.displayName,
+          noteText,
+          targetUrl,
+          targetAuthorHandle: safeText(payload.targetAuthorHandle) || extractedPost?.author || null,
+          targetAuthorDisplayName: safeText(payload.targetAuthorDisplayName) || null,
+          targetText,
+          targetPublishedAt: safeText(extractedPost?.publishedAt ?? payload.targetPublishedAt) || null,
+          mediaUrls,
+          markdownContent,
+          rawPayloadJson,
+          archivedAt: now,
+          updatedAt: now,
+          status: "saved" as const
+        };
     return {
       result: {
         ok: true,
-        matched: Boolean(preservedArchive),
-        created: false,
-        archiveId: preservedArchive?.id ?? null,
-        reason: preservedArchive ? null : "unresolved_target"
+        matched: true,
+        created: !existingArchive,
+        archiveId: archive.id,
+        reason: null
       },
-      archive: preservedArchive
+      archive
     };
   }
-  const markdownContent = buildArchiveMarkdownFromRecord(archiveDraft, mediaUrls);
-
   if (existingArchive) {
     return {
       result: {
@@ -2975,6 +3124,15 @@ export function updateArchiveNoteText(
   archiveId: string,
   newNoteText: string
 ): BotSessionState {
+  return updateArchive(data, rawSession, archiveId, { noteText: newNoteText });
+}
+
+export function updateArchive(
+  data: WebDatabase,
+  rawSession: string | null | undefined,
+  archiveId: string,
+  patch: ArchiveUpdatePatch
+): BotSessionState {
   const session = getBotSessionRecord(data, rawSession);
   if (!session) {
     throw new Error("You need to sign in first.");
@@ -2985,17 +3143,33 @@ export function updateArchiveNoteText(
     throw new Error("Select an archive to edit.");
   }
 
+  const hasNotePatch = Object.prototype.hasOwnProperty.call(patch, "noteText");
+  const hasTitlePatch = Object.prototype.hasOwnProperty.call(patch, "title");
+  const hasTagsPatch = Object.prototype.hasOwnProperty.call(patch, "tags");
+  if (!hasNotePatch && !hasTitlePatch && !hasTagsPatch) {
+    return getBotSessionState(data, rawSession);
+  }
+
   const now = new Date().toISOString();
-  const trimmedNote = newNoteText.trim() || null;
 
   const mentionArchive = data.botArchives.find(
     (candidate) => candidate.id === normalizedId && candidate.userId === session.userId
   );
   if (mentionArchive) {
-    mentionArchive.noteText = trimmedNote;
+    const nextRawNote = hasNotePatch ? normalizeArchiveNoteInput(patch.noteText) : mentionArchive.noteText;
+    const currentParts = parseMentionArchiveEditorState(nextRawNote);
+    mentionArchive.noteText =
+      hasTitlePatch || hasTagsPatch
+        ? composeMentionArchiveNoteText({
+            title: hasTitlePatch ? patch.title : currentParts.title,
+            body: currentParts.body,
+            tags: hasTagsPatch ? patch.tags : currentParts.tags
+          })
+        : nextRawNote;
     mentionArchive.updatedAt = now;
-    const mediaUrls = readArchiveExtractedPost(mentionArchive.rawPayloadJson)
-      ? summarizeExtractedPostPreviewMediaUrls(readArchiveExtractedPost(mentionArchive.rawPayloadJson)!)
+    const extractedPost = readArchiveExtractedPost(mentionArchive.rawPayloadJson);
+    const mediaUrls = extractedPost
+      ? summarizeExtractedPostPreviewMediaUrls(extractedPost)
       : [...mentionArchive.mediaUrls];
     mentionArchive.markdownContent = buildArchiveMarkdownFromRecord(mentionArchive, mediaUrls);
     return getBotSessionState(data, rawSession);
@@ -3006,24 +3180,46 @@ export function updateArchiveNoteText(
   );
   if (cloudArchive) {
     const payload = readCloudArchivePayload(cloudArchive.rawPayloadJson);
-    if (payload.aiResult) {
-      payload.aiResult.summary = trimmedNote;
-      cloudArchive.rawPayloadJson = JSON.stringify({
-        ...(cloudArchive.rawPayloadJson ? JSON.parse(cloudArchive.rawPayloadJson) : {}),
-        aiResult: payload.aiResult
-      });
+    const nextSummary = hasNotePatch ? normalizeArchiveNoteInput(patch.noteText) : payload.aiResult?.summary ?? null;
+    const nextTags = hasTagsPatch ? normalizeArchiveTagsInput(patch.tags) : buildCloudArchiveTags(payload);
+    const nextTitle =
+      (hasTitlePatch ? normalizeArchiveTitleInput(patch.title) : normalizeArchiveTitleInput(cloudArchive.targetTitle)) ||
+      buildArchiveTitle(cloudArchive.targetAuthorHandle, payload.extractedPost?.text ?? cloudArchive.targetText);
+
+    cloudArchive.targetTitle = nextTitle;
+    if (payload.extractedPost) {
+      payload.extractedPost.title = nextTitle;
     }
+
+    const nextAiResult = payload.aiResult
+      ? {
+          ...payload.aiResult,
+          summary: nextSummary,
+          tags: nextTags
+        }
+      : {
+          summary: nextSummary,
+          tags: nextTags,
+          frontmatter: {}
+        };
+
+    payload.aiResult = nextAiResult;
+    cloudArchive.rawPayloadJson = JSON.stringify({
+      ...(cloudArchive.rawPayloadJson ? JSON.parse(cloudArchive.rawPayloadJson) : {}),
+      extractedPost: payload.extractedPost,
+      aiResult: payload.aiResult
+    });
     cloudArchive.updatedAt = now;
     const extractedPost = payload.extractedPost;
     if (extractedPost) {
-      const tags = buildCloudArchiveTags(payload);
       const mediaRefs = buildRemoteMarkdownMediaRefs(extractedPost);
       cloudArchive.markdownContent = buildArchiveMarkdownFromExtractedPost(
         extractedPost,
         cloudArchive.savedAt,
-        tags,
+        nextTags,
         mediaRefs,
-        trimmedNote
+        nextSummary,
+        nextTitle
       );
     }
     return getBotSessionState(data, rawSession);
@@ -3035,11 +3231,9 @@ export function updateArchiveNoteText(
 export async function updateArchiveFromStore(
   rawSession: string | null | undefined,
   archiveId: string,
-  noteText: string
+  patch: ArchiveUpdatePatch
 ): Promise<BotSessionState> {
-  return withBotSessionDatabaseTransaction(rawSession, (data) =>
-    updateArchiveNoteText(data, rawSession, archiveId, noteText)
-  );
+  return withBotSessionDatabaseTransaction(rawSession, (data) => updateArchive(data, rawSession, archiveId, patch));
 }
 
 export function getBotUserAccessToken(data: WebDatabase, rawSession: string | null | undefined): string | null {

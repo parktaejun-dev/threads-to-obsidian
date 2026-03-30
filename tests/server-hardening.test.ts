@@ -115,6 +115,36 @@ test("mutating public routes reject requests without an Origin header", async ()
   }
 });
 
+test("public bot session endpoints disable browser caching", async () => {
+  const previousAdminToken = process.env.THREADS_WEB_ADMIN_TOKEN;
+  const previousDbFile = process.env.THREADS_WEB_DB_FILE;
+  const tempDir = await mkdtemp(path.join(tmpdir(), "threads-public-bot-cache-"));
+  const dbFile = path.join(tempDir, "web-bot-data.json");
+
+  process.env.THREADS_WEB_ADMIN_TOKEN = "threads-admin-secret";
+  process.env.THREADS_WEB_DB_FILE = dbFile;
+
+  const { server, origin } = await startTestServer();
+
+  try {
+    const response = await fetch(`${origin}/api/public/bot/session`);
+    assert.equal(response.status, 200);
+    assert.match(response.headers.get("cache-control") ?? "", /no-store/);
+  } finally {
+    await stopTestServer(server);
+    if (typeof previousAdminToken === "string") {
+      process.env.THREADS_WEB_ADMIN_TOKEN = previousAdminToken;
+    } else {
+      delete process.env.THREADS_WEB_ADMIN_TOKEN;
+    }
+    if (typeof previousDbFile === "string") {
+      process.env.THREADS_WEB_DB_FILE = previousDbFile;
+    } else {
+      delete process.env.THREADS_WEB_DB_FILE;
+    }
+  }
+});
+
 test("production startup rejects file-backed runtime databases", () => {
   const previousAdminToken = process.env.THREADS_WEB_ADMIN_TOKEN;
   const previousNodeEnv = process.env.NODE_ENV;

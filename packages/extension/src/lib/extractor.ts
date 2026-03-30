@@ -196,6 +196,48 @@ function findPostRoot(document: Document, canonicalUrl: string, shortcode: strin
   return null;
 }
 
+function findFirstForeignPostBlock(root: HTMLElement | null, canonicalUrl: string): HTMLElement | null {
+  if (!root) {
+    return null;
+  }
+
+  const nodeCtor = root.ownerDocument.defaultView?.Node;
+  if (!nodeCtor) {
+    return null;
+  }
+
+  let firstBlock: HTMLElement | null = null;
+  for (const anchor of root.querySelectorAll<HTMLAnchorElement>('a[href*="/post/"]')) {
+    let normalizedUrl: string;
+    try {
+      normalizedUrl = normalizeThreadsUrl(anchor.href);
+    } catch {
+      continue;
+    }
+
+    if (normalizedUrl === canonicalUrl) {
+      continue;
+    }
+
+    const block = findPostBlockFromAnchor(anchor);
+    if (!block || block === root || !root.contains(block)) {
+      continue;
+    }
+
+    if (!firstBlock) {
+      firstBlock = block;
+      continue;
+    }
+
+    const position = firstBlock.compareDocumentPosition(block);
+    if (position & nodeCtor.DOCUMENT_POSITION_PRECEDING) {
+      firstBlock = block;
+    }
+  }
+
+  return firstBlock;
+}
+
 function getVisibleImages(root: HTMLElement | null, author: string): string[] {
   if (!root) {
     return [];
@@ -392,11 +434,12 @@ function getPostTitle(_document: Document, author: string, text: string, _extern
   return author;
 }
 
-function extractDomText(root: HTMLElement | null, author: string, config: ExtractorConfig): string {
+function extractDomText(root: HTMLElement | null, author: string, canonicalUrl: string, config: ExtractorConfig): string {
   if (!root) {
     return "";
   }
 
+  const cutoffBlock = findFirstForeignPostBlock(root, canonicalUrl);
   const nodeFilter = root.ownerDocument.defaultView?.NodeFilter;
   const walker = root.ownerDocument.createTreeWalker(root, nodeFilter?.SHOW_TEXT ?? 4);
   const lines: string[] = [];
@@ -405,6 +448,9 @@ function extractDomText(root: HTMLElement | null, author: string, config: Extrac
   while (currentNode) {
     const text = currentNode.textContent?.trim();
     const parent = currentNode.parentElement;
+    if (cutoffBlock && parent && cutoffBlock.contains(parent)) {
+      break;
+    }
     if (text && parent && !parent.closest("button, time, a, script, style, svg, video, picture, figure, img")) {
       lines.push(text);
     }
@@ -474,7 +520,7 @@ function extractAuthorReplies(document: Document, root: HTMLElement | null, auth
     }
 
     startedChain = true;
-    const text = extractDomText(candidate.block, author, config);
+    const text = extractDomText(candidate.block, author, candidate.url, config);
     if (!text || text.startsWith("이전 글")) {
       continue;
     }
@@ -511,7 +557,7 @@ export async function extractPostFromDocument(document: Document, pageUrl: strin
   const root = findPostRoot(document, canonicalUrl, shortcode);
   const structuredText = getStructuredText(document, shortcode);
   const ogDescription = getMeta(document, 'meta[property="og:description"]');
-  const domText = extractDomText(root, author, config);
+  const domText = extractDomText(root, author, canonicalUrl, config);
   const rawText = domText || structuredText || ogDescription || "";
   const text = cleanTextLines(rawText, author, config) || ogDescription || "";
   if (!text) {

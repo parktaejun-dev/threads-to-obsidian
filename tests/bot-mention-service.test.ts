@@ -1,10 +1,14 @@
 import assert from "node:assert/strict";
-import test from "node:test";
+import test, { type TestFn } from "node:test";
 
 import { buildDefaultDatabase } from "@threads/web-schema";
 import { completeBotOauth, startBotOauth } from "../packages/web-server/src/server/bot-service";
 import { createBotMentionCollector } from "../packages/web-server/src/server/bot-mention-service";
 import { replaceRuntimeConfigForTests } from "../packages/web-server/src/server/runtime-config";
+
+const serialTest = (name: string, fn: TestFn): Promise<void> => {
+  return test(name, { concurrency: false }, fn);
+};
 
 const extractedThreadFixture = `
 <!doctype html>
@@ -44,7 +48,7 @@ function createJsonResponse(payload: unknown, init?: ResponseInit): Response {
   });
 }
 
-test("mention collector fetches mentions and ingests them idempotently", async () => {
+serialTest("mention collector fetches mentions and ingests them idempotently", async () => {
   const previousHandle = process.env.THREADS_BOT_HANDLE;
   const previousAppId = process.env.THREADS_BOT_APP_ID;
   const previousAppSecret = process.env.THREADS_BOT_APP_SECRET;
@@ -231,7 +235,7 @@ test("mention collector fetches mentions and ingests them idempotently", async (
   }
 });
 
-test("mention collector refreshes existing archives with the original replied post during user sync", async () => {
+serialTest("mention collector refreshes existing archives with the original replied post during user sync", async () => {
   const previousHandle = process.env.THREADS_BOT_HANDLE;
   const previousAppId = process.env.THREADS_BOT_APP_ID;
   const previousAppSecret = process.env.THREADS_BOT_APP_SECRET;
@@ -459,7 +463,7 @@ test("mention collector refreshes existing archives with the original replied po
   }
 });
 
-test("mention collector follows the original permalink from extracted mention html when API relations are missing", async () => {
+serialTest("mention collector follows the original permalink from extracted mention html when API relations are missing", async () => {
   const previousHandle = process.env.THREADS_BOT_HANDLE;
   const previousAppId = process.env.THREADS_BOT_APP_ID;
   const previousAppSecret = process.env.THREADS_BOT_APP_SECRET;
@@ -660,7 +664,7 @@ test("mention collector follows the original permalink from extracted mention ht
   }
 });
 
-test("mention collector skips target hydration for unmatched users", async () => {
+serialTest("mention collector skips target hydration for unmatched users", async () => {
   const previousHandle = process.env.THREADS_BOT_HANDLE;
   const previousAppId = process.env.THREADS_BOT_APP_ID;
   const previousAppSecret = process.env.THREADS_BOT_APP_SECRET;
@@ -829,7 +833,7 @@ test("mention collector skips target hydration for unmatched users", async () =>
   }
 });
 
-test("mention collector ingests linked-user replies when bot mentions feed misses the comment", async () => {
+serialTest("mention collector ingests linked-user replies when bot mentions feed misses the comment", async () => {
   const previousHandle = process.env.THREADS_BOT_HANDLE;
   const previousAppId = process.env.THREADS_BOT_APP_ID;
   const previousAppSecret = process.env.THREADS_BOT_APP_SECRET;
@@ -1032,7 +1036,7 @@ test("mention collector ingests linked-user replies when bot mentions feed misse
   }
 });
 
-test("mention collector repairs trigger-only archives from linked-user replies when the mention feed misses them", async () => {
+serialTest("mention collector repairs trigger-only archives from linked-user replies when the mention feed misses them", async () => {
   const previousHandle = process.env.THREADS_BOT_HANDLE;
   const previousAppId = process.env.THREADS_BOT_APP_ID;
   const previousAppSecret = process.env.THREADS_BOT_APP_SECRET;
@@ -1174,10 +1178,14 @@ test("mention collector repairs trigger-only archives from linked-user replies w
       "https://ss-threads.dahanda.dev"
     );
     process.env.THREADS_BOT_HANDLE = "ss_threads_bot";
+    const linkedUserId = data.botUsers.find((candidate) => candidate.threadsHandle === "linkedwriter")?.id;
+    if (!linkedUserId) {
+      throw new Error("Expected linkedwriter user to exist after OAuth completion.");
+    }
 
     data.botArchives.push({
       id: "archive-1",
-      userId: "user-1",
+      userId: linkedUserId,
       mentionId: "mention-1",
       mentionUrl: "https://www.threads.com/@linkedwriter/post/MENTION1",
       mentionAuthorHandle: "linkedwriter",

@@ -16,7 +16,6 @@ import {
   selectHighlight,
   type GrowthInsightsData
 } from "./growth-tier";
-import { buildArchiveTitle as buildArchiveTitleText } from "@threads/shared/utils";
 interface BotPublicConfig {
   botHandle: string;
   oauthConfigured: boolean;
@@ -48,6 +47,7 @@ interface BotArchiveView {
   id: string;
   origin: "mention" | "cloud";
   originLabel: string;
+  title: string;
   mentionUrl: string | null;
   mentionAuthorHandle: string | null;
   mentionAuthorDisplayName: string | null;
@@ -274,6 +274,12 @@ interface ScrapbookSyncSnapshot {
 }
 
 type WorkspaceTab = "inbox" | "watchlists" | "searches" | "insights";
+type ArchiveInlineEditMode = "title" | "tags";
+
+interface ArchiveInlineEditState {
+  archiveId: string;
+  mode: ArchiveInlineEditMode;
+}
 
 let latestConfig: BotPublicConfig | null = null;
 let latestState: BotSessionState | null = null;
@@ -281,6 +287,7 @@ let latestWorkspace: ScrapbookPlusState | null = null;
 let activeTab: WorkspaceTab = "inbox";
 let activeArchiveId: string | null = null;
 let editingArchiveId: string | null = null;
+let activeArchiveInlineEdit: ArchiveInlineEditState | null = null;
 let activeScrapbookHandle: string | null = null;
 const selectedArchiveIds = new Set<string>();
 const expandedMediaArchiveIds = new Set<string>();
@@ -448,7 +455,6 @@ const sessionTrigger = document.querySelector<HTMLButtonElement>("#session-trigg
 const sessionMenu = document.querySelector<HTMLElement>("#session-menu");
 const pageStatus = document.querySelector<HTMLParagraphElement>("#page-status");
 const saveStatusPanel = document.querySelector<HTMLElement>("#save-status-panel");
-const saveStatusEyebrow = document.querySelector<HTMLElement>("#save-status-eyebrow");
 const saveStatusLastLabel = document.querySelector<HTMLElement>("#save-status-last-label");
 const saveStatusLastValue = document.querySelector<HTMLElement>("#save-status-last-value");
 const saveStatusPlan = document.querySelector<HTMLElement>("#save-status-plan");
@@ -1661,7 +1667,11 @@ function escapeHtml(value: string): string {
 }
 
 async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(url, init);
+  const response = await fetch(url, {
+    credentials: "same-origin",
+    cache: "no-store",
+    ...init
+  });
   const payload = (await response.json().catch(() => null)) as (T & { error?: string }) | null;
   if (!response.ok) {
     throw new Error(payload?.error || formatMessage(runtimeLabel().requestFailed, { status: response.status }));
@@ -1671,7 +1681,11 @@ async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
 }
 
 async function requestBlob(url: string, init?: RequestInit): Promise<{ blob: Blob; filename: string | null }> {
-  const response = await fetch(url, init);
+  const response = await fetch(url, {
+    credentials: "same-origin",
+    cache: "no-store",
+    ...init
+  });
   if (!response.ok) {
     const payload = (await response.json().catch(() => null)) as { error?: string } | null;
     throw new Error(payload?.error || formatMessage(runtimeLabel().requestFailed, { status: response.status }));
@@ -1866,7 +1880,6 @@ function renderSaveStatus(state: BotSessionState | null): void {
   }
 
   const saveStatus = state?.saveStatus ?? null;
-  setElementText(saveStatusEyebrow, uiText("댓글 저장", "Reply saves"));
   setElementText(
     saveStatusLastLabel,
     uiText("업데이트", "Updated", {
@@ -2007,12 +2020,16 @@ function setConnectButtonsIdle(): void {
 }
 
 function buildArchiveTitle(item: BotArchiveView): string {
-  return buildArchiveTitleText(item.targetAuthorHandle, item.targetText, {
-    noteText: item.origin === "mention" ? item.noteText : null,
-    maxLength: 30,
-    fallbackWithAuthor: item.targetAuthorHandle ? t("scrapbookArchiveFallbackAuthorPost", { handle: item.targetAuthorHandle }) : undefined,
-    fallbackWithoutAuthor: t("scrapbookArchiveFallbackSavedItem")
-  });
+  const explicitTitle = item.title?.trim();
+  if (explicitTitle) {
+    return explicitTitle;
+  }
+
+  if (item.targetAuthorHandle) {
+    return t("scrapbookArchiveFallbackAuthorPost", { handle: item.targetAuthorHandle });
+  }
+
+  return t("scrapbookArchiveFallbackSavedItem");
 }
 
 function normalizeArchiveHandle(value: string | null | undefined): string {
@@ -2078,6 +2095,39 @@ function isLikelyArchiveParseIssue(item: BotArchiveView): boolean {
 
 function buildArchiveTagsLabel(item: BotArchiveView): string {
   return item.tags.map((tag) => `#${tag}`).join(" ");
+}
+
+function formatArchiveTagEditorValue(tags: string[]): string {
+  return tags.map((tag) => `#${tag}`).join(" ");
+}
+
+function parseArchiveTagEditorValue(value: string): string[] {
+  const hashtagMatches = value.match(/#[\p{L}\p{N}_-]+/gu);
+  const rawTags =
+    hashtagMatches && hashtagMatches.length > 0
+      ? hashtagMatches.map((match) => match.slice(1))
+      : value.split(/[\s,]+/u);
+
+  const normalized = new Set<string>();
+  for (const rawTag of rawTags) {
+    const tag = rawTag.trim().replace(/^#+/u, "").toLowerCase();
+    if (tag) {
+      normalized.add(tag);
+    }
+    if (normalized.size >= 3) {
+      break;
+    }
+  }
+
+  return [...normalized];
+}
+
+function isArchiveInlineEditActive(item: BotArchiveView, mode?: ArchiveInlineEditMode): boolean {
+  return Boolean(
+    activeArchiveInlineEdit &&
+      activeArchiveInlineEdit.archiveId === item.id &&
+      (mode ? activeArchiveInlineEdit.mode === mode : true)
+  );
 }
 
 function isArchiveCompactLayout(): boolean {
@@ -2919,11 +2969,19 @@ function renderArchiveDetailHtml(item: BotArchiveView): string {
       ${
         isEditing
           ? `<div class="archive-edit-form">
-              <label class="archive-edit-label">${escapeHtml(uiText("메모 편집", "Edit note"))}</label>
-              <textarea class="archive-edit-textarea" data-edit-textarea="${item.id}" rows="4" placeholder="${escapeHtml(uiText("메모를 입력하세요 (#태그 사용 가능)", "Enter a note (#tags supported)"))}">${escapeHtml(item.noteText ?? "")}</textarea>
+              <label class="archive-edit-label">${escapeHtml(uiText("제목 · 메모 편집", "Edit title and note"))}</label>
+              <p class="archive-edit-help">${escapeHtml(
+                uiText(
+                  "첫 줄은 제목, 다음 줄부터는 메모입니다. #태그도 여기서 함께 수정할 수 있어요.",
+                  "The first line becomes the title, lines below are notes, and you can edit #tags here too."
+                )
+              )}</p>
+              <textarea class="archive-edit-textarea" data-edit-textarea="${item.id}" rows="4" placeholder="${escapeHtml(
+                uiText("첫 줄은 제목, 다음 줄부터 메모를 입력하세요. #태그 가능", "First line is the title, lines below are notes. #tags supported.")
+              )}">${escapeHtml(item.noteText ?? "")}</textarea>
               <div class="archive-edit-actions">
-                <button class="primary-cta archive-edit-save" type="button" data-edit-save="${item.id}">${escapeHtml(uiText("저장", "Save"))}</button>
-                <button class="secondary-cta archive-edit-cancel" type="button" data-edit-cancel="${item.id}">${escapeHtml(uiText("취소", "Cancel"))}</button>
+                <button class="topbar-link topbar-link-strong archive-edit-save" type="button" data-edit-save="${item.id}">${escapeHtml(uiText("저장", "Save"))}</button>
+                <button class="topbar-link archive-edit-cancel" type="button" data-edit-cancel="${item.id}">${escapeHtml(uiText("취소", "Cancel"))}</button>
               </div>
             </div>`
           : ""
@@ -2946,10 +3004,51 @@ function renderArchiveDetailHtml(item: BotArchiveView): string {
       ${hasMedia && showMedia && item.mediaUrls.length > 0 ? renderMediaPreviewUrls(item.mediaUrls) : ""}
       ${renderReplyBlocks(item, showMedia)}
       <div class="archive-actions">
-        <button class="topbar-link archive-edit-toggle" type="button" data-archive-edit="${item.id}">${escapeHtml(isEditing ? uiText("편집 닫기", "Close edit") : uiText("편집", "Edit"))}</button>
+        <button class="topbar-link archive-edit-toggle" type="button" data-archive-edit="${item.id}">${escapeHtml(
+          isEditing ? uiText("편집 닫기", "Close edit") : uiText("메모·통합 편집", "Edit note and details")
+        )}</button>
         <button class="topbar-link archive-copy" type="button" data-copy="${item.id}">${escapeHtml(t("scrapbookCopyMarkdown"))}</button>
         <a class="topbar-link archive-action-link" href="/api/public/bot/archive/${encodeURIComponent(item.id)}.md">${escapeHtml(t("scrapbookDownloadMarkdown"))}</a>
         <button class="topbar-link archive-action-link" type="button" data-archive-delete="${item.id}">${escapeHtml(t("scrapbookDelete"))}</button>
+      </div>
+    </div>
+  `;
+}
+
+function renderArchiveInlineEditHtml(item: BotArchiveView): string {
+  if (!activeArchiveInlineEdit || activeArchiveInlineEdit.archiveId !== item.id) {
+    return "";
+  }
+
+  const isTitleMode = activeArchiveInlineEdit.mode === "title";
+  const label = isTitleMode ? uiText("제목 편집", "Edit title") : uiText("태그 편집", "Edit tags");
+  const help = isTitleMode
+    ? uiText(
+        "목록 제목만 바로 바꿉니다. 저장하면 이 항목에 제목이 고정됩니다.",
+        "Change the list title in place. Saving pins an explicit title for this item."
+      )
+    : uiText(
+        "공백이나 쉼표로 구분해 입력하거나 #태그 형식으로 적어도 됩니다. 최대 3개까지 저장됩니다.",
+        "Enter tags with spaces, commas, or #hashtags. Up to 3 tags are saved."
+      );
+  const value = isTitleMode ? buildArchiveTitle(item) : formatArchiveTagEditorValue(item.tags);
+  const placeholder = isTitleMode ? uiText("새 제목", "New title") : uiText("#threads #idea", "#threads #idea");
+
+  return `
+    <div class="archive-inline-edit">
+      <label class="archive-edit-label">${escapeHtml(label)}</label>
+      <p class="archive-edit-help">${escapeHtml(help)}</p>
+      <input
+        class="archive-edit-input"
+        type="text"
+        data-inline-input="${item.id}"
+        data-inline-mode="${activeArchiveInlineEdit.mode}"
+        value="${escapeHtml(value)}"
+        placeholder="${escapeHtml(placeholder)}"
+      />
+      <div class="archive-edit-actions">
+        <button class="topbar-link topbar-link-strong" type="button" data-inline-save="${item.id}" data-inline-mode="${activeArchiveInlineEdit.mode}">${escapeHtml(uiText("저장", "Save"))}</button>
+        <button class="topbar-link" type="button" data-inline-cancel="${item.id}">${escapeHtml(uiText("취소", "Cancel"))}</button>
       </div>
     </div>
   `;
@@ -2971,6 +3070,7 @@ function renderArchives(items: BotArchiveView[], isAuthenticated: boolean): void
       ? `<strong>${escapeHtml(t("scrapbookArchiveLoginTitle"))}</strong><span>${escapeHtml(t("scrapbookArchiveLoginRequiredCopy"))}</span>`
       : `<strong>${escapeHtml(t("scrapbookArchiveEmptyTitle"))}</strong><span>${escapeHtml(t("scrapbookArchiveEmptyCopy"))}</span>`;
     activeArchiveId = null;
+    activeArchiveInlineEdit = null;
     archivesPaginationEl?.classList.add("hidden");
     updateArchivesToolbar([], isAuthenticated);
     archivesFilterBar?.classList.toggle("hidden", true);
@@ -2989,6 +3089,9 @@ function renderArchives(items: BotArchiveView[], isAuthenticated: boolean): void
   syncSelectedArchiveIds(filtered);
   if (!filtered.some((item) => item.id === activeArchiveId)) {
     activeArchiveId = null;
+  }
+  if (activeArchiveInlineEdit && !filtered.some((item) => item.id === activeArchiveInlineEdit?.archiveId)) {
+    activeArchiveInlineEdit = null;
   }
 
   archivesEmptyEl.classList.add("hidden");
@@ -3017,6 +3120,7 @@ function renderArchives(items: BotArchiveView[], isAuthenticated: boolean): void
     const isSelected = selectedArchiveIds.has(item.id);
     const isActive = activeArchiveId === item.id;
     const rowMeta = buildArchiveRowMeta(item);
+    const hasInlineEdit = isArchiveInlineEditActive(item);
     html += `
         <tr class="${isActive ? "is-active" : ""}" data-open-row="${item.id}">
           <td class="archive-table-select">
@@ -3028,11 +3132,18 @@ function renderArchives(items: BotArchiveView[], isAuthenticated: boolean): void
             <div class="archive-row-main">
               <button class="archive-row-title" type="button" data-open-trigger="${item.id}">${escapeHtml(buildArchiveTitle(item))}</button>
               ${rowMeta ? `<div class="archive-row-meta">${escapeHtml(rowMeta)}</div>` : ""}
+              <div class="archive-row-inline-actions">
+                <button class="archive-row-inline-action ${isArchiveInlineEditActive(item, "title") ? "is-active" : ""}" type="button" data-row-edit="${item.id}" data-row-edit-mode="title" aria-pressed="${String(isArchiveInlineEditActive(item, "title"))}">${escapeHtml(uiText("제목 편집", "Edit title"))}</button>
+                <button class="archive-row-inline-action ${isArchiveInlineEditActive(item, "tags") ? "is-active" : ""}" type="button" data-row-edit="${item.id}" data-row-edit-mode="tags" aria-pressed="${String(isArchiveInlineEditActive(item, "tags"))}">${escapeHtml(uiText("태그 편집", "Edit tags"))}</button>
+              </div>
             </div>
           </td>
           <td class="archive-row-date">${escapeHtml(formatDate(item.archivedAt))}</td>
         </tr>
       `;
+    if (hasInlineEdit) {
+      html += `<tr class="archive-row-edit"><td colspan="3">${renderArchiveInlineEditHtml(item)}</td></tr>`;
+    }
     if (isActive) {
       html += `<tr class="archive-row-detail"><td colspan="3">${renderArchiveDetailHtml(item)}</td></tr>`;
     }
@@ -3069,7 +3180,7 @@ function renderArchives(items: BotArchiveView[], isAuthenticated: boolean): void
       if (!(event.target instanceof HTMLElement)) {
         return;
       }
-      if (event.target.closest(".archive-row-checkbox")) {
+      if (event.target.closest(".archive-row-checkbox") || event.target.closest(".archive-row-inline-actions")) {
         return;
       }
       toggleArchiveOpen(archiveId);
@@ -3084,6 +3195,49 @@ function renderArchives(items: BotArchiveView[], isAuthenticated: boolean): void
       }
       event.stopPropagation();
       toggleArchiveOpen(archiveId);
+    });
+  }
+
+  for (const button of archivesEl.querySelectorAll<HTMLButtonElement>("[data-row-edit]")) {
+    button.addEventListener("click", (event) => {
+      event.stopPropagation();
+      const archiveId = button.dataset.rowEdit;
+      const mode = button.dataset.rowEditMode as ArchiveInlineEditMode | undefined;
+      if (!archiveId || !mode) {
+        return;
+      }
+      activeArchiveInlineEdit =
+        activeArchiveInlineEdit?.archiveId === archiveId && activeArchiveInlineEdit.mode === mode
+          ? null
+          : { archiveId, mode };
+      editingArchiveId = null;
+      renderArchives(items, isAuthenticated);
+    });
+  }
+
+  for (const button of archivesEl.querySelectorAll<HTMLButtonElement>("[data-inline-save]")) {
+    button.addEventListener("click", () => {
+      const archiveId = button.dataset.inlineSave;
+      const mode = button.dataset.inlineMode as ArchiveInlineEditMode | undefined;
+      if (!archiveId || !mode) {
+        return;
+      }
+      const input = archivesEl.querySelector<HTMLInputElement>(`[data-inline-input="${archiveId}"]`);
+      if (!input) {
+        return;
+      }
+      if (mode === "title") {
+        void updateArchiveTitleRequest(archiveId, input.value);
+        return;
+      }
+      void updateArchiveTagsRequest(archiveId, input.value);
+    });
+  }
+
+  for (const button of archivesEl.querySelectorAll<HTMLButtonElement>("[data-inline-cancel]")) {
+    button.addEventListener("click", () => {
+      activeArchiveInlineEdit = null;
+      renderArchives(items, isAuthenticated);
     });
   }
 
@@ -3114,6 +3268,7 @@ function renderArchives(items: BotArchiveView[], isAuthenticated: boolean): void
     const archiveEditButton = archivesEl.querySelector<HTMLButtonElement>("[data-archive-edit]");
     if (archiveEditButton) {
       archiveEditButton.addEventListener("click", () => {
+        activeArchiveInlineEdit = null;
         editingArchiveId = editingArchiveId === detailItem.id ? null : detailItem.id;
         renderArchives(items, isAuthenticated);
       });
@@ -3989,6 +4144,8 @@ function applySessionState(
   const nextUserHandle = isAuthenticated ? normalizeScrapbookHandle(state.user?.threadsHandle) : null;
   activeScrapbookHandle = nextUserHandle;
   if (!isAuthenticated || (previousUserHandle && nextUserHandle && previousUserHandle !== nextUserHandle)) {
+    editingArchiveId = null;
+    activeArchiveInlineEdit = null;
     latestWorkspace = null;
     renderScopeStatus(null);
     renderWatchlists(null);
@@ -4100,8 +4257,10 @@ async function initializeScrapbook(): Promise<void> {
 
   if (workspace) {
     applyWorkspaceState(workspace);
-  } else if (state.authenticated && state.user) {
-    void refreshWorkspace().catch(() => undefined);
+  }
+
+  if (state.authenticated && state.user) {
+    void syncLatestMentions({ silent: true, suppressErrors: true }).catch(() => undefined);
   }
 }
 
@@ -4112,6 +4271,19 @@ async function refreshWorkspace(): Promise<void> {
 
 async function refreshEverything(): Promise<void> {
   await Promise.all([refreshSession(), refreshWorkspace()]);
+}
+
+function applyArchiveMutationState(state: BotSessionState): void {
+  if (!latestConfig) {
+    latestState = state;
+    return;
+  }
+
+  applySessionState(latestConfig, {
+    ...state,
+    botHandle: latestConfig.botHandle,
+    oauthConfigured: latestConfig.oauthConfigured
+  });
 }
 
 async function submitPlusActivation(event: SubmitEvent): Promise<void> {
@@ -4185,7 +4357,7 @@ async function clearPlusActivationRequest(): Promise<void> {
   }
 }
 
-async function syncLatestMentions(): Promise<void> {
+async function syncLatestMentions(options: { silent?: boolean; suppressErrors?: boolean } = {}): Promise<void> {
   if (!latestConfig) {
     return;
   }
@@ -4206,15 +4378,22 @@ async function syncLatestMentions(): Promise<void> {
     if (state.workspace) {
       applyWorkspaceState(state.workspace);
     }
-    const filteredCount = filterArchives(state.archives).length;
-    setStatus(
-      hasActiveArchiveFilters() && state.archives.length > filteredCount
-        ? uiText(
-            "새 댓글 저장 상태를 확인했습니다. 현재 검색이나 태그 필터 때문에 일부 항목이 바로 안 보일 수 있습니다.",
-            "Checked the latest reply saves. Some items may still be hidden by your current search or tag filters."
-          )
-        : uiText("새 댓글 저장 상태를 다시 확인했습니다.", "Checked the latest reply save status.")
-    );
+    if (!options.silent) {
+      const filteredCount = filterArchives(state.archives).length;
+      setStatus(
+        hasActiveArchiveFilters() && state.archives.length > filteredCount
+          ? uiText(
+              "새 댓글 저장 상태를 확인했습니다. 현재 검색이나 태그 필터 때문에 일부 항목이 바로 안 보일 수 있습니다.",
+              "Checked the latest reply saves. Some items may still be hidden by your current search or tag filters."
+            )
+          : uiText("새 댓글 저장 상태를 다시 확인했습니다.", "Checked the latest reply save status.")
+      );
+    }
+  } catch (error) {
+    if (!options.suppressErrors) {
+      setStatus(error instanceof Error ? error.message : uiText("저장 상태를 다시 확인할 수 없습니다.", "Could not refresh save status."), true);
+    }
+    throw error;
   } finally {
     isRefreshingSaveStatus = false;
     renderSaveStatus(latestState);
@@ -4293,6 +4472,9 @@ async function deleteArchiveRequest(archiveId: string): Promise<void> {
   if (activeArchiveId === normalizedId) {
     activeArchiveId = null;
   }
+  if (activeArchiveInlineEdit?.archiveId === normalizedId) {
+    activeArchiveInlineEdit = null;
+  }
   await refreshEverything();
   setStatus(t("scrapbookStatusArchiveDeleted"));
 }
@@ -4304,16 +4486,56 @@ async function updateArchiveNoteRequest(archiveId: string, noteText: string): Pr
   }
 
   try {
-    await requestJson<BotSessionState>(`/api/public/bot/archive/${encodeURIComponent(normalizedId)}`, {
+    const state = await requestJson<BotSessionState>(`/api/public/bot/archive/${encodeURIComponent(normalizedId)}`, {
       method: "PATCH",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ noteText })
     });
     editingArchiveId = null;
-    await refreshEverything();
+    applyArchiveMutationState(state);
     setStatus(uiText("메모가 저장되었습니다.", "Note saved."));
   } catch (error) {
     setStatus(error instanceof Error ? error.message : uiText("메모 저장에 실패했습니다.", "Failed to save note."), true);
+  }
+}
+
+async function updateArchiveTitleRequest(archiveId: string, title: string): Promise<void> {
+  const normalizedId = archiveId.trim();
+  if (!normalizedId) {
+    return;
+  }
+
+  try {
+    const state = await requestJson<BotSessionState>(`/api/public/bot/archive/${encodeURIComponent(normalizedId)}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ title })
+    });
+    activeArchiveInlineEdit = null;
+    applyArchiveMutationState(state);
+    setStatus(uiText("제목이 저장되었습니다.", "Title saved."));
+  } catch (error) {
+    setStatus(error instanceof Error ? error.message : uiText("제목 저장에 실패했습니다.", "Failed to save title."), true);
+  }
+}
+
+async function updateArchiveTagsRequest(archiveId: string, rawTags: string): Promise<void> {
+  const normalizedId = archiveId.trim();
+  if (!normalizedId) {
+    return;
+  }
+
+  try {
+    const state = await requestJson<BotSessionState>(`/api/public/bot/archive/${encodeURIComponent(normalizedId)}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ tags: parseArchiveTagEditorValue(rawTags) })
+    });
+    activeArchiveInlineEdit = null;
+    applyArchiveMutationState(state);
+    setStatus(uiText("태그가 저장되었습니다.", "Tags saved."));
+  } catch (error) {
+    setStatus(error instanceof Error ? error.message : uiText("태그 저장에 실패했습니다.", "Failed to save tags."), true);
   }
 }
 

@@ -24,6 +24,7 @@ import {
   saveCloudArchiveWithExtensionToken,
   startBotOauth,
   syncExtensionCloudLicenseLink,
+  updateArchive,
   validateBotIngestRequest
 } from "../packages/web-server/src/server/bot-service";
 import { replaceRuntimeConfigForTests } from "../packages/web-server/src/server/runtime-config";
@@ -720,6 +721,264 @@ test("trigger-only mention captures are hidden when the bot mention is at the en
   }
 });
 
+test("session state returns server-built titles for mention archives", () => {
+  const data = buildDefaultDatabase("2026-03-25T00:00:00.000Z");
+  data.botUsers.push({
+    id: "user-1",
+    threadsUserId: "threads-user-1",
+    threadsHandle: "writer",
+    displayName: "Writer",
+    profilePictureUrl: null,
+    biography: null,
+    isVerified: false,
+    accessTokenCiphertext: null,
+    tokenExpiresAt: null,
+    email: null,
+    grantedScopes: [],
+    scopeVersion: 0,
+    lastScopeUpgradeAt: null,
+    createdAt: "2026-03-25T00:00:00.000Z",
+    updatedAt: "2026-03-25T00:00:00.000Z",
+    lastLoginAt: "2026-03-25T00:00:00.000Z",
+    status: "active"
+  });
+  data.botSessions.push({
+    id: "session-1",
+    userId: "user-1",
+    sessionHash: createHash("sha256").update("session-token-1").digest("hex"),
+    createdAt: "2026-03-25T00:00:00.000Z",
+    expiresAt: "2026-04-25T00:00:00.000Z",
+    lastSeenAt: "2026-03-25T00:00:00.000Z",
+    revokedAt: null,
+    status: "active"
+  });
+  data.botArchives.push({
+    id: "archive-1",
+    userId: "user-1",
+    mentionId: "mention-1",
+    mentionUrl: "https://www.threads.com/@writer/post/MENTION1",
+    mentionAuthorHandle: "writer",
+    mentionAuthorDisplayName: "Writer",
+    noteText: "유니트리 휴머노이드 간병 로봇\n아직 사람은 다루지는 않는데, 사람도 곧 케어하겠네요. @ss_threads_bot",
+    targetUrl: "https://www.threads.com/@choi.openai/post/ROOT999",
+    targetAuthorHandle: "choi.openai",
+    targetAuthorDisplayName: "choi.openai",
+    targetText: "중국의 로봇 기업 유니트리(Unitree)가 병원 현장에 휴머노이드 로봇을 투입해 실제 간병 및 지원 인력으로 활용하기 시작했습니다.",
+    targetPublishedAt: "2026-03-25T01:00:00.000Z",
+    mediaUrls: [],
+    markdownContent: "# stale",
+    rawPayloadJson: JSON.stringify({
+      mention: {
+        id: "mention-1"
+      },
+      target: {
+        id: "target-1"
+      },
+      extractedPost: {
+        canonicalUrl: "https://www.threads.com/@choi.openai/post/ROOT999",
+        shortcode: "ROOT999",
+        author: "choi.openai",
+        title: "중국의 로봇 기업 유니트리(Unitree)가 병원",
+        text: "중국의 로봇 기업 유니트리(Unitree)가 병원 현장에 휴머노이드 로봇을 투입해 실제 간병 및 지원 인력으로 활용하기 시작했습니다.",
+        publishedAt: "2026-03-25T01:00:00.000Z",
+        capturedAt: "2026-03-25T01:00:00.000Z",
+        sourceType: "text",
+        imageUrls: [],
+        videoUrl: null,
+        externalUrl: null,
+        quotedPostUrl: null,
+        repliedToUrl: null,
+        thumbnailUrl: null,
+        authorReplies: [],
+        extractorVersion: "2026-03-25",
+        contentHash: "target-hash-1"
+      }
+    }),
+    archivedAt: "2026-03-25T01:00:00.000Z",
+    updatedAt: "2026-03-25T01:00:00.000Z",
+    status: "saved"
+  });
+
+  const state = getBotSessionState(data, "session-token-1");
+  assert.equal(state.archives.length, 1);
+  assert.equal(state.archives[0]?.title, "유니트리 휴머노이드 간병 로봇");
+});
+
+test("archive patch updates mention title and tags without dropping note body", () => {
+  const data = buildDefaultDatabase("2026-03-25T00:00:00.000Z");
+  data.botUsers.push({
+    id: "user-1",
+    threadsUserId: "threads-user-1",
+    threadsHandle: "writer",
+    displayName: "Writer",
+    profilePictureUrl: null,
+    biography: null,
+    isVerified: false,
+    accessTokenCiphertext: null,
+    tokenExpiresAt: null,
+    email: null,
+    grantedScopes: [],
+    scopeVersion: 0,
+    lastScopeUpgradeAt: null,
+    createdAt: "2026-03-25T00:00:00.000Z",
+    updatedAt: "2026-03-25T00:00:00.000Z",
+    lastLoginAt: "2026-03-25T00:00:00.000Z",
+    status: "active"
+  });
+  data.botSessions.push({
+    id: "session-1",
+    userId: "user-1",
+    sessionHash: createHash("sha256").update("session-token-1").digest("hex"),
+    createdAt: "2026-03-25T00:00:00.000Z",
+    expiresAt: "2026-04-25T00:00:00.000Z",
+    lastSeenAt: "2026-03-25T00:00:00.000Z",
+    revokedAt: null,
+    status: "active"
+  });
+  data.botArchives.push({
+    id: "archive-1",
+    userId: "user-1",
+    mentionId: "mention-1",
+    mentionUrl: "https://www.threads.com/@writer/post/MENTION1",
+    mentionAuthorHandle: "writer",
+    mentionAuthorDisplayName: "Writer",
+    noteText: "원래 제목\n남겨둘 메모입니다. #oldtag",
+    targetUrl: "https://www.threads.com/@choi.openai/post/ROOT999",
+    targetAuthorHandle: "choi.openai",
+    targetAuthorDisplayName: "choi.openai",
+    targetText: "중국의 로봇 기업 유니트리(Unitree)가 병원 현장에 휴머노이드 로봇을 투입해 실제 간병 및 지원 인력으로 활용하기 시작했습니다.",
+    targetPublishedAt: "2026-03-25T01:00:00.000Z",
+    mediaUrls: [],
+    markdownContent: "# stale",
+    rawPayloadJson: JSON.stringify({
+      extractedPost: {
+        canonicalUrl: "https://www.threads.com/@choi.openai/post/ROOT999",
+        shortcode: "ROOT999",
+        author: "choi.openai",
+        title: "중국의 로봇 기업 유니트리(Unitree)가 병원",
+        text: "중국의 로봇 기업 유니트리(Unitree)가 병원 현장에 휴머노이드 로봇을 투입해 실제 간병 및 지원 인력으로 활용하기 시작했습니다.",
+        publishedAt: "2026-03-25T01:00:00.000Z",
+        capturedAt: "2026-03-25T01:00:00.000Z",
+        sourceType: "text",
+        imageUrls: [],
+        videoUrl: null,
+        externalUrl: null,
+        quotedPostUrl: null,
+        repliedToUrl: null,
+        thumbnailUrl: null,
+        authorReplies: [],
+        extractorVersion: "2026-03-25",
+        contentHash: "target-hash-1"
+      }
+    }),
+    archivedAt: "2026-03-25T01:00:00.000Z",
+    updatedAt: "2026-03-25T01:00:00.000Z",
+    status: "saved"
+  });
+
+  let state = updateArchive(data, "session-token-1", "archive-1", {
+    title: "새 제목"
+  });
+  assert.equal(state.archives[0]?.title, "새 제목");
+  assert.match(data.botArchives[0]?.noteText ?? "", /^새 제목\n/u);
+  assert.match(data.botArchives[0]?.noteText ?? "", /남겨둘 메모입니다\./u);
+
+  state = updateArchive(data, "session-token-1", "archive-1", {
+    tags: ["launch", "ai"]
+  });
+  assert.equal(state.archives[0]?.title, "새 제목");
+  assert.deepEqual(state.archives[0]?.tags, ["launch", "ai"]);
+  assert.match(data.botArchives[0]?.noteText ?? "", /#launch #ai$/u);
+});
+
+test("archive patch updates cloud title and tags in the saved archive view", () => {
+  const data = buildDefaultDatabase("2026-03-25T00:00:00.000Z");
+  data.botUsers.push({
+    id: "user-1",
+    threadsUserId: "threads-user-1",
+    threadsHandle: "writer",
+    displayName: "Writer",
+    profilePictureUrl: null,
+    biography: null,
+    isVerified: false,
+    accessTokenCiphertext: null,
+    tokenExpiresAt: null,
+    email: null,
+    grantedScopes: [],
+    scopeVersion: 0,
+    lastScopeUpgradeAt: null,
+    createdAt: "2026-03-25T00:00:00.000Z",
+    updatedAt: "2026-03-25T00:00:00.000Z",
+    lastLoginAt: "2026-03-25T00:00:00.000Z",
+    status: "active"
+  });
+  data.botSessions.push({
+    id: "session-1",
+    userId: "user-1",
+    sessionHash: createHash("sha256").update("session-token-1").digest("hex"),
+    createdAt: "2026-03-25T00:00:00.000Z",
+    expiresAt: "2026-04-25T00:00:00.000Z",
+    lastSeenAt: "2026-03-25T00:00:00.000Z",
+    revokedAt: null,
+    status: "active"
+  });
+  data.cloudArchives.push({
+    id: "cloud-1",
+    userId: "user-1",
+    canonicalUrl: "https://www.threads.com/@writer/post/CLOUD1",
+    shortcode: "CLOUD1",
+    targetAuthorHandle: "writer",
+    targetAuthorDisplayName: "Writer",
+    targetTitle: "Writer on Threads",
+    targetText: "Cloud archive body",
+    targetPublishedAt: "2026-03-25T01:00:00.000Z",
+    mediaUrls: [],
+    markdownContent: "# stale",
+    rawPayloadJson: JSON.stringify({
+      extractedPost: {
+        canonicalUrl: "https://www.threads.com/@writer/post/CLOUD1",
+        shortcode: "CLOUD1",
+        author: "writer",
+        title: "Writer on Threads",
+        text: "Cloud archive body",
+        publishedAt: "2026-03-25T01:00:00.000Z",
+        capturedAt: "2026-03-25T01:00:00.000Z",
+        sourceType: "text",
+        imageUrls: [],
+        videoUrl: null,
+        externalUrl: null,
+        quotedPostUrl: null,
+        repliedToUrl: null,
+        thumbnailUrl: null,
+        authorReplies: [],
+        extractorVersion: "2026-03-25",
+        contentHash: "cloud-hash-1"
+      },
+      aiResult: {
+        summary: "Original summary",
+        tags: ["threads"],
+        frontmatter: {}
+      },
+      aiWarning: null,
+      locale: "en"
+    }),
+    contentHash: "cloud-hash-1",
+    savedAt: "2026-03-25T01:00:00.000Z",
+    updatedAt: "2026-03-25T01:00:00.000Z",
+    status: "saved"
+  });
+
+  const state = updateArchive(data, "session-token-1", "cloud-1", {
+    title: "Cloud launch recap",
+    tags: ["launch", "threads"]
+  });
+
+  assert.equal(state.archives[0]?.title, "Cloud launch recap");
+  assert.deepEqual(state.archives[0]?.tags, ["launch", "threads"]);
+  assert.equal(data.cloudArchives[0]?.targetTitle, "Cloud launch recap");
+  assert.match(data.cloudArchives[0]?.rawPayloadJson ?? "", /Cloud launch recap/);
+});
+
 test("scrapbook ZIP export keeps one markdown file and flat image files per archive", async () => {
   const previousFetch = globalThis.fetch;
   const previousMediaAllowlist = process.env.THREADS_ARCHIVE_MEDIA_HOST_ALLOWLIST;
@@ -939,6 +1198,7 @@ test("cloud save creates a scrapbook archive with deep link and ZIP export", asy
     const sessionState = getBotSessionState(data, "session-token-cloud-1");
     assert.equal(sessionState.archives.length, 1);
     assert.equal(sessionState.archives[0]?.origin, "cloud");
+    assert.equal(sessionState.archives[0]?.title, "Writer on Threads");
     assert.equal(sessionState.archives[0]?.mentionUrl, null);
     assert.deepEqual(sessionState.archives[0]?.tags, ["launch", "threads"]);
 

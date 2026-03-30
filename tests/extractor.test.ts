@@ -181,6 +181,52 @@ const domFallbackFixture = `
 </html>
 `;
 
+const commentContaminationFixture = `
+<!doctype html>
+<html lang="ko">
+  <head>
+    <link rel="canonical" href="https://www.threads.com/@choi.openai/post/ROOT999" />
+    <meta property="og:title" content="choi.openai on Threads" />
+  </head>
+  <body>
+    <main>
+      <section>
+        <div class="thread-card">
+          <div class="meta">
+            <a href="https://www.threads.com/@choi.openai/post/ROOT999"><time datetime="2026-03-30T00:15:00.000Z">19시간</time></a>
+            <div>choi.openai</div>
+          </div>
+          <div class="body">
+            <div>중국의 로봇 기업 유니트리(Unitree)가 병원 현장에 휴머노이드 로봇을 투입해 실제 간병 및 지원 인력으로 활용하기 시작했습니다.</div>
+            <div>새벽 시간에 휠체어를 옮기는 등 육체적으로 고된 반복 업무를 직접 수행하고 있는데요.</div>
+            <div>지치지 않고 움직이는 로봇은 이제 현실의 인력 부족 문제를 직접 해결하고 있습니다.</div>
+            <div>로봇이 언제쯤 우리 일상을 바꿀까 싶었지만, 사람의 손길이 가장 절실한 곳에서부터 이미 조용히 혁명이 시작되고 있습니다.</div>
+          </div>
+        </div>
+        <div class="reply-card">
+          <div class="meta">
+            <a href="https://www.threads.com/@mkk_aoh/post/COMMENT1"><time datetime="2026-03-30T00:25:00.000Z">10분</time></a>
+            <div>mkk_aoh</div>
+          </div>
+          <div class="body">
+            <div>어디서 분명 감정적인 교류가 필요한 간호사가 가장 대체 되지 않을거라 했는데.</div>
+          </div>
+        </div>
+        <div class="reply-card">
+          <div class="meta">
+            <a href="https://www.threads.com/@mine_111379/post/COMMENT2"><time datetime="2026-03-30T00:28:00.000Z">7분</time></a>
+            <div>mine_111379</div>
+          </div>
+          <div class="body">
+            <div>감정교류는 저것이 절대 해 줄 수 없음.</div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>
+`;
+
 const structuredUnicodeFixture = `
 <!doctype html>
 <html lang="ko">
@@ -371,6 +417,16 @@ test("dom fallback keeps only the main post text and unwraps link shim urls", as
   assert.equal(post.text.includes("좋아요"), false);
   assert.equal(post.text.includes("솔루션"), false);
   assert.equal(post.text.includes("github.com/toget"), false);
+});
+
+test("root extraction stops before foreign reply cards inside the same container", async () => {
+  const dom = new JSDOM(commentContaminationFixture, { url: "https://www.threads.com/@choi.openai/post/ROOT999" });
+  const post = await extractPostFromDocument(dom.window.document, dom.window.location.href);
+
+  assert.match(post.text, /유니트리/);
+  assert.equal(post.text.includes("mkk_aoh"), false);
+  assert.equal(post.text.includes("mine_111379"), false);
+  assert.equal(post.text.includes("감정교류는 저것이 절대"), false);
 });
 
 test("structured text decodes unicode escapes and prefers the text closest to the target shortcode", async () => {

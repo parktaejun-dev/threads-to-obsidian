@@ -536,6 +536,43 @@ async function extractRenderedPost(page: Page, sourceUrl: string): Promise<Extra
         return null;
       };
 
+      const findFirstForeignPostBlock = (root: HTMLElement | null, canonicalUrl: string): HTMLElement | null => {
+        if (!root) {
+          return null;
+        }
+
+        let firstBlock: HTMLElement | null = null;
+        for (const anchor of root.querySelectorAll<HTMLAnchorElement>('a[href*="/post/"]')) {
+          let normalizedUrl: string;
+          try {
+            normalizedUrl = normalizeThreadsUrl(anchor.href);
+          } catch {
+            continue;
+          }
+
+          if (normalizedUrl === canonicalUrl) {
+            continue;
+          }
+
+          const block = findPostBlockFromAnchor(anchor);
+          if (!block || block === root || !root.contains(block)) {
+            continue;
+          }
+
+          if (!firstBlock) {
+            firstBlock = block;
+            continue;
+          }
+
+          const position = firstBlock.compareDocumentPosition(block);
+          if (position & Node.DOCUMENT_POSITION_PRECEDING) {
+            firstBlock = block;
+          }
+        }
+
+        return firstBlock;
+      };
+
       const getVisibleImages = (root: HTMLElement | null, author: string): string[] => {
         if (!root) {
           return [];
@@ -704,16 +741,20 @@ async function extractRenderedPost(page: Page, sourceUrl: string): Promise<Extra
         return author;
       };
 
-      const extractDomText = (root: HTMLElement | null, author: string): string => {
+      const extractDomText = (root: HTMLElement | null, author: string, canonicalUrl: string): string => {
         if (!root) {
           return "";
         }
+        const cutoffBlock = findFirstForeignPostBlock(root, canonicalUrl);
         const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
         const lines: string[] = [];
         let currentNode = walker.nextNode();
         while (currentNode) {
           const text = currentNode.textContent?.trim();
           const parent = currentNode.parentElement;
+          if (cutoffBlock && parent && cutoffBlock.contains(parent)) {
+            break;
+          }
           if (text && parent && !parent.closest("button, time, a, script, style, svg, video, picture, figure, img")) {
             lines.push(text);
           }
@@ -766,7 +807,7 @@ async function extractRenderedPost(page: Page, sourceUrl: string): Promise<Extra
             continue;
           }
           startedChain = true;
-          const text = extractDomText(candidate.block, author);
+          const text = extractDomText(candidate.block, author, candidate.url);
           if (!text || text.startsWith("이전 글")) {
             continue;
           }
@@ -795,7 +836,7 @@ async function extractRenderedPost(page: Page, sourceUrl: string): Promise<Extra
       const author = extractAuthorFromUrl(canonicalUrl);
       const root = findPostRoot(canonicalUrl, shortcode);
       const ogDescription = getMeta('meta[property="og:description"]') ?? "";
-      const rawText = extractDomText(root, author) || ogDescription;
+      const rawText = extractDomText(root, author, canonicalUrl) || ogDescription;
       const text = cleanTextLines(rawText, author) || ogDescription;
       const ogThumbnailUrl = getMeta('meta[property="og:image"]');
       const imageUrls = getVisibleImages(root, author);
@@ -1210,7 +1251,9 @@ export async function resolveTargetPostWithBrowser(mentionUrl: string): Promise<
     if (!currentSnapshot.pageMatchedSource || currentSnapshot.blockedByAuth || !isThreadsPostUrl(currentSnapshot.canonicalUrl)) {
       return null;
     }
-    const currentPost = await buildSimpleExtractedPost(currentSnapshot);
+    const currentPost =
+      (await extractRenderedPost(page, normalizedMentionUrl).catch(() => null)) ??
+      (await buildSimpleExtractedPost(currentSnapshot));
     const relatedUrl = safeText(currentSnapshot.relatedUrl);
     if (!relatedUrl) {
       return null;
@@ -1233,7 +1276,8 @@ export async function resolveTargetPostWithBrowser(mentionUrl: string): Promise<
       const resolvedTargetMatchesRelated = normalizeThreadsUrl(resolvedSnapshot.canonicalUrl) === normalizeThreadsUrl(relatedUrl);
       const resolvedTargetPost =
         resolvedTargetMatchesRelated && !resolvedSnapshot.blockedByAuth && isThreadsPostUrl(resolvedSnapshot.canonicalUrl)
-          ? await buildSimpleExtractedPost(resolvedSnapshot)
+          ? ((await extractRenderedPost(page, relatedUrl).catch(() => null)) ??
+            (await buildSimpleExtractedPost(resolvedSnapshot)))
           : null;
       const resolvedTargetText = safeText(resolvedTargetPost?.text);
       if (resolvedTargetText && resolvedTargetPost) {

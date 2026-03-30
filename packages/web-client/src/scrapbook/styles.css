@@ -531,25 +531,31 @@ h3 {
 }
 
 .save-status-panel {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 18px;
+  justify-content: flex-start;
+  gap: 14px;
+  width: fit-content;
+  max-width: 100%;
   margin-top: 16px;
-  padding: 18px 20px;
+  padding: 16px 18px;
 }
 
 .save-status-head {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  width: 100%;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  gap: 14px;
+  width: auto;
 }
 
 .save-status-copy {
-  display: grid;
-  gap: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  min-width: 0;
+  gap: 8px 14px;
 }
 
 .save-status-meta {
@@ -564,7 +570,7 @@ h3 {
 }
 
 .save-status-stamp {
-  display: flex;
+  display: inline-flex;
   flex-wrap: wrap;
   align-items: baseline;
   gap: 6px;
@@ -576,7 +582,7 @@ h3 {
 }
 
 .save-status-plan {
-  display: flex;
+  display: inline-flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
@@ -603,13 +609,23 @@ h3 {
 }
 
 .save-status-plan-summary {
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface-muted);
   color: var(--muted);
-  font-size: 13px;
-  font-weight: 600;
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .save-status-inline-link {
-  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+  padding: 0 2px;
   border: 0;
   background: transparent;
   color: var(--muted);
@@ -1630,6 +1646,33 @@ h3 {
   min-width: 0;
 }
 
+.archive-row-inline-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.archive-row-inline-action {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.archive-row-inline-action.is-active {
+  border-color: var(--line-strong);
+  background: var(--surface-muted);
+  color: var(--ink);
+}
+
 .archive-row-meta {
   color: var(--muted);
   font-size: 12px;
@@ -2005,6 +2048,33 @@ h3 {
   color: var(--ink-tertiary);
 }
 
+.archive-edit-help {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.archive-edit-input {
+  width: 100%;
+  min-height: 42px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+  transition: border-color 0.15s ease;
+  box-sizing: border-box;
+}
+
+.archive-edit-input:focus {
+  outline: none;
+  border-color: var(--primary, #2563eb);
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
+}
+
 .archive-edit-textarea {
   width: 100%;
   min-height: 80px;
@@ -2033,17 +2103,8 @@ h3 {
   justify-content: flex-end;
 }
 
-.archive-edit-save {
-  padding: 6px 16px;
-  font-size: 13px;
-  font-weight: 600;
-  border-radius: var(--radius-sm);
-}
-
-.archive-edit-cancel {
-  padding: 6px 16px;
-  font-size: 13px;
-  border-radius: var(--radius-sm);
+.archive-edit-actions .topbar-link {
+  min-width: 88px;
 }
 
 .archive-edit-toggle {
@@ -2261,6 +2322,10 @@ h3 {
   .insights-actions,
   .insights-saved-actions {
     width: 100%;
+  }
+
+  .archive-inline-edit {
+    padding: 14px 16px 18px;
   }
 
   .topbar-actions {
@@ -3547,6 +3612,22 @@ h3 {
 }
 
 /* --- Inline Detail --- */
+.archive-row-edit {
+  background: transparent;
+}
+
+.archive-row-edit > td {
+  padding: 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.archive-inline-edit {
+  display: grid;
+  gap: 8px;
+  padding: 14px 24px 18px 54px;
+  background: linear-gradient(180deg, rgba(248, 250, 252, 0.88), rgba(255, 255, 255, 0.98));
+}
+
 .archive-row-detail {
   background: var(--surface-muted);
 }
@@ -3917,10 +3998,6 @@ h3 {
 
   .save-status-copy {
     gap: 2px;
-  }
-
-  #save-status-eyebrow {
-    display: none;
   }
 
   .save-status-stamp {

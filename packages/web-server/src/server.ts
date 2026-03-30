@@ -4032,6 +4032,8 @@ async function handlePublicBotRoute(
   const locale = resolveRequestLocale(request, requestUrl);
   const msg = tServer(locale);
 
+  response.setHeader("cache-control", "no-store");
+
   if (pathname === "/api/public/bot/config") {
     if ((request.method ?? "GET") !== "GET") {
       methodNotAllowed(response);
@@ -4371,12 +4373,26 @@ async function handlePublicBotRoute(
     const archivePatchMatch = pathname.match(/^\/api\/public\/bot\/archive\/([^/]+)$/);
     if ((request.method ?? "GET") === "PATCH" && archivePatchMatch) {
       const rawSession = readCookie(request.headers, BOT_SESSION_COOKIE);
-      const body = await parseJsonBody<{ noteText?: string }>(request, config.maxBodyBytes);
+      const body = await parseJsonBody<{ noteText?: string; title?: string; tags?: string[] }>(request, config.maxBodyBytes);
+      const patch: {
+        noteText?: string;
+        title?: string;
+        tags?: string[];
+      } = {};
+      if (Object.prototype.hasOwnProperty.call(body, "noteText")) {
+        patch.noteText = typeof body.noteText === "string" ? body.noteText : "";
+      }
+      if (Object.prototype.hasOwnProperty.call(body, "title")) {
+        patch.title = typeof body.title === "string" ? body.title : "";
+      }
+      if (Object.prototype.hasOwnProperty.call(body, "tags")) {
+        patch.tags = Array.isArray(body.tags) ? body.tags.filter((tag): tag is string => typeof tag === "string") : [];
+      }
       try {
         const state = await updateArchiveFromStore(
           rawSession,
           decodeURIComponent(archivePatchMatch[1] ?? ""),
-          typeof body.noteText === "string" ? body.noteText : ""
+          patch
         );
         json(response, 200, state);
       } catch (error) {
