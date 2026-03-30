@@ -3274,11 +3274,18 @@ function resolveStaticPath(candidate: string): string | null {
   return null;
 }
 
-function buildStaticAssetHeaders(contentType: string): Record<string, string> {
-  return {
+function buildStaticAssetHeaders(contentType: string, etag?: string): Record<string, string> {
+  const headers = {
     "content-type": contentType,
-    "x-content-type-options": "nosniff"
+    "x-content-type-options": "nosniff",
+    "cache-control": "no-cache, must-revalidate"
   };
+
+  if (etag) {
+    headers.etag = etag;
+  }
+
+  return headers;
 }
 
 function buildPublicMarketingPageHeaders(contentType: string): Record<string, string> {
@@ -3315,6 +3322,14 @@ async function serveStatic(request: IncomingMessage, response: ServerResponse, p
 
     try {
       const extension = path.extname(absolutePath);
+      const contentType = MIME_TYPES[extension] ?? "application/octet-stream";
+      const fileStats = await stat(absolutePath);
+      const staticAssetEtag = buildEtag({
+        path: absolutePath,
+        size: fileStats.size,
+        mtimeMs: fileStats.mtimeMs
+      });
+      const staticAssetHeaders = buildStaticAssetHeaders(contentType, staticAssetEtag);
       if (relativePath === "landing/index.html") {
         const requestUrl = new URL(request.url ?? "/", `http://${request.headers.host ?? "127.0.0.1"}`);
         const siteUrl = resolvePublicOrigin(request, requestUrl);
@@ -3352,7 +3367,7 @@ async function serveStatic(request: IncomingMessage, response: ServerResponse, p
         });
         if (readIfNoneMatchHeader(request) === etag) {
           response.writeHead(304, {
-            ...buildPublicMarketingPageHeaders(MIME_TYPES[extension] ?? "application/octet-stream"),
+            ...buildPublicMarketingPageHeaders(contentType),
             ...buildPublicHtmlCacheHeaders(etag)
           });
           response.end();
@@ -3360,7 +3375,7 @@ async function serveStatic(request: IncomingMessage, response: ServerResponse, p
         }
 
         response.writeHead(200, {
-          ...buildPublicMarketingPageHeaders(MIME_TYPES[extension] ?? "application/octet-stream"),
+          ...buildPublicMarketingPageHeaders(contentType),
           ...buildPublicHtmlCacheHeaders(etag)
         });
         response.end(contents);
@@ -3389,7 +3404,7 @@ async function serveStatic(request: IncomingMessage, response: ServerResponse, p
         });
         if (readIfNoneMatchHeader(request) === etag) {
           response.writeHead(304, {
-            ...buildPublicMarketingPageHeaders(MIME_TYPES[extension] ?? "application/octet-stream"),
+            ...buildPublicMarketingPageHeaders(contentType),
             ...buildPublicHtmlCacheHeaders(etag)
           });
           response.end();
@@ -3397,7 +3412,7 @@ async function serveStatic(request: IncomingMessage, response: ServerResponse, p
         }
 
         response.writeHead(200, {
-          ...buildPublicMarketingPageHeaders(MIME_TYPES[extension] ?? "application/octet-stream"),
+          ...buildPublicMarketingPageHeaders(contentType),
           ...buildPublicHtmlCacheHeaders(etag)
         });
         response.end(contents);
@@ -3405,21 +3420,48 @@ async function serveStatic(request: IncomingMessage, response: ServerResponse, p
       }
 
       if (relativePath === "scrapbook/index.html") {
+        if (readIfNoneMatchHeader(request) === staticAssetEtag) {
+          response.writeHead(304, staticAssetHeaders);
+          response.end();
+          return true;
+        }
+
         const contents = await readFile(absolutePath);
-        response.writeHead(200, buildPublicMarketingPageHeaders(MIME_TYPES[extension] ?? "application/octet-stream"));
+        response.writeHead(200, {
+          ...buildPublicMarketingPageHeaders(contentType),
+          ...staticAssetHeaders
+        });
         response.end(contents);
         return true;
       }
 
       if (relativePath === "admin/index.html") {
         const contents = await readFile(absolutePath);
-        response.writeHead(200, buildAdminPageHeaders(MIME_TYPES[extension] ?? "application/octet-stream"));
+        if (readIfNoneMatchHeader(request) === staticAssetEtag) {
+          response.writeHead(304, {
+            ...buildAdminPageHeaders(contentType),
+            etag: staticAssetEtag
+          });
+          response.end();
+          return true;
+        }
+
+        response.writeHead(200, {
+          ...buildAdminPageHeaders(contentType),
+          etag: staticAssetEtag
+        });
         response.end(contents);
         return true;
       }
 
+      if (readIfNoneMatchHeader(request) === staticAssetEtag) {
+        response.writeHead(304, staticAssetHeaders);
+        response.end();
+        return true;
+      }
+
       const contents = await readFile(absolutePath);
-      response.writeHead(200, buildStaticAssetHeaders(MIME_TYPES[extension] ?? "application/octet-stream"));
+      response.writeHead(200, staticAssetHeaders);
       response.end(contents);
       return true;
     } catch {
@@ -4658,6 +4700,257 @@ async function handlePublicBotRoute(
     } catch (error) {
       json(response, 400, {
         error: toPublicErrorMessage(error, "Could not delete the insight card.")
+      });
+    }
+    return;
+  }
+
+  if (pathname === "/api/public/bot/notion/connection") {
+    if ((request.method ?? "GET") !== "POST") {
+      methodNotAllowed(response);
+      return;
+    }
+
+    const rawSession = readCookie(request.headers, BOT_SESSION_COOKIE);
+    const state = await buildPublicBotSessionResponse(rawSession, collector);
+    if (!state.authenticated || !state.user) {
+      json(response, 401, { error: "You need to sign in first." });
+      return;
+    }
+
+    const notionToken = `bot-scrapbook:${state.user.id}`;
+    const notionDeviceId = `bot-scrapbook:${state.user.id}`;
+    const notionTokenHash = createHash("sha256").update(notionToken).digest("hex");
+    const result = await withDatabaseTransaction(async (data) => {
+      return getNotionConnectionSummary(data, notionTokenHash, notionDeviceId);
+    });
+    json(response, 200, result);
+    return;
+  }
+
+  if (pathname === "/api/public/bot/notion/oauth/start") {
+    if ((request.method ?? "GET") !== "POST") {
+      methodNotAllowed(response);
+      return;
+    }
+
+    const rawSession = readCookie(request.headers, BOT_SESSION_COOKIE);
+    const state = await buildPublicBotSessionResponse(rawSession, collector);
+    if (!state.authenticated || !state.user) {
+      json(response, 401, { error: "You need to sign in first." });
+      return;
+    }
+
+    const notionToken = `bot-scrapbook:${state.user.id}`;
+    const notionDeviceId = `bot-scrapbook:${state.user.id}`;
+    try {
+      const result = await withDatabaseTransaction(async (data) => {
+        return await createNotionAuthStart(data, notionToken, notionDeviceId, "Scrapbook Web", publicOrigin);
+      });
+      json(response, 200, result);
+    } catch (error) {
+      json(response, 400, {
+        error: toPublicErrorMessage(error, "Could not start Notion OAuth.")
+      });
+    }
+    return;
+  }
+
+  if (pathname === "/api/public/bot/notion/disconnect") {
+    if ((request.method ?? "GET") !== "POST") {
+      methodNotAllowed(response);
+      return;
+    }
+
+    const rawSession = readCookie(request.headers, BOT_SESSION_COOKIE);
+    const state = await buildPublicBotSessionResponse(rawSession, collector);
+    if (!state.authenticated || !state.user) {
+      json(response, 401, { error: "You need to sign in first." });
+      return;
+    }
+
+    const notionToken = `bot-scrapbook:${state.user.id}`;
+    const notionDeviceId = `bot-scrapbook:${state.user.id}`;
+    const notionTokenHash = createHash("sha256").update(notionToken).digest("hex");
+    const result = await withDatabaseTransaction(async (data) => {
+      return disconnectNotionConnection(data, notionTokenHash, notionDeviceId);
+    });
+    json(response, 200, result);
+    return;
+  }
+
+  if (pathname === "/api/public/bot/notion/locations/search") {
+    if ((request.method ?? "GET") !== "POST") {
+      methodNotAllowed(response);
+      return;
+    }
+
+    const rawSession = readCookie(request.headers, BOT_SESSION_COOKIE);
+    const state = await buildPublicBotSessionResponse(rawSession, collector);
+    if (!state.authenticated || !state.user) {
+      json(response, 401, { error: "You need to sign in first." });
+      return;
+    }
+
+    const body = await parseJsonBody<{ parentType?: string; query?: string }>(request, config.maxBodyBytes);
+    const parentType = body.parentType === "data_source" ? "data_source" : "page";
+    const notionToken = `bot-scrapbook:${state.user.id}`;
+    const notionDeviceId = `bot-scrapbook:${state.user.id}`;
+    const notionTokenHash = createHash("sha256").update(notionToken).digest("hex");
+
+    try {
+      const result = await withDatabaseTransaction(async (data) => {
+        return await searchNotionLocations(data, notionTokenHash, notionDeviceId, parentType, safeText(body.query) || "");
+      });
+      json(response, 200, { results: result });
+    } catch (error) {
+      json(response, 400, {
+        error: toPublicErrorMessage(error, "Could not search Notion locations.")
+      });
+    }
+    return;
+  }
+
+  if (pathname === "/api/public/bot/notion/locations/select") {
+    if ((request.method ?? "GET") !== "POST") {
+      methodNotAllowed(response);
+      return;
+    }
+
+    const rawSession = readCookie(request.headers, BOT_SESSION_COOKIE);
+    const state = await buildPublicBotSessionResponse(rawSession, collector);
+    if (!state.authenticated || !state.user) {
+      json(response, 401, { error: "You need to sign in first." });
+      return;
+    }
+
+    const body = await parseJsonBody<{
+      parentType?: string;
+      targetId?: string;
+      targetLabel?: string;
+      targetUrl?: string;
+    }>(request, config.maxBodyBytes);
+    const parentType = body.parentType === "data_source" ? "data_source" : "page";
+    const targetId = safeText(body.targetId);
+    const targetLabel = safeText(body.targetLabel);
+    const targetUrl = safeText(body.targetUrl);
+    if (!targetId || !targetLabel || !targetUrl) {
+      badRequest(response, "targetId, targetLabel, and targetUrl are required.");
+      return;
+    }
+
+    const notionToken = `bot-scrapbook:${state.user.id}`;
+    const notionDeviceId = `bot-scrapbook:${state.user.id}`;
+    const notionTokenHash = createHash("sha256").update(notionToken).digest("hex");
+
+    try {
+      const result = await withDatabaseTransaction(async (data) => {
+        return await selectNotionLocation(data, notionTokenHash, notionDeviceId, parentType, targetId, targetLabel, targetUrl);
+      });
+      json(response, 200, result);
+    } catch (error) {
+      json(response, 400, {
+        error: toPublicErrorMessage(error, "Could not select the Notion location.")
+      });
+    }
+    return;
+  }
+
+  if (pathname === "/api/public/bot/notion/export") {
+    if ((request.method ?? "GET") !== "POST") {
+      methodNotAllowed(response);
+      return;
+    }
+
+    const rawSession = readCookie(request.headers, BOT_SESSION_COOKIE);
+    const state = await buildPublicBotSessionResponse(rawSession, collector);
+    if (!state.authenticated || !state.user) {
+      json(response, 401, { error: "You need to sign in first." });
+      return;
+    }
+
+    const body = await parseJsonBody<{ ids?: string[]; locale?: string }>(request, config.maxBodyBytes);
+    const requestedIds = [...new Set((Array.isArray(body.ids) ? body.ids : []).map((value) => safeText(value)).filter(Boolean))];
+    if (requestedIds.length === 0) {
+      badRequest(response, "Select at least one archive to export.");
+      return;
+    }
+
+    const archiveLookup = new Map(state.archives.map((item) => [item.id, item]));
+    const archives = requestedIds
+      .map((archiveId) => archiveLookup.get(archiveId) ?? null)
+      .filter((candidate): candidate is NonNullable<typeof candidate> => Boolean(candidate));
+    if (archives.length === 0) {
+      badRequest(response, "The requested archives could not be found.");
+      return;
+    }
+
+    const notionToken = `bot-scrapbook:${state.user.id}`;
+    const notionDeviceId = `bot-scrapbook:${state.user.id}`;
+    const notionTokenHash = createHash("sha256").update(notionToken).digest("hex");
+    const locale = normalizeLocale(body.locale, "ko");
+
+    try {
+      const result = await withDatabaseTransaction(async (data) => {
+        const pages: Array<{ pageId: string; pageUrl: string; title: string }> = [];
+
+        for (const archive of archives) {
+          const post: ExtractedPost = {
+            canonicalUrl: archive.targetUrl,
+            shortcode: archive.targetUrl.split("/").pop() ?? archive.id,
+            author: archive.targetAuthorHandle ?? "",
+            title: archive.title,
+            text: archive.targetText,
+            publishedAt: archive.targetPublishedAt,
+            capturedAt: archive.updatedAt,
+            sourceType: archive.mediaUrls.length > 0 ? "image" : "text",
+            imageUrls: [...archive.mediaUrls],
+            videoUrl: null,
+            externalUrl: null,
+            quotedPostUrl: null,
+            repliedToUrl: archive.mentionUrl,
+            thumbnailUrl: archive.mediaUrls[0] ?? null,
+            authorReplies: archive.authorReplies.map((reply) => ({
+              author: reply.author,
+              canonicalUrl: reply.canonicalUrl,
+              shortcode: reply.canonicalUrl.split("/").pop() ?? archive.id,
+              text: reply.text,
+              publishedAt: reply.publishedAt,
+              sourceType: reply.mediaUrls.length > 0 ? "image" : "text",
+              imageUrls: [...reply.mediaUrls],
+              videoUrl: null,
+              externalUrl: null,
+              thumbnailUrl: reply.mediaUrls[0] ?? null
+            })),
+            extractorVersion: "scrapbook-web-notion-export",
+            contentHash: archive.id
+          };
+
+          const saved = await savePostThroughNotionConnection(data, notionTokenHash, notionDeviceId, {
+            locale,
+            post,
+            includeImages: true,
+            uploadMedia: false,
+            aiResult: null,
+            aiWarning: null
+          });
+          pages.push({
+            pageId: saved.pageId,
+            pageUrl: saved.pageUrl,
+            title: saved.title
+          });
+        }
+
+        return {
+          exportedCount: pages.length,
+          pages
+        };
+      });
+
+      json(response, 200, result);
+    } catch (error) {
+      json(response, 400, {
+        error: toPublicErrorMessage(error, "Could not export scrapbook items to Notion.")
       });
     }
     return;

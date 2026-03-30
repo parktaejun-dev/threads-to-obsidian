@@ -786,7 +786,7 @@ const obsidianLandingMessages: { ko: LandingMsg; en: LandingMsg } = {
     productBTag: "모바일(멘션)",
     productBTitle: "모바일은 멘션 댓글",
     productBDesc: "모바일: 댓글에 @{botHandle}만 적기",
-    productBCta: "멘션 저장함 열기",
+    productBCta: "스크랩북 열기",
     pricingEyebrow: "요금제",
     pricingTitle: "결제는 단순하게.",
     pricingCopy: "",
@@ -1401,7 +1401,7 @@ Object.assign(landingStorefrontCopy.ja.obsidian, {
   includedUpdates: "月額 US$2.99 · 年額 US$19.99 · Free 100/5 + searches -> Plus 1000/50 + watchlists/insights",
   heroNotes: [
     "Chrome extension: 今見ている投稿を保存",
-    "scrapbook Free: mention inbox + searches + Markdown / ZIP export",
+    "scrapbook Free: モバイル メンション保存 + searches + Markdown / ZIP export",
     "scrapbook Plus: watchlists と insights"
   ],
   links: {
@@ -1446,7 +1446,7 @@ Object.assign(landingStorefrontCopy["pt-BR"].obsidian, {
   includedUpdates: "US$2.99 por mês · US$19.99 por ano · Free 100/5 + searches -> Plus 1000/50 + watchlists/insights",
   heroNotes: [
     "Chrome extension: salve o post que você está vendo agora",
-    "scrapbook Free: mention inbox + searches + Markdown / ZIP export",
+    "scrapbook Free: salvamento por menção + searches + Markdown / ZIP export",
     "scrapbook Plus: watchlists e insights"
   ],
   links: {
@@ -1491,7 +1491,7 @@ Object.assign(landingStorefrontCopy.es.obsidian, {
   includedUpdates: "US$2.99 al mes · US$19.99 al año · Free 100/5 + searches -> Plus 1000/50 + watchlists/insights",
   heroNotes: [
     "Chrome extension: guarda la publicación que estás viendo ahora",
-    "scrapbook Free: mention inbox + searches + Markdown / ZIP export",
+    "scrapbook Free: guardado por mención + searches + Markdown / ZIP export",
     "scrapbook Plus: watchlists e insights"
   ],
   links: {
@@ -1536,7 +1536,7 @@ Object.assign(landingStorefrontCopy["zh-TW"].obsidian, {
   includedUpdates: "月繳 US$2.99 · 年繳 US$19.99 · Free 100/5 + searches -> Plus 1000/50 + watchlists/insights",
   heroNotes: [
     "Chrome extension: 儲存你正在看的貼文",
-    "scrapbook Free: mention inbox + searches + Markdown / ZIP export",
+    "scrapbook Free: 提及留言儲存 + searches + Markdown / ZIP export",
     "scrapbook Plus: watchlists 與 insights"
   ],
   links: {
@@ -1581,7 +1581,7 @@ Object.assign(landingStorefrontCopy.vi.obsidian, {
   includedUpdates: "US$2.99 mỗi tháng · US$19.99 mỗi năm · Free 100/5 + searches -> Plus 1000/50 + watchlists/insights",
   heroNotes: [
     "Chrome extension: lưu bài viết bạn đang xem ngay lúc này",
-    "scrapbook Free: mention inbox + searches + Markdown / ZIP export",
+    "scrapbook Free: lưu qua mention + searches + Markdown / ZIP export",
     "scrapbook Plus: watchlists và insights"
   ],
   links: {
@@ -2504,9 +2504,9 @@ export const scrapbookMessages = {
     scrapbookDownloadMarkdown: "Markdown 다운로드",
     scrapbookDownloadZip: "ZIP 다운로드",
     scrapbookArchiveLoginRequiredCopy:
-      "Threads 계정을 연결하면 받은함과 클라우드 저장 항목이 여기에 함께 나타납니다.",
+      "Threads 계정을 연결하면 스크랩북에 저장된 항목이 여기에 나타납니다.",
     scrapbookArchiveEmptyTitle: "아직 저장된 항목이 없습니다.",
-    scrapbookArchiveEmptyCopy: "받은함, 클라우드 저장, 모니터링에서 자동 저장된 항목이 여기에 모입니다.",
+    scrapbookArchiveEmptyCopy: "멘션, 클라우드 저장, 모니터링에서 자동 저장된 항목이 여기에 모입니다.",
     scrapbookVerified: "인증됨",
     scrapbookLastLogin: "마지막 로그인 {date}",
     scrapbookProfilePictureAlt: "{name} profile picture",
@@ -2565,15 +2565,15 @@ export const scrapbookMessages = {
     scrapbookStatusWatchlistSynced: "계정 모니터링을 확인했습니다.",
     scrapbookStatusWatchlistDeleted: "계정 모니터링을 삭제했습니다.",
     scrapbookStatusArchiveDeleted: "아카이브를 삭제했습니다.",
-    scrapbookStatusTrackedSaved: "게시물을 받은함에 보관했습니다.",
+    scrapbookStatusTrackedSaved: "게시물을 스크랩북에 보관했습니다.",
     scrapbookStatusSearchSaved: "키워드 모니터링을 저장했습니다.",
     scrapbookStatusSearchRun: "키워드 모니터링을 실행했습니다.",
     scrapbookStatusSearchDeleted: "키워드 모니터링을 삭제했습니다.",
-    scrapbookStatusSearchArchived: "검색 결과를 받은함에 저장했습니다.",
+    scrapbookStatusSearchArchived: "검색 결과를 스크랩북에 저장했습니다.",
     scrapbookStatusSearchDismissed: "검색 결과를 숨겼습니다.",
     scrapbookInsightsRefreshLoading: "불러오는 중...",
     scrapbookStatusInsightsRefreshed: "성과 데이터를 업데이트했습니다.",
-    scrapbookStatusInsightSaved: "게시물을 받은함에 보관했습니다.",
+    scrapbookStatusInsightSaved: "게시물을 스크랩북에 보관했습니다.",
     scrapbookStatusInsightsCardShared: "성과 카드를 공유했습니다.",
     scrapbookStatusInsightsCardDownloaded: "성과 카드 이미지를 저장했습니다.",
     scrapbookStatusInsightsViewSaved: "성과 카드를 저장했습니다.",

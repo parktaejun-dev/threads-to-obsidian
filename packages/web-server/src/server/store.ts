@@ -2802,10 +2802,17 @@ function normalizeStorefrontSettings(
   parsed: Partial<StorefrontSettings> | undefined,
   fallback: StorefrontSettings
 ): StorefrontSettings {
-  const legacyHeroNotes = [
-    "한 제품, 두 진입 경로: PC extension + 모바일 mention scrapbook",
-    "Free: mention inbox + searches + Markdown / ZIP export",
-    "Plus: 1,000 saves + 50 folders + watchlists · insights"
+  const legacyHeroNoteSets = [
+    [
+      "한 제품, 두 진입 경로: PC extension + 모바일 mention scrapbook",
+      "Free: mention inbox + searches + Markdown / ZIP export",
+      "Plus: 1,000 saves + 50 folders + watchlists · insights"
+    ],
+    [
+      "한 제품, 두 진입 경로: PC extension + 모바일 mention scrapbook",
+      "Free: mobile mention save + searches + Markdown / ZIP export",
+      "Plus: 1,000 saves + 50 folders + watchlists · insights"
+    ]
   ];
   const legacyFaqs = [
     {
@@ -2875,8 +2882,11 @@ function normalizeStorefrontSettings(
   }
   if (
     !Array.isArray(parsed?.heroNotes) ||
-    (parsed.heroNotes.length === legacyHeroNotes.length &&
-      parsed.heroNotes.every((note, index) => note === legacyHeroNotes[index]))
+    legacyHeroNoteSets.some(
+      (legacySet) =>
+        parsed.heroNotes!.length === legacySet.length &&
+        parsed.heroNotes!.every((note, index) => note === legacySet[index])
+    )
   ) {
     merged.heroNotes = fallback.heroNotes;
   }

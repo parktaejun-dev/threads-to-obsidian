@@ -74,6 +74,36 @@ interface BotSessionState {
   saveStatus: BotSaveStatusView | null;
 }
 
+interface NotionConnectionSummary {
+  connected: boolean;
+  workspaceId: string | null;
+  workspaceName: string | null;
+  workspaceIcon: string | null;
+  selectedParentType: "page" | "data_source" | null;
+  selectedParentId: string | null;
+  selectedParentLabel: string | null;
+  selectedParentUrl: string | null;
+}
+
+interface NotionLocationOption {
+  id: string;
+  type: "page" | "data_source";
+  label: string;
+  url: string;
+  subtitle: string | null;
+}
+
+interface NotionExportPageResult {
+  pageId: string;
+  pageUrl: string;
+  title: string;
+}
+
+interface NotionExportResult {
+  exportedCount: number;
+  pages: NotionExportPageResult[];
+}
+
 interface BotSyncState extends BotSessionState {
   workspace?: ScrapbookPlusState;
 }
@@ -265,6 +295,28 @@ interface ScrapbookPlusState {
   searches: ScrapbookSearchView[];
   insights: ScrapbookInsightsView;
 }
+
+type ArchiveExportTarget = "zip" | "notion" | "obsidian";
+type PickerWindow = Window & {
+  showDirectoryPicker?: (options?: { id?: string; mode?: "read" | "readwrite" }) => Promise<FileSystemDirectoryHandle>;
+};
+type PermissionDirectoryHandle = FileSystemDirectoryHandle & {
+  queryPermission?: (descriptor?: { mode?: "read" | "readwrite" }) => Promise<PermissionState>;
+  requestPermission?: (descriptor?: { mode?: "read" | "readwrite" }) => Promise<PermissionState>;
+};
+
+interface StoredDirectoryHandleRecord {
+  handle: FileSystemDirectoryHandle;
+  label: string;
+  savedAt: string;
+}
+
+const OBSIDIAN_DIRECTORY_DB_NAME = "threads-to-obsidian";
+const OBSIDIAN_DIRECTORY_STORE_NAME = "handles";
+const OBSIDIAN_DIRECTORY_KEY = "obsidian-target-directory";
+const OBSIDIAN_EXPORT_FOLDER = "Threads Scrapbook";
+let cachedObsidianDirectoryHandle: FileSystemDirectoryHandle | null = null;
+let storedObsidianDirectoryRecordPromise: Promise<StoredDirectoryHandleRecord | null> | null = null;
 
 interface ScrapbookSyncSnapshot {
   savedAt: string;
@@ -2912,33 +2964,538 @@ function downloadBlob(blob: Blob, filename: string): void {
   window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
 }
 
-async function exportArchivesZip(archiveIds: string[]): Promise<void> {
-  if (archiveIds.length === 0) {
-    setStatus(t("scrapbookExportChooseItems"), true);
-    return;
+function promptArchiveExportTarget(): ArchiveExportTarget | null {
+  const rawChoice = window.prompt(
+    uiText(
+      "내보내기 대상을 입력하세요: zip / notion / obsidian",
+      "Choose an export target: zip / notion / obsidian"
+    ),
+    "zip"
+  );
+  if (rawChoice === null) {
+    return null;
   }
 
+  const normalized = rawChoice.trim().toLowerCase();
+  if (normalized === "zip" || normalized === "1") {
+    return "zip";
+  }
+  if (normalized === "notion" || normalized === "2") {
+    return "notion";
+  }
+  if (normalized === "obsidian" || normalized === "3") {
+    return "obsidian";
+  }
+
+  setStatus(
+    uiText(
+      "알 수 없는 내보내기 대상입니다. zip, notion, obsidian 중 하나를 입력하세요.",
+      "Unknown export target. Enter zip, notion, or obsidian."
+    ),
+    true
+  );
+  return null;
+}
+
+function getPickerWindow(): PickerWindow {
+  return window as PickerWindow;
+}
+
+function supportsObsidianDirectExport(): boolean {
+  return typeof getPickerWindow().showDirectoryPicker === "function";
+}
+
+async function openObsidianDirectoryDatabase(): Promise<IDBDatabase> {
+  return await new Promise((resolve, reject) => {
+    const request = indexedDB.open(OBSIDIAN_DIRECTORY_DB_NAME, 1);
+
+    request.addEventListener("upgradeneeded", () => {
+      const database = request.result;
+      if (!database.objectStoreNames.contains(OBSIDIAN_DIRECTORY_STORE_NAME)) {
+        database.createObjectStore(OBSIDIAN_DIRECTORY_STORE_NAME);
+      }
+    });
+
+    request.addEventListener("success", () => resolve(request.result));
+    request.addEventListener("error", () => reject(request.error ?? new Error("Could not open IndexedDB.")));
+  });
+}
+
+async function getStoredObsidianDirectoryRecord(): Promise<StoredDirectoryHandleRecord | null> {
+  const database = await openObsidianDirectoryDatabase();
+  return await new Promise((resolve, reject) => {
+    const transaction = database.transaction(OBSIDIAN_DIRECTORY_STORE_NAME, "readonly");
+    const store = transaction.objectStore(OBSIDIAN_DIRECTORY_STORE_NAME);
+    const request = store.get(OBSIDIAN_DIRECTORY_KEY);
+
+    transaction.addEventListener("complete", () => database.close());
+    transaction.addEventListener("abort", () => {
+      database.close();
+      reject(transaction.error ?? new Error("Could not read the stored Obsidian directory."));
+    });
+    transaction.addEventListener("error", () => {
+      database.close();
+      reject(transaction.error ?? new Error("Could not read the stored Obsidian directory."));
+    });
+    request.addEventListener("success", () => resolve((request.result ?? null) as StoredDirectoryHandleRecord | null));
+    request.addEventListener("error", () => reject(request.error ?? new Error("Could not read the stored Obsidian directory.")));
+  });
+}
+
+function loadStoredObsidianDirectoryRecord(): Promise<StoredDirectoryHandleRecord | null> {
+  if (!storedObsidianDirectoryRecordPromise) {
+    storedObsidianDirectoryRecordPromise = getStoredObsidianDirectoryRecord().catch(() => null);
+  }
+  return storedObsidianDirectoryRecordPromise;
+}
+
+storedObsidianDirectoryRecordPromise = getStoredObsidianDirectoryRecord().catch(() => null);
+
+async function setStoredObsidianDirectoryHandle(handle: FileSystemDirectoryHandle): Promise<void> {
+  const database = await openObsidianDirectoryDatabase();
+  await new Promise<void>((resolve, reject) => {
+    const transaction = database.transaction(OBSIDIAN_DIRECTORY_STORE_NAME, "readwrite");
+    const store = transaction.objectStore(OBSIDIAN_DIRECTORY_STORE_NAME);
+    store.put(
+      {
+        handle,
+        label: handle.name,
+        savedAt: new Date().toISOString()
+      } satisfies StoredDirectoryHandleRecord,
+      OBSIDIAN_DIRECTORY_KEY
+    );
+
+    transaction.addEventListener("complete", () => {
+      database.close();
+      resolve();
+    });
+    transaction.addEventListener("abort", () => {
+      database.close();
+      reject(transaction.error ?? new Error("Could not store the Obsidian directory."));
+    });
+    transaction.addEventListener("error", () => {
+      database.close();
+      reject(transaction.error ?? new Error("Could not store the Obsidian directory."));
+    });
+  });
+  cachedObsidianDirectoryHandle = handle;
+  storedObsidianDirectoryRecordPromise = Promise.resolve({
+    handle,
+    label: handle.name,
+    savedAt: new Date().toISOString()
+  });
+}
+
+async function clearStoredObsidianDirectoryHandle(): Promise<void> {
+  const database = await openObsidianDirectoryDatabase();
+  await new Promise<void>((resolve, reject) => {
+    const transaction = database.transaction(OBSIDIAN_DIRECTORY_STORE_NAME, "readwrite");
+    const store = transaction.objectStore(OBSIDIAN_DIRECTORY_STORE_NAME);
+    store.delete(OBSIDIAN_DIRECTORY_KEY);
+
+    transaction.addEventListener("complete", () => {
+      database.close();
+      resolve();
+    });
+    transaction.addEventListener("abort", () => {
+      database.close();
+      reject(transaction.error ?? new Error("Could not clear the stored Obsidian directory."));
+    });
+    transaction.addEventListener("error", () => {
+      database.close();
+      reject(transaction.error ?? new Error("Could not clear the stored Obsidian directory."));
+    });
+  });
+  cachedObsidianDirectoryHandle = null;
+  storedObsidianDirectoryRecordPromise = Promise.resolve(null);
+}
+
+async function queryObsidianDirectoryPermission(
+  handle: FileSystemDirectoryHandle
+): Promise<PermissionState | "unsupported"> {
+  const permissionHandle = handle as PermissionDirectoryHandle;
+  const queryPermission = permissionHandle.queryPermission;
+  if (typeof queryPermission !== "function") {
+    return "unsupported";
+  }
+  return await queryPermission.call(permissionHandle, { mode: "readwrite" });
+}
+
+async function requestObsidianDirectoryPermission(handle: FileSystemDirectoryHandle): Promise<boolean> {
+  const permissionHandle = handle as PermissionDirectoryHandle;
+  const requestPermission = permissionHandle.requestPermission;
+  if (typeof requestPermission !== "function") {
+    return false;
+  }
+  return (await requestPermission.call(permissionHandle, { mode: "readwrite" })) === "granted";
+}
+
+async function ensureObsidianDirectoryPermission(handle: FileSystemDirectoryHandle): Promise<boolean> {
+  const currentPermission = await queryObsidianDirectoryPermission(handle);
+  if (currentPermission === "granted" || currentPermission === "unsupported") {
+    return true;
+  }
+  if (currentPermission === "denied") {
+    return false;
+  }
+  return await requestObsidianDirectoryPermission(handle);
+}
+
+async function pickObsidianDirectoryHandle(): Promise<FileSystemDirectoryHandle> {
+  const showDirectoryPicker = getPickerWindow().showDirectoryPicker;
+  if (typeof showDirectoryPicker !== "function") {
+    throw new Error(
+      uiText(
+        "Obsidian 바로 내보내기는 Chromium 계열 브라우저의 폴더 권한 API가 필요합니다.",
+        "Direct Obsidian export requires the folder access API in a Chromium-based browser."
+      )
+    );
+  }
+
+  return await showDirectoryPicker({
+    id: "obsidian-vault-target",
+    mode: "readwrite"
+  });
+}
+
+async function resolveObsidianDirectoryHandle(): Promise<FileSystemDirectoryHandle> {
+  if (cachedObsidianDirectoryHandle && (await ensureObsidianDirectoryPermission(cachedObsidianDirectoryHandle))) {
+    return cachedObsidianDirectoryHandle;
+  }
+
+  if (supportsObsidianDirectExport()) {
+    const stored = await loadStoredObsidianDirectoryRecord();
+    if (stored && (await ensureObsidianDirectoryPermission(stored.handle))) {
+      cachedObsidianDirectoryHandle = stored.handle;
+      return stored.handle;
+    }
+    if (stored) {
+      await clearStoredObsidianDirectoryHandle().catch(() => undefined);
+    }
+
+    const picked = await pickObsidianDirectoryHandle();
+    if (!(await ensureObsidianDirectoryPermission(picked))) {
+      throw new Error(
+        uiText(
+          "선택한 Obsidian 폴더에 쓰기 권한이 없습니다.",
+          "The selected Obsidian folder does not have write permission."
+        )
+      );
+    }
+    await setStoredObsidianDirectoryHandle(picked);
+    return picked;
+  }
+
+  throw new Error(
+    uiText(
+      "이 브라우저에서는 Obsidian 폴더에 직접 저장할 수 없습니다. Chromium 계열 브라우저에서 다시 시도하세요.",
+      "This browser cannot save directly into an Obsidian folder. Try again in a Chromium-based browser."
+    )
+  );
+}
+
+async function ensureObsidianSubdirectory(
+  rootHandle: FileSystemDirectoryHandle,
+  parts: string[]
+): Promise<FileSystemDirectoryHandle> {
+  let current = rootHandle;
+  for (const part of parts) {
+    current = await current.getDirectoryHandle(part, { create: true });
+  }
+  return current;
+}
+
+function sanitizeObsidianFilename(value: string, fallback: string): string {
+  const normalized = value
+    .normalize("NFKC")
+    .replace(/[\\/:*?"<>|#^\[\]]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 120);
+  return normalized || fallback;
+}
+
+async function createUniqueMarkdownFileHandle(
+  directory: FileSystemDirectoryHandle,
+  preferredFilename: string
+): Promise<FileSystemFileHandle> {
+  const safeFilename = sanitizeObsidianFilename(preferredFilename.replace(/\.md$/i, ""), "threads-scrapbook");
+  for (let index = 1; index < 1000; index += 1) {
+    const candidate = index === 1 ? `${safeFilename}.md` : `${safeFilename} (${index}).md`;
+    try {
+      await directory.getFileHandle(candidate);
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "NotFoundError") {
+        return await directory.getFileHandle(candidate, { create: true });
+      }
+      throw error;
+    }
+  }
+
+  throw new Error(
+    uiText(
+      "Obsidian 메모 파일명을 만들지 못했습니다.",
+      "Could not create a unique Obsidian note filename."
+    )
+  );
+}
+
+async function writeMarkdownToObsidianDirectory(
+  directory: FileSystemDirectoryHandle,
+  preferredFilename: string,
+  markdownContent: string
+): Promise<void> {
+  const fileHandle = await createUniqueMarkdownFileHandle(directory, preferredFilename);
+  const writable = await fileHandle.createWritable();
+  await writable.write(new Blob([markdownContent], { type: "text/markdown;charset=utf-8" }));
+  await writable.close();
+}
+
+async function withArchiveExportBusyState(callback: () => Promise<void>): Promise<void> {
   isExportingArchives = true;
   if (latestState) {
     updateArchivesToolbar(latestState.archives, latestState.authenticated && Boolean(latestState.user));
   }
 
   try {
-    const { blob, filename } = await requestBlob("/api/public/bot/archives.zip", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ ids: archiveIds })
-    });
-    downloadBlob(blob, filename || "threads-scrapbook.zip");
-    setStatus(t("scrapbookExportReady", { count: archiveIds.length }));
-  } catch (error) {
-    setStatus(error instanceof Error ? error.message : t("scrapbookExportFailed"), true);
+    await callback();
   } finally {
     isExportingArchives = false;
     if (latestState) {
       updateArchivesToolbar(latestState.archives, latestState.authenticated && Boolean(latestState.user));
     }
   }
+}
+
+async function exportArchivesZip(archiveIds: string[]): Promise<void> {
+  if (archiveIds.length === 0) {
+    setStatus(t("scrapbookExportChooseItems"), true);
+    return;
+  }
+
+  await withArchiveExportBusyState(async () => {
+    try {
+      const { blob, filename } = await requestBlob("/api/public/bot/archives.zip", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ ids: archiveIds })
+      });
+      downloadBlob(blob, filename || "threads-scrapbook.zip");
+      setStatus(t("scrapbookExportReady", { count: archiveIds.length }));
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : t("scrapbookExportFailed"), true);
+    }
+  });
+}
+
+async function getScrapbookNotionConnection(): Promise<NotionConnectionSummary> {
+  return await requestJson<NotionConnectionSummary>("/api/public/bot/notion/connection", {
+    method: "POST"
+  });
+}
+
+async function ensureScrapbookNotionLocation(): Promise<NotionConnectionSummary | null> {
+  const connection = await getScrapbookNotionConnection();
+  if (!connection.connected) {
+    const start = await requestJson<{ authorizeUrl: string }>("/api/public/bot/notion/oauth/start", {
+      method: "POST"
+    });
+    window.open(start.authorizeUrl, "_blank", "noopener,noreferrer");
+    setStatus(
+      uiText(
+        "Notion 연결 창을 열었습니다. 승인 후 이 페이지로 돌아와 다시 내보내기를 실행하세요.",
+        "Opened the Notion connection window. Approve it, then come back and run export again."
+      )
+    );
+    return null;
+  }
+
+  if (connection.selectedParentId) {
+    return connection;
+  }
+
+  const rawParentType = window.prompt(
+    uiText(
+      "Notion 저장 위치 유형을 입력하세요: page 또는 data_source",
+      "Enter the Notion destination type: page or data_source"
+    ),
+    "page"
+  );
+  if (rawParentType === null) {
+    return null;
+  }
+
+  const normalizedParentType = rawParentType.trim().toLowerCase();
+  const parentType =
+    normalizedParentType === "data_source" || normalizedParentType === "database" || normalizedParentType === "db"
+      ? "data_source"
+      : "page";
+
+  const query = window.prompt(
+    uiText(
+      "Notion에서 저장할 페이지 또는 데이터소스를 검색하세요.",
+      "Search for the Notion page or data source to save into."
+    ),
+    ""
+  );
+  if (query === null) {
+    return null;
+  }
+
+  const searchResult = await requestJson<{ results: NotionLocationOption[] }>("/api/public/bot/notion/locations/search", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      parentType,
+      query: query.trim()
+    })
+  });
+
+  if (searchResult.results.length === 0) {
+    setStatus(
+      uiText(
+        "Notion 저장 위치 검색 결과가 없습니다. 다른 검색어로 다시 시도하세요.",
+        "No Notion save locations matched. Try again with a different search."
+      ),
+      true
+    );
+    return null;
+  }
+
+  const visibleOptions = searchResult.results.slice(0, 8);
+  const optionsText = visibleOptions
+    .map((item, index) => `${index + 1}. [${item.type}] ${item.label}${item.subtitle ? ` - ${item.subtitle}` : ""}`)
+    .join("\n");
+  const rawSelection = window.prompt(
+    formatMessage(
+      uiText(
+        "저장할 Notion 위치 번호를 입력하세요.\n{options}",
+        "Enter the Notion destination number.\n{options}"
+      ),
+      { options: optionsText }
+    ),
+    "1"
+  );
+  if (rawSelection === null) {
+    return null;
+  }
+
+  const selectionIndex = Number.parseInt(rawSelection, 10) - 1;
+  if (!Number.isInteger(selectionIndex) || selectionIndex < 0 || selectionIndex >= visibleOptions.length) {
+    setStatus(
+      uiText(
+        "올바른 Notion 저장 위치 번호를 입력하세요.",
+        "Enter a valid Notion destination number."
+      ),
+      true
+    );
+    return null;
+  }
+
+  const selected = visibleOptions[selectionIndex];
+  return await requestJson<NotionConnectionSummary>("/api/public/bot/notion/locations/select", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      parentType,
+      targetId: selected.id,
+      targetLabel: selected.label,
+      targetUrl: selected.url
+    })
+  });
+}
+
+async function exportArchivesNotion(archiveIds: string[]): Promise<void> {
+  if (archiveIds.length === 0) {
+    setStatus(t("scrapbookExportChooseItems"), true);
+    return;
+  }
+
+  await withArchiveExportBusyState(async () => {
+    try {
+      const connection = await ensureScrapbookNotionLocation();
+      if (!connection) {
+        return;
+      }
+
+      const result = await requestJson<NotionExportResult>("/api/public/bot/notion/export", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          ids: archiveIds,
+          locale: currentLocale
+        })
+      });
+
+      setStatus(
+        formatMessage(
+          uiText(
+            "Notion 내보내기를 완료했습니다. {count}개 페이지를 만들었습니다.",
+            "Finished the Notion export. Created {count} page(s)."
+          ),
+          { count: result.exportedCount }
+        )
+      );
+      if (result.pages.length === 1 && result.pages[0]?.pageUrl) {
+        window.open(result.pages[0].pageUrl, "_blank", "noopener,noreferrer");
+      }
+    } catch (error) {
+      setStatus(
+        error instanceof Error
+          ? error.message
+          : uiText("Notion으로 내보내지 못했습니다.", "Could not export to Notion."),
+        true
+      );
+    }
+  });
+}
+
+async function exportArchivesObsidian(items: BotArchiveView[]): Promise<void> {
+  if (items.length === 0) {
+    setStatus(t("scrapbookExportChooseItems"), true);
+    return;
+  }
+
+  let rootHandle: FileSystemDirectoryHandle;
+  try {
+    rootHandle = await resolveObsidianDirectoryHandle();
+  } catch (error) {
+    setStatus(
+      error instanceof Error
+        ? error.message
+        : uiText("Obsidian으로 내보내지 못했습니다.", "Could not export to Obsidian."),
+      true
+    );
+    return;
+  }
+
+  await withArchiveExportBusyState(async () => {
+    try {
+      const targetDirectory = await ensureObsidianSubdirectory(rootHandle, [OBSIDIAN_EXPORT_FOLDER]);
+
+      for (const item of items) {
+        const preferredFilename = sanitizeObsidianFilename(item.title || item.targetText || item.id, "threads-scrapbook");
+        await writeMarkdownToObsidianDirectory(targetDirectory, preferredFilename, item.markdownContent);
+      }
+
+      setStatus(
+        formatMessage(
+          uiText(
+            "Obsidian 내보내기를 완료했습니다. {count}개 노트를 저장했습니다.",
+            "Finished the Obsidian export. Saved {count} note(s)."
+          ),
+          { count: items.length }
+        )
+      );
+    } catch (error) {
+      setStatus(
+        error instanceof Error
+          ? error.message
+          : uiText("Obsidian으로 내보내지 못했습니다.", "Could not export to Obsidian."),
+        true
+      );
+    }
+  });
 }
 
 function renderArchiveDetailHtml(item: BotArchiveView): string {
@@ -4862,8 +5419,27 @@ archivesExportAll?.addEventListener("click", async () => {
   if (!latestState?.authenticated || !latestState.user) {
     return;
   }
-  const selectedIds = latestState.archives.filter((item) => selectedArchiveIds.has(item.id)).map((item) => item.id);
-  await exportArchivesZip(selectedIds.length > 0 ? selectedIds : latestState.archives.map((item) => item.id));
+
+  const exportTarget = promptArchiveExportTarget();
+  if (!exportTarget) {
+    return;
+  }
+
+  const exportItems = latestState.archives.filter((item) => selectedArchiveIds.has(item.id));
+  const targetItems = exportItems.length > 0 ? exportItems : latestState.archives;
+  const targetIds = targetItems.map((item) => item.id);
+
+  if (exportTarget === "notion") {
+    await exportArchivesNotion(targetIds);
+    return;
+  }
+
+  if (exportTarget === "obsidian") {
+    await exportArchivesObsidian(targetItems);
+    return;
+  }
+
+  await exportArchivesZip(targetIds);
 });
 
 archivesMoveSelected?.addEventListener("click", () => {
