@@ -8,13 +8,16 @@
     "packages/*"
   ],
   "scripts": {
-    "build": "npm run build:extension && npm run build:web && npm run build:server",
+    "build": "npm run build:extension && npm run build:web && npm run build:server && npm run build:mobile-save-server",
+    "build:mobile-app-apk": "npm run build:apk -w @threads/mobile-app",
     "build:extension": "npm run build -w @threads/extension",
     "package:extension": "npm run build:extension && node scripts/package-extension-zip.mjs",
     "package:extension:zip": "node scripts/package-extension-zip.mjs",
     "build:web": "npm run build -w @threads/web-client",
     "build:server": "npm run build -w @threads/web-server",
+    "build:mobile-save-server": "npm run build -w @threads/mobile-save-server",
     "web:start": "npm run start -w @threads/web-server",
+    "mobile-save:start": "npm run start -w @threads/mobile-save-server",
     "db:migrate:postgres": "node scripts/migrate-web-db-to-postgres.mjs",
     "db:backfill:relational": "node scripts/backfill-relational-web-db.mjs",
     "typecheck": "tsc -b --pretty false",
@@ -23,6 +26,7 @@
     "typecheck:extension": "tsc -p packages/extension/tsconfig.json --pretty false",
     "typecheck:web": "tsc -p packages/web-client/tsconfig.json --pretty false",
     "typecheck:server": "tsc -p packages/web-server/tsconfig.json --pretty false",
+    "typecheck:mobile-save-server": "tsc -p packages/mobile-save-server/tsconfig.json --pretty false",
     "typecheck:tests": "tsc -p tsconfig.tests.json --pretty false",
     "test": "tsx --test tests/**/*.test.ts"
   },

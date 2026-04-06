@@ -11,8 +11,9 @@
   --co-success: #166534;
   --co-danger: #b91c1c;
   --co-radius-md: 18px;
-  --co-radius-sm: 16px;
-  --co-control-height: 52px;
+  --co-radius-sm: 14px;
+  --co-control-height: 44px;
+  --co-button-radius: 14px;
   --co-font: "Pretendard Variable", "Pretendard", -apple-system, sans-serif;
 }
 
@@ -121,12 +122,12 @@ button {
 
 .web-lang-select {
   min-height: var(--co-control-height);
-  padding: 0 46px 0 18px;
+  padding: 0 40px 0 14px;
   border: 1px solid var(--co-border);
-  border-radius: 999px;
+  border-radius: var(--co-button-radius);
   background: var(--co-surface);
   color: var(--co-text);
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 600;
   cursor: pointer;
   appearance: none;
@@ -471,7 +472,7 @@ button {
   min-height: 44px;
   padding: 0 16px;
   border: 1px solid var(--co-border);
-  border-radius: 999px;
+  border-radius: var(--co-button-radius);
   font-size: 14px;
   font-weight: 700;
   transition: transform 180ms ease, border-color 180ms ease;
@@ -545,9 +546,9 @@ button {
 .checkout-form button {
   width: 100%;
   min-height: var(--co-control-height);
-  padding: 0 16px;
+  padding: 0 14px;
   border: 1px solid var(--co-border);
-  border-radius: var(--co-radius-sm);
+  border-radius: var(--co-button-radius);
   background: var(--co-surface);
   color: var(--co-text);
 }

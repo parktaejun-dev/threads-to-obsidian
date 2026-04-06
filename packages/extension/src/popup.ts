@@ -193,6 +193,16 @@ function normalizePreviewText(item: RecentSave): string {
   return item.canonicalUrl;
 }
 
+function normalizeDisplayTitle(item: RecentSave, previewText: string): string {
+  const cleanedTitle = item.title.replace(/\s+/g, " ").trim();
+  if (cleanedTitle) {
+    return cleanedTitle;
+  }
+
+  const cleanedPreview = previewText.replace(/\s+/g, " ").trim();
+  return cleanedPreview || item.canonicalUrl;
+}
+
 function normalizeBodyText(item: RecentSave): string {
   const cleanedBody = cleanTextLines(item.post.text, item.author);
   return cleanedBody.replace(/\n{3,}/g, "\n\n").trim();
@@ -244,16 +254,24 @@ function renderRecentSaves(items: RecentSave[]): void {
   recentList.innerHTML = items
     .map((item) => {
       const preview = normalizePreviewText(item);
+      const title = normalizeDisplayTitle(item, preview);
       const fullBody = normalizeBodyText(item) || normalizeReplyPreview(item) || item.canonicalUrl;
       const expanded = expandedSaveIds.has(item.id);
-      const displayText = expanded ? preview : truncateText(preview, 50);
+      const displayPreview = expanded ? preview : truncateText(preview, 50);
+      const normalizedPreview = preview.replace(/\s+/g, " ").trim();
+      const showPreview =
+        !expanded &&
+        normalizedPreview.length > 0 &&
+        normalizedPreview !== title &&
+        normalizedPreview !== item.canonicalUrl;
       const expandLabel = expanded ? msg.popupCollapse : msg.popupExpand;
       const resaveLabel = msg.popupResave;
       const canResave = !(item.saveTarget === "cloud" && item.remoteOrigin === "mention");
 
       return `
         <li class="recent-item">
-          <div class="recent-title">${escapeHtml(displayText)}</div>
+          <div class="recent-title">${escapeHtml(title)}</div>
+          ${showPreview ? `<div class="recent-preview">${escapeHtml(displayPreview)}</div>` : ""}
           <div class="recent-meta">@${escapeHtml(item.author)} · ${escapeHtml(new Date(item.savedAt ?? item.downloadedAt).toLocaleString())}</div>
           ${item.warning ? `<div class="recent-warning">${escapeHtml(item.warning)}</div>` : ""}
           <a class="recent-url" href="${escapeAttribute(item.canonicalUrl)}" target="_blank" rel="noreferrer">${escapeHtml(item.canonicalUrl)}</a>
@@ -458,7 +476,7 @@ async function repairVisibleRecentSaves(state: PopupState): Promise<RecentSave[]
       index === targetIndex
         ? {
           ...item,
-          title: livePost.title,
+          title: item.title || livePost.title,
           contentHash: livePost.contentHash,
           post: livePost
         }
@@ -492,7 +510,13 @@ function mergeZipFallbackStatus(status: SaveStatus, reason: string | null): Save
   return status;
 }
 
-async function recordDirectSave(post: ExtractedPost, archiveName: string, savedRelativePath: string, warning: string | null): Promise<RecentSave> {
+async function recordDirectSave(
+  post: ExtractedPost,
+  archiveName: string,
+  title: string,
+  savedRelativePath: string,
+  warning: string | null
+): Promise<RecentSave> {
   const duplicate = await findDuplicateSave(post.canonicalUrl, post.contentHash, "obsidian");
   const now = new Date().toISOString();
   const recent: RecentSave = duplicate
@@ -502,7 +526,7 @@ async function recordDirectSave(post: ExtractedPost, archiveName: string, savedR
       canonicalUrl: post.canonicalUrl,
       shortcode: post.shortcode,
       author: post.author,
-      title: post.title,
+      title,
       savedAt: duplicate.savedAt ?? duplicate.downloadedAt,
       downloadedAt: now,
       archiveName,
@@ -521,7 +545,7 @@ async function recordDirectSave(post: ExtractedPost, archiveName: string, savedR
       canonicalUrl: post.canonicalUrl,
       shortcode: post.shortcode,
       author: post.author,
-      title: post.title,
+      title,
       savedAt: now,
       downloadedAt: now,
       archiveName,
@@ -579,7 +603,7 @@ async function tryDirectSaveCurrent(): Promise<{ status: SaveStatus } | { fallba
       options.savePathPattern,
       options.aiOrganization
     );
-    const recent = await recordDirectSave(post, result.archiveName, result.savedRelativePath, result.warning);
+    const recent = await recordDirectSave(post, result.archiveName, result.title, result.savedRelativePath, result.warning);
 
     return {
       status: {
@@ -711,6 +735,7 @@ async function resaveRecent(item: RecentSave): Promise<void> {
     const updatedSave: RecentSave = {
       ...item,
       saveTarget: "obsidian",
+      title: result.title,
       savedAt: item.savedAt ?? item.downloadedAt,
       downloadedAt: new Date().toISOString(),
       archiveName: result.archiveName,

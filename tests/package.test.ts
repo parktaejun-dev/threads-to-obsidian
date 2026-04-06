@@ -44,7 +44,7 @@ test("zip packaging stores note and downloaded image assets", async () => {
     assert.ok(note?.includes("published_at: 2026-03-08T08:00:00.000Z"));
     assert.ok(note?.includes("captured_at: 2026-03-08T08:01:00.000Z"));
     assert.ok(note?.includes("Author: @writer"));
-    assert.ok(note?.includes("![Image 1](02. image-01.jpg)"));
+    assert.ok(note?.includes('<img src="02. image-01.jpg" alt="Image 1" loading="lazy" width="720"'));
     assert.ok(zip.file("2026-03-08_writer_ZIP123/02. image-01.jpg"));
   } finally {
     globalThis.fetch = originalFetch;
@@ -112,7 +112,7 @@ test("zip packaging includes consecutive author replies and reply assets", async
     assert.ok(note?.includes("### Reply 1/2"));
     assert.ok(note?.includes("### Reply 2/2"));
     assert.ok(note?.includes("---"));
-    assert.ok(note?.includes("![Reply image 1 1](03. reply-01-image-01.jpg)"));
+    assert.ok(note?.includes('<img src="03. reply-01-image-01.jpg" alt="Reply image 1 1" loading="lazy" width="720"'));
     assert.ok(zip.file("2026-03-08_writer_ZIP123/03. reply-01-image-01.jpg"));
   } finally {
     globalThis.fetch = originalFetch;
@@ -158,7 +158,7 @@ test("zip packaging keeps video link, thumbnail, and saved video file for video 
     assert.ok(note?.includes("## Video"));
     assert.ok(note?.includes("Open on Threads: https://www.threads.com/@writer/post/ZIP123"));
     assert.ok(note?.includes("Saved video file: 02. video.mp4"));
-    assert.ok(note?.includes("![Video thumbnail](02. video-thumb.png)"));
+    assert.ok(note?.includes('<img src="02. video-thumb.png" alt="Video thumbnail" loading="lazy" width="720"'));
     assert.equal(note?.includes("## Image"), false);
     assert.ok(zip.file("2026-03-08_writer_ZIP123/02. video.mp4"));
     assert.ok(zip.file("2026-03-08_writer_ZIP123/02. video-thumb.png"));
@@ -183,7 +183,7 @@ test("zip packaging keeps remote video links when media download is disabled", a
   const note = await zip.file(`2026-03-08_writer_ZIP123/${buildArchiveNoteFilename("2026-03-08_writer_ZIP123")}`)?.async("string");
 
   assert.ok(note?.includes("Open on Threads: https://www.threads.com/@writer/post/ZIP123"));
-  assert.ok(note?.includes("![Video thumbnail](https://cdn.example.com/threads-logo.png)"));
+  assert.ok(note?.includes('<img src="https://cdn.example.com/threads-logo.png" alt="Video thumbnail" loading="lazy" width="720"'));
   assert.equal(Boolean(zip.file("2026-03-08_writer_ZIP123/02. video.mp4")), false);
 });
 
@@ -218,6 +218,6 @@ test("notion packaging renders body markdown without frontmatter and keeps remot
   assert.equal(result.markdownContent.startsWith("---"), false);
   assert.ok(result.markdownContent.includes("# writer on Threads"));
   assert.ok(result.markdownContent.includes("Source: https://www.threads.com/@writer/post/ZIP123"));
-  assert.ok(result.markdownContent.includes("![Image 1](https://cdn.example.com/image-1.jpg)"));
-  assert.ok(result.markdownContent.includes("![Video thumbnail](https://cdn.example.com/thread-thumb.png)"));
+  assert.ok(result.markdownContent.includes('<img src="https://cdn.example.com/image-1.jpg" alt="Image 1" loading="lazy" width="720"'));
+  assert.ok(result.markdownContent.includes('<img src="https://cdn.example.com/thread-thumb.png" alt="Video thumbnail" loading="lazy" width="720"'));
 });

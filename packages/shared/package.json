@@ -10,6 +10,7 @@
     "./i18n": "./src/i18n.ts",
     "./license": "./src/license.ts",
     "./locale": "./src/locale.ts",
+    "./mobile-save": "./src/mobile-save.ts",
     "./markdown": "./src/markdown.ts",
     "./notion": "./src/notion.ts",
     "./types": "./src/types.ts",

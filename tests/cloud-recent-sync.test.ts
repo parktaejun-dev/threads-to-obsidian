@@ -78,6 +78,8 @@ test("buildRecentSaveFromCloudArchive maps cloud archive metadata into a popup r
   assert.equal(recent.remotePageId, "cloud-1");
   assert.equal(recent.remotePageUrl, archive.archiveUrl);
   assert.equal(recent.remoteOrigin, "cloud");
+  assert.equal(recent.title, "Cloud archive title");
+  assert.equal(recent.archiveName, "Cloud archive title");
   assert.equal(recent.savedAt, archive.savedAt);
   assert.equal(recent.downloadedAt, archive.updatedAt);
 });

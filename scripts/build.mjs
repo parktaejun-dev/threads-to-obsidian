@@ -12,6 +12,8 @@ const webAssetsDist = path.join(webDist, "assets");
 const extensionRoot = path.join(root, "packages", "extension");
 const webClientRoot = path.join(root, "packages", "web-client");
 const webServerRoot = path.join(root, "packages", "web-server");
+const mobileSaveServerRoot = path.join(root, "packages", "mobile-save-server");
+const mobileSaveDist = path.join(dist, "mobile-save");
 const isDev = process.argv.includes("--dev");
 const targetArg = process.argv.find((arg) => arg.startsWith("--target="))?.slice("--target=".length) ?? "all";
 
@@ -22,10 +24,10 @@ function normalizeTargets(rawTarget) {
     .filter(Boolean);
 
   if (targets.length === 0 || targets.includes("all")) {
-    return new Set(["extension", "web", "server"]);
+    return new Set(["extension", "web", "server", "mobile-save-server"]);
   }
 
-  const supportedTargets = new Set(["extension", "web", "server"]);
+  const supportedTargets = new Set(["extension", "web", "server", "mobile-save-server"]);
   for (const target of targets) {
     if (!supportedTargets.has(target)) {
       throw new Error(`Unsupported build target: ${target}`);
@@ -139,6 +141,27 @@ async function buildServer() {
   });
 }
 
+async function buildMobileSaveServer() {
+  await mkdir(mobileSaveDist, { recursive: true });
+  await rm(path.join(mobileSaveDist, "server.js"), { force: true });
+  await rm(path.join(mobileSaveDist, "server.js.map"), { force: true });
+
+  await build({
+    entryPoints: {
+      server: path.join(mobileSaveServerRoot, "src", "server.ts")
+    },
+    bundle: true,
+    external: ["jsdom"],
+    outdir: mobileSaveDist,
+    splitting: false,
+    sourcemap: isDev,
+    target: "node20",
+    format: "esm",
+    platform: "node",
+    logLevel: "info"
+  });
+}
+
 if (targetArg === "all") {
   await rm(dist, { recursive: true, force: true });
 }
@@ -155,4 +178,8 @@ if (targets.has("web")) {
 
 if (targets.has("server")) {
   await buildServer();
+}
+
+if (targets.has("mobile-save-server")) {
+  await buildMobileSaveServer();
 }

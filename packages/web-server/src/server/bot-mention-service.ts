@@ -636,16 +636,26 @@ function isClaimableJob(job: BotMentionJobRecord, now: number, leaseMs: number):
   return safeTime(job.leasedAt, 0) + leaseMs <= now;
 }
 
+type MentionJobClaimOrder = "oldest" | "newest";
+
 function claimMentionJobs(
   data: WebDatabase,
   now: string,
   batchSize: number,
-  leaseMs: number
+  leaseMs: number,
+  options: {
+    order?: MentionJobClaimOrder;
+  } = {}
 ): BotMentionJobRecord[] {
   const nowMs = safeTime(now);
+  const sortDirection = options.order === "newest" ? -1 : 1;
   const claimed = data.botMentionJobs
     .filter((candidate) => isClaimableJob(candidate, nowMs, leaseMs))
-    .sort((left, right) => safeTime(left.availableAt) - safeTime(right.availableAt) || safeTime(left.createdAt) - safeTime(right.createdAt))
+    .sort((left, right) =>
+      sortDirection === -1
+        ? safeTime(right.availableAt) - safeTime(left.availableAt) || safeTime(right.createdAt) - safeTime(left.createdAt)
+        : safeTime(left.availableAt) - safeTime(right.availableAt) || safeTime(left.createdAt) - safeTime(right.createdAt)
+    )
     .slice(0, batchSize);
 
   for (const job of claimed) {
@@ -1436,6 +1446,7 @@ async function drainMentionSyncJobs(
     });
   }
 
+  const preferNewestJobs = mode === "manual" || mode === "test" || mode === "user_sync";
   const summary = createSummary(mode, {});
 
   while (true) {
@@ -1443,10 +1454,18 @@ async function drainMentionSyncJobs(
       ? await claimStoredBotMentionJobs(
           new Date().toISOString(),
           options.jobBatchSize,
-          options.jobLeaseMs
+          options.jobLeaseMs,
+          undefined,
+          { order: preferNewestJobs ? "newest" : "oldest" }
         )
       : await options.runTransaction((data) =>
-          claimMentionJobs(data, new Date().toISOString(), options.jobBatchSize, options.jobLeaseMs)
+          claimMentionJobs(
+            data,
+            new Date().toISOString(),
+            options.jobBatchSize,
+            options.jobLeaseMs,
+            { order: preferNewestJobs ? "newest" : "oldest" }
+          )
         );
     if (claimedJobs.length === 0) {
       break;
@@ -1829,13 +1848,14 @@ export function createBotMentionCollector(deps: {
       return syncInFlight;
     }
 
+    const prioritizeFreshSync = mode === "manual" || mode === "test" || mode === "user_sync";
     status.lastStartedAt = new Date().toISOString();
     status.lastError = null;
     updateRunningState();
 
     syncInFlight = (async () => {
-      const enqueueSummary = pollInFlight ? await pollInFlight : await enqueueNow(mode);
-      const priorDrainSummary = drainInFlight ? await drainInFlight : createSummary(mode, {});
+      const enqueueSummary = prioritizeFreshSync || !pollInFlight ? await enqueueNow(mode) : await pollInFlight;
+      const priorDrainSummary = prioritizeFreshSync || !drainInFlight ? createSummary(mode, {}) : await drainInFlight;
       const drainSummary = await drainNow(mode);
       return commitSummary(mergeSummaries(mode, enqueueSummary, priorDrainSummary, drainSummary));
     })()

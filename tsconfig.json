@@ -3,6 +3,7 @@
   "references": [
     { "path": "./packages/shared/tsconfig.json" },
     { "path": "./packages/web-schema/tsconfig.json" },
+    { "path": "./packages/mobile-save-server/tsconfig.json" },
     { "path": "./packages/extension/tsconfig.json" },
     { "path": "./packages/web-client/tsconfig.json" },
     { "path": "./packages/web-server/tsconfig.json" },

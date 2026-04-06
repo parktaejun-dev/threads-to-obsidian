@@ -1,9 +1,11 @@
 import { getAiProviderPreset } from "./config";
-import { t } from "./i18n";
+import { getLocale, t, type Locale } from "./i18n";
+import { sanitizeGeneratedTitle } from "./utils";
 import type { AiOrganizationResult, AiOrganizationSettings, ExtractedPost, FrontmatterPrimitive, FrontmatterValue } from "./types";
 
 const RESERVED_FRONTMATTER_KEYS = new Set([
   "title",
+  "ai_title",
   "author",
   "tags",
   "summary",
@@ -39,6 +41,16 @@ type GeminiGenerateContentResponse = {
   error?: {
     message?: string;
   };
+};
+
+const AI_OUTPUT_LANGUAGE_LABELS: Record<Locale, string> = {
+  ko: "Korean",
+  en: "English",
+  ja: "Japanese",
+  "pt-BR": "Brazilian Portuguese",
+  es: "Spanish",
+  "zh-TW": "Traditional Chinese",
+  vi: "Vietnamese"
 };
 
 function normalizeBaseUrl(baseUrl: string): string {
@@ -203,13 +215,22 @@ function extractJsonCandidate(raw: string): string {
   return raw.trim();
 }
 
-function buildPrompt(post: ExtractedPost, settings: AiOrganizationSettings): string {
+function buildSystemInstruction(locale: Locale): string {
+  const languageLabel = AI_OUTPUT_LANGUAGE_LABELS[locale];
+  return [
+    "You convert Threads posts into clean Obsidian metadata.",
+    "Output JSON only.",
+    `Write title and summary in ${languageLabel} (${locale}) unless the user's extra rules explicitly request another language.`
+  ].join(" ");
+}
+
+function buildPrompt(post: ExtractedPost, settings: AiOrganizationSettings, locale: Locale): string {
   const replyBlock =
     post.authorReplies.length > 0
       ? post.authorReplies
           .map(
-            (reply, index) =>
-              `Reply ${index + 1}\nAuthor: @${reply.author}\nPublished: ${reply.publishedAt ?? "unknown"}\nText:\n${reply.text}`
+            (reply, index, replies) =>
+              `Reply ${index + 1}/${replies.length}\nAuthor: @${reply.author}\nPublished: ${reply.publishedAt ?? "unknown"}\nText:\n${reply.text}`
           )
           .join("\n\n")
       : "None";
@@ -219,16 +240,19 @@ function buildPrompt(post: ExtractedPost, settings: AiOrganizationSettings): str
     "",
     "Schema:",
     "{",
+    '  "title": "string | null",',
     '  "summary": "string | null",',
     '  "tags": ["string"],',
     '  "frontmatter": { "flat_key": "string | number | boolean | null | array" }',
     "}",
     "",
     "Rules:",
+    "- title should be plain text, specific, and short enough to use as a note title.",
     "- Keep summary concise and factual.",
     "- tags should be short, lowercase, and reusable in Obsidian.",
     "- frontmatter must be flat. No nested objects.",
-    "- Do not repeat default fields like title, author, canonical_url, shortcode, tags, or summary inside frontmatter.",
+    "- Do not repeat default fields like title, ai_title, author, canonical_url, shortcode, tags, or summary inside frontmatter.",
+    `- Write title and summary in ${AI_OUTPUT_LANGUAGE_LABELS[locale]} (${locale}) unless user rules explicitly request another language.`,
     "- If unsure, return null or an empty array/object.",
     "",
     `User rules:\n${settings.prompt.trim() || "No extra rules."}`,
@@ -288,6 +312,7 @@ function sanitizeTags(value: unknown): string[] {
 
 function sanitizeResult(raw: unknown): AiOrganizationResult {
   const parsed = typeof raw === "object" && raw ? (raw as Record<string, unknown>) : {};
+  const title = typeof parsed.title === "string" ? sanitizeGeneratedTitle(parsed.title, 90) : null;
   const summary =
     typeof parsed.summary === "string" && parsed.summary.trim()
       ? parsed.summary.trim().slice(0, 600)
@@ -313,7 +338,7 @@ function sanitizeResult(raw: unknown): AiOrganizationResult {
     frontmatter[key] = value;
   }
 
-  return { summary, tags, frontmatter };
+  return { title, summary, tags, frontmatter };
 }
 
 function summarizeAiError(error: unknown, settings?: AiOrganizationSettings, normalizedBaseUrl?: string): string {
@@ -336,6 +361,7 @@ function normalizeGeminiModel(model: string): string {
 async function requestOpenAiCompatibleCompletion(
   normalizedBaseUrl: string,
   model: string,
+  systemInstruction: string,
   prompt: string,
   apiKey: string,
   signal: AbortSignal
@@ -356,7 +382,7 @@ async function requestOpenAiCompatibleCompletion(
       messages: [
         {
           role: "system",
-          content: "You convert Threads posts into clean Obsidian metadata. Output JSON only."
+          content: systemInstruction
         },
         {
           role: "user",
@@ -384,6 +410,7 @@ async function requestOpenAiCompatibleCompletion(
 async function requestGeminiCompletion(
   normalizedBaseUrl: string,
   model: string,
+  systemInstruction: string,
   prompt: string,
   apiKey: string,
   signal: AbortSignal
@@ -403,7 +430,7 @@ async function requestGeminiCompletion(
       systemInstruction: {
         parts: [
           {
-            text: "You convert Threads posts into clean Obsidian metadata. Output JSON only."
+            text: systemInstruction
           }
         ]
       },
@@ -451,6 +478,7 @@ export async function organizePostWithAi(
   try {
     normalizedBaseUrl = normalizeBaseUrl(settings.baseUrl);
     const model = settings.model.trim();
+    const locale = await getLocale();
     if (!model) {
       return { result: null, warning: (await t()).warnAiMissingModel };
     }
@@ -461,19 +489,27 @@ export async function organizePostWithAi(
 
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 20000);
-    const prompt = buildPrompt(post, settings);
+    const systemInstruction = buildSystemInstruction(locale);
+    const prompt = buildPrompt(post, settings, locale);
     const transport = getAiProviderPreset(settings.provider).transport;
 
     try {
       const rawContent =
         transport === "gemini"
-          ? await requestGeminiCompletion(normalizedBaseUrl, model, prompt, settings.apiKey, controller.signal)
-          : await requestOpenAiCompatibleCompletion(normalizedBaseUrl, model, prompt, settings.apiKey, controller.signal);
+          ? await requestGeminiCompletion(normalizedBaseUrl, model, systemInstruction, prompt, settings.apiKey, controller.signal)
+          : await requestOpenAiCompatibleCompletion(
+              normalizedBaseUrl,
+              model,
+              systemInstruction,
+              prompt,
+              settings.apiKey,
+              controller.signal
+            );
 
       const candidate = extractJsonCandidate(rawContent);
       const parsed = JSON.parse(candidate) as unknown;
       const result = sanitizeResult(parsed);
-      if (!result.summary && result.tags.length === 0 && Object.keys(result.frontmatter).length === 0) {
+      if (!result.title && !result.summary && result.tags.length === 0 && Object.keys(result.frontmatter).length === 0) {
         return { result: null, warning: null };
       }
 

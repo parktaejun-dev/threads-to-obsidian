@@ -2,6 +2,7 @@ import { type Locale, type Messages, t, tSync } from "./i18n";
 import { organizePostWithAi } from "./llm";
 import { renderNotionMarkdown, type MarkdownMediaRefs } from "./markdown";
 import type { AiOrganizationResult, AiOrganizationSettings, AuthorReply, ExtractedPost, NotionParentType, NotionSettings } from "./types";
+import { resolvePreferredTitle } from "./utils";
 
 const NOTION_API_URL = "https://api.notion.com/v1/pages";
 const NOTION_BLOCKS_API_URL = "https://api.notion.com/v1/blocks";
@@ -307,13 +308,14 @@ function buildAutoPropertyValue(
 ): Record<string, unknown> | null {
   const normalizedName = normalizePropertyName(propertyName);
   const propertyType = schema.type ?? "";
+  const resolvedTitle = resolvePreferredTitle(post.title, aiResult?.title);
   const tags = Array.from(new Set(["threads", ...(aiResult?.tags ?? [])]));
   const hasImages = post.imageUrls.length > 0 || post.authorReplies.some((reply) => reply.imageUrls.length > 0);
   const hasExternalUrl = Boolean(post.externalUrl || post.authorReplies.some((reply) => reply.externalUrl));
 
   if (propertyType === "title") {
     return {
-      title: chunkRichText(post.title)
+      title: chunkRichText(resolvedTitle)
     };
   }
 
@@ -462,9 +464,10 @@ async function renderBundleFromAi(
 ): Promise<{ title: string; markdownContent: string; aiResult: AiOrganizationResult | null; warning: string | null }> {
   const mediaRefs = buildNotionMediaRefs(post, includeImages && inlineMedia);
   const markdownContent = await renderNotionMarkdown(post, mediaRefs, aiWarning, aiResult, locale);
+  const resolvedTitle = resolvePreferredTitle(post.title, aiResult?.title);
 
   return {
-    title: post.title,
+    title: resolvedTitle,
     markdownContent,
     aiResult,
     warning: aiWarning

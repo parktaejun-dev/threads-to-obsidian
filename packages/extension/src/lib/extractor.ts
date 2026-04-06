@@ -238,28 +238,86 @@ function findFirstForeignPostBlock(root: HTMLElement | null, canonicalUrl: strin
   return firstBlock;
 }
 
+function parseSrcsetCandidate(value: string | null | undefined): string | null {
+  const normalized = (value ?? "").trim();
+  if (!normalized) {
+    return null;
+  }
+
+  const candidate = normalized
+    .split(",")
+    .map((entry) => entry.trim().split(/\s+/)[0] ?? "")
+    .filter(Boolean)
+    .pop();
+  return candidate && /^https?:\/\//i.test(candidate) ? candidate : null;
+}
+
+function readImageCandidates(img: HTMLImageElement): string[] {
+  return dedupeStrings([
+    img.currentSrc,
+    img.src,
+    parseSrcsetCandidate(img.srcset),
+    img.getAttribute("data-src"),
+    img.getAttribute("data-image-src"),
+    img.getAttribute("data-lazy-src"),
+    img.getAttribute("data-canonical-src"),
+    parseSrcsetCandidate(img.getAttribute("data-srcset")),
+    parseSrcsetCandidate(img.getAttribute("data-image-srcset"))
+  ]).filter((value) => /^https?:\/\//i.test(value));
+}
+
+function readImageDimension(img: HTMLImageElement, dimension: "width" | "height"): number {
+  const liveValue = dimension === "width" ? img.naturalWidth || img.width : img.naturalHeight || img.height;
+  if (liveValue > 0) {
+    return liveValue;
+  }
+
+  const attributeValue = Number.parseInt(img.getAttribute(dimension) ?? "", 10);
+  return Number.isFinite(attributeValue) && attributeValue > 0 ? attributeValue : 0;
+}
+
+function looksLikeAvatarImage(img: HTMLImageElement): boolean {
+  const alt = img.alt.trim().toLowerCase();
+  const src = (img.currentSrc || img.src || "").trim().toLowerCase();
+  return /프로필 사진|profile picture|profile photo|avatar/u.test(alt) || /profile[_-]?pic|avatar/u.test(src);
+}
+
+function hasEnoughVisualSize(width: number, height: number, minimumDimension: number): boolean {
+  if (width >= minimumDimension || height >= minimumDimension) {
+    return true;
+  }
+
+  return width === 0 && height === 0;
+}
+
 function getVisibleImages(root: HTMLElement | null, author: string, minimumDimension = 140): string[] {
   if (!root) {
     return [];
   }
 
-  const urls = Array.from(root.querySelectorAll<HTMLImageElement>("img"))
-    .filter((img) => {
-      const src = img.currentSrc || img.src;
-      if (!src || !src.startsWith("http")) {
-        return false;
-      }
+  const normalizedAuthor = author.trim().replace(/^@+/, "").toLowerCase();
+  const urls = Array.from(root.querySelectorAll<HTMLImageElement>("img")).flatMap((img) => {
+    const candidates = readImageCandidates(img);
+    if (candidates.length === 0) {
+      return [];
+    }
 
-      const alt = img.alt.trim();
-      const width = img.naturalWidth || img.width;
-      const height = img.naturalHeight || img.height;
-      if (alt.includes("프로필 사진") || alt.includes(author)) {
-        return false;
-      }
+    const alt = img.alt.trim().toLowerCase();
+    const width = readImageDimension(img, "width");
+    const height = readImageDimension(img, "height");
+    const likelyAvatar =
+      looksLikeAvatarImage(img) ||
+      ((width > 0 || height > 0) &&
+        width < minimumDimension &&
+        height < minimumDimension &&
+        normalizedAuthor.length > 0 &&
+        alt.includes(normalizedAuthor));
+    if (likelyAvatar || !hasEnoughVisualSize(width, height, minimumDimension)) {
+      return [];
+    }
 
-      return width >= minimumDimension || height >= minimumDimension;
-    })
-    .map((img) => img.currentSrc || img.src);
+    return [candidates[0] as string];
+  });
 
   if (urls.length > 0) {
     return dedupeStrings(urls);

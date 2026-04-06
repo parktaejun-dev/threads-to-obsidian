@@ -30,6 +30,7 @@ export interface AiOrganizationSettings {
 }
 
 export interface AiOrganizationResult {
+  title: string | null;
   summary: string | null;
   tags: string[];
   frontmatter: Record<string, FrontmatterValue>;
@@ -162,6 +163,7 @@ export interface PackagedResult {
   blob: Blob;
   zipFilename: string;
   archiveName: string;
+  title: string;
   warning: string | null;
 }
 

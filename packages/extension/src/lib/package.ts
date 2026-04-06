@@ -3,7 +3,7 @@ import { organizePostWithAi } from "./llm";
 import type { AiOrganizationResult, AiOrganizationSettings, ExtractedPost, PackagedResult } from "./types";
 import { t } from "./i18n";
 import { renderMarkdown, renderNotionMarkdown, type MarkdownMediaRefs } from "./markdown";
-import { buildArchiveBaseName, buildPathPatternParts, buildZipFilename } from "./utils";
+import { buildArchiveBaseName, buildPathPatternParts, buildZipFilename, resolvePreferredTitle } from "./utils";
 
 export interface ArchiveAssetFile {
   relativePath: string;
@@ -12,6 +12,7 @@ export interface ArchiveAssetFile {
 
 export interface ArchiveBundle {
   archiveName: string;
+  title: string;
   markdownContent: string;
   assetFiles: ArchiveAssetFile[];
   warning: string | null;
@@ -154,6 +155,7 @@ export async function buildArchiveBundle(
   const resolvedFallbackWarning = fallbackWarning ?? (await t()).warnImageDownloadOff;
   const archiveName = buildArchiveBaseName(filenamePattern, post);
   const ai = aiOrganization ? await organizePostWithAi(post, aiOrganization) : { result: null, warning: null };
+  const title = resolvePreferredTitle(post.title, ai.result?.title);
   const postImages = await collectImageAssets(
     post.imageUrls,
     prefixAssetBasePath("02", "image"),
@@ -222,6 +224,7 @@ export async function buildArchiveBundle(
 
   return {
     archiveName,
+    title,
     markdownContent,
     assetFiles: [
       ...postImages.assetFiles,
@@ -263,9 +266,10 @@ export async function buildNotionBundle(
 ): Promise<NotionBundle> {
   const ai = aiOrganization ? await organizePostWithAi(post, aiOrganization) : { result: null, warning: null };
   const markdownContent = await renderNotionMarkdown(post, buildNotionMediaRefs(post, includeImages), ai.warning, ai.result);
+  const title = resolvePreferredTitle(post.title, ai.result?.title);
 
   return {
-    title: post.title,
+    title,
     markdownContent,
     aiResult: ai.result,
     warning: ai.warning
@@ -293,6 +297,7 @@ export async function buildZipPackage(
     blob: await zip.generateAsync({ type: "blob" }),
     zipFilename: buildZipFilename(filenamePattern, post),
     archiveName: bundle.archiveName,
+    title: bundle.title,
     warning: bundle.warning
   };
 }

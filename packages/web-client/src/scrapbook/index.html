@@ -171,6 +171,27 @@
               <span data-i18n="scrapbookArchiveLoginCopy">Threads 계정을 연결하면 저장된 글과 cloud 저장 항목이 여기에 나타납니다.</span>
             </div>
 
+          <div id="archives-loading" class="archive-loading-panel hidden" aria-live="polite" role="status">
+            <div class="archive-loading-head">
+              <span class="archive-loading-orb" aria-hidden="true"></span>
+              <strong id="archives-loading-label">게시판 불러오는 중</strong>
+            </div>
+            <div class="archive-loading-grid" aria-hidden="true">
+              <div class="archive-loading-row">
+                <span class="archive-loading-line is-title"></span>
+                <span class="archive-loading-line is-meta"></span>
+              </div>
+              <div class="archive-loading-row">
+                <span class="archive-loading-line is-title"></span>
+                <span class="archive-loading-line is-meta is-meta-wide"></span>
+              </div>
+              <div class="archive-loading-row">
+                <span class="archive-loading-line is-title is-title-wide"></span>
+                <span class="archive-loading-line is-meta"></span>
+              </div>
+            </div>
+          </div>
+
           <div id="archives-board" class="archive-board hidden">
             <table class="archive-table">
               <thead>

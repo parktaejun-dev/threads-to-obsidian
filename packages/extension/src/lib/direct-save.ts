@@ -5,6 +5,7 @@ import { buildPathPatternParts } from "./utils";
 
 export interface DirectSaveResult {
   archiveName: string;
+  title: string;
   savedRelativePath: string;
   warning: string | null;
 }
@@ -138,6 +139,7 @@ export async function writePostToDirectory(
 
   return {
     archiveName,
+    title: bundle.title,
     savedRelativePath: [...routeParts, archiveName, markdownFilename].join("/"),
     warning: bundle.warning
   };

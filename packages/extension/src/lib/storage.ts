@@ -482,7 +482,7 @@ export function buildRecentSaveFromCloudArchive(record: CloudArchiveRecentRecord
     canonicalUrl: record.post.canonicalUrl,
     shortcode: record.post.shortcode,
     author: record.post.author,
-    title: record.post.title,
+    title: record.title,
     savedAt: record.savedAt,
     downloadedAt: record.updatedAt,
     archiveName: record.title,

@@ -34,7 +34,7 @@ export async function fetchWithTimeout(input: RequestInfo | URL, init: RequestIn
 
   const timeoutId = setTimeout(() => {
     controller.abort(new Error(`Outbound request timed out after ${timeoutMs} ms.`));
-  }, timeoutMs);
+  }, timeoutMs) as ReturnType<typeof setTimeout> & { unref?: () => void };
   timeoutId.unref?.();
 
   try {

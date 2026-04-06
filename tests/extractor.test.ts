@@ -53,6 +53,35 @@ const imageFixture = `
 </html>
 `;
 
+const lazyImageFixture = `
+<!doctype html>
+<html lang="ko">
+  <head>
+    <link rel="canonical" href="https://www.threads.com/@photographer/post/LAZY123" />
+    <meta property="og:title" content="photographer on Threads" />
+  </head>
+  <body>
+    <main>
+      <article>
+        <a href="https://www.threads.com/@photographer/post/LAZY123"><time datetime="2026-03-08T08:30:00.000Z">30분</time></a>
+        <div>photographer</div>
+        <div>지연 로딩 이미지 테스트</div>
+        <img src="https://cdn.example.com/avatar.jpg" alt="photographer profile picture" width="40" height="40" />
+        <img
+          alt="메인 이미지"
+          data-srcset="https://cdn.example.com/image-1-small.jpg 480w, https://cdn.example.com/image-1-large.jpg 1080w"
+        />
+        <img
+          alt="둘째 이미지"
+          data-src="https://cdn.example.com/image-2.jpg"
+        />
+        <button>좋아요 5</button>
+      </article>
+    </main>
+  </body>
+</html>
+`;
+
 const videoFixture = `
 <!doctype html>
 <html lang="ko">
@@ -404,6 +433,16 @@ test("image permalink excludes avatar images and keeps related post url", async 
   assert.equal(post.sourceType, "image");
   assert.equal(post.imageUrls.length, 2);
   assert.equal(post.quotedPostUrl, "https://www.threads.com/@other/post/QQQ111");
+});
+
+test("image permalink keeps lazy-loaded image candidates even without width attributes", async () => {
+  const dom = new JSDOM(lazyImageFixture, { url: "https://www.threads.com/@photographer/post/LAZY123" });
+  const post = await extractPostFromDocument(dom.window.document, dom.window.location.href);
+
+  assert.deepEqual(post.imageUrls, [
+    "https://cdn.example.com/image-1-large.jpg",
+    "https://cdn.example.com/image-2.jpg"
+  ]);
 });
 
 test("video permalink falls back to thumbnail metadata", async () => {

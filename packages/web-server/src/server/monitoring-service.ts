@@ -19,7 +19,7 @@ const MAX_MONITOR_RUNS = 30;
 const MAX_MONITOR_INCIDENTS = 100;
 
 let collectorStatusReader: (() => BotMentionCollectorStatus | null) | null = null;
-let autoRunTimer: NodeJS.Timeout | null = null;
+let autoRunTimer: ReturnType<typeof setInterval> | null = null;
 
 function byNewest<T extends { createdAt?: string; lastSeenAt?: string }>(left: T, right: T): number {
   const leftValue = left.lastSeenAt ?? left.createdAt ?? "";
@@ -307,10 +307,11 @@ export function configureMonitoringService(options: {
     return;
   }
 
-  autoRunTimer = setInterval(() => {
+  const interval = setInterval(() => {
     void runMonitoringNow().catch(() => undefined);
-  }, AUTO_RUN_INTERVAL_MS);
-  autoRunTimer.unref?.();
+  }, AUTO_RUN_INTERVAL_MS) as ReturnType<typeof setInterval> & { unref?: () => void };
+  interval.unref?.();
+  autoRunTimer = interval;
 }
 
 export function stopMonitoringService(): void {

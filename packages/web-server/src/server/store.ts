@@ -63,6 +63,22 @@ type RelationalColumnDescriptor<T> = {
   getValue: (record: T) => unknown;
 };
 
+export type UserScopedHydrationOptions = {
+  includeBotArchives?: boolean;
+  includeCloudArchives?: boolean;
+  includeWatchlists?: boolean;
+  includeSearchMonitors?: boolean;
+  includeSearchResults?: boolean;
+  includeTrackedPosts?: boolean;
+  includeInsightsSnapshots?: boolean;
+  includeSavedViews?: boolean;
+  includeBotArchiveRawPayloadJson?: boolean;
+  includeCloudArchiveRawPayloadJson?: boolean;
+  includeSearchResultRawPayloadJson?: boolean;
+  includeTrackedPostRawPayloadJson?: boolean;
+  includeInsightsSnapshotRawPayloadJson?: boolean;
+};
+
 export function getDatabaseFilePath(): string {
   return getRuntimeConfigSnapshot().database.filePath || DEFAULT_DB_FILE;
 }
@@ -918,6 +934,33 @@ function normalizePostgresCloudArchive(row: Record<string, unknown>): CloudArchi
   };
 }
 
+function buildSelectedColumnList(columnNames: readonly string[], includeRawPayloadJson = true): string {
+  return columnNames
+    .filter((name) => includeRawPayloadJson || name !== "raw_payload_json")
+    .join(", ");
+}
+
+const BOT_ARCHIVE_SELECT_COLUMNS = [
+  "id",
+  "user_id",
+  "mention_id",
+  "mention_url",
+  "mention_author_handle",
+  "mention_author_display_name",
+  "note_text",
+  "target_url",
+  "target_author_handle",
+  "target_author_display_name",
+  "target_text",
+  "target_published_at",
+  "media_urls",
+  "markdown_content",
+  "raw_payload_json",
+  "archived_at",
+  "updated_at",
+  "status"
+] as const;
+
 const BOT_LOGIN_TOKEN_COLUMNS: readonly RelationalColumnDescriptor<BotLoginTokenRecord>[] = [
   { name: "id", getValue: (record) => record.id },
   { name: "user_id", getValue: (record) => record.userId },
@@ -995,6 +1038,7 @@ const CLOUD_ARCHIVE_COLUMNS: readonly RelationalColumnDescriptor<CloudArchiveRec
   { name: "updated_at", cast: "timestamptz", getValue: (record) => record.updatedAt },
   { name: "status", getValue: (record) => record.status }
 ];
+const CLOUD_ARCHIVE_SELECT_COLUMNS = CLOUD_ARCHIVE_COLUMNS.map(({ name }) => name);
 
 async function ensurePostgresBotLoginTokensStore(client: PgPool | PoolClient, tableName: string): Promise<void> {
   const fullTableName = getPostgresBotLoginTokensTableName(tableName);
@@ -1482,6 +1526,7 @@ const SEARCH_RESULT_COLUMNS: readonly RelationalColumnDescriptor<SearchResultRec
   { name: "raw_payload_json", getValue: (record) => record.rawPayloadJson },
   { name: "status", getValue: (record) => record.status }
 ];
+const SEARCH_RESULT_SELECT_COLUMNS = SEARCH_RESULT_COLUMNS.map(({ name }) => name);
 
 const TRACKED_POST_COLUMNS: readonly RelationalColumnDescriptor<TrackedPostRecord>[] = [
   { name: "id", getValue: (record) => record.id },
@@ -1504,6 +1549,7 @@ const TRACKED_POST_COLUMNS: readonly RelationalColumnDescriptor<TrackedPostRecor
   { name: "updated_at", cast: "timestamptz", getValue: (record) => record.updatedAt },
   { name: "raw_payload_json", getValue: (record) => record.rawPayloadJson }
 ];
+const TRACKED_POST_SELECT_COLUMNS = TRACKED_POST_COLUMNS.map(({ name }) => name);
 
 const INSIGHTS_SNAPSHOT_COLUMNS: readonly RelationalColumnDescriptor<InsightsSnapshotRecord>[] = [
   { name: "id", getValue: (record) => record.id },
@@ -1522,6 +1568,7 @@ const INSIGHTS_SNAPSHOT_COLUMNS: readonly RelationalColumnDescriptor<InsightsSna
   { name: "captured_at", cast: "timestamptz", getValue: (record) => record.capturedAt },
   { name: "raw_payload_json", getValue: (record) => record.rawPayloadJson }
 ];
+const INSIGHTS_SNAPSHOT_SELECT_COLUMNS = INSIGHTS_SNAPSHOT_COLUMNS.map(({ name }) => name);
 
 const SAVED_VIEW_COLUMNS: readonly RelationalColumnDescriptor<SavedViewRecord>[] = [
   { name: "id", getValue: (record) => record.id },
@@ -1967,11 +2014,12 @@ async function loadPostgresBotExtensionAccessTokensForUser(
 async function loadPostgresBotArchivesForUser(
   client: PgPool | PoolClient,
   backend: PostgresDatabaseBackend,
-  userId: string
+  userId: string,
+  options: UserScopedHydrationOptions = {}
 ): Promise<BotArchiveRecord[]> {
   await ensurePostgresBotArchivesStore(client, backend.tableName);
   const result = await client.query<Record<string, unknown>>(
-    `SELECT *
+    `SELECT ${buildSelectedColumnList(BOT_ARCHIVE_SELECT_COLUMNS, options.includeBotArchiveRawPayloadJson !== false)}
      FROM ${escapeQualifiedIdentifier(getPostgresBotArchivesTableName(backend.tableName))}
      WHERE user_id = $1
      ORDER BY updated_at DESC, archived_at DESC`,
@@ -1983,11 +2031,12 @@ async function loadPostgresBotArchivesForUser(
 async function loadPostgresCloudArchivesForUser(
   client: PgPool | PoolClient,
   backend: PostgresDatabaseBackend,
-  userId: string
+  userId: string,
+  options: UserScopedHydrationOptions = {}
 ): Promise<CloudArchiveRecord[]> {
   await ensurePostgresCloudArchivesStore(client, backend.tableName);
   const result = await client.query<Record<string, unknown>>(
-    `SELECT *
+    `SELECT ${buildSelectedColumnList(CLOUD_ARCHIVE_SELECT_COLUMNS, options.includeCloudArchiveRawPayloadJson !== false)}
      FROM ${escapeQualifiedIdentifier(getPostgresCloudArchivesTableName(backend.tableName))}
      WHERE user_id = $1
      ORDER BY updated_at DESC, saved_at DESC`,
@@ -2031,11 +2080,12 @@ async function loadPostgresSearchMonitorsForUser(
 async function loadPostgresSearchResultsForUser(
   client: PgPool | PoolClient,
   backend: PostgresDatabaseBackend,
-  userId: string
+  userId: string,
+  options: UserScopedHydrationOptions = {}
 ): Promise<SearchResultRecord[]> {
   await ensurePostgresSearchResultsStore(client, backend.tableName);
   const result = await client.query<Record<string, unknown>>(
-    `SELECT *
+    `SELECT ${buildSelectedColumnList(SEARCH_RESULT_SELECT_COLUMNS, options.includeSearchResultRawPayloadJson !== false)}
      FROM ${escapeQualifiedIdentifier(getPostgresSearchResultsTableName(backend.tableName))}
      WHERE user_id = $1
      ORDER BY discovered_at DESC, updated_at DESC`,
@@ -2047,11 +2097,12 @@ async function loadPostgresSearchResultsForUser(
 async function loadPostgresTrackedPostsForUser(
   client: PgPool | PoolClient,
   backend: PostgresDatabaseBackend,
-  userId: string
+  userId: string,
+  options: UserScopedHydrationOptions = {}
 ): Promise<TrackedPostRecord[]> {
   await ensurePostgresTrackedPostsStore(client, backend.tableName);
   const result = await client.query<Record<string, unknown>>(
-    `SELECT *
+    `SELECT ${buildSelectedColumnList(TRACKED_POST_SELECT_COLUMNS, options.includeTrackedPostRawPayloadJson !== false)}
      FROM ${escapeQualifiedIdentifier(getPostgresTrackedPostsTableName(backend.tableName))}
      WHERE user_id = $1
      ORDER BY discovered_at DESC, updated_at DESC`,
@@ -2063,11 +2114,15 @@ async function loadPostgresTrackedPostsForUser(
 async function loadPostgresInsightsSnapshotsForUser(
   client: PgPool | PoolClient,
   backend: PostgresDatabaseBackend,
-  userId: string
+  userId: string,
+  options: UserScopedHydrationOptions = {}
 ): Promise<InsightsSnapshotRecord[]> {
   await ensurePostgresInsightsSnapshotsStore(client, backend.tableName);
   const result = await client.query<Record<string, unknown>>(
-    `SELECT *
+    `SELECT ${buildSelectedColumnList(
+      INSIGHTS_SNAPSHOT_SELECT_COLUMNS,
+      options.includeInsightsSnapshotRawPayloadJson !== false
+    )}
      FROM ${escapeQualifiedIdentifier(getPostgresInsightsSnapshotsTableName(backend.tableName))}
      WHERE user_id = $1
      ORDER BY captured_at DESC`,
@@ -2637,6 +2692,28 @@ async function hydratePostgresDatabase(
   return database;
 }
 
+async function hydrateBotAuthPostgresDatabase(
+  client: PgPool | PoolClient,
+  backend: PostgresDatabaseBackend
+): Promise<WebDatabase> {
+  const database = await loadPrimaryDatabasePayload(client, backend);
+  database.botUsers = await loadPostgresBotUsers(client, backend, database.botUsers);
+  database.botLoginTokens = await loadPostgresBotLoginTokens(client, backend, database.botLoginTokens);
+  database.botOauthSessions = await loadPostgresBotOauthSessions(client, backend, database.botOauthSessions);
+  database.botSessions = await loadPostgresBotSessions(client, backend, database.botSessions);
+  database.botExtensionLinkSessions = await loadPostgresBotExtensionLinkSessions(
+    client,
+    backend,
+    database.botExtensionLinkSessions
+  );
+  database.botExtensionAccessTokens = await loadPostgresBotExtensionAccessTokens(
+    client,
+    backend,
+    database.botExtensionAccessTokens
+  );
+  return database;
+}
+
 async function syncPostgresRelationalCollections(
   client: PgPool | PoolClient,
   backend: PostgresDatabaseBackend,
@@ -2725,7 +2802,8 @@ function snapshotUserScopedCollections(data: WebDatabase) {
 async function hydrateUserScopedPostgresDatabase(
   client: PgPool | PoolClient,
   backend: PostgresDatabaseBackend,
-  userId: string
+  userId: string,
+  options: UserScopedHydrationOptions = {}
 ): Promise<WebDatabase> {
   const database = await loadPrimaryDatabasePayload(client, backend);
   const user = await findPostgresBotUserById(client, backend, userId);
@@ -2736,14 +2814,30 @@ async function hydrateUserScopedPostgresDatabase(
   database.botExtensionLinkSessions = await loadPostgresBotExtensionLinkSessionsForUser(client, backend, userId);
   database.botExtensionAccessTokens = await loadPostgresBotExtensionAccessTokensForUser(client, backend, userId);
   database.botMentionJobs = [];
-  database.botArchives = await loadPostgresBotArchivesForUser(client, backend, userId);
-  database.cloudArchives = await loadPostgresCloudArchivesForUser(client, backend, userId);
-  database.watchlists = await loadPostgresWatchlistsForUser(client, backend, userId);
-  database.searchMonitors = await loadPostgresSearchMonitorsForUser(client, backend, userId);
-  database.searchResults = await loadPostgresSearchResultsForUser(client, backend, userId);
-  database.trackedPosts = await loadPostgresTrackedPostsForUser(client, backend, userId);
-  database.insightsSnapshots = await loadPostgresInsightsSnapshotsForUser(client, backend, userId);
-  database.savedViews = await loadPostgresSavedViewsForUser(client, backend, userId);
+  database.botArchives =
+    options.includeBotArchives === false ? [] : await loadPostgresBotArchivesForUser(client, backend, userId, options);
+  database.cloudArchives =
+    options.includeCloudArchives === false
+      ? []
+      : await loadPostgresCloudArchivesForUser(client, backend, userId, options);
+  database.watchlists =
+    options.includeWatchlists === false ? [] : await loadPostgresWatchlistsForUser(client, backend, userId);
+  database.searchMonitors =
+    options.includeSearchMonitors === false ? [] : await loadPostgresSearchMonitorsForUser(client, backend, userId);
+  database.searchResults =
+    options.includeSearchResults === false
+      ? []
+      : await loadPostgresSearchResultsForUser(client, backend, userId, options);
+  database.trackedPosts =
+    options.includeTrackedPosts === false
+      ? []
+      : await loadPostgresTrackedPostsForUser(client, backend, userId, options);
+  database.insightsSnapshots =
+    options.includeInsightsSnapshots === false
+      ? []
+      : await loadPostgresInsightsSnapshotsForUser(client, backend, userId, options);
+  database.savedViews =
+    options.includeSavedViews === false ? [] : await loadPostgresSavedViewsForUser(client, backend, userId);
   return database;
 }
 
@@ -3130,24 +3224,41 @@ export async function withBotAuthDatabaseTransaction<T>(
     try {
       await client.query("BEGIN");
       await ensurePrimaryPostgresStoreRow(client, backend);
-      const database = await loadPrimaryDatabasePayload(client, backend);
-      database.botUsers = await loadPostgresBotUsers(client, backend, database.botUsers);
-      database.botLoginTokens = await loadPostgresBotLoginTokens(client, backend, database.botLoginTokens);
-      database.botOauthSessions = await loadPostgresBotOauthSessions(client, backend, database.botOauthSessions);
-      database.botSessions = await loadPostgresBotSessions(client, backend, database.botSessions);
-      database.botExtensionLinkSessions = await loadPostgresBotExtensionLinkSessions(
-        client,
-        backend,
-        database.botExtensionLinkSessions
-      );
-      database.botExtensionAccessTokens = await loadPostgresBotExtensionAccessTokens(
-        client,
-        backend,
-        database.botExtensionAccessTokens
-      );
+      const database = await hydrateBotAuthPostgresDatabase(client, backend);
       const initial = snapshotBotAuthCollections(database);
       const output = await handler(database);
       await syncPostgresBotAuthCollections(client, backend, initial, database);
+      await client.query("COMMIT");
+      return output;
+    } catch (error) {
+      await client.query("ROLLBACK").catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
+    }
+  });
+}
+
+export async function withBotAuthDatabaseReadTransaction<T>(
+  handler: (database: WebDatabase) => Promise<T> | T,
+  filePath?: string
+): Promise<T> {
+  return withDatabaseAccess(async () => {
+    const backend = resolveDatabaseBackend(filePath);
+    if (backend.kind !== "postgres") {
+      return withDatabaseLock(async () => {
+        const database = await loadDatabaseUnsafe(backend.filePath);
+        return handler(database);
+      });
+    }
+
+    const pool = await getPostgresPool(backend.connectionString);
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      await ensurePrimaryPostgresStoreRow(client, backend);
+      const database = await hydrateBotAuthPostgresDatabase(client, backend);
+      const output = await handler(database);
       await client.query("COMMIT");
       return output;
     } catch (error) {
@@ -3188,6 +3299,76 @@ export async function withUserScopedDatabaseTransaction<T>(
     } finally {
       client.release();
     }
+  });
+}
+
+export async function withUserScopedDatabaseReadTransaction<T>(
+  userId: string,
+  handler: (database: WebDatabase) => Promise<T> | T,
+  filePath?: string,
+  options: UserScopedHydrationOptions = {}
+): Promise<T> {
+  return withDatabaseAccess(async () => {
+    const backend = resolveDatabaseBackend(filePath);
+    if (backend.kind !== "postgres") {
+      return withDatabaseLock(async () => {
+        const database = await loadDatabaseUnsafe(backend.filePath);
+        return handler(database);
+      });
+    }
+
+    const normalizedUserId = userId.trim();
+    const pool = await getPostgresPool(backend.connectionString);
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      await ensurePrimaryPostgresStoreRow(client, backend);
+      const database = await hydrateUserScopedPostgresDatabase(client, backend, normalizedUserId, options);
+      const output = await handler(database);
+      await client.query("COMMIT");
+      return output;
+    } catch (error) {
+      await client.query("ROLLBACK").catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
+    }
+  });
+}
+
+export async function findBotSessionByHashFromStore(
+  sessionHash: string,
+  filePath?: string
+): Promise<BotSessionRecord | null> {
+  return withDatabaseAccess(async () => {
+    const backend = resolveDatabaseBackend(filePath);
+    if (backend.kind !== "postgres") {
+      return withDatabaseLock(async () => {
+        const database = await loadDatabaseUnsafe(backend.filePath);
+        return database.botSessions.find((candidate) => candidate.sessionHash === sessionHash) ?? null;
+      });
+    }
+
+    const pool = await getPostgresPool(backend.connectionString);
+    return findPostgresBotSessionByHash(pool, backend, sessionHash);
+  });
+}
+
+export async function findBotExtensionAccessTokenByHashFromStore(
+  tokenHash: string,
+  filePath?: string
+): Promise<BotExtensionAccessTokenRecord | null> {
+  return withDatabaseAccess(async () => {
+    const backend = resolveDatabaseBackend(filePath);
+    if (backend.kind !== "postgres") {
+      return withDatabaseLock(async () => {
+        const database = await loadDatabaseUnsafe(backend.filePath);
+        return database.botExtensionAccessTokens.find((candidate) => candidate.tokenHash === tokenHash) ?? null;
+      });
+    }
+
+    const pool = await getPostgresPool(backend.connectionString);
+    return findPostgresBotExtensionAccessTokenByHash(pool, backend, tokenHash);
   });
 }
 
@@ -3848,12 +4029,18 @@ export async function enqueueBotMentionJobs(
   });
 }
 
+type BotMentionJobClaimOrder = "oldest" | "newest";
+
 export async function claimBotMentionJobs(
   now: string,
   batchSize: number,
   leaseMs: number,
-  filePath?: string
+  filePath?: string,
+  options: {
+    order?: BotMentionJobClaimOrder;
+  } = {}
 ): Promise<BotMentionJobRecord[]> {
+  const sortDirection = options.order === "newest" ? "DESC" : "ASC";
   return withDatabaseAccess(async () => {
     const backend = resolveDatabaseBackend(filePath);
     if (backend.kind === "postgres") {
@@ -3875,7 +4062,7 @@ export async function claimBotMentionJobs(
                    AND COALESCE(leased_at, available_at) <= $2::timestamptz
                  )
                )
-             ORDER BY available_at ASC, created_at ASC
+             ORDER BY available_at ${sortDirection}, created_at ${sortDirection}
              FOR UPDATE SKIP LOCKED
              LIMIT $3
            )
@@ -3917,7 +4104,11 @@ export async function claimBotMentionJobs(
           const leasedAt = candidate.leasedAt ? Date.parse(candidate.leasedAt) : 0;
           return leasedAt + leaseMs <= nowMs;
         })
-        .sort((left, right) => Date.parse(left.availableAt) - Date.parse(right.availableAt) || Date.parse(left.createdAt) - Date.parse(right.createdAt))
+        .sort((left, right) =>
+          sortDirection === "DESC"
+            ? Date.parse(right.availableAt) - Date.parse(left.availableAt) || Date.parse(right.createdAt) - Date.parse(left.createdAt)
+            : Date.parse(left.availableAt) - Date.parse(right.availableAt) || Date.parse(left.createdAt) - Date.parse(right.createdAt)
+        )
         .slice(0, batchSize)
         .map((candidate) => {
           candidate.status = "processing";

@@ -1,0 +1,31 @@
+{
+  "expo": {
+    "name": "ss-threads",
+    "slug": "threads-local-save",
+    "scheme": "threads-local-save",
+    "icon": "./assets/app-icon.png",
+    "plugins": [
+      "expo-secure-store",
+      "expo-sharing",
+      "expo-web-browser"
+    ],
+    "splash": {
+      "image": "./assets/app-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "ios": {
+      "bundleIdentifier": "dev.dahanda.threadslocalsave",
+      "config": {
+        "usesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "package": "dev.dahanda.threadslocalsave",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/app-icon.png",
+        "backgroundColor": "#ffffff"
+      }
+    }
+  }
+}

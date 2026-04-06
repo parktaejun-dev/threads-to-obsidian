@@ -51,6 +51,7 @@ import {
   getExtensionCloudConnectionStatusFromStore,
   getBotPublicConfig,
   getBotSessionAuthStateFromStore,
+  getBotSessionState,
   getBotSessionStateFromStore,
   listExtensionCloudArchivesFromStore,
   readBotArchiveZipFromStore,
@@ -63,6 +64,7 @@ import {
   revokeBotSessionFromStore,
   syncExtensionCloudLicenseLinkFromStore,
   startBotOauthFromStore,
+  withBotSessionDatabaseReadTransaction,
   validateBotIngestRequest
 } from "./server/bot-service";
 import {
@@ -77,6 +79,7 @@ import {
   deleteSearchMonitorFromStore,
   deleteWatchlistFromStore,
   dismissSearchResultFromStore,
+  readScrapbookPlusState,
   readScrapbookPlusStateFromStore,
   refreshInsightsFromStore,
   saveInsightsViewFromStore,
@@ -223,7 +226,7 @@ type RateLimitBucket = {
 
 type RateLimitState = {
   buckets: Map<string, RateLimitBucket>;
-  gcTimer: NodeJS.Timeout | null;
+  gcTimer: ReturnType<typeof setInterval> | null;
 };
 
 class RequestError extends Error {
@@ -299,7 +302,7 @@ function scheduleBotSessionRepair(rawSession: string | null | undefined): void {
       .finally(() => {
         pendingBotSessionRepairRequests.delete(sessionKey);
       });
-  }, 0);
+  }, 0) as ReturnType<typeof setTimeout> & { unref?: () => void };
   timer.unref?.();
 }
 
@@ -2079,9 +2082,17 @@ type MutationOriginPolicy = {
   allowExtensionOrigin: boolean;
 };
 
+function isMobileSavePath(pathname: string): boolean {
+  return pathname === "/mobile-save" || pathname.startsWith("/mobile-save/");
+}
+
 function getMutationOriginPolicy(pathname: string, method: string): MutationOriginPolicy {
   const normalizedMethod = method.toUpperCase();
   if (!["POST", "PUT", "PATCH", "DELETE"].includes(normalizedMethod)) {
+    return { enforce: false, allowExtensionOrigin: false };
+  }
+
+  if (isMobileSavePath(pathname)) {
     return { enforce: false, allowExtensionOrigin: false };
   }
 
@@ -2123,6 +2134,74 @@ function readBearerToken(request: IncomingMessage): string | null {
   }
 
   return safeText(authorization.slice("Bearer ".length));
+}
+
+function getMobileSaveProxyOrigin(): string {
+  const configured = safeText(process.env.THREADS_MOBILE_SAVE_PROXY_ORIGIN);
+  if (configured) {
+    return configured;
+  }
+
+  const host = safeText(process.env.THREADS_MOBILE_SAVE_HOST) || "127.0.0.1";
+  const port = safeText(process.env.THREADS_MOBILE_SAVE_PORT) || "4180";
+  return `http://${host}:${port}`;
+}
+
+async function proxyMobileSaveRequest(
+  request: IncomingMessage,
+  response: ServerResponse,
+  requestUrl: URL,
+  maxBodyBytes: number
+): Promise<void> {
+  const upstreamUrl = new URL(`${requestUrl.pathname}${requestUrl.search}`, getMobileSaveProxyOrigin());
+  const headers = new Headers();
+
+  for (const [key, value] of Object.entries(request.headers)) {
+    if (!value || key === "host" || key === "content-length" || key === "connection") {
+      continue;
+    }
+
+    if (Array.isArray(value)) {
+      for (const entry of value) {
+        headers.append(key, entry);
+      }
+    } else {
+      headers.set(key, value);
+    }
+  }
+
+  if (request.headers.host) {
+    headers.set("x-forwarded-host", request.headers.host);
+  }
+  headers.set("x-forwarded-proto", requestUrl.protocol.replace(/:$/, ""));
+
+  const body =
+    request.method && !["GET", "HEAD"].includes(request.method.toUpperCase())
+      ? await readRequestBody(request, maxBodyBytes)
+      : undefined;
+
+  let upstreamResponse: Response;
+  try {
+    upstreamResponse = await fetchWithTimeout(upstreamUrl, {
+      method: request.method,
+      headers,
+      body: body && body.byteLength > 0 ? new Uint8Array(body) : undefined
+    });
+  } catch (error) {
+    throw new RequestError(503, error instanceof Error ? error.message : "Mobile save service is unavailable.");
+  }
+
+  response.statusCode = upstreamResponse.status;
+  upstreamResponse.headers.forEach((value, key) => {
+    if (key.toLowerCase() === "transfer-encoding" || key.toLowerCase() === "content-length") {
+      return;
+    }
+    response.setHeader(key, value);
+  });
+
+  const payload = Buffer.from(await upstreamResponse.arrayBuffer());
+  response.setHeader("content-length", String(payload.byteLength));
+  response.end(payload);
 }
 
 function normalizeIpAddress(value: string | null | undefined): string {
@@ -2334,6 +2413,33 @@ async function buildPublicBotAuthResponse(
   return getBotSessionAuthStateFromStore(rawSession);
 }
 
+async function buildPublicBotInboxResponse(
+  rawSession: string | null | undefined,
+  collector: BotMentionCollector
+): Promise<
+  Awaited<ReturnType<typeof getBotSessionStateFromStore>> & {
+    saveStatus: PublicMentionSaveStatus | null;
+  }
+> {
+  const state = await withBotSessionDatabaseReadTransaction(
+    rawSession,
+    (data) => getBotSessionState(data, rawSession),
+    {
+      includeWatchlists: false,
+      includeSearchMonitors: false,
+      includeSearchResults: false,
+      includeTrackedPosts: false,
+      includeInsightsSnapshots: false,
+      includeSavedViews: false
+    }
+  );
+  const saveStatus = state.authenticated && state.user ? await buildPublicMentionSaveStatus(state, collector) : null;
+  return {
+    ...state,
+    saveStatus
+  };
+}
+
 async function buildPublicBotBootstrapResponse(
   rawSession: string | null | undefined,
   collector: BotMentionCollector
@@ -2343,10 +2449,18 @@ async function buildPublicBotBootstrapResponse(
     workspace: Awaited<ReturnType<typeof readScrapbookPlusStateFromStore>>;
   }
 > {
-  // Keep these user-scoped reads sequential so we do not open overlapping
-  // write-capable transactions against the same tables during login/bootstrap.
-  const state = await getBotSessionStateFromStore(rawSession);
-  const workspace = await readScrapbookPlusStateFromStore(rawSession);
+  const { state, workspace } = await withBotSessionDatabaseReadTransaction(
+    rawSession,
+    (data, userId) => ({
+      state: getBotSessionState(data, rawSession),
+      workspace: readScrapbookPlusState(data, rawSession, userId)
+    }),
+    {
+      includeSearchResultRawPayloadJson: false,
+      includeTrackedPostRawPayloadJson: false,
+      includeInsightsSnapshotRawPayloadJson: false
+    }
+  );
   const saveStatus = state.authenticated && state.user ? await buildPublicMentionSaveStatus(state, collector) : null;
   return {
     ...state,
@@ -2450,10 +2564,11 @@ function ensureRateLimitBucketGcTimer(state: RateLimitState): void {
     return;
   }
 
-  state.gcTimer = setInterval(() => {
+  const gcTimer = setInterval(() => {
     cleanupRateLimitBuckets(state);
-  }, RATE_LIMIT_BUCKET_GC_INTERVAL_MS);
-  state.gcTimer.unref?.();
+  }, RATE_LIMIT_BUCKET_GC_INTERVAL_MS) as ReturnType<typeof setInterval> & { unref?: () => void };
+  gcTimer.unref?.();
+  state.gcTimer = gcTimer;
 }
 
 function stopRateLimitBucketGcTimer(state: RateLimitState): void {
@@ -4378,6 +4493,22 @@ async function handlePublicBotRoute(
     return;
   }
 
+  if (pathname === "/api/public/bot/inbox") {
+    if ((request.method ?? "GET") !== "GET") {
+      methodNotAllowed(response);
+      return;
+    }
+
+    const rawSession = readCookie(request.headers, BOT_SESSION_COOKIE);
+    const state = await buildPublicBotInboxResponse(rawSession, collector);
+    refreshActiveBotSessionCookie(response, rawSession, secureCookie, state.authenticated);
+    json(response, 200, state);
+    if (state.authenticated) {
+      scheduleBotSessionRepair(rawSession);
+    }
+    return;
+  }
+
   if (pathname === "/api/public/bot/cloud/save") {
     json(response, 410, {
       error: "Legacy cloud save is no longer supported. Reconnect the extension and use the current cloud save flow."
@@ -6231,6 +6362,11 @@ async function handleRequest(
       return;
     }
 
+    if (isMobileSavePath(pathname)) {
+      await proxyMobileSaveRequest(request, response, requestUrl, config.maxBodyBytes);
+      return;
+    }
+
     if (await serveStatic(request, response, pathname)) {
       return;
     }
@@ -6375,7 +6511,7 @@ export function startWebServer(port?: number): import("node:http").Server {
     const forceExitTimer = setTimeout(() => {
       console.error("[threads-web] Graceful shutdown timed out.");
       process.exit(1);
-    }, getGracefulShutdownTimeoutMs());
+    }, getGracefulShutdownTimeoutMs()) as ReturnType<typeof setTimeout> & { unref?: () => void };
     forceExitTimer.unref?.();
 
     shutdownPromise = new Promise<void>((resolve) => {

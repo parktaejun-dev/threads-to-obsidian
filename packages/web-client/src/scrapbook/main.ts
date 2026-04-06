@@ -353,6 +353,7 @@ let archiveSearchQuery = "";
 let activeArchiveTag: string | null = null;
 let activeFolderId: string | null = null;
 let pendingConnectedStatus = false;
+let archivesHydrating = false;
 let hasAppliedSyncSnapshot = false;
 
 interface FolderEntry {
@@ -544,6 +545,8 @@ const avatarFallback = document.querySelector<HTMLElement>("#profile-avatar-fall
 const archivesEl = document.querySelector<HTMLElement>("#archives");
 const archivesBoard = document.querySelector<HTMLElement>("#archives-board");
 const archivesEmptyEl = document.querySelector<HTMLElement>("#archives-empty");
+const archivesLoadingEl = document.querySelector<HTMLElement>("#archives-loading");
+const archivesLoadingLabel = document.querySelector<HTMLElement>("#archives-loading-label");
 const archivesPaginationEl = document.querySelector<HTMLElement>("#archives-pagination");
 const archivesPerPageSelect = document.querySelector<HTMLSelectElement>("#archives-per-page-select");
 const archivesPagePrev = document.querySelector<HTMLButtonElement>("#archives-page-prev");
@@ -1678,9 +1681,26 @@ function applyStaticTranslations(): void {
   setElementText(
     authPanelCopyNote,
     uiText(
-      "Threads 계정을 연결하면 수집된 글이 이곳에 모입니다. 연결 확인에는 1분 이상 걸릴 수 있습니다.",
-      "Connect your Threads account and the collected posts will gather here. Confirmation can take over a minute."
+      "Threads 계정을 연결하면 수집된 글이 이곳에 모입니다. 연결이 끝나면 보통 바로 표시됩니다.",
+      "Connect your Threads account and the collected posts will gather here. Once connected, they usually appear right away.",
+      {
+        ja: "Threads アカウントを接続すると、収集した投稿がここに集まります。接続が終わると通常はすぐ表示されます。",
+        "pt-BR": "Conecte sua conta Threads e os posts coletados aparecerão aqui. Depois da conexão, eles normalmente surgem quase na hora.",
+        es: "Conecta tu cuenta de Threads y las publicaciones recopiladas aparecerán aquí. Una vez conectada, normalmente se muestran enseguida.",
+        "zh-TW": "連接 Threads 帳號後，收集到的貼文會顯示在這裡。連線完成後通常會立即出現。",
+        vi: "Kết nối tài khoản Threads và các bài đã thu thập sẽ hiện ở đây. Sau khi kết nối xong, chúng thường xuất hiện gần như ngay lập tức."
+      }
     )
+  );
+  setElementText(
+    archivesLoadingLabel,
+    uiText("게시판 불러오는 중", "Loading your board", {
+      ja: "ボードを読み込み中",
+      "pt-BR": "Carregando seu painel",
+      es: "Cargando tu panel",
+      "zh-TW": "正在載入看板",
+      vi: "Đang tải bảng của bạn"
+    })
   );
 }
 
@@ -1826,16 +1846,6 @@ function setMetricValue(valueEl: HTMLElement | null, deltaEl: HTMLElement | null
   deltaEl.classList.toggle("metric-negative", typeof metric.delta === "number" && metric.delta < 0);
 }
 
-function getPendingConnectStatusMessage(): string {
-  return uiText("Threads 로그인 응답을 확인하는 중입니다. 연결이 끝나면 아래에 수집된 글이 표시됩니다. 1분 이상 걸릴 수 있습니다.", "Confirming your Threads sign-in. Once connected, the collected posts will appear below. This can take over a minute.", {
-    ja: "Threads ログイン応答を確認しています。接続が完了すると、下に収集済みの投稿が表示されます。1 分以上かかることがあります。",
-    "pt-BR": "Confirmando a resposta do login do Threads. Quando conectar, as postagens coletadas aparecerão abaixo. Isso pode levar mais de um minuto.",
-    es: "Confirmando la respuesta del inicio de sesión de Threads. Cuando se conecte, las publicaciones recopiladas aparecerán abajo. Puede tardar más de un minuto.",
-    "zh-TW": "正在確認 Threads 登入回應。連線完成後，收集到的貼文會顯示在下方。這可能需要一分鐘以上。",
-    vi: "Đang xác nhận phản hồi đăng nhập Threads. Khi kết nối xong, các bài đã thu thập sẽ xuất hiện bên dưới. Việc này có thể mất hơn một phút."
-  });
-}
-
 function getPendingConnectButtonLabel(): string {
   return uiText("연결 확인 중...", "Confirming connection...", {
     ja: "ログインを確認中...",
@@ -1879,9 +1889,28 @@ function setStatus(message: string, isError = false): void {
   pageStatus.setAttribute("role", isError ? "alert" : "status");
 }
 
-function setLoadingStatus(message: string): void {
-  setStatus(message, false);
-  pageStatus?.classList.add("is-loading");
+function syncArchivesLoadingPanel(show: boolean): void {
+  archivesLoadingEl?.classList.toggle("hidden", !show);
+}
+
+function setArchivesHydrating(isLoading: boolean): void {
+  if (archivesHydrating === isLoading) {
+    return;
+  }
+
+  archivesHydrating = isLoading;
+  if (latestState) {
+    renderArchives(latestState.archives, latestState.authenticated && Boolean(latestState.user));
+    return;
+  }
+
+  syncArchivesLoadingPanel(isLoading);
+  if (isLoading) {
+    archivesEmptyEl?.classList.add("hidden");
+    archivesBoard?.classList.add("hidden");
+    archivesFilterBar?.classList.add("hidden");
+    archivesPaginationEl?.classList.add("hidden");
+  }
 }
 
 function resolvePendingConnectedStatus(state: BotSessionState | null): void {
@@ -1930,8 +1959,15 @@ function renderSaveStatus(state: BotSessionState | null): void {
   setElementText(
     authPanelCopyNote,
     uiText(
-      "Threads 계정을 연결하면 수집된 글이 이곳에 모입니다. 연결 확인에는 1분 이상 걸릴 수 있습니다.",
-      "Connect your Threads account and the collected posts will gather here. Confirmation can take over a minute."
+      "Threads 계정을 연결하면 수집된 글이 이곳에 모입니다. 연결이 끝나면 보통 바로 표시됩니다.",
+      "Connect your Threads account and the collected posts will gather here. Once connected, they usually appear right away.",
+      {
+        ja: "Threads アカウントを接続すると、収集した投稿がここに集まります。接続が終わると通常はすぐ表示されます。",
+        "pt-BR": "Conecte sua conta Threads e os posts coletados aparecerão aqui. Depois da conexão, eles normalmente surgem quase na hora.",
+        es: "Conecta tu cuenta de Threads y las publicaciones recopiladas aparecerán aquí. Una vez conectada, normalmente se muestran enseguida.",
+        "zh-TW": "連接 Threads 帳號後，收集到的貼文會顯示在這裡。連線完成後通常會立即出現。",
+        vi: "Kết nối tài khoản Threads và các bài đã thu thập sẽ hiện ở đây. Sau khi kết nối xong, chúng thường xuất hiện gần như ngay lập tức."
+      }
     )
   );
 
@@ -3652,6 +3688,20 @@ function renderArchives(items: BotArchiveView[], isAuthenticated: boolean): void
   syncArchiveSortControls();
   syncArchiveFilterControls();
 
+  const showLoadingState = isAuthenticated && archivesHydrating && (items.length === 0 || pendingConnectedStatus);
+  syncArchivesLoadingPanel(showLoadingState);
+  if (showLoadingState) {
+    archivesEl.innerHTML = "";
+    archivesBoard.classList.add("hidden");
+    archivesEmptyEl.classList.add("hidden");
+    archivesPaginationEl?.classList.add("hidden");
+    updateArchivesToolbar([], isAuthenticated);
+    archivesFilterBar?.classList.add("hidden");
+    renderArchiveTagPanel([], false);
+    syncScrapbookHistory();
+    return;
+  }
+
   if (!isAuthenticated || items.length === 0) {
     archivesEl.innerHTML = "";
     archivesBoard.classList.add("hidden");
@@ -4744,6 +4794,9 @@ function applySessionState(
   }
 
   const isAuthenticated = state.authenticated && Boolean(state.user);
+  if (!isAuthenticated) {
+    archivesHydrating = false;
+  }
   const nextUserHandle = isAuthenticated ? normalizeScrapbookHandle(state.user?.threadsHandle) : null;
   activeScrapbookHandle = nextUserHandle;
   if (!isAuthenticated || (previousUserHandle && nextUserHandle && previousUserHandle !== nextUserHandle)) {
@@ -4840,7 +4893,7 @@ function applyQueryStatus(): void {
   const archiveId = routeState.archiveId ?? currentUrl.searchParams.get("archive");
   if (connected === "1") {
     pendingConnectedStatus = true;
-    setLoadingStatus(getPendingConnectStatusMessage());
+    setStatus("");
     renderConnectButtons();
   } else if (authError) {
     setStatus(authError, true);
@@ -4866,6 +4919,16 @@ async function refreshSession(): Promise<void> {
   applySessionState(config, materializeSessionStateFromAuth(state));
 }
 
+async function refreshInbox(): Promise<void> {
+  const state = await requestJson<BotSessionState>("/api/public/bot/inbox");
+  const config = {
+    botHandle: state.botHandle,
+    oauthConfigured: state.oauthConfigured
+  };
+  latestConfig = config;
+  applySessionState(config, state);
+}
+
 async function refreshBootstrap(): Promise<void> {
   const state = await requestJson<BotBootstrapState>("/api/public/bot/bootstrap");
   const config = {
@@ -4879,32 +4942,24 @@ async function refreshBootstrap(): Promise<void> {
 }
 
 async function initializeScrapbook(): Promise<void> {
-  let sessionLoaded = false;
-
+  setArchivesHydrating(true);
   try {
-    await refreshSession();
-    sessionLoaded = Boolean(latestState?.authenticated && latestState.user);
-  } catch {
-    sessionLoaded = false;
-  }
+    if (pendingConnectedStatus) {
+      try {
+        await refreshInbox();
+      } catch {
+        // Ignore a transient inbox failure here; the bootstrap refresh below is the source of truth.
+      }
+    }
 
-  if (sessionLoaded) {
-    // Paint auth-connected state first; load the heavier bootstrap payload in the background.
-    void refreshBootstrap()
-      .then(() => {
-        if (latestState?.authenticated && latestState.user) {
-          void syncLatestMentions({ silent: true, suppressErrors: true }).catch(() => undefined);
-        }
-      })
-      .catch((error) => {
-        setStatus(error instanceof Error ? error.message : t("scrapbookStatusLoadFailed"), true);
-      });
-    return;
-  }
-
-  await refreshBootstrap();
-  if (latestState?.authenticated && latestState.user) {
-    void syncLatestMentions({ silent: true, suppressErrors: true }).catch(() => undefined);
+    await refreshBootstrap();
+    if (latestState?.authenticated && latestState.user) {
+      void syncLatestMentions({ silent: true, suppressErrors: true }).catch(() => undefined);
+    }
+  } catch (error) {
+    setStatus(error instanceof Error ? error.message : t("scrapbookStatusLoadFailed"), true);
+  } finally {
+    setArchivesHydrating(false);
   }
 }
 
@@ -5564,7 +5619,7 @@ localeSelect?.addEventListener("change", () => {
   }
 });
 applyQueryStatus();
-hasAppliedSyncSnapshot = applySyncSnapshot();
+hasAppliedSyncSnapshot = false;
 setActiveTab("inbox");
 
 void (async () => {

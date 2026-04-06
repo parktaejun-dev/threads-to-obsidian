@@ -350,6 +350,13 @@ button {
   overflow-wrap: anywhere;
 }
 
+.recent-preview {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
 .recent-meta {
   margin-top: 3px;
   color: var(--muted);

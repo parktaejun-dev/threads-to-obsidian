@@ -105,6 +105,9 @@ const publicInstances = parsePositiveInteger(
 const workerPort = process.env.THREADS_WEB_WORKER_PORT || fileEnv.THREADS_WEB_WORKER_PORT || "4175";
 const workerHost = process.env.THREADS_WEB_WORKER_HOST || fileEnv.THREADS_WEB_WORKER_HOST || "127.0.0.1";
 const publicPorts = buildPublicPorts(publicPort, workerPort, publicInstances);
+const mobileSavePort = process.env.THREADS_MOBILE_SAVE_PORT || fileEnv.THREADS_MOBILE_SAVE_PORT || "4180";
+const mobileSaveHost = process.env.THREADS_MOBILE_SAVE_HOST || fileEnv.THREADS_MOBILE_SAVE_HOST || "127.0.0.1";
+const mobileSaveScript = path.join(__dirname, "dist", "mobile-save", "server.js");
 
 module.exports = {
   apps: [
@@ -119,6 +122,20 @@ module.exports = {
         THREADS_WEB_PORT: workerPort,
         THREADS_WEB_HOST: workerHost
       }),
+      autorestart: true,
+      env: {
+        NODE_ENV: "production"
+      },
+      exec_mode: "fork",
+      exp_backoff_restart_delay: 100,
+      kill_timeout: 20000,
+      watch: false
+    },
+    {
+      name: "threads-mobile-save",
+      cwd: __dirname,
+      script: "/usr/bin/bash",
+      args: `-lc 'cd "${quote(__dirname)}" && set -a; source "${quote(envFile)}"; set +a; export THREADS_MOBILE_SAVE_PORT="${quote(mobileSavePort)}"; export THREADS_MOBILE_SAVE_HOST="${quote(mobileSaveHost)}"; exec node "${quote(mobileSaveScript)}"'`,
       autorestart: true,
       env: {
         NODE_ENV: "production"

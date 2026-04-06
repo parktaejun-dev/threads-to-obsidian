@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import JSZip from "jszip";
+import { setLocale } from "../packages/extension/src/lib/i18n";
 import { buildArchiveNoteFilename, buildZipPackage } from "../packages/extension/src/lib/package";
 import type { AiOrganizationSettings, ExtractedPost } from "../packages/extension/src/lib/types";
 
@@ -36,6 +37,7 @@ const aiSettings: AiOrganizationSettings = {
 test("AI organization can add summary, tags, and frontmatter to the saved note", async () => {
   const previousChrome = (globalThis as any).chrome;
   const previousFetch = globalThis.fetch;
+  let requestBody = "";
 
   (globalThis as any).chrome = {
     permissions: {
@@ -45,20 +47,25 @@ test("AI organization can add summary, tags, and frontmatter to the saved note",
     },
     storage: {
       local: {
-        async get() {
-          return {};
+        async get(key: string) {
+          return key === "app-locale" ? { "app-locale": "ko" } : {};
+        },
+        async set() {
+          return undefined;
         }
       }
     }
   };
 
-  globalThis.fetch = async () =>
-    new Response(
+  globalThis.fetch = async (_input, init) => {
+    requestBody = typeof init?.body === "string" ? init.body : "";
+    return new Response(
       JSON.stringify({
         choices: [
           {
             message: {
               content: JSON.stringify({
+                title: "Threads 저장 노트 정리",
                 summary: "짧게 요약한 저장 노트입니다.",
                 tags: ["threads", "obsidian-sync", "automation"],
                 frontmatter: {
@@ -76,13 +83,19 @@ test("AI organization can add summary, tags, and frontmatter to the saved note",
         }
       }
     );
+  };
 
   try {
+    await setLocale("ko");
     const result = await buildZipPackage(post, "{author}_{shortcode}", false, undefined, "", aiSettings);
+    assert.equal(result.title, "Threads 저장 노트 정리");
+    assert.ok(requestBody.includes("Write title and summary in Korean (ko)"));
     const zip = await JSZip.loadAsync(await result.blob.arrayBuffer());
     const note = await zip.file(`${result.archiveName}/${buildArchiveNoteFilename(result.archiveName)}`)?.async("string");
 
     assert.ok(note);
+    assert.ok(note.includes("# Threads 저장 노트 정리"));
+    assert.ok(note.includes("title: \"Threads 저장 노트 정리\""));
     assert.ok(note.includes("summary: \"짧게 요약한 저장 노트입니다.\""));
     assert.ok(note.includes('- "obsidian-sync"'));
     assert.ok(note.includes("source_kind: \"thread\""));
@@ -110,6 +123,9 @@ test("Gemini provider uses its native endpoint and still writes AI metadata", as
       local: {
         async get() {
           return {};
+        },
+        async set() {
+          return undefined;
         }
       }
     }
@@ -127,6 +143,7 @@ test("Gemini provider uses its native endpoint and still writes AI metadata", as
               parts: [
                 {
                   text: JSON.stringify({
+                    title: "Gemini 저장 제목",
                     summary: "Gemini가 생성한 요약입니다.",
                     tags: ["gemini", "threads"],
                     frontmatter: {
@@ -161,6 +178,7 @@ test("Gemini provider uses its native endpoint and still writes AI metadata", as
         model: "gemini-2.0-flash"
       }
     );
+    assert.equal(result.title, "Gemini 저장 제목");
     const zip = await JSZip.loadAsync(await result.blob.arrayBuffer());
     const note = await zip.file(`${result.archiveName}/${buildArchiveNoteFilename(result.archiveName)}`)?.async("string");
 
@@ -168,6 +186,7 @@ test("Gemini provider uses its native endpoint and still writes AI metadata", as
     assert.ok(requestedUrl.includes("key=test-key"));
     assert.ok(requestBody.includes("\"responseMimeType\":\"application/json\""));
     assert.ok(note);
+    assert.ok(note.includes("# Gemini 저장 제목"));
     assert.ok(note.includes("summary: \"Gemini가 생성한 요약입니다.\""));
     assert.ok(note.includes("provider: \"gemini\""));
   } finally {
@@ -192,6 +211,9 @@ test("DeepSeek provider uses its OpenAI-compatible endpoint and writes AI metada
       local: {
         async get() {
           return {};
+        },
+        async set() {
+          return undefined;
         }
       }
     }
@@ -207,6 +229,7 @@ test("DeepSeek provider uses its OpenAI-compatible endpoint and writes AI metada
           {
             message: {
               content: JSON.stringify({
+                title: "DeepSeek 저장 제목",
                 summary: "DeepSeek가 생성한 요약입니다.",
                 tags: ["deepseek", "threads"],
                 frontmatter: {
@@ -239,12 +262,14 @@ test("DeepSeek provider uses its OpenAI-compatible endpoint and writes AI metada
         model: "deepseek-chat"
       }
     );
+    assert.equal(result.title, "DeepSeek 저장 제목");
     const zip = await JSZip.loadAsync(await result.blob.arrayBuffer());
     const note = await zip.file(`${result.archiveName}/${buildArchiveNoteFilename(result.archiveName)}`)?.async("string");
 
     assert.equal(requestedUrl, "https://api.deepseek.com/v1/chat/completions");
     assert.equal(authorizationHeader, "Bearer test-key");
     assert.ok(note);
+    assert.ok(note.includes("# DeepSeek 저장 제목"));
     assert.ok(note.includes("summary: \"DeepSeek가 생성한 요약입니다.\""));
     assert.ok(note.includes("provider: \"deepseek\""));
   } finally {
@@ -267,6 +292,9 @@ test("AI failure warning includes the active provider and base URL", async () =>
       local: {
         async get() {
           return {};
+        },
+        async set() {
+          return undefined;
         }
       }
     }

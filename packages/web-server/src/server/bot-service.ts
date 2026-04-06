@@ -17,7 +17,14 @@ import type {
   FrontmatterPrimitive
 } from "@threads/shared/types";
 import { extractPostFromDocument } from "@threads/shared/extractor";
-import { buildArchiveTitle as buildArchiveTitleText, dedupeStrings, extractFirstLineTitle } from "@threads/shared/utils";
+import {
+  buildArchiveTitle as buildArchiveTitleText,
+  dedupeStrings,
+  extractFirstLineTitle,
+  resolvePreferredTitle,
+  sanitizeGeneratedTitle
+} from "@threads/shared/utils";
+import { buildDefaultDatabase } from "@threads/web-schema";
 import type {
   BotArchiveRecord,
   BotExtensionAccessTokenRecord,
@@ -29,7 +36,11 @@ import type {
   WebDatabase
 } from "@threads/web-schema";
 import {
+  findBotExtensionAccessTokenByHashFromStore,
+  findBotSessionByHashFromStore,
+  type UserScopedHydrationOptions,
   withBotAuthDatabaseTransaction,
+  withUserScopedDatabaseReadTransaction,
   withUserScopedDatabaseTransaction,
   upsertBotArchive,
   upsertBotExtensionAccessToken,
@@ -66,6 +77,26 @@ const THREADS_OAUTH_SCOPES = [
   "threads_keyword_search",
   "threads_manage_insights"
 ];
+
+const BOT_SESSION_AUTH_READ_OPTIONS = {
+  includeBotArchives: false,
+  includeCloudArchives: false,
+  includeWatchlists: false,
+  includeSearchMonitors: false,
+  includeSearchResults: false,
+  includeTrackedPosts: false,
+  includeInsightsSnapshots: false,
+  includeSavedViews: false
+} satisfies UserScopedHydrationOptions;
+
+const BOT_SESSION_STATE_READ_OPTIONS = {
+  includeWatchlists: false,
+  includeSearchMonitors: false,
+  includeSearchResults: false,
+  includeTrackedPosts: false,
+  includeInsightsSnapshots: false,
+  includeSavedViews: false
+} satisfies UserScopedHydrationOptions;
 
 interface ThreadsOauthConfig {
   appId: string;
@@ -465,14 +496,16 @@ function parseAiOrganizationResult(value: unknown): AiOrganizationResult | null 
     }
   }
 
+  const title = sanitizeGeneratedTitle(readString(record.title), 90);
   const summary = readString(record.summary);
   const tags = dedupeStrings(readStringArray(record.tags));
 
-  if (!summary && tags.length === 0 && Object.keys(frontmatter).length === 0) {
+  if (!title && !summary && tags.length === 0 && Object.keys(frontmatter).length === 0) {
     return null;
   }
 
   return {
+    title,
     summary,
     tags,
     frontmatter
@@ -988,10 +1021,24 @@ function buildArchiveTitle(targetAuthorHandle: string | null, targetText: string
   });
 }
 
+const RESPONSIVE_MARKDOWN_IMAGE_WIDTH = 720;
+
+function escapeHtmlAttribute(value: string): string {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("\"", "&quot;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;");
+}
+
+function renderResponsiveMarkdownImage(ref: string, alt: string): string {
+  return `<img src="${escapeHtmlAttribute(ref)}" alt="${escapeHtmlAttribute(alt)}" loading="lazy" width="${RESPONSIVE_MARKDOWN_IMAGE_WIDTH}" style="display:block; max-width:100%; height:auto;" />`;
+}
+
 function renderMarkdownImageBlocks(refs: string[], labelPrefix: string): string[] {
   const lines: string[] = [];
   for (const [index, ref] of refs.entries()) {
-    lines.push(`![${labelPrefix} ${index + 1}](${ref})`, "");
+    lines.push(renderResponsiveMarkdownImage(ref, `${labelPrefix} ${index + 1}`), "");
   }
   return lines;
 }
@@ -1009,7 +1056,7 @@ function renderMarkdownVideoBlock(videoRef: BotArchiveVideoRef | null, canonical
   lines.push("");
 
   if (videoRef.thumbnail) {
-    lines.push(`![Video thumbnail](${videoRef.thumbnail})`, "");
+    lines.push(renderResponsiveMarkdownImage(videoRef.thumbnail, "Video thumbnail"), "");
   }
 
   return lines;
@@ -1134,19 +1181,19 @@ function buildArchiveMarkdown(payload: BotArchiveMarkdownPayload): string {
   if (payload.mediaUrls.length > 0) {
     lines.push("", "## Media", "");
     for (const [index, mediaRef] of payload.mediaUrls.entries()) {
+      if (isImageRef(mediaRef)) {
+        const fallbackLabel = `image-${String(index + 1).padStart(2, "0")}`;
+        lines.push(renderResponsiveMarkdownImage(mediaRef, shortenUrlLabel(mediaRef, fallbackLabel)));
+        continue;
+      }
+
       if (isRemoteRef(mediaRef)) {
-        const fallbackLabel = isImageRef(mediaRef)
-          ? `image-${String(index + 1).padStart(2, "0")}`
-          : `media-${String(index + 1).padStart(2, "0")}`;
+        const fallbackLabel = `media-${String(index + 1).padStart(2, "0")}`;
         lines.push(`- [${shortenUrlLabel(mediaRef, fallbackLabel)}](${mediaRef})`);
         continue;
       }
 
-      if (isImageRef(mediaRef)) {
-        lines.push(`![${mediaRef}](${mediaRef})`);
-      } else {
-        lines.push(`- [${mediaRef}](${mediaRef})`);
-      }
+      lines.push(`- [${mediaRef}](${mediaRef})`);
     }
   }
 
@@ -2390,25 +2437,31 @@ export function getBotSessionState(data: WebDatabase, rawSession: string | null 
 }
 
 async function resolveSessionUserId(rawSession: string | null | undefined): Promise<string | null> {
-  if (!safeText(rawSession)) {
+  const normalizedSession = safeText(rawSession);
+  if (!normalizedSession) {
     return null;
   }
 
-  return withBotAuthDatabaseTransaction((data) => {
-    const session = getBotSessionRecord(data, rawSession);
-    return session?.userId ?? null;
-  });
+  const session = await findBotSessionByHashFromStore(hashSecret(normalizedSession));
+  if (!session || session.status !== "active" || isExpired(session.expiresAt)) {
+    return null;
+  }
+
+  return session.userId;
 }
 
 async function resolveExtensionTokenUserId(rawToken: string | null | undefined): Promise<string | null> {
-  if (!safeText(rawToken)) {
+  const normalizedToken = safeText(rawToken);
+  if (!normalizedToken) {
     return null;
   }
 
-  return withBotAuthDatabaseTransaction((data) => {
-    const tokenRecord = findBotExtensionAccessTokenRecord(data, rawToken);
-    return tokenRecord?.userId ?? null;
-  });
+  const tokenRecord = await findBotExtensionAccessTokenByHashFromStore(hashSecret(normalizedToken));
+  if (!tokenRecord || tokenRecord.status !== "active" || isExpired(tokenRecord.expiresAt)) {
+    return null;
+  }
+
+  return tokenRecord.userId;
 }
 
 export async function withBotSessionDatabaseTransaction<T>(
@@ -2423,6 +2476,23 @@ export async function withBotSessionDatabaseTransaction<T>(
   return withBotAuthDatabaseTransaction((data) => handler(data, null));
 }
 
+export async function withBotSessionDatabaseReadTransaction<T>(
+  rawSession: string | null | undefined,
+  handler: (data: WebDatabase, userId: string | null) => Promise<T> | T,
+  options: UserScopedHydrationOptions = {}
+): Promise<T> {
+  if (!safeText(rawSession)) {
+    return handler(buildDefaultDatabase(), null);
+  }
+
+  const userId = await resolveSessionUserId(rawSession);
+  if (userId) {
+    return withUserScopedDatabaseReadTransaction(userId, (data) => handler(data, userId), undefined, options);
+  }
+
+  return handler(buildDefaultDatabase(), null);
+}
+
 export async function withExtensionTokenDatabaseTransaction<T>(
   rawToken: string | null | undefined,
   handler: (data: WebDatabase, userId: string | null) => Promise<T> | T
@@ -2433,6 +2503,22 @@ export async function withExtensionTokenDatabaseTransaction<T>(
   }
 
   return withBotAuthDatabaseTransaction((data) => handler(data, null));
+}
+
+export async function withExtensionTokenDatabaseReadTransaction<T>(
+  rawToken: string | null | undefined,
+  handler: (data: WebDatabase, userId: string | null) => Promise<T> | T
+): Promise<T> {
+  if (!safeText(rawToken)) {
+    return handler(buildDefaultDatabase(), null);
+  }
+
+  const userId = await resolveExtensionTokenUserId(rawToken);
+  if (userId) {
+    return withUserScopedDatabaseReadTransaction(userId, (data) => handler(data, userId));
+  }
+
+  return handler(buildDefaultDatabase(), null);
 }
 
 export async function startBotOauthFromStore(publicOrigin: string): Promise<BotOauthStartResult> {
@@ -2480,7 +2566,7 @@ export async function completeExtensionLinkCodeFromStore(
 export async function getExtensionCloudConnectionStatusFromStore(
   rawToken: string | null | undefined
 ): Promise<CloudConnectionStatus> {
-  return withBotAuthDatabaseTransaction((data) => getExtensionCloudConnectionStatus(data, rawToken));
+  return withExtensionTokenDatabaseReadTransaction(rawToken, (data) => getExtensionCloudConnectionStatus(data, rawToken));
 }
 
 export async function revokeExtensionCloudConnectionFromStore(
@@ -2509,7 +2595,11 @@ export async function getBotSessionStateFromStore(
     };
   }
 
-  return withBotSessionDatabaseTransaction(rawSession, (data) => getBotSessionState(data, rawSession));
+  return withBotSessionDatabaseReadTransaction(
+    rawSession,
+    (data) => getBotSessionState(data, rawSession),
+    BOT_SESSION_STATE_READ_OPTIONS
+  );
 }
 
 export async function getBotSessionAuthStateFromStore(
@@ -2519,7 +2609,11 @@ export async function getBotSessionAuthStateFromStore(
     return buildUnauthenticatedSessionAuthState();
   }
 
-  return withBotSessionDatabaseTransaction(rawSession, (data) => getBotSessionAuthState(data, rawSession));
+  return withBotSessionDatabaseReadTransaction(
+    rawSession,
+    (data) => getBotSessionAuthState(data, rawSession),
+    BOT_SESSION_AUTH_READ_OPTIONS
+  );
 }
 
 export async function repairBotSessionArchives(
@@ -2600,7 +2694,7 @@ export async function readBotArchiveMarkdownFromStore(
   rawSession: string | null | undefined,
   archiveId: string
 ): Promise<{ filename: string; markdownContent: string }> {
-  return withBotSessionDatabaseTransaction(rawSession, (data) => readBotArchiveMarkdown(data, rawSession, archiveId));
+  return withBotSessionDatabaseReadTransaction(rawSession, (data) => readBotArchiveMarkdown(data, rawSession, archiveId));
 }
 
 export async function readBotArchiveZip(
@@ -2638,7 +2732,7 @@ export async function readBotArchiveZipFromStore(
   rawSession: string | null | undefined,
   archiveIds: string[]
 ): Promise<BotArchiveZipResult> {
-  return withBotSessionDatabaseTransaction(rawSession, (data) => readBotArchiveZip(data, rawSession, archiveIds));
+  return withBotSessionDatabaseReadTransaction(rawSession, (data) => readBotArchiveZip(data, rawSession, archiveIds));
 }
 
 function buildArchiveRawPayload(payload: BotIngestPayload): string | null {
@@ -2942,7 +3036,7 @@ async function saveCloudArchiveForUser(
     locale
   });
   const now = new Date().toISOString();
-  const title = buildArchiveTitle(post.author, post.text);
+  const title = resolvePreferredTitle(safeText(post.title) || buildArchiveTitle(post.author, post.text), input.aiResult?.title);
 
   const existing =
     data.cloudArchives.find(
@@ -2961,7 +3055,7 @@ async function saveCloudArchiveForUser(
     existing.shortcode = shortcode;
     existing.targetAuthorHandle = safeText(post.author) || existing.targetAuthorHandle;
     existing.targetAuthorDisplayName = existing.targetAuthorDisplayName;
-    existing.targetTitle = safeText(post.title) || title;
+    existing.targetTitle = title;
     existing.targetText = safeText(post.text) || existing.targetText;
     existing.targetPublishedAt = safeText(post.publishedAt) || null;
     existing.mediaUrls = mediaUrls;
@@ -2986,7 +3080,7 @@ async function saveCloudArchiveForUser(
     shortcode,
     targetAuthorHandle: safeText(post.author) || null,
     targetAuthorDisplayName: null,
-    targetTitle: safeText(post.title) || title,
+    targetTitle: title,
     targetText: safeText(post.text),
     targetPublishedAt: safeText(post.publishedAt) || null,
     mediaUrls,
@@ -3246,10 +3340,12 @@ export function updateArchive(
     const nextAiResult = payload.aiResult
       ? {
           ...payload.aiResult,
+          title: nextTitle,
           summary: nextSummary,
           tags: nextTags
         }
       : {
+          title: nextTitle,
           summary: nextSummary,
           tags: nextTags,
           frontmatter: {}

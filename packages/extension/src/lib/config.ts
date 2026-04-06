@@ -8,7 +8,7 @@ export interface AiProviderPreset {
 }
 
 export const DEFAULT_AI_ORGANIZATION_PROMPT =
-  "Summarize the post in 1-3 sentences. Add up to 5 concise tags. Add only useful flat frontmatter fields when confident, such as topic, language, sentiment, or source_kind.";
+  "Suggest a clear title, summarize the post in 1-3 sentences, add up to 5 concise tags, and add only useful flat frontmatter fields when confident, such as topic, language, sentiment, or source_kind.";
 
 export const NOTION_UI_HIDDEN = false;
 

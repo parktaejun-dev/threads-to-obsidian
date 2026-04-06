@@ -15,6 +15,7 @@ import type {
 import {
   getBotRequiredScopes,
   getBotScopeVersion,
+  withBotSessionDatabaseReadTransaction,
   withBotSessionDatabaseTransaction,
   getBotSessionUserRecord,
   getBotSessionAuthContext
@@ -1397,13 +1398,33 @@ export async function readAuthenticatedScrapbookPlusState(
 export async function readScrapbookPlusStateFromStore(
   rawSession: string | null | undefined
 ): Promise<ScrapbookPlusState> {
-  return withBotSessionDatabaseTransaction(rawSession, (data) => readScrapbookPlusState(data, rawSession));
+  return withBotSessionDatabaseReadTransaction(
+    rawSession,
+    (data) => readScrapbookPlusState(data, rawSession),
+    {
+      includeBotArchives: false,
+      includeCloudArchives: false,
+      includeSearchResultRawPayloadJson: false,
+      includeTrackedPostRawPayloadJson: false,
+      includeInsightsSnapshotRawPayloadJson: false
+    }
+  );
 }
 
 export async function readAuthenticatedScrapbookPlusStateFromStore(
   rawSession: string | null | undefined
 ): Promise<ScrapbookPlusState> {
-  return withBotSessionDatabaseTransaction(rawSession, (data) => readAuthenticatedScrapbookPlusState(data, rawSession));
+  return withBotSessionDatabaseReadTransaction(
+    rawSession,
+    (data) => readAuthenticatedScrapbookPlusState(data, rawSession),
+    {
+      includeBotArchives: false,
+      includeCloudArchives: false,
+      includeSearchResultRawPayloadJson: false,
+      includeTrackedPostRawPayloadJson: false,
+      includeInsightsSnapshotRawPayloadJson: false
+    }
+  );
 }
 
 export async function activateScrapbookPlusForSession(

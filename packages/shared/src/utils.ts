@@ -176,6 +176,23 @@ export function extractFirstLineTitle(text: string | null | undefined): string {
   return firstLine ? firstLine.replace(/\s+/g, " ") : "";
 }
 
+export function sanitizeGeneratedTitle(value: string | null | undefined, maxLength = 120): string | null {
+  const normalized = decodeEscapedJsonString(value ?? "")
+    .replace(/\r\n?/g, " ")
+    .replace(/^#+\s*/u, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!normalized) {
+    return null;
+  }
+
+  return trimTextExcerpt(normalized, maxLength);
+}
+
+export function resolvePreferredTitle(fallbackTitle: string, suggestedTitle: string | null | undefined): string {
+  return sanitizeGeneratedTitle(suggestedTitle) ?? fallbackTitle;
+}
+
 export interface ArchiveTitleOptions {
   noteText?: string | null;
   maxLength?: number;

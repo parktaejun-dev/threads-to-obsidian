@@ -963,6 +963,7 @@ test("archive patch updates cloud title and tags in the saved archive view", () 
         contentHash: "cloud-hash-1"
       },
       aiResult: {
+        title: "Cloud launch recap",
         summary: "Original summary",
         tags: ["threads"],
         frontmatter: {}
@@ -1102,10 +1103,10 @@ test("scrapbook ZIP export keeps one markdown file and flat image files per arch
 
     const note = await zip.file(noteFilename)?.async("text");
     assert.ok(note?.includes("# Archive this source"));
-    assert.ok(note?.includes("(image-01.jpg)"));
+    assert.ok(note?.includes('<img src="image-01.jpg" alt="Image 1" loading="lazy" width="720"'));
     assert.ok(note?.includes("## Author Replies"));
     assert.ok(note?.includes("Follow-up reply from the author."));
-    assert.ok(note?.includes("(reply-01-image-01.jpg)"));
+    assert.ok(note?.includes('<img src="reply-01-image-01.jpg" alt="Reply 1 image 1" loading="lazy" width="720"'));
   } finally {
     globalThis.fetch = previousFetch;
     if (typeof previousMediaAllowlist === "string") {
@@ -1171,6 +1172,7 @@ test("cloud save creates a scrapbook archive with deep link and ZIP export", asy
         locale: "en",
         aiWarning: "AI summary used fallback tags.",
         aiResult: {
+          title: "AI launch summary",
           summary: "A concise AI summary.",
           tags: ["launch", "threads"],
           frontmatter: {
@@ -1206,7 +1208,7 @@ test("cloud save creates a scrapbook archive with deep link and ZIP export", asy
     const sessionState = getBotSessionState(data, "session-token-cloud-1");
     assert.equal(sessionState.archives.length, 1);
     assert.equal(sessionState.archives[0]?.origin, "cloud");
-    assert.equal(sessionState.archives[0]?.title, "Writer on Threads");
+    assert.equal(sessionState.archives[0]?.title, "AI launch summary");
     assert.equal(sessionState.archives[0]?.mentionUrl, null);
     assert.deepEqual(sessionState.archives[0]?.tags, ["launch", "threads"]);
 

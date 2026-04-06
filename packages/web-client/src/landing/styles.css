@@ -13,7 +13,10 @@
   --radius-lg: 18px;
   --radius-md: 16px;
   --radius-sm: 12px;
-  --control-height: 52px;
+  --control-height: 44px;
+  --button-height: 44px;
+  --button-radius: 14px;
+  --button-padding-inline: 16px;
   --font-sans: "Pretendard Variable", "Pretendard", -apple-system, BlinkMacSystemFont, sans-serif;
 }
 
@@ -134,13 +137,13 @@ img {
 }
 
 .web-lang-select {
-  min-height: var(--control-height);
-  padding: 0 46px 0 18px;
+  min-height: var(--button-height);
+  padding: 0 40px 0 14px;
   border: 1px solid var(--line);
-  border-radius: 999px;
+  border-radius: var(--button-radius);
   background: var(--surface);
   color: var(--ink);
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 600;
   cursor: pointer;
   appearance: none;
@@ -169,13 +172,13 @@ img {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: var(--control-height);
-  padding: 0 24px;
+  min-height: var(--button-height);
+  padding: 0 var(--button-padding-inline);
   border: 1px solid var(--line);
-  border-radius: 999px;
+  border-radius: var(--button-radius);
   background: var(--surface);
   color: var(--ink);
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 700;
   letter-spacing: -0.02em;
   transition:
@@ -198,7 +201,8 @@ img {
 }
 
 .primary-cta-block {
-  width: 100%;
+  width: fit-content;
+  max-width: 100%;
 }
 
 .hero {
@@ -641,8 +645,9 @@ h3 {
 }
 
 .install-inline-cta {
-  min-height: 44px;
+  min-height: var(--button-height);
   padding: 0 16px;
+  border-radius: var(--button-radius);
 }
 
 .install-page .lead {

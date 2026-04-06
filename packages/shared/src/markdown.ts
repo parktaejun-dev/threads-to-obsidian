@@ -1,5 +1,6 @@
 import type { AiOrganizationResult, ExtractedPost, FrontmatterPrimitive, FrontmatterValue } from "./types";
 import { type Locale, type Messages, t, tSync } from "./i18n";
+import { resolvePreferredTitle } from "./utils";
 
 export interface MarkdownVideoRef {
   thumbnail: string | null;
@@ -12,6 +13,8 @@ export interface MarkdownMediaRefs {
   replyImages: string[][];
   replyVideos: Array<MarkdownVideoRef | null>;
 }
+
+const RESPONSIVE_MARKDOWN_IMAGE_WIDTH = 720;
 
 function formatYamlStringValue(value: string | null): string {
   if (!value) {
@@ -57,10 +60,22 @@ function renderFrontmatterField(key: string, value: FrontmatterValue): string[] 
   return [`${key}: ${formatFrontmatterPrimitive(value)}`];
 }
 
+function escapeHtmlAttribute(value: string): string {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("\"", "&quot;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;");
+}
+
+function renderResponsiveImage(ref: string, alt: string): string {
+  return `<img src="${escapeHtmlAttribute(ref)}" alt="${escapeHtmlAttribute(alt)}" loading="lazy" width="${RESPONSIVE_MARKDOWN_IMAGE_WIDTH}" style="display:block; max-width:100%; height:auto;" />`;
+}
+
 function renderImageBlock(refs: string[], labelPrefix: string): string[] {
   const lines: string[] = [];
   for (const [index, ref] of refs.entries()) {
-    lines.push(`![${labelPrefix} ${index + 1}](${ref})`, "");
+    lines.push(renderResponsiveImage(ref, `${labelPrefix} ${index + 1}`), "");
   }
   return lines;
 }
@@ -79,7 +94,7 @@ function renderVideoBlock(videoRef: MarkdownVideoRef | null, canonicalUrl: strin
   lines.push("");
 
   if (videoRef.thumbnail) {
-    lines.push(`![${msg.mdVideoThumbnailLabel}](${videoRef.thumbnail})`, "");
+    lines.push(renderResponsiveImage(videoRef.thumbnail, msg.mdVideoThumbnailLabel), "");
   }
 
   return lines;
@@ -121,7 +136,7 @@ async function renderReplySection(post: ExtractedPost, mediaRefs: MarkdownMediaR
       section.push("");
 
       if (replyVideoRef?.thumbnail) {
-        section.push(`![${msg.mdVideoThumbnailLabel}](${replyVideoRef.thumbnail})`, "");
+        section.push(renderResponsiveImage(replyVideoRef.thumbnail, msg.mdVideoThumbnailLabel), "");
       }
     }
 
@@ -170,7 +185,7 @@ async function renderReplySectionWithMessages(
       section.push("");
 
       if (replyVideoRef?.thumbnail) {
-        section.push(`![${msg.mdVideoThumbnailLabel}](${replyVideoRef.thumbnail})`, "");
+        section.push(renderResponsiveImage(replyVideoRef.thumbnail, msg.mdVideoThumbnailLabel), "");
       }
     }
 
@@ -197,7 +212,8 @@ async function buildMarkdownBodyWithMessages(
   aiResult: AiOrganizationResult | null,
   msg: Messages
 ): Promise<string[]> {
-  const body: string[] = [`# ${post.title}`, "", `${msg.mdSource}: ${post.canonicalUrl}`, `${msg.mdAuthor}: @${post.author}`];
+  const resolvedTitle = resolvePreferredTitle(post.title, aiResult?.title);
+  const body: string[] = [`# ${resolvedTitle}`, "", `${msg.mdSource}: ${post.canonicalUrl}`, `${msg.mdAuthor}: @${post.author}`];
 
   if (post.publishedAt) {
     body.push(`${msg.mdPublishedAt}: ${post.publishedAt}`);
@@ -240,12 +256,13 @@ export async function renderMarkdown(
   locale?: Locale
 ): Promise<string> {
   const msg = locale ? tSync(locale) : await t();
+  const resolvedTitle = resolvePreferredTitle(post.title, aiResult?.title);
   const hasImages = post.imageUrls.length > 0 || post.authorReplies.some((reply) => reply.imageUrls.length > 0);
   const hasExternalUrl = Boolean(post.externalUrl || post.authorReplies.some((reply) => reply.externalUrl));
   const tags = Array.from(new Set(["threads", ...(aiResult?.tags ?? [])]));
   const frontmatter = [
     "---",
-    `title: ${formatYamlStringValue(post.title)}`,
+    `title: ${formatYamlStringValue(resolvedTitle)}`,
     `author: ${formatYamlStringValue(post.author)}`,
     ...renderFrontmatterField("tags", tags),
     ...(aiResult?.summary ? renderFrontmatterField("summary", aiResult.summary) : []),

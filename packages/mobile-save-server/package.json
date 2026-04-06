@@ -1,0 +1,19 @@
+{
+  "name": "@threads/mobile-save-server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@threads/shared": "0.1.0",
+    "jsdom": "^26.0.0"
+  },
+  "scripts": {
+    "build": "node ../../scripts/build.mjs --target=mobile-save-server",
+    "start": "node ../../dist/mobile-save/server.js",
+    "typecheck": "tsc -p tsconfig.json --pretty false"
+  }
+}
+

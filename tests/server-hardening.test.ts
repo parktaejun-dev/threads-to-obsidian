@@ -140,6 +140,23 @@ test("public bot session endpoints disable browser caching", async () => {
     assert.equal("archives" in sessionBody, false);
     assert.equal("saveStatus" in sessionBody, false);
 
+    const inboxResponse = await fetch(`${origin}/api/public/bot/inbox`);
+    assert.equal(inboxResponse.status, 200);
+    assert.match(inboxResponse.headers.get("cache-control") ?? "", /no-store/);
+
+    const inboxBody = await inboxResponse.json() as {
+      authenticated?: boolean;
+      archives?: unknown[];
+      saveStatus?: unknown;
+      workspace?: unknown;
+    };
+    assert.equal(inboxBody.authenticated, false);
+    assert.ok(Array.isArray(inboxBody.archives));
+    assert.equal(inboxBody.archives?.length, 0);
+    assert.equal("saveStatus" in inboxBody, true);
+    assert.equal(inboxBody.saveStatus, null);
+    assert.equal("workspace" in inboxBody, false);
+
     const bootstrapResponse = await fetch(`${origin}/api/public/bot/bootstrap`);
     assert.equal(bootstrapResponse.status, 200);
     assert.match(bootstrapResponse.headers.get("cache-control") ?? "", /no-store/);
@@ -242,17 +259,17 @@ test("production startup rejects file-backed runtime databases", () => {
     if (typeof previousAdminToken === "string") {
       process.env.THREADS_WEB_ADMIN_TOKEN = previousAdminToken;
     } else {
-      delete process.env.THREADS_WEB_ADMIN_TOKEN;
+      Reflect.deleteProperty(process.env, "THREADS_WEB_ADMIN_TOKEN");
     }
     if (typeof previousNodeEnv === "string") {
       process.env.NODE_ENV = previousNodeEnv;
     } else {
-      delete process.env.NODE_ENV;
+      Reflect.deleteProperty(process.env, "NODE_ENV");
     }
     if (typeof previousStoreBackend === "string") {
       process.env.THREADS_WEB_STORE_BACKEND = previousStoreBackend;
     } else {
-      delete process.env.THREADS_WEB_STORE_BACKEND;
+      Reflect.deleteProperty(process.env, "THREADS_WEB_STORE_BACKEND");
     }
     if (typeof previousPostgresUrl === "string") {
       process.env.THREADS_WEB_POSTGRES_URL = previousPostgresUrl;
